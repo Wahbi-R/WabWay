@@ -78,12 +78,12 @@ class _TripHero extends StatelessWidget {
             const SizedBox(height: kSpace2),
             Text('Nov 12 – Nov 22, 2024  ·  4 members', style: kStyleCaption),
             const SizedBox(height: kSpace5),
-            Row(
+            const Row(
               children: [
                 _HeroStat(label: 'Spots saved', value: '18'),
-                const SizedBox(width: kSpace6),
+                SizedBox(width: kSpace6),
                 _HeroStat(label: 'Days planned', value: '10'),
-                const SizedBox(width: kSpace6),
+                SizedBox(width: kSpace6),
                 _HeroStat(label: 'Total spent', value: '¥142k'),
               ],
             ),
@@ -131,7 +131,7 @@ class _QuickBalanceCard extends StatelessWidget {
         padding: const EdgeInsets.all(kSpace4),
         child: Row(
           children: [
-            Icon(Icons.account_balance_wallet_rounded, color: kColorPrimary, size: 20),
+            const Icon(Icons.account_balance_wallet_rounded, color: kColorPrimary, size: 20),
             const SizedBox(width: kSpace3),
             Expanded(
               child: Column(
@@ -155,7 +155,7 @@ class _QuickBalanceCard extends StatelessWidget {
               style: TextButton.styleFrom(
                 foregroundColor: kColorPrimaryDark,
                 backgroundColor: kColorPaper,
-                shape: RoundedRectangleBorder(borderRadius: kRadiusMd),
+                shape: const RoundedRectangleBorder(borderRadius: kRadiusMd),
               ),
               child: Text('Settle up', style: kStyleBodySemibold.copyWith(color: kColorPrimaryDark)),
             ),
@@ -193,7 +193,7 @@ class _ActivityFeed extends StatelessWidget {
                 leading: Container(
                   width: 36,
                   height: 36,
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     color: kColorSurfaceSunken,
                     shape: BoxShape.circle,
                   ),

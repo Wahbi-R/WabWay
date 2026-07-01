@@ -64,7 +64,7 @@ Color kColorSecondaryActive() => Color.lerp(kColorSecondary, Colors.black, 0.28)
 Color kColorDangerHover()  => Color.lerp(kColorDanger, Colors.black, 0.15)!;
 Color kColorDangerActive() => Color.lerp(kColorDanger, Colors.black, 0.24)!;
 
-Color kColorTextTertiary() => kColorInkSoft.withOpacity(0.65);
+Color kColorTextTertiary() => kColorInkSoft.withValues(alpha: 0.65);
 
 // ─── Shadow helpers ───────────────────────────────────────────────────────────
 

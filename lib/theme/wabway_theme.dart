@@ -177,7 +177,7 @@ class WabwayColors extends ThemeExtension<WabwayColors> {
 // ─── Theme builder ────────────────────────────────────────────────────────────
 
 ThemeData buildWabwayTheme() {
-  final colorScheme = ColorScheme.light(
+  const colorScheme = ColorScheme.light(
     primary:          kColorPrimary,
     onPrimary:        kColorTextOnPrimary,
     secondary:        kColorSecondary,
@@ -225,7 +225,7 @@ ThemeData buildWabwayTheme() {
       shadowColor: const Color(0x12241E16),
       elevation: 4,
       indicatorColor: kColorPrimarySoft,
-      indicatorShape: RoundedRectangleBorder(borderRadius: kRadiusPill),
+      indicatorShape: const RoundedRectangleBorder(borderRadius: kRadiusPill),
       iconTheme: WidgetStateProperty.resolveWith((states) {
         final active = states.contains(WidgetState.selected);
         return IconThemeData(
@@ -242,12 +242,12 @@ ThemeData buildWabwayTheme() {
     ),
 
     // Cards
-    cardTheme: CardThemeData(
+    cardTheme: const CardThemeData(
       color: kColorPaper,
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: kRadiusLg,
-        side: const BorderSide(color: kColorBorder),
+        side: BorderSide(color: kColorBorder),
       ),
       margin: EdgeInsets.zero,
     ),
@@ -260,26 +260,26 @@ ThemeData buildWabwayTheme() {
     ),
 
     // Input fields
-    inputDecorationTheme: InputDecorationTheme(
+    inputDecorationTheme: const InputDecorationTheme(
       filled: true,
       fillColor: kColorPaper,
       border: OutlineInputBorder(
         borderRadius: kRadiusSm,
-        borderSide: const BorderSide(color: kColorBorder),
+        borderSide: BorderSide(color: kColorBorder),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: kRadiusSm,
-        borderSide: const BorderSide(color: kColorBorder),
+        borderSide: BorderSide(color: kColorBorder),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: kRadiusSm,
-        borderSide: const BorderSide(color: kColorPrimary, width: 1.5),
+        borderSide: BorderSide(color: kColorPrimary, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: kRadiusSm,
-        borderSide: const BorderSide(color: kColorDanger, width: 1.5),
+        borderSide: BorderSide(color: kColorDanger, width: 1.5),
       ),
-      contentPadding: const EdgeInsets.symmetric(
+      contentPadding: EdgeInsets.symmetric(
         horizontal: kSpace4,
         vertical: kSpace3,
       ),
@@ -290,7 +290,7 @@ ThemeData buildWabwayTheme() {
       fillColor: WidgetStateProperty.resolveWith((states) =>
         states.contains(WidgetState.selected) ? kColorPrimary : Colors.transparent),
       checkColor: WidgetStateProperty.all(kColorTextOnPrimary),
-      shape: RoundedRectangleBorder(borderRadius: kRadiusXs),
+      shape: const RoundedRectangleBorder(borderRadius: kRadiusXs),
       side: const BorderSide(color: kColorBorder, width: 1.5),
     ),
 
@@ -303,7 +303,7 @@ ThemeData buildWabwayTheme() {
     ),
 
     // Dialog
-    dialogTheme: DialogThemeData(
+    dialogTheme: const DialogThemeData(
       backgroundColor: kColorPaper,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(borderRadius: kRadiusXl),
@@ -315,12 +315,12 @@ ThemeData buildWabwayTheme() {
     snackBarTheme: SnackBarThemeData(
       backgroundColor: kColorInk,
       contentTextStyle: kStyleCaption.copyWith(color: Colors.white),
-      shape: RoundedRectangleBorder(borderRadius: kRadiusMd),
+      shape: const RoundedRectangleBorder(borderRadius: kRadiusMd),
       behavior: SnackBarBehavior.floating,
     ),
 
     // Floating action button
-    floatingActionButtonTheme: FloatingActionButtonThemeData(
+    floatingActionButtonTheme: const FloatingActionButtonThemeData(
       backgroundColor: kColorPrimary,
       foregroundColor: kColorTextOnPrimary,
       elevation: 4,
@@ -333,7 +333,7 @@ ThemeData buildWabwayTheme() {
       selectedColor: kColorPrimary,
       labelStyle: kStyleCaptionMedium,
       padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: kSpace1),
-      shape: RoundedRectangleBorder(borderRadius: kRadiusPill),
+      shape: const RoundedRectangleBorder(borderRadius: kRadiusPill),
       side: const BorderSide(color: kColorBorder),
     ),
 
@@ -349,7 +349,7 @@ ThemeData buildWabwayTheme() {
     ),
 
     // List tiles
-    listTileTheme: ListTileThemeData(
+    listTileTheme: const ListTileThemeData(
       tileColor: Colors.transparent,
       iconColor: kColorInkSoft,
       textColor: kColorInk,

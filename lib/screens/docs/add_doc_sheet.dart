@@ -386,7 +386,7 @@ class _LinkSection extends StatelessWidget {
       case DocLinkedType.trip:
         return Container(
           padding: const EdgeInsets.all(kSpace3),
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             color: kColorSurfaceSunken,
             borderRadius: kRadiusMd,
           ),

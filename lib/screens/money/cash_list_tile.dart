@@ -40,7 +40,7 @@ class CashListTile extends StatelessWidget {
             Container(
               width: 40,
               height: 40,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: kColorAccentSoft,
                 borderRadius: kRadiusMd,
               ),

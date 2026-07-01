@@ -61,7 +61,7 @@ class _SkeletonRow extends StatelessWidget {
           Container(
             width: 44,
             height: 44,
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: kColorSurfaceSunken,
               borderRadius: kRadiusSm,
             ),
@@ -76,7 +76,7 @@ class _SkeletonRow extends StatelessWidget {
                   alignment: Alignment.centerLeft,
                   child: Container(
                     height: 12,
-                    decoration: BoxDecoration(
+                    decoration: const BoxDecoration(
                       color: kColorSurfaceSunken,
                       borderRadius: kRadiusPill,
                     ),
@@ -88,7 +88,7 @@ class _SkeletonRow extends StatelessWidget {
                   alignment: Alignment.centerLeft,
                   child: Container(
                     height: 10,
-                    decoration: BoxDecoration(
+                    decoration: const BoxDecoration(
                       color: kColorSurfaceSunken,
                       borderRadius: kRadiusPill,
                     ),

@@ -236,9 +236,9 @@ class _WabwayBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: kColorPaper,
-        border: const Border(
+        border: Border(
           top: BorderSide(color: kColorBorder),
         ),
         boxShadow: kShadowMd,
@@ -411,7 +411,7 @@ class _SidebarHeader extends StatelessWidget {
           Container(
             width: 30,
             height: 30,
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: kColorPrimary,
               borderRadius: kRadiusXs,
             ),
@@ -489,7 +489,7 @@ class _SidebarRowState extends State<_SidebarRow> {
             color: widget.isActive
                 ? kColorPrimarySoft
                 : _hovered
-                    ? kColorPrimarySoft.withOpacity(0.5)
+                    ? kColorPrimarySoft.withValues(alpha: 0.5)
                     : Colors.transparent,
             borderRadius: kRadiusSm,
           ),

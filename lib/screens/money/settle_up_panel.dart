@@ -162,7 +162,7 @@ class _SettleUpPanelState extends State<SettleUpPanel> {
           ],
 
           if (owedToYou.isEmpty && youOwe.isEmpty)
-            WabwayEmptyState(
+            const WabwayEmptyState(
               icon: Icons.check_circle_rounded,
               title: 'All settled up',
               description: 'No outstanding balances.',

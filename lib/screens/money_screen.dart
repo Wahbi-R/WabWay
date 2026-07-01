@@ -107,7 +107,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
   Widget _buildDesktopListPanel() {
     if (_tab == _MoneyTab.receipts) {
       if (_receipts.isEmpty) {
-        return _EmptyList(
+        return const _EmptyList(
           icon: Icons.receipt_long_rounded,
           label: 'No receipts yet',
         );
@@ -126,7 +126,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
 
     if (_tab == _MoneyTab.cash) {
       if (_withdrawals.isEmpty) {
-        return _EmptyList(
+        return const _EmptyList(
           icon: Icons.atm_rounded,
           label: 'No withdrawals yet',
         );
@@ -225,7 +225,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
           children: [
             // Receipts tab
             _receipts.isEmpty
-                ? WabwayEmptyState(
+                ? const WabwayEmptyState(
                     icon: Icons.receipt_long_rounded,
                     title: 'No receipts yet',
                     description: 'Tap + to add the first expense.',
@@ -249,7 +249,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
 
             // Cash tab
             _withdrawals.isEmpty
-                ? WabwayEmptyState(
+                ? const WabwayEmptyState(
                     icon: Icons.atm_rounded,
                     title: 'No withdrawals yet',
                     description: 'Tap + to log an ATM withdrawal.',

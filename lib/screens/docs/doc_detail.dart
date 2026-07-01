@@ -254,7 +254,7 @@ class _LinkedRow extends StatelessWidget {
             Container(
               width: 32,
               height: 32,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: kColorSurfaceSunken,
                 borderRadius: kRadiusMd,
               ),
@@ -302,7 +302,7 @@ class _NotesSection extends StatelessWidget {
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(kSpace3),
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             color: kColorSurfaceSunken,
             borderRadius: kRadiusMd,
           ),

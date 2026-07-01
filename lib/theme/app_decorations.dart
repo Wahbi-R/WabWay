@@ -79,17 +79,17 @@ InputDecoration kInputDecoration({
   Widget? prefix,
   Widget? suffix,
 }) {
-  final border = OutlineInputBorder(
+  const border = OutlineInputBorder(
     borderRadius: kRadiusSm,
-    borderSide: const BorderSide(color: kColorBorder),
+    borderSide: BorderSide(color: kColorBorder),
   );
-  final focusBorder = OutlineInputBorder(
+  const focusBorder = OutlineInputBorder(
     borderRadius: kRadiusSm,
-    borderSide: const BorderSide(color: kColorPrimary, width: 1.5),
+    borderSide: BorderSide(color: kColorPrimary, width: 1.5),
   );
-  final errorBorder = OutlineInputBorder(
+  const errorBorder = OutlineInputBorder(
     borderRadius: kRadiusSm,
-    borderSide: const BorderSide(color: kColorDanger, width: 1.5),
+    borderSide: BorderSide(color: kColorDanger, width: 1.5),
   );
 
   return InputDecoration(
@@ -113,14 +113,14 @@ InputDecoration kInputDecoration({
 
 // ─── Sidebar nav row decoration ───────────────────────────────────────────────
 
-BoxDecoration kSidebarRowActive() => BoxDecoration(
+BoxDecoration kSidebarRowActive() => const BoxDecoration(
   color: kColorPrimarySoft,
   borderRadius: kRadiusSm,
 );
 
 // ─── Photo slot decoration (warm placeholder, never grey) ────────────────────
 
-BoxDecoration kPhotoSlotDecoration() => BoxDecoration(
+BoxDecoration kPhotoSlotDecoration() => const BoxDecoration(
   color: kColorSurfaceSunken,
   borderRadius: kRadiusMd,
 );

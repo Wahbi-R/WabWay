@@ -75,7 +75,7 @@ class DocGridCard extends StatelessWidget {
                   const Spacer(),
                   Row(
                     children: [
-                      Icon(Icons.person_outline_rounded, size: 11, color: kColorInkSoft),
+                      const Icon(Icons.person_outline_rounded, size: 11, color: kColorInkSoft),
                       const SizedBox(width: 3),
                       Expanded(
                         child: Text(
@@ -159,7 +159,7 @@ class DocListRow extends StatelessWidget {
                         ' · ',
                         style: kStyleCaption.copyWith(color: kColorInkSoft, fontSize: 12),
                       ),
-                      Icon(Icons.link_rounded, size: 11, color: kColorInkSoft),
+                      const Icon(Icons.link_rounded, size: 11, color: kColorInkSoft),
                       const SizedBox(width: 2),
                       Text(
                         '${doc.links.length}',

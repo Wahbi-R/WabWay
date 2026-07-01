@@ -254,7 +254,7 @@ class _AttachPlaceholder extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Icon(Icons.attach_file_rounded, size: 24, color: kColorInkSoft),
+          const Icon(Icons.attach_file_rounded, size: 24, color: kColorInkSoft),
           const SizedBox(height: kSpace2),
           Text('Attach receipt photo', style: kStyleCaption),
         ],

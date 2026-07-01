@@ -26,108 +26,118 @@ class MoreScreen extends StatelessWidget {
           const SizedBox(height: kSpace3),
           DecoratedBox(
             decoration: kCardDecoration(),
-            child: Column(
-              children: _members.asMap().entries.map((e) {
-                final i = e.key;
-                final (name, email, isOrganiser) = e.value;
-                final isLast = i == _members.length - 1;
-                return Column(
-                  children: [
-                    ListTile(
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: kSpace4,
-                        vertical: kSpace2,
-                      ),
-                      leading: CircleAvatar(
-                        radius: 18,
-                        backgroundColor: kColorPrimarySoft,
-                        child: Text(
-                          name[0],
-                          style: kStyleBodySemibold.copyWith(color: kColorPrimaryDark),
+            child: Material(
+              color: Colors.transparent,
+              child: Column(
+                children: _members.asMap().entries.map((e) {
+                  final i = e.key;
+                  final (name, email, isOrganiser) = e.value;
+                  final isLast = i == _members.length - 1;
+                  return Column(
+                    children: [
+                      ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: kSpace4,
+                          vertical: kSpace2,
                         ),
+                        leading: CircleAvatar(
+                          radius: 18,
+                          backgroundColor: kColorPrimarySoft,
+                          child: Text(
+                            name[0],
+                            style: kStyleBodySemibold.copyWith(color: kColorPrimaryDark),
+                          ),
+                        ),
+                        title: Text(name, style: kStyleBodyMedium),
+                        subtitle: Text(email, style: kStyleCaption),
+                        trailing: isOrganiser
+                            ? Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: kSpace2,
+                                  vertical: 2,
+                                ),
+                                decoration: const BoxDecoration(
+                                  color: kColorAccentSoft,
+                                  borderRadius: kRadiusPill,
+                                ),
+                                child: Text(
+                                  'Organiser',
+                                  style: kStyleOverline.copyWith(color: kColorAccent),
+                                ),
+                              )
+                            : null,
                       ),
-                      title: Text(name, style: kStyleBodyMedium),
-                      subtitle: Text(email, style: kStyleCaption),
-                      trailing: isOrganiser
-                          ? Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: kSpace2,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: kColorAccentSoft,
-                                borderRadius: kRadiusPill,
-                              ),
-                              child: Text(
-                                'Organiser',
-                                style: kStyleOverline.copyWith(color: kColorAccent),
-                              ),
-                            )
-                          : null,
-                    ),
-                    if (!isLast) const Divider(height: 1, indent: kSpace4 + 36 + kSpace3),
-                  ],
-                );
-              }).toList(),
+                      if (!isLast)
+                        const Divider(height: 1, indent: kSpace4 + 36 + kSpace3),
+                    ],
+                  );
+                }).toList(),
+              ),
             ),
           ),
 
           const SizedBox(height: kSpace4),
 
           // Invite section
-          _SectionHeader(title: 'Invite'),
+          const _SectionHeader(title: 'Invite'),
           const SizedBox(height: kSpace3),
           DecoratedBox(
             decoration: kCardDecoration(),
-            child: ListTile(
-              contentPadding: const EdgeInsets.all(kSpace4),
-              leading: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: kColorPrimarySoft,
-                  borderRadius: kRadiusMd,
+            child: Material(
+              color: Colors.transparent,
+              child: ListTile(
+                contentPadding: const EdgeInsets.all(kSpace4),
+                leading: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: const BoxDecoration(
+                    color: kColorPrimarySoft,
+                    borderRadius: kRadiusMd,
+                  ),
+                  child: const Icon(Icons.person_add_rounded, size: 20, color: kColorPrimary),
                 ),
-                child: const Icon(Icons.person_add_rounded, size: 20, color: kColorPrimary),
+                title: Text('Invite friends', style: kStyleBodySemibold),
+                subtitle: Padding(
+                  padding: const EdgeInsets.only(top: kSpace1),
+                  child: Text('Share a link or invite code', style: kStyleCaption),
+                ),
+                trailing: Icon(Icons.chevron_right_rounded, color: kColorTextTertiary()),
+                onTap: () {},
               ),
-              title: Text('Invite friends', style: kStyleBodySemibold),
-              subtitle: Padding(
-                padding: const EdgeInsets.only(top: kSpace1),
-                child: Text('Share a link or invite code', style: kStyleCaption),
-              ),
-              trailing: Icon(Icons.chevron_right_rounded, color: kColorTextTertiary()),
-              onTap: () {},
             ),
           ),
 
           const SizedBox(height: kSpace4),
 
           // Settings
-          _SectionHeader(title: 'Trip settings'),
+          const _SectionHeader(title: 'Trip settings'),
           const SizedBox(height: kSpace3),
           DecoratedBox(
             decoration: kCardDecoration(),
-            child: Column(
-              children: [
-                _SettingsRow(
-                  icon: Icons.edit_rounded,
-                  label: 'Edit trip name',
-                  onTap: () {},
-                ),
-                const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
-                _SettingsRow(
-                  icon: Icons.notifications_rounded,
-                  label: 'Notifications',
-                  onTap: () {},
-                ),
-                const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
-                _SettingsRow(
-                  icon: Icons.logout_rounded,
-                  label: 'Leave trip',
-                  color: kColorDanger,
-                  onTap: () {},
-                ),
-              ],
+            child: Material(
+              color: Colors.transparent,
+              child: Column(
+                children: [
+                  _SettingsRow(
+                    icon: Icons.edit_rounded,
+                    label: 'Edit trip name',
+                    onTap: () {},
+                  ),
+                  const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
+                  _SettingsRow(
+                    icon: Icons.notifications_rounded,
+                    label: 'Notifications',
+                    onTap: () {},
+                  ),
+                  const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
+                  _SettingsRow(
+                    icon: Icons.logout_rounded,
+                    label: 'Leave trip',
+                    color: kColorDanger,
+                    onTap: () {},
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: kSpace16),

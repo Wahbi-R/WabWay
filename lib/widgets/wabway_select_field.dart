@@ -39,29 +39,46 @@ class WabwaySelectField<T> extends StatelessWidget {
           Text(label!, style: kStyleCaptionMedium.copyWith(color: kColorInk)),
           const SizedBox(height: 6),
         ],
-        DropdownButtonFormField<T>(
-          value: value,
-          onChanged: onChanged,
-          validator: validator,
-          isExpanded: true,
-          icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
-          iconEnabledColor: kColorInkSoft,
-          dropdownColor: kColorPaper,
-          style: kStyleBody,
-          hint: hint != null
-              ? Text(hint!, style: kStyleBody.copyWith(color: kColorInkSoft))
-              : null,
-          decoration: kInputDecoration().copyWith(
-            errorText: error,
-            errorStyle: kStyleOverline.copyWith(color: kColorDanger),
+        LayoutBuilder(
+          builder: (context, constraints) => FormField<T>(
+            initialValue: value,
+            validator: validator,
+            builder: (state) => InputDecorator(
+              decoration: kInputDecoration().copyWith(
+                errorText: state.hasError ? state.errorText : error,
+                errorStyle: kStyleOverline.copyWith(color: kColorDanger),
+              ),
+              isEmpty: state.value == null,
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<T>(
+                  value: state.value,
+                  isExpanded: true,
+                  menuWidth: constraints.maxWidth,
+                  dropdownColor: kColorPaper,
+                  borderRadius: kRadiusMd,
+                  style: kStyleBody,
+                  icon: const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 18,
+                    color: kColorInkSoft,
+                  ),
+                  hint: hint != null
+                      ? Text(hint!, style: kStyleBody.copyWith(color: kColorInkSoft))
+                      : null,
+                  onChanged: (v) {
+                    state.didChange(v);
+                    onChanged?.call(v);
+                  },
+                  items: items
+                      .map((item) => DropdownMenuItem<T>(
+                            value: item.value,
+                            child: Text(item.label, style: kStyleBody),
+                          ))
+                      .toList(),
+                ),
+              ),
+            ),
           ),
-          borderRadius: kRadiusMd,
-          items: items
-              .map((item) => DropdownMenuItem<T>(
-                    value: item.value,
-                    child: Text(item.label, style: kStyleBody),
-                  ))
-              .toList(),
         ),
       ],
     );

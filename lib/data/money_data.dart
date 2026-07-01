@@ -1,0 +1,388 @@
+import 'package:flutter/material.dart';
+
+// ─── Members ──────────────────────────────────────────────────────────────────
+
+class TripMember {
+  const TripMember({required this.id, required this.name});
+  final String id;
+  final String name;
+  bool get isYou => id == kYouId;
+}
+
+const kYouId = 'you';
+
+const kMockMembers = <TripMember>[
+  TripMember(id: 'you',    name: 'You'),
+  TripMember(id: 'alex',   name: 'Alex'),
+  TripMember(id: 'jordan', name: 'Jordan'),
+  TripMember(id: 'sam',    name: 'Sam'),
+];
+
+TripMember memberById(String id) =>
+    kMockMembers.firstWhere((m) => m.id == id,
+        orElse: () => TripMember(id: id, name: id));
+
+// ─── Receipt ──────────────────────────────────────────────────────────────────
+
+enum ReceiptCategory {
+  food, transport, accommodation, activity, shopping, other;
+
+  String get label => switch (this) {
+    ReceiptCategory.food          => 'Food',
+    ReceiptCategory.transport     => 'Transport',
+    ReceiptCategory.accommodation => 'Stay',
+    ReceiptCategory.activity      => 'Activity',
+    ReceiptCategory.shopping      => 'Shopping',
+    ReceiptCategory.other         => 'Other',
+  };
+
+  IconData get icon => switch (this) {
+    ReceiptCategory.food          => Icons.restaurant_rounded,
+    ReceiptCategory.transport     => Icons.train_rounded,
+    ReceiptCategory.accommodation => Icons.hotel_rounded,
+    ReceiptCategory.activity      => Icons.local_activity_rounded,
+    ReceiptCategory.shopping      => Icons.shopping_bag_rounded,
+    ReceiptCategory.other         => Icons.receipt_long_rounded,
+  };
+
+  Color get color => switch (this) {
+    ReceiptCategory.food          => const Color(0xFFC96F4A),
+    ReceiptCategory.transport     => const Color(0xFF7D9A75),
+    ReceiptCategory.accommodation => const Color(0xFFD6A84F),
+    ReceiptCategory.activity      => const Color(0xFF7B8EC8),
+    ReceiptCategory.shopping      => const Color(0xFFA97BB5),
+    ReceiptCategory.other         => const Color(0xFF6F665D),
+  };
+
+  Color get softColor => switch (this) {
+    ReceiptCategory.food          => const Color(0xFFF7EDE7),
+    ReceiptCategory.transport     => const Color(0xFFEEF4EC),
+    ReceiptCategory.accommodation => const Color(0xFFF8F0E2),
+    ReceiptCategory.activity      => const Color(0xFFEEF0F8),
+    ReceiptCategory.shopping      => const Color(0xFFF5EEF7),
+    ReceiptCategory.other         => const Color(0xFFEEEAE3),
+  };
+}
+
+class ReceiptSplit {
+  const ReceiptSplit({
+    required this.memberId,
+    required this.amount,
+    this.isSettled = false,
+  });
+  final String memberId;
+  final double amount;
+  final bool isSettled;
+}
+
+class Receipt {
+  const Receipt({
+    required this.id,
+    required this.title,
+    required this.amount,
+    required this.currency,
+    required this.paidById,
+    required this.splits,
+    required this.category,
+    required this.date,
+    this.notes,
+  });
+
+  final String id;
+  final String title;
+  final double amount;
+  final String currency;
+  final String paidById;
+  final List<ReceiptSplit> splits;
+  final ReceiptCategory category;
+  final DateTime date;
+  final String? notes;
+
+  double get myShare =>
+      splits.where((s) => s.memberId == kYouId).fold(0.0, (a, s) => a + s.amount);
+
+  // Positive = net owed to you, Negative = you owe someone
+  double get myNet {
+    if (paidById == kYouId) {
+      return splits.where((s) => s.memberId != kYouId).fold(0.0, (a, s) => a + s.amount);
+    }
+    final yours = splits.where((s) => s.memberId == kYouId);
+    return yours.isEmpty ? 0.0 : -yours.first.amount;
+  }
+}
+
+// ─── Cash withdrawal ──────────────────────────────────────────────────────────
+
+class CashDistribution {
+  const CashDistribution({required this.memberId, required this.amount});
+  final String memberId;
+  final double amount;
+}
+
+class CashWithdrawal {
+  const CashWithdrawal({
+    required this.id,
+    required this.withdrawnById,
+    required this.amount,
+    required this.currency,
+    required this.date,
+    this.atmFee = 0,
+    this.notes,
+    this.distributions = const [],
+  });
+
+  final String id;
+  final String withdrawnById;
+  final double amount;
+  final double atmFee;
+  final String currency;
+  final DateTime date;
+  final String? notes;
+  final List<CashDistribution> distributions;
+
+  double get totalDistributed =>
+      distributions.fold(0.0, (a, d) => a + d.amount);
+
+  double get myNet {
+    if (withdrawnById == kYouId) {
+      return distributions.where((d) => d.memberId != kYouId).fold(0.0, (a, d) => a + d.amount);
+    }
+    final yours = distributions.where((d) => d.memberId == kYouId);
+    return yours.isEmpty ? 0.0 : -yours.first.amount;
+  }
+}
+
+// ─── Balances ─────────────────────────────────────────────────────────────────
+
+class MemberBalance {
+  const MemberBalance({required this.member, required this.net});
+  final TripMember member;
+  final double net; // positive = they owe you, negative = you owe them
+}
+
+List<MemberBalance> calculateBalances(
+  List<Receipt> receipts,
+  List<CashWithdrawal> withdrawals,
+) {
+  final Map<String, double> net = {};
+
+  for (final r in receipts) {
+    for (final split in r.splits) {
+      if (r.paidById == kYouId && split.memberId != kYouId) {
+        net[split.memberId] = (net[split.memberId] ?? 0) + split.amount;
+      } else if (r.paidById != kYouId && split.memberId == kYouId) {
+        net[r.paidById] = (net[r.paidById] ?? 0) - split.amount;
+      }
+    }
+  }
+
+  for (final w in withdrawals) {
+    if (w.withdrawnById == kYouId) {
+      for (final d in w.distributions) {
+        if (d.memberId != kYouId) {
+          net[d.memberId] = (net[d.memberId] ?? 0) + d.amount;
+        }
+      }
+    } else {
+      for (final d in w.distributions) {
+        if (d.memberId == kYouId) {
+          net[w.withdrawnById] = (net[w.withdrawnById] ?? 0) - d.amount;
+        }
+      }
+    }
+  }
+
+  return kMockMembers
+      .where((m) => !m.isYou)
+      .map((m) => MemberBalance(member: m, net: net[m.id] ?? 0))
+      .toList();
+}
+
+// ─── Settlement suggestions ───────────────────────────────────────────────────
+
+class SettlementSuggestion {
+  SettlementSuggestion({
+    required this.fromMemberId,
+    required this.toMemberId,
+    required this.amount,
+    required this.currency,
+    this.isSettled = false,
+  });
+  final String fromMemberId;
+  final String toMemberId;
+  final double amount;
+  final String currency;
+  bool isSettled;
+}
+
+List<SettlementSuggestion> suggestSettlements(
+  List<MemberBalance> balances,
+  String currency,
+) {
+  return balances
+      .where((b) => b.net.abs() > 0.5)
+      .map((b) => b.net > 0
+          ? SettlementSuggestion(
+              fromMemberId: b.member.id,
+              toMemberId: kYouId,
+              amount: b.net,
+              currency: currency,
+            )
+          : SettlementSuggestion(
+              fromMemberId: kYouId,
+              toMemberId: b.member.id,
+              amount: -b.net,
+              currency: currency,
+            ))
+      .toList();
+}
+
+// ─── Formatting ───────────────────────────────────────────────────────────────
+
+String fmtAmount(double amount, String currency) {
+  return switch (currency) {
+    'JPY' => '¥${amount.toStringAsFixed(0)}',
+    'USD' => '\$${amount.toStringAsFixed(2)}',
+    'EUR' => '€${amount.toStringAsFixed(2)}',
+    _     => '$currency ${amount.toStringAsFixed(2)}',
+  };
+}
+
+String fmtDate(DateTime d) {
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return '${months[d.month - 1]} ${d.day}';
+}
+
+// ─── Mock data ────────────────────────────────────────────────────────────────
+
+Receipt _split4(
+  String id,
+  String title,
+  double amount,
+  String currency,
+  String paidById,
+  ReceiptCategory category,
+  DateTime date, {
+  String? notes,
+}) {
+  final share = (amount / 4 * 100).roundToDouble() / 100;
+  return Receipt(
+    id: id,
+    title: title,
+    amount: amount,
+    currency: currency,
+    paidById: paidById,
+    category: category,
+    date: date,
+    notes: notes,
+    splits: kMockMembers
+        .map((m) => ReceiptSplit(memberId: m.id, amount: share))
+        .toList(),
+  );
+}
+
+final kMockReceipts = <Receipt>[
+  _split4('r1', 'Ramen Ichiran', 4800, 'JPY', 'alex',
+      ReceiptCategory.food, DateTime(2024, 11, 12)),
+  Receipt(
+    id: 'r2',
+    title: 'Shinkansen Tokyo → Kyoto',
+    amount: 27400,
+    currency: 'JPY',
+    paidById: 'you',
+    category: ReceiptCategory.transport,
+    date: DateTime(2024, 11, 15),
+    notes: 'Reserved seats, non-reserved section.',
+    splits: const [
+      ReceiptSplit(memberId: 'you',    amount: 6850),
+      ReceiptSplit(memberId: 'jordan', amount: 6850),
+      ReceiptSplit(memberId: 'sam',    amount: 6850),
+      ReceiptSplit(memberId: 'alex',   amount: 6850, isSettled: true),
+    ],
+  ),
+  Receipt(
+    id: 'r3',
+    title: 'Hotel Shinjuku (2 nights)',
+    amount: 36000,
+    currency: 'JPY',
+    paidById: 'jordan',
+    category: ReceiptCategory.accommodation,
+    date: DateTime(2024, 11, 12),
+    splits: const [
+      ReceiptSplit(memberId: 'you',    amount: 9000),
+      ReceiptSplit(memberId: 'alex',   amount: 9000),
+      ReceiptSplit(memberId: 'jordan', amount: 9000),
+      ReceiptSplit(memberId: 'sam',    amount: 9000),
+    ],
+  ),
+  _split4('r4', 'Tsukiji Breakfast', 3200, 'JPY', 'you',
+      ReceiptCategory.food, DateTime(2024, 11, 13)),
+  _split4('r5', 'Convenience Store Run', 1450, 'JPY', 'sam',
+      ReceiptCategory.food, DateTime(2024, 11, 13)),
+  _split4('r6', 'teamLab Borderless Tickets', 14000, 'JPY', 'you',
+      ReceiptCategory.activity, DateTime(2024, 11, 14),
+      notes: '4 × ¥3,500. Book in advance next time.'),
+  Receipt(
+    id: 'r7',
+    title: 'Kyoto Ryokan (1 night)',
+    amount: 52000,
+    currency: 'JPY',
+    paidById: 'you',
+    category: ReceiptCategory.accommodation,
+    date: DateTime(2024, 11, 16),
+    splits: const [
+      ReceiptSplit(memberId: 'you',    amount: 13000),
+      ReceiptSplit(memberId: 'alex',   amount: 13000),
+      ReceiptSplit(memberId: 'jordan', amount: 13000),
+      ReceiptSplit(memberId: 'sam',    amount: 13000),
+    ],
+  ),
+  _split4('r8', 'Dotonbori Street Food', 2800, 'JPY', 'alex',
+      ReceiptCategory.food, DateTime(2024, 11, 18)),
+];
+
+final kMockWithdrawals = <CashWithdrawal>[
+  CashWithdrawal(
+    id: 'w1',
+    withdrawnById: 'you',
+    amount: 50000,
+    currency: 'JPY',
+    atmFee: 220,
+    date: DateTime(2024, 11, 12),
+    notes: '7-Eleven ATM. No foreign-transaction fee card.',
+    distributions: const [
+      CashDistribution(memberId: 'you',    amount: 10000),
+      CashDistribution(memberId: 'alex',   amount: 15000),
+      CashDistribution(memberId: 'jordan', amount: 15000),
+      CashDistribution(memberId: 'sam',    amount: 10000),
+    ],
+  ),
+  CashWithdrawal(
+    id: 'w2',
+    withdrawnById: 'you',
+    amount: 30000,
+    currency: 'JPY',
+    date: DateTime(2024, 11, 16),
+    distributions: const [
+      CashDistribution(memberId: 'you',    amount: 10000),
+      CashDistribution(memberId: 'alex',   amount: 10000),
+      CashDistribution(memberId: 'jordan', amount: 5000),
+      CashDistribution(memberId: 'sam',    amount: 5000),
+    ],
+  ),
+  CashWithdrawal(
+    id: 'w3',
+    withdrawnById: 'alex',
+    amount: 20000,
+    currency: 'JPY',
+    atmFee: 110,
+    date: DateTime(2024, 11, 14),
+    notes: 'For Kyoto spending money.',
+    distributions: const [
+      CashDistribution(memberId: 'you',    amount: 5000),
+      CashDistribution(memberId: 'alex',   amount: 5000),
+      CashDistribution(memberId: 'jordan', amount: 5000),
+      CashDistribution(memberId: 'sam',    amount: 5000),
+    ],
+  ),
+];

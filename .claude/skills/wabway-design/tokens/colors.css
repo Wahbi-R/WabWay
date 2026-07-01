@@ -1,0 +1,77 @@
+/* ---------------------------------------------------------------------
+   Wabway — Color tokens
+   Warm, travel-focused palette. Base hues first, semantic aliases after.
+   Hover/active/soft variants are derived with color-mix() in oklch so
+   every shade stays perceptually consistent with its source — no hand
+   -picked extra hexes to keep in sync.
+   ------------------------------------------------------------------- */
+
+:root {
+  /* ---- Base hues (source-of-truth hexes from the product brief) ---- */
+  --base-cream:        #F8F3EA; /* background */
+  --base-paper:        #FFFDF8; /* surface / card */
+  --base-terracotta:   #C96F4A; /* primary */
+  --base-terracotta-dk:#9F4F34; /* primary dark */
+  --base-sage:         #7D9A75; /* secondary */
+  --base-gold:         #D6A84F; /* accent */
+  --base-ink:          #2F2A25; /* text primary */
+  --base-ink-soft:     #6F665D; /* text secondary */
+  --base-sand:         #E6DCCF; /* border */
+  --base-success:      #4F8A5B;
+  --base-warning:      #C98A2E;
+  --base-danger:       #B94A48;
+
+  /* ---- Neutrals / surfaces ---- */
+  --color-bg:             var(--base-cream);
+  --color-bg-raised:      #FBF8F2;
+  --color-surface:        var(--base-paper);
+  --color-surface-sunken: #F1EAE0;
+  --color-border:         var(--base-sand);
+  --color-border-strong:  color-mix(in oklch, var(--base-sand) 55%, var(--base-ink-soft));
+  --color-overlay:        color-mix(in oklch, var(--base-ink) 55%, transparent);
+
+  /* ---- Text ---- */
+  --color-text-primary:   var(--base-ink);
+  --color-text-secondary: var(--base-ink-soft);
+  --color-text-tertiary:  color-mix(in oklch, var(--base-ink-soft) 65%, var(--base-cream));
+  --color-text-on-primary:#FFFDF8;
+  --color-text-link:      var(--base-terracotta-dk);
+
+  /* ---- Primary (terracotta) ---- */
+  --color-primary:        var(--base-terracotta);
+  --color-primary-dark:   var(--base-terracotta-dk);
+  --color-primary-hover:  color-mix(in oklch, var(--base-terracotta) 88%, black);
+  --color-primary-active: color-mix(in oklch, var(--base-terracotta) 76%, black);
+  --color-primary-soft:   color-mix(in oklch, var(--base-terracotta) 14%, var(--base-paper));
+  --color-primary-soft-border: color-mix(in oklch, var(--base-terracotta) 30%, var(--base-paper));
+
+  /* ---- Secondary (sage) ---- */
+  --color-secondary:        var(--base-sage);
+  --color-secondary-hover:  color-mix(in oklch, var(--base-sage) 85%, black);
+  --color-secondary-active: color-mix(in oklch, var(--base-sage) 72%, black);
+  --color-secondary-soft:   color-mix(in oklch, var(--base-sage) 16%, var(--base-paper));
+  --color-secondary-soft-border: color-mix(in oklch, var(--base-sage) 32%, var(--base-paper));
+
+  /* ---- Accent (gold) ---- */
+  --color-accent:        var(--base-gold);
+  --color-accent-hover:  color-mix(in oklch, var(--base-gold) 85%, black);
+  --color-accent-soft:   color-mix(in oklch, var(--base-gold) 18%, var(--base-paper));
+  --color-accent-soft-border: color-mix(in oklch, var(--base-gold) 35%, var(--base-paper));
+
+  /* ---- Semantic states ---- */
+  --color-success:       var(--base-success);
+  --color-success-soft:  color-mix(in oklch, var(--base-success) 16%, var(--base-paper));
+  --color-success-border:color-mix(in oklch, var(--base-success) 35%, var(--base-paper));
+
+  --color-warning:       var(--base-warning);
+  --color-warning-soft:  color-mix(in oklch, var(--base-warning) 18%, var(--base-paper));
+  --color-warning-border:color-mix(in oklch, var(--base-warning) 38%, var(--base-paper));
+
+  --color-danger:        var(--base-danger);
+  --color-danger-hover:  color-mix(in oklch, var(--base-danger) 85%, black);
+  --color-danger-soft:   color-mix(in oklch, var(--base-danger) 14%, var(--base-paper));
+  --color-danger-border: color-mix(in oklch, var(--base-danger) 34%, var(--base-paper));
+
+  /* ---- Focus ring ---- */
+  --color-focus-ring: color-mix(in oklch, var(--base-terracotta) 45%, transparent);
+}

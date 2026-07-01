@@ -1,0 +1,62 @@
+<!-- @dsCard group="Components" viewport="700x900" name="Spots & Board" subtitle="TripCard, SpotCard, LinkPreviewCard, VoteChip, CommentThread, MemberAvatarRow" -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>
+  body { margin: 0; background: var(--color-bg); font-family: var(--font-sans); }
+  .section { padding: 14px 18px; display: flex; flex-direction: column; gap: 12px; }
+  .label { font-size: 11px; color: var(--color-text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { TripCard, SpotCard, LinkPreviewCard, VoteChipGroup, CommentThread, MemberAvatarRow } = window.WabwayDesignSystem_4e50d7;
+function Demo() {
+  const [vote, setVote] = React.useState('must');
+  return (
+    <div>
+      <div className="section">
+        <div className="label">Trip card</div>
+        <div style={{width: 260}}>
+          <TripCard name="Japan, November" destination="Tokyo → Kyoto" dateRange="Nov 8–18" members={[{name:'Alex Kim'},{name:'Josh Park'},{name:'Matt Lee'},{name:'You'}]} iconBase="../../" />
+        </div>
+      </div>
+      <div className="section">
+        <div className="label">Spot cards</div>
+        <SpotCard name="Fushimi Inari Shrine" city="Kyoto" category="Temple" status="Must-do" votes={{must:3,want:1}} iconBase="../../" />
+        <SpotCard name="Ichiran Ramen" city="Shinjuku" category="Food" status="Idea" votes={{want:2}} iconBase="../../" />
+      </div>
+      <div className="section">
+        <div className="label">Link preview card</div>
+        <LinkPreviewCard title="Ramen spot near Shinjuku" sourceLabel="Instagram" sourceType="instagram" notes="Looks great, near the station." iconBase="../../" />
+      </div>
+      <div className="section">
+        <div className="label">Vote chip group</div>
+        <VoteChipGroup value={vote} onChange={setVote} />
+      </div>
+      <div className="section">
+        <div className="label">Member avatar row</div>
+        <MemberAvatarRow members={[{name:'Alex Kim'},{name:'Josh Park'},{name:'Matt Lee'},{name:'Priya Shah'},{name:'You'}]} max={4} />
+      </div>
+      <div className="section">
+        <div className="label">Comment thread</div>
+        <CommentThread comments={[
+          {author:'Josh Park', text:'We should go early before it gets packed.', time:'2d ago', vote:'must'},
+          {author:'Matt Lee', text:'Agreed, heard sunrise is the move.', time:'1d ago'},
+        ]} />
+      </div>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+</script>
+</body>
+</html>

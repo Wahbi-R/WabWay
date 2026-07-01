@@ -1,0 +1,43 @@
+<!-- @dsCard group="Components" viewport="700x560" name="Itinerary & Travel" subtitle="ItineraryDayCard, TravelItemCard" -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>
+  body { margin: 0; background: var(--color-bg); font-family: var(--font-sans); }
+  .section { padding: 14px 18px; display: flex; flex-direction: column; gap: 12px; }
+  .label { font-size: 11px; color: var(--color-text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { ItineraryDayCard, TravelItemCard } = window.WabwayDesignSystem_4e50d7;
+function Demo() {
+  return (
+    <div>
+      <div className="section">
+        <div className="label">Itinerary day</div>
+        <ItineraryDayCard date="Nov 12" city="Tokyo" items={[
+          {time:'10:00', title:'TeamLab Borderless'},
+          {time:'13:00', title:'Lunch in Ginza'},
+          {time:'20:00', title:'Shinjuku food & drinks', notes: 'Meet at the Golden Gai entrance'},
+        ]} />
+      </div>
+      <div className="section">
+        <div className="label">Travel items</div>
+        <TravelItemCard type="Flight" title="Air Canada AC003" subtitle="YYZ → HND, Nov 8" confirmationNumber="QXR7TZ" />
+        <TravelItemCard type="Hotel" title="Shinjuku Granbell Hotel" subtitle="Nov 8–12" confirmationNumber="HTL-88213" />
+      </div>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+</script>
+</body>
+</html>

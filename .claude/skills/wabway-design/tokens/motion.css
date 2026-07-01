@@ -1,0 +1,16 @@
+/* ---------------------------------------------------------------------
+   Wabway — Motion tokens
+   Quick, soft, never bouncy or playful-elastic — a calm travel
+   companion, not a game. Ease-out on entrances, ease-in-out on
+   state changes.
+   ------------------------------------------------------------------- */
+
+:root {
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1); /* @kind other */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1); /* @kind other */
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0); /* @kind other */
+
+  --duration-fast: 120ms; /* @kind other */
+  --duration-base: 200ms; /* @kind other */
+  --duration-slow: 320ms; /* @kind other */
+}

@@ -1,0 +1,17 @@
+<!-- @dsCard group="Brand" viewport="700x230" name="Icon Set" subtitle="Lucide, single-color via currentColor, 1.75-2px stroke" -->
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../styles.css">
+<style>
+  body { margin:0; background:var(--color-surface); font-family: var(--font-sans); padding: 16px 18px; }
+  .grid { display:grid; grid-template-columns: repeat(11, 1fr); gap: 10px; }
+  .cell { display:flex; flex-direction:column; align-items:center; gap:4px; }
+  .ic { width: 22px; height: 22px; background: var(--color-text-primary); -webkit-mask-size: contain; mask-size: contain; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; -webkit-mask-position: center; mask-position: center; }
+  .lbl { font-size: 8px; color: var(--color-text-tertiary); text-align:center; }
+</style></head>
+<body>
+<div class="grid" id="g"></div>
+<script>
+const icons = ['house','map-pin','link','calendar-days','wallet','file-text','users','user-plus','settings','ellipsis','plus','search','list-filter','x','pencil','trash-2','camera','upload','download','share-2','check','circle-check','chevron-right','arrow-left','menu','log-out','bell','image','banknote','receipt','plane','train-front','bed-double','ticket','landmark','map','message-circle','star','copy','qr-code','smartphone','globe','clock','mail','triangle-alert','wifi-off','loader-circle','inbox','folder','paperclip','user','circle'];
+document.getElementById('g').innerHTML = icons.map(n => `<div class="cell"><span class="ic" style="-webkit-mask-image:url(../assets/icons/${n}.svg); mask-image:url(../assets/icons/${n}.svg);"></span><span class="lbl">${n}</span></div>`).join('');
+</script>
+</body></html>

@@ -1,0 +1,13 @@
+<!-- @dsCard group="Brand" viewport="700x120" name="Borders" subtitle="Single hairline neutral border; stronger only for emphasis/selection" -->
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../styles.css">
+<style>
+  body { margin:0; background:var(--color-bg); font-family: var(--font-sans); padding: 18px 22px; display:flex; gap: 20px; }
+  .box { width: 130px; height: 80px; background: var(--color-surface); border-radius: var(--radius-md); display:flex; align-items:flex-end; padding: 8px; font-size: 11px; color: var(--color-text-tertiary); font-family: var(--font-mono); }
+</style></head>
+<body>
+  <div class="box" style="border: 1px solid var(--color-border)">default</div>
+  <div class="box" style="border: 1px solid var(--color-border-strong)">strong</div>
+  <div class="box" style="border: 1.5px solid var(--color-primary)">selected</div>
+  <div class="box" style="border: 1.5px solid var(--color-danger)">error</div>
+</body></html>

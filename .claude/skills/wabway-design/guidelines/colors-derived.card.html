@@ -1,0 +1,28 @@
+<!-- @dsCard group="Colors" viewport="700x190" name="Derived States" subtitle="Hover/active/soft tints generated via color-mix() — never hand-picked" -->
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../styles.css">
+<style>
+  body { margin:0; background:var(--color-bg); font-family: var(--font-sans); padding: 16px 18px; }
+  .grp { display:flex; gap:8px; margin-bottom:12px; align-items:center; }
+  .lbl { width: 70px; font-size:11px; color:var(--color-text-tertiary); text-transform:uppercase; letter-spacing:0.04em; }
+  .sw { width:64px; height:36px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:10px; font-family:var(--font-mono); color:#fff; }
+</style></head>
+<body>
+  <div class="grp"><span class="lbl">Primary</span>
+    <div class="sw" style="background:var(--color-primary-soft); color:var(--color-primary-dark)">soft</div>
+    <div class="sw" style="background:var(--color-primary)">base</div>
+    <div class="sw" style="background:var(--color-primary-hover)">hover</div>
+    <div class="sw" style="background:var(--color-primary-active)">active</div>
+  </div>
+  <div class="grp"><span class="lbl">Secondary</span>
+    <div class="sw" style="background:var(--color-secondary-soft); color:color-mix(in oklch, var(--color-secondary) 60%, black)">soft</div>
+    <div class="sw" style="background:var(--color-secondary)">base</div>
+    <div class="sw" style="background:var(--color-secondary-hover)">hover</div>
+    <div class="sw" style="background:var(--color-secondary-active)">active</div>
+  </div>
+  <div class="grp"><span class="lbl">Danger</span>
+    <div class="sw" style="background:var(--color-danger-soft); color:var(--color-danger)">soft</div>
+    <div class="sw" style="background:var(--color-danger)">base</div>
+    <div class="sw" style="background:var(--color-danger-hover)">hover</div>
+  </div>
+</body></html>

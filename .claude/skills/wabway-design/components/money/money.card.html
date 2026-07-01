@@ -1,0 +1,56 @@
+<!-- @dsCard group="Components" viewport="700x900" name="Money" subtitle="ReceiptCard, SplitMemberRow, BalanceSummaryCard, CashWithdrawalCard, CashDistributionRow" -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>
+  body { margin: 0; background: var(--color-bg); font-family: var(--font-sans); }
+  .section { padding: 14px 18px; display: flex; flex-direction: column; gap: 12px; }
+  .label { font-size: 11px; color: var(--color-text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { ReceiptCard, SplitMemberRow, BalanceSummaryCard, CashWithdrawalCard, CashDistributionRow } = window.WabwayDesignSystem_4e50d7;
+function Demo() {
+  return (
+    <div>
+      <div className="section">
+        <div className="label">Balance summary</div>
+        <BalanceSummaryCard youOwe={[{name:'Alex Kim', amount:'3,200'}]} youAreOwed={[{name:'Josh Park', amount:'5,000'},{name:'Matt Lee', amount:'2,100'}]} />
+      </div>
+      <div className="section">
+        <div className="label">Receipt cards</div>
+        <ReceiptCard title="Ramen dinner" amount="8,400" paidBy="Alex Kim" category="Food" splitCount={4} dateLabel="Nov 10" />
+      </div>
+      <div className="section">
+        <div className="label">Split member rows</div>
+        <div style={{background:'var(--color-surface)', border:'1px solid var(--color-border)', borderRadius:'var(--radius-lg)', padding:'4px 16px'}}>
+          <SplitMemberRow name="Alex Kim" amount="2,100" selected />
+          <SplitMemberRow name="Josh Park" amount="2,100" selected />
+          <SplitMemberRow name="Matt Lee" amount="2,100" selected={false} />
+        </div>
+      </div>
+      <div className="section">
+        <div className="label">Cash withdrawal card</div>
+        <CashWithdrawalCard withdrawnBy="You" amount="50,000" atmFee="220" dateLabel="Nov 10" distributed={[{name:'Alex Kim',amount:'15,000'},{name:'Matt Lee',amount:'15,000'},{name:'Josh Park',amount:'10,000'}]} />
+      </div>
+      <div className="section">
+        <div className="label">Cash distribution row (editable)</div>
+        <div style={{background:'var(--color-surface)', border:'1px solid var(--color-border)', borderRadius:'var(--radius-lg)', padding:'4px 16px'}}>
+          <CashDistributionRow name="Alex Kim" amount="15,000" editable onAmountChange={()=>{}} />
+        </div>
+      </div>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+</script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+/* ---------------------------------------------------------------------
+   Wabway — Elevation / shadow tokens
+   Soft, warm-tinted shadows (ink-brown, never pure black) at low
+   opacity with generous blur — paper-like, never harsh.
+   ------------------------------------------------------------------- */
+
+:root {
+  --shadow-color: 36 30 22; /* rgb channels of base-ink, for use with rgb(var(..)/alpha) */
+
+  --shadow-xs: 0 1px 2px rgb(var(--shadow-color) / 0.06);
+  --shadow-sm: 0 2px 6px rgb(var(--shadow-color) / 0.07), 0 1px 2px rgb(var(--shadow-color) / 0.05);
+  --shadow-md: 0 8px 20px rgb(var(--shadow-color) / 0.09), 0 2px 6px rgb(var(--shadow-color) / 0.06);
+  --shadow-lg: 0 16px 40px rgb(var(--shadow-color) / 0.13), 0 4px 12px rgb(var(--shadow-color) / 0.07);
+  --shadow-focus: 0 0 0 4px var(--color-focus-ring);
+
+  --shadow-inset-sm: inset 0 1px 2px rgb(var(--shadow-color) / 0.08);
+}

@@ -1,0 +1,17 @@
+<!-- @dsCard group="Brand" viewport="700x150" name="Motion Easing" subtitle="Quick & quiet — 120-320ms, ease-out entrances, no bounce" -->
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../styles.css">
+<style>
+  body { margin:0; background:var(--color-bg); font-family: var(--font-sans); padding: 18px 22px; }
+  .track { position: relative; height: 36px; background: var(--color-surface-sunken); border-radius: var(--radius-pill); margin-bottom: 14px; }
+  .dot { position: absolute; top: 3px; left: 3px; width: 30px; height: 30px; border-radius: 50%; background: var(--color-primary); animation: slide 1.8s var(--ease-out) infinite alternate; }
+  .track:nth-child(2) .dot { animation-timing-function: var(--ease-standard); background: var(--color-secondary); }
+  .lbl { font-size: 11px; font-family: var(--font-mono); color: var(--color-text-tertiary); margin: -10px 0 6px; }
+  @keyframes slide { to { left: calc(100% - 33px); } }
+</style></head>
+<body>
+  <div class="lbl">ease-out (entrances) · 320ms</div>
+  <div class="track"><div class="dot"></div></div>
+  <div class="lbl">ease-standard (toggles) · 320ms</div>
+  <div class="track"><div class="dot"></div></div>
+</body></html>

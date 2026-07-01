@@ -1,0 +1,50 @@
+/* ---------------------------------------------------------------------
+   Wabway — Typography tokens
+   Plus Jakarta Sans for all UI text (friendly geometric sans with warm,
+   slightly rounded terminals). Lora (warm serif) reserved for editorial
+   / display moments — trip names, big quotes, empty-state headlines —
+   like a stamp in a travel journal. IBM Plex Mono for codes, amounts in
+   tables, and confirmation numbers.
+   ------------------------------------------------------------------- */
+
+:root {
+  --font-sans:    'Plus Jakarta Sans', -apple-system, 'Segoe UI', system-ui, sans-serif;
+  --font-serif:   'Lora', Georgia, 'Times New Roman', serif;
+  --font-mono:    'IBM Plex Mono', 'SF Mono', Menlo, monospace;
+
+  /* Type scale */
+  --text-xs:    12px;
+  --text-sm:    13px;
+  --text-base:  15px;
+  --text-md:    17px;
+  --text-lg:    19px;
+  --text-xl:    23px;
+  --text-2xl:   28px;
+  --text-3xl:   34px;
+  --text-4xl:   42px;
+
+  --leading-tight:  1.15;
+  --leading-snug:   1.3;
+  --leading-normal: 1.5;
+  --leading-loose:  1.7;
+
+  --tracking-tight: -0.01em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.04em;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --weight-extrabold: 800;
+
+  /* Semantic aliases */
+  --text-display:      var(--text-4xl);
+  --text-heading-lg:    var(--text-3xl);
+  --text-heading-md:    var(--text-2xl);
+  --text-heading-sm:    var(--text-xl);
+  --text-title:         var(--text-lg);
+  --text-body:          var(--text-base);
+  --text-caption:       var(--text-sm);
+  --text-overline:      var(--text-xs);
+}

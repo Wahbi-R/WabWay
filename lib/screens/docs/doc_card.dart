@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../data/docs_data.dart';
+import '../../data/member_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
@@ -79,7 +80,7 @@ class DocGridCard extends StatelessWidget {
                       const SizedBox(width: 3),
                       Expanded(
                         child: Text(
-                          doc.uploadedBy,
+                          memberById(doc.uploadedById).name,
                           style: kStyleCaption.copyWith(fontSize: 11),
                           overflow: TextOverflow.ellipsis,
                         ),

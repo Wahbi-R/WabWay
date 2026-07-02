@@ -83,7 +83,6 @@ class _AddDocContentState extends State<_AddDocContent> {
   DocType _type = DocType.other;
   DocLinkedType? _linkType;
   String? _linkedId;
-  String? _linkedLabel;
   bool _fileSelected = false;
 
   @override
@@ -100,11 +99,11 @@ class _AddDocContentState extends State<_AddDocContent> {
       title: _titleCtrl.text.trim(),
       type: _type,
       ext: 'pdf',
-      uploadedBy: 'You',
+      uploadedById: 'you',
       uploadedAt: DateTime.now(),
       notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
-      links: (_linkType != null && _linkedId != null && _linkedLabel != null)
-          ? [DocumentLink(type: _linkType!, linkedId: _linkedId!, label: _linkedLabel!)]
+      links: (_linkType != null && _linkedId != null)
+          ? [DocumentLink(type: _linkType!, linkedId: _linkedId!)]
           : const [],
     ));
   }
@@ -116,15 +115,7 @@ class _AddDocContentState extends State<_AddDocContent> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (widget.showDragHandle)
-          Padding(
-            padding: const EdgeInsets.only(top: kSpace3, bottom: kSpace1),
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: const BoxDecoration(color: kColorBorder, borderRadius: kRadiusPill),
-            ),
-          ),
+        if (widget.showDragHandle) const WabwayDragHandle(),
 
         Padding(
           padding: const EdgeInsets.fromLTRB(kSpace4, kSpace3, kSpace4, 0),
@@ -182,21 +173,11 @@ class _AddDocContentState extends State<_AddDocContent> {
                   _LinkSection(
                     linkType: _linkType,
                     linkedId: _linkedId,
-                    linkedLabel: _linkedLabel,
                     onLinkTypeChanged: (t) => setState(() {
                       _linkType = t;
-                      if (t == DocLinkedType.trip) {
-                        _linkedId = 'trip1';
-                        _linkedLabel = 'Japan Nov 2024';
-                      } else {
-                        _linkedId = null;
-                        _linkedLabel = null;
-                      }
+                      _linkedId = t == DocLinkedType.trip ? 'trip1' : null;
                     }),
-                    onLinkItemChanged: (id, label) => setState(() {
-                      _linkedId = id;
-                      _linkedLabel = label;
-                    }),
+                    onLinkItemChanged: (id) => setState(() => _linkedId = id),
                   ),
                   const SizedBox(height: kSpace4),
 
@@ -293,16 +274,14 @@ class _LinkSection extends StatelessWidget {
   const _LinkSection({
     required this.linkType,
     required this.linkedId,
-    required this.linkedLabel,
     required this.onLinkTypeChanged,
     required this.onLinkItemChanged,
   });
 
   final DocLinkedType? linkType;
   final String? linkedId;
-  final String? linkedLabel;
   final ValueChanged<DocLinkedType?> onLinkTypeChanged;
-  final void Function(String id, String label) onLinkItemChanged;
+  final ValueChanged<String> onLinkItemChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -340,11 +319,7 @@ class _LinkSection extends StatelessWidget {
         return WabwaySelectField<String?>(
           label: 'Spot',
           value: linkedId,
-          onChanged: (id) {
-            if (id == null) return;
-            final spot = kMockSpots.where((s) => s.id == id).firstOrNull;
-            if (spot != null) onLinkItemChanged(id, spot.name);
-          },
+          onChanged: (id) { if (id != null) onLinkItemChanged(id); },
           items: kMockSpots
               .map((s) => WabwaySelectItem(value: s.id, label: s.name))
               .toList(),
@@ -354,11 +329,7 @@ class _LinkSection extends StatelessWidget {
         return WabwaySelectField<String?>(
           label: 'Receipt',
           value: linkedId,
-          onChanged: (id) {
-            if (id == null) return;
-            final r = kMockReceipts.where((r) => r.id == id).firstOrNull;
-            if (r != null) onLinkItemChanged(id, r.title);
-          },
+          onChanged: (id) { if (id != null) onLinkItemChanged(id); },
           items: kMockReceipts
               .map((r) => WabwaySelectItem(value: r.id, label: r.title))
               .toList(),
@@ -368,13 +339,7 @@ class _LinkSection extends StatelessWidget {
         return WabwaySelectField<String?>(
           label: 'Withdrawal',
           value: linkedId,
-          onChanged: (id) {
-            if (id == null) return;
-            final w = kMockWithdrawals.where((w) => w.id == id).firstOrNull;
-            if (w != null) {
-              onLinkItemChanged(id, 'ATM ${fmtAmount(w.amount, w.currency)}');
-            }
-          },
+          onChanged: (id) { if (id != null) onLinkItemChanged(id); },
           items: kMockWithdrawals
               .map((w) => WabwaySelectItem(
                     value: w.id,
@@ -403,7 +368,7 @@ class _LinkSection extends StatelessWidget {
         return WabwayTextField(
           label: 'Item name',
           hint: 'Enter a label for this link',
-          onChanged: (v) => onLinkItemChanged('custom', v),
+          onChanged: (v) => onLinkItemChanged('custom'),
         );
     }
   }

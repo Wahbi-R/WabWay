@@ -1,4 +1,5 @@
 export 'wabway_avatar.dart';
+export 'wabway_detail_widgets.dart';
 export 'wabway_badge.dart';
 export 'wabway_button.dart';
 export 'wabway_card.dart';

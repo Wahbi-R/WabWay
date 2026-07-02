@@ -91,7 +91,7 @@ class ItemDetailContent extends StatelessWidget {
 
               if (item.notes != null && item.notes!.isNotEmpty) ...[
                 const SizedBox(height: kSpace4),
-                _NotesSection(notes: item.notes!),
+                WabwayNotesSection(notes: item.notes!),
               ],
 
               const SizedBox(height: kSpace4),
@@ -138,7 +138,7 @@ class _ItemHeader extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _TypeBadge(type: item.type),
+                    WabwayEntityBadge(icon: item.type.icon, label: item.type.label, color: item.type.color, iconSize: 12),
                     const SizedBox(height: kSpace1),
                     Row(
                       children: [
@@ -244,34 +244,10 @@ class _MetaCard extends StatelessWidget {
         children: [
           for (int i = 0; i < rows.length; i++) ...[
             if (i > 0) const Divider(height: kSpace4, thickness: 1, color: kColorBorder),
-            _MetaRow(icon: rows[i].$1, label: rows[i].$2, value: rows[i].$3 ?? ''),
+            WabwayMetaRow(icon: rows[i].$1, label: rows[i].$2, value: rows[i].$3 ?? ''),
           ],
         ],
       ),
-    );
-  }
-}
-
-class _MetaRow extends StatelessWidget {
-  const _MetaRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-  final IconData icon;
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: kColorInkSoft),
-        const SizedBox(width: kSpace2),
-        Text(label, style: kStyleCaption),
-        const Spacer(),
-        Text(value, style: kStyleBodyMedium),
-      ],
     );
   }
 }
@@ -404,33 +380,6 @@ class _DocChip extends StatelessWidget {
   }
 }
 
-// ─── Notes section ────────────────────────────────────────────────────────────
-
-class _NotesSection extends StatelessWidget {
-  const _NotesSection({required this.notes});
-  final String notes;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Notes', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
-        const SizedBox(height: kSpace2),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(kSpace3),
-          decoration: const BoxDecoration(
-            color: kColorSurfaceSunken,
-            borderRadius: kRadiusMd,
-          ),
-          child: Text(notes, style: kStyleBody),
-        ),
-      ],
-    );
-  }
-}
-
 // ─── Actions section ──────────────────────────────────────────────────────────
 
 class _ActionsSection extends StatelessWidget {
@@ -537,17 +486,9 @@ void _showActionsSheet(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(top: kSpace3, bottom: kSpace1),
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: const BoxDecoration(
-                  color: kColorBorder, borderRadius: kRadiusPill),
-            ),
-          ),
+          const WabwayDragHandle(),
           if (item.mapsUrl != null)
-            _SheetTile(
+            WabwayActionTile(
               icon: Icons.map_rounded,
               label: 'Open in Maps',
               onTap: () {
@@ -559,17 +500,17 @@ void _showActionsSheet(
                 ));
               },
             ),
-          _SheetTile(
+          WabwayActionTile(
             icon: Icons.attach_file_rounded,
             label: 'Attach Document',
             onTap: () => Navigator.pop(ctx),
           ),
-          _SheetTile(
+          WabwayActionTile(
             icon: Icons.edit_rounded,
             label: 'Edit item',
             onTap: () => Navigator.pop(ctx),
           ),
-          _SheetTile(
+          WabwayActionTile(
             icon: Icons.delete_outline_rounded,
             label: 'Delete',
             color: kColorDanger,
@@ -586,58 +527,3 @@ void _showActionsSheet(
   );
 }
 
-class _SheetTile extends StatelessWidget {
-  const _SheetTile({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.color,
-  });
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = color ?? kColorInk;
-    return ListTile(
-      leading: Icon(icon, color: c, size: 20),
-      title: Text(label, style: kStyleBodyMedium.copyWith(color: c)),
-      onTap: onTap,
-    );
-  }
-}
-
-// ─── Type badge ───────────────────────────────────────────────────────────────
-
-class _TypeBadge extends StatelessWidget {
-  const _TypeBadge({required this.type});
-  final ItineraryItemType type;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: type.color.withValues(alpha: 0.12),
-        borderRadius: kRadiusPill,
-        border: Border.all(color: type.color.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(type.icon, size: 12, color: type.color),
-          const SizedBox(width: 5),
-          Text(
-            type.label,
-            style: kStyleCaption.copyWith(
-              color: type.color,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

@@ -114,7 +114,7 @@ class _AddSpotContentState extends State<_AddSpotContent> {
       mapsUrl: _mapsCtrl.text.trim().isEmpty ? null : _mapsCtrl.text.trim(),
       sourceUrl: _sourceCtrl.text.trim().isEmpty ? null : _sourceCtrl.text.trim(),
       notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
-      addedBy: 'You',
+      addedById: 'you',
     );
     widget.onSubmit(spot);
   }
@@ -127,18 +127,7 @@ class _AddSpotContentState extends State<_AddSpotContent> {
       mainAxisSize: MainAxisSize.min,
       children: [
         // Drag handle (mobile only)
-        if (widget.showDragHandle)
-          Padding(
-            padding: const EdgeInsets.only(top: kSpace3, bottom: kSpace1),
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: const BoxDecoration(
-                color: kColorBorder,
-                borderRadius: kRadiusPill,
-              ),
-            ),
-          ),
+        if (widget.showDragHandle) const WabwayDragHandle(),
 
         // Header
         Padding(

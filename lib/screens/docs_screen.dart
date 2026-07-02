@@ -1,6 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../data/docs_data.dart';
+import '../data/member_data.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
@@ -44,7 +45,7 @@ class _DocsScreenState extends State<DocsScreen> {
       final matchSearch = q.isEmpty ||
           d.title.toLowerCase().contains(q) ||
           d.type.label.toLowerCase().contains(q) ||
-          d.uploadedBy.toLowerCase().contains(q);
+          memberById(d.uploadedById).name.toLowerCase().contains(q);
       return matchType && matchSearch;
     }).toList();
   }

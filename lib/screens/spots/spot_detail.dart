@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../data/member_data.dart';
 import '../../data/spot_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
@@ -110,10 +111,11 @@ class _SpotDetailContentState extends State<SpotDetailContent> {
     if (text.isEmpty) return;
     setState(() {
       _extraComments.add(SpotComment(
-        author: 'You',
+        id: 'local_${DateTime.now().millisecondsSinceEpoch}',
+        authorId: kYouId,
         vote: _myVote,
         text: text,
-        time: 'just now',
+        createdAt: DateTime.now(),
       ));
       _commentCtrl.clear();
     });
@@ -332,27 +334,27 @@ class _GroupVotesSummary extends StatelessWidget {
     final rows = <Widget>[];
 
     for (final type in VoteType.values) {
-      final names = votes.voters(type);
-      if (names.isEmpty) continue;
+      final ids = votes.voters(type);
+      if (ids.isEmpty) continue;
       rows.add(
         Padding(
           padding: const EdgeInsets.only(bottom: kSpace2),
           child: Row(
             children: [
-              ...names.take(3).map(
-                    (name) => Padding(
+              ...ids.take(3).map(
+                    (id) => Padding(
                       padding: const EdgeInsets.only(right: 6),
                       child: WabwayAvatar(
-                        name: name,
+                        name: memberById(id).name,
                         size: WabwayAvatarSize.xs,
                       ),
                     ),
                   ),
-              if (names.length > 3)
+              if (ids.length > 3)
                 Padding(
                   padding: const EdgeInsets.only(right: 6),
                   child: Text(
-                    '+${names.length - 3}',
+                    '+${ids.length - 3}',
                     style: kStyleOverline.copyWith(color: kColorInkSoft),
                   ),
                 ),
@@ -381,7 +383,7 @@ class _CommentRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          WabwayAvatar(name: comment.author, size: WabwayAvatarSize.sm),
+          WabwayAvatar(name: memberById(comment.authorId).name, size: WabwayAvatarSize.sm),
           const SizedBox(width: kSpace3),
           Expanded(
             child: Column(
@@ -390,7 +392,7 @@ class _CommentRow extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      comment.author,
+                      memberById(comment.authorId).name,
                       style: kStyleBodySemibold,
                     ),
                     if (comment.vote != null) ...[
@@ -402,7 +404,7 @@ class _CommentRow extends StatelessWidget {
                       ),
                     ],
                     const Spacer(),
-                    Text(comment.time, style: kStyleOverline),
+                    Text(fmtCommentTime(comment.createdAt), style: kStyleOverline),
                   ],
                 ),
                 const SizedBox(height: kSpace1),
@@ -426,7 +428,7 @@ class _CommentInput extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        const WabwayAvatar(name: 'You', size: WabwayAvatarSize.sm),
+        WabwayAvatar(name: memberById(kYouId).name, size: WabwayAvatarSize.sm),
         const SizedBox(width: kSpace3),
         Expanded(
           child: TextField(

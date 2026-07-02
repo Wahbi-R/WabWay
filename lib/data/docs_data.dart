@@ -105,11 +105,9 @@ class DocumentLink {
   const DocumentLink({
     required this.type,
     required this.linkedId,
-    required this.label,
   });
   final DocLinkedType type;
   final String linkedId;
-  final String label;
 }
 
 // ─── Trip document ────────────────────────────────────────────────────────────
@@ -120,7 +118,7 @@ class TripDocument {
     required this.title,
     required this.type,
     required this.ext,
-    required this.uploadedBy,
+    required this.uploadedById,
     required this.uploadedAt,
     this.fileSizeKb,
     this.amount,
@@ -133,7 +131,7 @@ class TripDocument {
   final String title;
   final DocType type;
   final String ext;
-  final String uploadedBy;
+  final String uploadedById;
   final DateTime uploadedAt;
   final int? fileSizeKb;
   final double? amount;
@@ -174,15 +172,12 @@ final kMockDocuments = <TripDocument>[
     title: 'JAL Flight JL723 — Narita',
     type: DocType.flight,
     ext: 'pdf',
-    uploadedBy: 'Alex',
+    uploadedById: 'alex',
     uploadedAt: DateTime(2024, 10, 15),
     fileSizeKb: 245,
     notes: 'Outbound flight. Arrives Nov 11 at 3:40pm local time.',
     links: const [
-      DocumentLink(
-          type: DocLinkedType.trip,
-          linkedId: 'trip1',
-          label: 'Japan Nov 2024'),
+      DocumentLink(type: DocLinkedType.trip, linkedId: 'trip1'),
     ],
   ),
   TripDocument(
@@ -190,15 +185,12 @@ final kMockDocuments = <TripDocument>[
     title: 'Return Flight JL724',
     type: DocType.flight,
     ext: 'pdf',
-    uploadedBy: 'Alex',
+    uploadedById: 'alex',
     uploadedAt: DateTime(2024, 10, 15),
     fileSizeKb: 220,
     notes: 'Departs Nov 20 at 11:55pm.',
     links: const [
-      DocumentLink(
-          type: DocLinkedType.trip,
-          linkedId: 'trip1',
-          label: 'Japan Nov 2024'),
+      DocumentLink(type: DocLinkedType.trip, linkedId: 'trip1'),
     ],
   ),
   TripDocument(
@@ -206,17 +198,14 @@ final kMockDocuments = <TripDocument>[
     title: 'Hotel Shinjuku Confirmation',
     type: DocType.hotel,
     ext: 'pdf',
-    uploadedBy: 'Jordan',
+    uploadedById: 'jordan',
     uploadedAt: DateTime(2024, 10, 20),
     fileSizeKb: 180,
     amount: 36000,
     currency: 'JPY',
     notes: 'Check-in Nov 12, check-out Nov 14. Breakfast included.',
     links: const [
-      DocumentLink(
-          type: DocLinkedType.receipt,
-          linkedId: 'r3',
-          label: 'Hotel Shinjuku (2 nights)'),
+      DocumentLink(type: DocLinkedType.receipt, linkedId: 'r3'),
     ],
   ),
   TripDocument(
@@ -224,17 +213,14 @@ final kMockDocuments = <TripDocument>[
     title: 'Kyoto Ryokan Booking',
     type: DocType.hotel,
     ext: 'pdf',
-    uploadedBy: 'You',
+    uploadedById: 'you',
     uploadedAt: DateTime(2024, 10, 25),
     fileSizeKb: 320,
     amount: 52000,
     currency: 'JPY',
     notes: 'Traditional ryokan with onsen. Dinner and breakfast included.',
     links: const [
-      DocumentLink(
-          type: DocLinkedType.receipt,
-          linkedId: 'r7',
-          label: 'Kyoto Ryokan (1 night)'),
+      DocumentLink(type: DocLinkedType.receipt, linkedId: 'r7'),
     ],
   ),
   TripDocument(
@@ -242,16 +228,13 @@ final kMockDocuments = <TripDocument>[
     title: 'Shinkansen Tickets × 4',
     type: DocType.train,
     ext: 'pdf',
-    uploadedBy: 'You',
+    uploadedById: 'you',
     uploadedAt: DateTime(2024, 11, 1),
     fileSizeKb: 150,
     amount: 27400,
     currency: 'JPY',
     links: const [
-      DocumentLink(
-          type: DocLinkedType.receipt,
-          linkedId: 'r2',
-          label: 'Shinkansen Tokyo → Kyoto'),
+      DocumentLink(type: DocLinkedType.receipt, linkedId: 'r2'),
     ],
   ),
   TripDocument(
@@ -259,15 +242,12 @@ final kMockDocuments = <TripDocument>[
     title: 'Japan Rail Pass',
     type: DocType.train,
     ext: 'pdf',
-    uploadedBy: 'Alex',
+    uploadedById: 'alex',
     uploadedAt: DateTime(2024, 9, 10),
     fileSizeKb: 890,
     notes: '14-day JR Pass. Valid Nov 11–25.',
     links: const [
-      DocumentLink(
-          type: DocLinkedType.trip,
-          linkedId: 'trip1',
-          label: 'Japan Nov 2024'),
+      DocumentLink(type: DocLinkedType.trip, linkedId: 'trip1'),
     ],
   ),
   TripDocument(
@@ -275,21 +255,15 @@ final kMockDocuments = <TripDocument>[
     title: 'teamLab Borderless Tickets',
     type: DocType.ticket,
     ext: 'pdf',
-    uploadedBy: 'Alex',
+    uploadedById: 'alex',
     uploadedAt: DateTime(2024, 11, 5),
     fileSizeKb: 95,
     amount: 14000,
     currency: 'JPY',
     notes: '4 × ¥3,500. Nov 14 at 10:00am.',
     links: const [
-      DocumentLink(
-          type: DocLinkedType.receipt,
-          linkedId: 'r6',
-          label: 'teamLab Borderless'),
-      DocumentLink(
-          type: DocLinkedType.spot,
-          linkedId: '8',
-          label: 'teamLab Borderless'),
+      DocumentLink(type: DocLinkedType.receipt, linkedId: 'r6'),
+      DocumentLink(type: DocLinkedType.spot, linkedId: '8'),
     ],
   ),
   TripDocument(
@@ -297,15 +271,12 @@ final kMockDocuments = <TripDocument>[
     title: 'Travel Insurance Policy',
     type: DocType.insurance,
     ext: 'pdf',
-    uploadedBy: 'You',
+    uploadedById: 'you',
     uploadedAt: DateTime(2024, 9, 28),
     fileSizeKb: 3800,
     notes: 'Emergency medical up to \$500k USD. 24/7 hotline: +1-800-555-0100.',
     links: const [
-      DocumentLink(
-          type: DocLinkedType.trip,
-          linkedId: 'trip1',
-          label: 'Japan Nov 2024'),
+      DocumentLink(type: DocLinkedType.trip, linkedId: 'trip1'),
     ],
   ),
   TripDocument(
@@ -313,14 +284,11 @@ final kMockDocuments = <TripDocument>[
     title: 'Customs Declaration Form',
     type: DocType.form,
     ext: 'pdf',
-    uploadedBy: 'Jordan',
+    uploadedById: 'jordan',
     uploadedAt: DateTime(2024, 11, 11),
     fileSizeKb: 45,
     links: const [
-      DocumentLink(
-          type: DocLinkedType.trip,
-          linkedId: 'trip1',
-          label: 'Japan Nov 2024'),
+      DocumentLink(type: DocLinkedType.trip, linkedId: 'trip1'),
     ],
   ),
   TripDocument(
@@ -328,16 +296,13 @@ final kMockDocuments = <TripDocument>[
     title: 'Ramen Ichiran Receipt Photo',
     type: DocType.receipt,
     ext: 'jpg',
-    uploadedBy: 'Alex',
+    uploadedById: 'alex',
     uploadedAt: DateTime(2024, 11, 12),
     fileSizeKb: 1240,
     amount: 4800,
     currency: 'JPY',
     links: const [
-      DocumentLink(
-          type: DocLinkedType.receipt,
-          linkedId: 'r1',
-          label: 'Ramen Ichiran'),
+      DocumentLink(type: DocLinkedType.receipt, linkedId: 'r1'),
     ],
   ),
   TripDocument(
@@ -345,16 +310,13 @@ final kMockDocuments = <TripDocument>[
     title: '7-Eleven ATM Slip',
     type: DocType.receipt,
     ext: 'jpg',
-    uploadedBy: 'You',
+    uploadedById: 'you',
     uploadedAt: DateTime(2024, 11, 12),
     fileSizeKb: 640,
     amount: 50000,
     currency: 'JPY',
     links: const [
-      DocumentLink(
-          type: DocLinkedType.cashWithdrawal,
-          linkedId: 'w1',
-          label: 'ATM ¥50,000 withdrawal'),
+      DocumentLink(type: DocLinkedType.cashWithdrawal, linkedId: 'w1'),
     ],
   ),
   TripDocument(
@@ -362,12 +324,11 @@ final kMockDocuments = <TripDocument>[
     title: 'Dotonbori Night — Screenshot',
     type: DocType.screenshot,
     ext: 'png',
-    uploadedBy: 'Sam',
+    uploadedById: 'sam',
     uploadedAt: DateTime(2024, 11, 18),
     fileSizeKb: 2100,
     links: const [
-      DocumentLink(
-          type: DocLinkedType.spot, linkedId: '4', label: 'Dotonbori'),
+      DocumentLink(type: DocLinkedType.spot, linkedId: '4'),
     ],
   ),
 ];

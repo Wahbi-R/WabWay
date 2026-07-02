@@ -120,18 +120,7 @@ class _AddCashContentState extends State<_AddCashContent> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (widget.showDragHandle)
-          Padding(
-            padding: const EdgeInsets.only(top: kSpace3, bottom: kSpace1),
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: const BoxDecoration(
-                color: kColorBorder,
-                borderRadius: kRadiusPill,
-              ),
-            ),
-          ),
+        if (widget.showDragHandle) const WabwayDragHandle(),
 
         Padding(
           padding: const EdgeInsets.fromLTRB(kSpace4, kSpace3, kSpace4, 0),

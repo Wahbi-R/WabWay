@@ -174,22 +174,7 @@ class CashDetailContent extends StatelessWidget {
               const SizedBox(height: kSpace5),
 
               // Attach placeholder
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: kSpace6),
-                decoration: BoxDecoration(
-                  color: kColorSurfaceSunken,
-                  borderRadius: kRadiusMd,
-                  border: Border.all(color: kColorBorder),
-                ),
-                child: Column(
-                  children: [
-                    const Icon(Icons.attach_file_rounded, size: 24, color: kColorInkSoft),
-                    const SizedBox(height: kSpace2),
-                    Text('Attach ATM slip', style: kStyleCaption),
-                  ],
-                ),
-              ),
+              const WabwayAttachPlaceholder(label: 'Attach ATM slip'),
             ],
           ),
         ),

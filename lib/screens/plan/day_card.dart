@@ -47,8 +47,7 @@ class _TripDayCardState extends State<TripDayCard> {
   @override
   Widget build(BuildContext context) {
     final items = widget.day.sortedItems;
-    final hasNotes =
-        widget.day.notes != null && widget.day.notes!.isNotEmpty;
+    final hasNotes = widget.day.notes != null && widget.day.notes!.isNotEmpty;
     final headerTappable =
         hasNotes || (widget.isDesktop && widget.onDayTap != null);
 
@@ -65,7 +64,6 @@ class _TripDayCardState extends State<TripDayCard> {
             onTap: headerTappable ? _handleHeaderTap : null,
           ),
           const Divider(height: 1, color: kColorBorder),
-
           if (items.isEmpty)
             _EmptyDayBody(onAddItem: widget.onAddItem)
           else
@@ -157,8 +155,8 @@ class _DayHeader extends StatelessWidget {
                             )),
                         const SizedBox(width: kSpace2),
                         Text('·',
-                            style: kStyleCaption.copyWith(
-                                color: kColorInkSoft)),
+                            style:
+                                kStyleCaption.copyWith(color: kColorInkSoft)),
                         const SizedBox(width: kSpace2),
                         Text(
                           fmtDayDate(day.date),
@@ -271,7 +269,8 @@ class _EmptyDayBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: kSpace5, horizontal: kSpace4),
+      padding:
+          const EdgeInsets.symmetric(vertical: kSpace5, horizontal: kSpace4),
       child: Column(
         children: [
           Text(
@@ -304,7 +303,8 @@ class _AddItemRow extends StatelessWidget {
       onTap: onTap,
       borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: kSpace4, vertical: kSpace3),
+        padding:
+            const EdgeInsets.symmetric(horizontal: kSpace4, vertical: kSpace3),
         child: Row(
           children: [
             const SizedBox(width: 50 + kSpace3), // align with content column

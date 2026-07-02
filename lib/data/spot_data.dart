@@ -121,17 +121,19 @@ class SpotVotes {
 }
 
 class SpotComment {
-  const SpotComment({
-    required this.author,
+  SpotComment({
+    required this.id,
+    required this.authorId,
     this.vote,
     required this.text,
-    required this.time,
+    required this.createdAt,
   });
 
-  final String author;
+  final String id;
+  final String authorId;
   final VoteType? vote;
   final String text;
-  final String time;
+  final DateTime createdAt;
 }
 
 class Spot {
@@ -147,7 +149,7 @@ class Spot {
     this.notes,
     this.votes = const SpotVotes(),
     this.comments = const [],
-    required this.addedBy,
+    required this.addedById,
   });
 
   final String id;
@@ -161,12 +163,12 @@ class Spot {
   final String? notes;
   final SpotVotes votes;
   final List<SpotComment> comments;
-  final String addedBy;
+  final String addedById;
 }
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
-const kMockSpots = <Spot>[
+final kMockSpots = <Spot>[
   Spot(
     id: '1',
     name: 'Senso-ji Temple',
@@ -178,22 +180,24 @@ const kMockSpots = <Spot>[
     sourceUrl: 'https://www.timeout.com/tokyo/attractions/senso-ji',
     notes:
         'Most famous temple in Tokyo. Go before 8am to beat the crowds — the Nakamise shopping street leading up to it is also great for snacks and souvenirs.',
-    votes: SpotVotes(mustDo: ['Alex', 'Jordan'], want: ['Sam']),
+    votes: const SpotVotes(mustDo: ['alex', 'jordan'], want: ['sam']),
     comments: [
       SpotComment(
-        author: 'Alex',
+        id: 'c1_1',
+        authorId: 'alex',
         vote: VoteType.mustDo,
         text: 'Non-negotiable. The atmosphere at dawn is something else.',
-        time: '2d ago',
+        createdAt: DateTime(2024, 11, 9, 10, 14),
       ),
       SpotComment(
-        author: 'Jordan',
+        id: 'c1_2',
+        authorId: 'jordan',
         vote: VoteType.mustDo,
         text: "Agreed. The incense smoke from the giant cauldron in front is a whole experience.",
-        time: '1d ago',
+        createdAt: DateTime(2024, 11, 10, 18, 42),
       ),
     ],
-    addedBy: 'Alex',
+    addedById: 'alex',
   ),
   Spot(
     id: '2',
@@ -205,16 +209,17 @@ const kMockSpots = <Spot>[
     mapsUrl: 'https://maps.google.com/?q=Tsukiji+Outer+Market',
     notes:
         'The inner wholesale market moved to Toyosu, but the outer market is still open with incredible street food — fresh sushi, tamagoyaki, grilled seafood skewers.',
-    votes: SpotVotes(mustDo: ['Sam'], want: ['Alex', 'Jordan']),
+    votes: const SpotVotes(mustDo: ['sam'], want: ['alex', 'jordan']),
     comments: [
       SpotComment(
-        author: 'Sam',
+        id: 'c2_1',
+        authorId: 'sam',
         vote: VoteType.mustDo,
         text: 'Best sushi breakfast of my life last time. We have to go.',
-        time: '3d ago',
+        createdAt: DateTime(2024, 11, 8, 9, 5),
       ),
     ],
-    addedBy: 'Sam',
+    addedById: 'sam',
   ),
   Spot(
     id: '3',
@@ -226,22 +231,24 @@ const kMockSpots = <Spot>[
     mapsUrl: 'https://maps.google.com/?q=Arashiyama+Bamboo+Grove',
     sourceUrl: 'https://www.japan-guide.com/e/e3951.html',
     notes: 'Iconic bamboo path. Also worth doing: Tenryu-ji garden nearby, and the monkey park up the hill for city views.',
-    votes: SpotVotes(mustDo: ['Alex', 'Sam', 'Jordan']),
+    votes: const SpotVotes(mustDo: ['alex', 'sam', 'jordan']),
     comments: [
       SpotComment(
-        author: 'Jordan',
+        id: 'c3_1',
+        authorId: 'jordan',
         vote: VoteType.mustDo,
         text: 'I have seen this in literally every video about Japan. We are going.',
-        time: '4d ago',
+        createdAt: DateTime(2024, 11, 7, 20, 31),
       ),
       SpotComment(
-        author: 'Alex',
+        id: 'c3_2',
+        authorId: 'alex',
         vote: VoteType.mustDo,
         text: 'Combine it with Tenryu-ji for a full half-day.',
-        time: '3d ago',
+        createdAt: DateTime(2024, 11, 8, 11, 17),
       ),
     ],
-    addedBy: 'Jordan',
+    addedById: 'jordan',
   ),
   Spot(
     id: '4',
@@ -253,16 +260,17 @@ const kMockSpots = <Spot>[
     mapsUrl: 'https://maps.google.com/?q=Dotonbori+Osaka',
     notes:
         'The main food and entertainment strip of Osaka. Try takoyaki from Aizuya, kushikatsu at Daruma, and walk the canal at night for the neon reflection.',
-    votes: SpotVotes(mustDo: ['Alex'], want: ['Jordan', 'Sam']),
+    votes: const SpotVotes(mustDo: ['alex'], want: ['jordan', 'sam']),
     comments: [
       SpotComment(
-        author: 'Sam',
+        id: 'c4_1',
+        authorId: 'sam',
         vote: VoteType.want,
         text: 'The giant running crab sign is so good.',
-        time: '5d ago',
+        createdAt: DateTime(2024, 11, 6, 16, 55),
       ),
     ],
-    addedBy: 'Alex',
+    addedById: 'alex',
   ),
   Spot(
     id: '5',
@@ -275,24 +283,26 @@ const kMockSpots = <Spot>[
     sourceUrl: 'https://www.insidekyoto.com/fushimi-inari-taisha',
     notes:
         'Thousands of torii gates winding up the mountain. The full hike takes about 2–3 hours. Just the lower section is already stunning and takes 30–45 min.',
-    votes: SpotVotes(mustDo: ['Jordan'], want: ['Alex'], maybe: ['Sam']),
+    votes: const SpotVotes(mustDo: ['jordan'], want: ['alex'], maybe: ['sam']),
     comments: [
       SpotComment(
-        author: 'Jordan',
+        id: 'c5_1',
+        authorId: 'jordan',
         vote: VoteType.mustDo,
         text: 'I want to do the full hike to the top. Worth waking up early for.',
-        time: '2d ago',
+        createdAt: DateTime(2024, 11, 9, 14, 8),
       ),
       SpotComment(
-        author: 'Sam',
+        id: 'c5_2',
+        authorId: 'sam',
         vote: VoteType.maybe,
         text: 'How far is the full hike? My knees might not cooperate.',
-        time: '1d ago',
+        createdAt: DateTime(2024, 11, 10, 21, 3),
       ),
     ],
-    addedBy: 'Jordan',
+    addedById: 'jordan',
   ),
-  Spot(
+  const Spot(
     id: '6',
     name: 'Shibuya Crossing',
     city: 'Tokyo',
@@ -302,9 +312,8 @@ const kMockSpots = <Spot>[
     mapsUrl: 'https://maps.google.com/?q=Shibuya+Crossing',
     notes:
         "World's busiest pedestrian crossing. Watch from above at Mag's Park or the Shibuya Sky observation deck for the full effect. Also walk through at rush hour.",
-    votes: SpotVotes(want: ['Alex', 'Jordan'], maybe: ['Sam']),
-    comments: [],
-    addedBy: 'Alex',
+    votes: SpotVotes(want: ['alex', 'jordan'], maybe: ['sam']),
+    addedById: 'alex',
   ),
   Spot(
     id: '7',
@@ -316,16 +325,17 @@ const kMockSpots = <Spot>[
     mapsUrl: 'https://maps.google.com/?q=Nishiki+Market+Kyoto',
     sourceUrl: 'https://www.timeout.com/kyoto/restaurants/nishiki-market',
     notes: "Kyoto's Kitchen — a narrow 5-block covered market. Try dashimaki tamago, pickles, and fresh yuba (tofu skin). Very crowded on weekends.",
-    votes: SpotVotes(want: ['Sam'], maybe: ['Jordan']),
+    votes: const SpotVotes(want: ['sam'], maybe: ['jordan']),
     comments: [
       SpotComment(
-        author: 'Sam',
+        id: 'c7_1',
+        authorId: 'sam',
         vote: VoteType.want,
         text: 'Saw this on a food vlog. The egg-on-a-stick thing alone is worth it.',
-        time: '1d ago',
+        createdAt: DateTime(2024, 11, 10, 12, 47),
       ),
     ],
-    addedBy: 'Sam',
+    addedById: 'sam',
   ),
   Spot(
     id: '8',
@@ -337,24 +347,26 @@ const kMockSpots = <Spot>[
     mapsUrl: 'https://maps.google.com/?q=teamLab+Borderless+Tokyo',
     sourceUrl: 'https://www.teamlab.art/e/borderless-azabudaihills/',
     notes: 'Digital art museum — the reopened Azabudai Hills location. Tickets book up weeks ahead. We are booked for Nov 14 at 10am.',
-    votes: SpotVotes(mustDo: ['Alex', 'Jordan', 'Sam']),
+    votes: const SpotVotes(mustDo: ['alex', 'jordan', 'sam']),
     comments: [
       SpotComment(
-        author: 'Alex',
+        id: 'c8_1',
+        authorId: 'alex',
         vote: VoteType.mustDo,
         text: 'Already booked. Nov 14, 10am. Do not be late.',
-        time: '6d ago',
+        createdAt: DateTime(2024, 11, 5, 8, 22),
       ),
       SpotComment(
-        author: 'Sam',
+        id: 'c8_2',
+        authorId: 'sam',
         vote: VoteType.mustDo,
         text: 'Excited! Wear something you do not mind getting slightly wet.',
-        time: '5d ago',
+        createdAt: DateTime(2024, 11, 6, 19, 11),
       ),
     ],
-    addedBy: 'Alex',
+    addedById: 'alex',
   ),
-  Spot(
+  const Spot(
     id: '9',
     name: 'Gion District',
     city: 'Kyoto',
@@ -364,8 +376,20 @@ const kMockSpots = <Spot>[
     mapsUrl: 'https://maps.google.com/?q=Gion+Kyoto',
     notes:
         "Historic geisha district. Walk Hanamikoji Street in the early evening — you might spot a geiko or maiko heading to an appointment. Respect the no-photo zones.",
-    votes: SpotVotes(mustDo: ['Jordan'], want: ['Alex'], maybe: ['Sam']),
-    comments: [],
-    addedBy: 'Jordan',
+    votes: SpotVotes(mustDo: ['jordan'], want: ['alex'], maybe: ['sam']),
+    addedById: 'jordan',
   ),
 ];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+String fmtCommentTime(DateTime dt) {
+  final diff = DateTime.now().difference(dt);
+  if (diff.inSeconds < 60) return 'just now';
+  if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+  if (diff.inHours < 24) return '${diff.inHours}h ago';
+  if (diff.inDays < 7) return '${diff.inDays}d ago';
+  if (diff.inDays < 30) return '${(diff.inDays / 7).floor()}wk ago';
+  if (diff.inDays < 365) return '${(diff.inDays / 30).floor()}mo ago';
+  return '${(diff.inDays / 365).floor()}yr ago';
+}

@@ -140,7 +140,7 @@ class ReceiptDetailContent extends StatelessWidget {
               const SizedBox(height: kSpace5),
 
               // Attach receipt placeholder
-              _AttachPlaceholder(),
+              const WabwayAttachPlaceholder(label: 'Attach receipt photo'),
             ],
           ),
         ),
@@ -241,24 +241,3 @@ class _SplitRow extends StatelessWidget {
   }
 }
 
-class _AttachPlaceholder extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: kSpace6),
-      decoration: BoxDecoration(
-        color: kColorSurfaceSunken,
-        borderRadius: kRadiusMd,
-        border: Border.all(color: kColorBorder, style: BorderStyle.solid),
-      ),
-      child: Column(
-        children: [
-          const Icon(Icons.attach_file_rounded, size: 24, color: kColorInkSoft),
-          const SizedBox(height: kSpace2),
-          Text('Attach receipt photo', style: kStyleCaption),
-        ],
-      ),
-    );
-  }
-}

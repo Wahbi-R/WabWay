@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_theme.dart';
 import '../theme/app_decorations.dart';
+import 'share/incoming_share_screen.dart';
 
 class MoreScreen extends StatelessWidget {
   const MoreScreen({super.key});
@@ -140,6 +141,13 @@ class MoreScreen extends StatelessWidget {
               ),
             ),
           ),
+          const SizedBox(height: kSpace4),
+
+          // Share flow preview
+          const _SectionHeader(title: 'Share'),
+          const SizedBox(height: kSpace3),
+          const IncomingShareDemoLauncher(),
+
           const SizedBox(height: kSpace16),
         ],
       ),

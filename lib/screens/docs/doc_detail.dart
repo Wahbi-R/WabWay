@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../data/docs_data.dart';
 import '../../data/money_data.dart';
+import '../../data/spot_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
@@ -61,7 +62,7 @@ class DocDetailContent extends StatelessWidget {
               ],
               if (doc.notes != null && doc.notes!.isNotEmpty) ...[
                 const SizedBox(height: kSpace4),
-                _NotesSection(notes: doc.notes!),
+                WabwayNotesSection(notes: doc.notes!),
               ],
               const SizedBox(height: kSpace4),
               _ActionsSection(doc: doc),
@@ -104,7 +105,7 @@ class _DocHeader extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _TypeBadge(type: doc.type),
+                  WabwayEntityBadge(icon: doc.type.icon, label: doc.type.label, color: doc.type.color),
                   const SizedBox(height: kSpace1),
                   DocExtBadge(doc: doc),
                 ],
@@ -140,26 +141,26 @@ class _FileMetaCard extends StatelessWidget {
       padding: const EdgeInsets.all(kSpace4),
       child: Column(
         children: [
-          _MetaRow(
+          WabwayMetaRow(
             icon: Icons.person_outline_rounded,
             label: 'Uploaded by',
-            value: doc.uploadedBy,
+            value: memberById(doc.uploadedById).name,
           ),
           _divider(),
-          _MetaRow(
+          WabwayMetaRow(
             icon: Icons.calendar_today_rounded,
             label: 'Date',
             value: _fmtDateFull(doc.uploadedAt),
           ),
           _divider(),
-          _MetaRow(
+          WabwayMetaRow(
             icon: Icons.storage_rounded,
             label: 'File size',
             value: doc.formattedSize,
           ),
           if (doc.amount != null) ...[
             _divider(),
-            _MetaRow(
+            WabwayMetaRow(
               icon: Icons.attach_money_rounded,
               label: 'Amount',
               value: fmtAmount(doc.amount!, doc.currency ?? 'JPY'),
@@ -177,36 +178,6 @@ class _FileMetaCard extends StatelessWidget {
 
   Widget _divider() =>
       const Divider(height: kSpace4, thickness: 1, color: kColorBorder);
-}
-
-class _MetaRow extends StatelessWidget {
-  const _MetaRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-    this.valueStyle,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-  final TextStyle? valueStyle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: kColorInkSoft),
-        const SizedBox(width: kSpace2),
-        Text(label, style: kStyleCaption),
-        const Spacer(),
-        Text(
-          value,
-          style: valueStyle ?? kStyleBodyMedium,
-        ),
-      ],
-    );
-  }
 }
 
 // ─── Linked section ───────────────────────────────────────────────────────────
@@ -242,7 +213,7 @@ class _LinkedRow extends StatelessWidget {
         onTap: () {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(
-              'Navigate to ${link.type.label}: ${link.label}',
+              'Navigate to ${link.type.label}: ${_resolveLinkedLabel(link.type, link.linkedId)}',
               style: kStyleBody.copyWith(color: Colors.white),
             ),
             behavior: SnackBarBehavior.floating,
@@ -266,7 +237,7 @@ class _LinkedRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    link.label,
+                    _resolveLinkedLabel(link.type, link.linkedId),
                     style: kStyleBodyMedium,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -282,33 +253,6 @@ class _LinkedRow extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-// ─── Notes section ────────────────────────────────────────────────────────────
-
-class _NotesSection extends StatelessWidget {
-  const _NotesSection({required this.notes});
-  final String notes;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Notes', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
-        const SizedBox(height: kSpace2),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(kSpace3),
-          decoration: const BoxDecoration(
-            color: kColorSurfaceSunken,
-            borderRadius: kRadiusMd,
-          ),
-          child: Text(notes, style: kStyleBody),
-        ),
-      ],
     );
   }
 }
@@ -472,15 +416,8 @@ void _showActionsSheet(BuildContext context, TripDocument doc) {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(top: kSpace3, bottom: kSpace1),
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: const BoxDecoration(color: kColorBorder, borderRadius: kRadiusPill),
-            ),
-          ),
-          _ActionTile(
+          const WabwayDragHandle(),
+          WabwayActionTile(
             icon: Icons.open_in_new_rounded,
             label: 'Open',
             onTap: () {
@@ -492,7 +429,7 @@ void _showActionsSheet(BuildContext context, TripDocument doc) {
               ));
             },
           ),
-          _ActionTile(
+          WabwayActionTile(
             icon: Icons.download_rounded,
             label: 'Download',
             onTap: () {
@@ -504,14 +441,14 @@ void _showActionsSheet(BuildContext context, TripDocument doc) {
               ));
             },
           ),
-          _ActionTile(
+          WabwayActionTile(
             icon: Icons.edit_rounded,
             label: 'Rename',
             onTap: () {
               Navigator.pop(ctx);
             },
           ),
-          _ActionTile(
+          WabwayActionTile(
             icon: Icons.receipt_long_rounded,
             label: 'Create Receipt from document',
             onTap: () async {
@@ -519,12 +456,12 @@ void _showActionsSheet(BuildContext context, TripDocument doc) {
               await showAddReceiptSheet(context);
             },
           ),
-          _ActionTile(
+          WabwayActionTile(
             icon: Icons.event_note_rounded,
             label: 'Attach to Itinerary',
             onTap: () => Navigator.pop(ctx),
           ),
-          _ActionTile(
+          WabwayActionTile(
             icon: Icons.delete_outline_rounded,
             label: 'Delete',
             color: kColorDanger,
@@ -540,64 +477,23 @@ void _showActionsSheet(BuildContext context, TripDocument doc) {
   );
 }
 
-class _ActionTile extends StatelessWidget {
-  const _ActionTile({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.color,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = color ?? kColorInk;
-    return ListTile(
-      leading: Icon(icon, color: c, size: 20),
-      title: Text(label, style: kStyleBodyMedium.copyWith(color: c)),
-      onTap: onTap,
-    );
-  }
-}
-
-// ─── Type badge ───────────────────────────────────────────────────────────────
-
-class _TypeBadge extends StatelessWidget {
-  const _TypeBadge({required this.type});
-  final DocType type;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: type.color.withValues(alpha: 0.12),
-        borderRadius: kRadiusPill,
-        border: Border.all(color: type.color.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(type.icon, size: 13, color: type.color),
-          const SizedBox(width: 5),
-          Text(
-            type.label,
-            style: kStyleCaption.copyWith(
-              color: type.color,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+String _resolveLinkedLabel(DocLinkedType type, String id) {
+  switch (type) {
+    case DocLinkedType.spot:
+      return kMockSpots.where((s) => s.id == id).firstOrNull?.name ?? type.label;
+    case DocLinkedType.receipt:
+      return kMockReceipts.where((r) => r.id == id).firstOrNull?.title ?? type.label;
+    case DocLinkedType.cashWithdrawal:
+      final w = kMockWithdrawals.where((w) => w.id == id).firstOrNull;
+      return w != null ? 'ATM ${fmtAmount(w.amount, w.currency)}' : type.label;
+    case DocLinkedType.trip:
+      return 'Japan Nov 2024';
+    default:
+      return type.label;
+  }
+}
 
 String _fmtDateFull(DateTime d) {
   const months = [

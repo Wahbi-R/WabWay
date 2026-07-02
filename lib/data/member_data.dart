@@ -7,13 +7,12 @@ class TripMember {
   bool get isYou => id == kYouId;
 }
 
-const kYouId = 'you';
+// Updated at runtime with real auth/member data in MoneyScreen.didChangeDependencies.
+// Fallback values ensure the money UI doesn't crash before MoneyScreen initialises.
+String kYouId = 'you';
 
-const kMockMembers = <TripMember>[
-  TripMember(id: 'you',    name: 'You'),
-  TripMember(id: 'alex',   name: 'Alex'),
-  TripMember(id: 'jordan', name: 'Jordan'),
-  TripMember(id: 'sam',    name: 'Sam'),
+List<TripMember> kMockMembers = const [
+  TripMember(id: 'you', name: 'You'),
 ];
 
 TripMember memberById(String id) =>

@@ -1,11 +1,30 @@
 import 'package:flutter/material.dart';
+import '../../core/supabase/client.dart';
+import '../../core/supabase/money_service.dart';
 import '../../data/money_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 
-Future<CashWithdrawal?> showAddCashSheet(BuildContext context) {
+/// Opens the Add Withdrawal form.
+///
+/// Pass [tripId], [userId], and [members] from MoneyScreen so the form can
+/// save to Supabase. When called without those params the form returns a
+/// locally-constructed CashWithdrawal and skips the Supabase write.
+Future<CashWithdrawal?> showAddCashSheet(
+  BuildContext context, {
+  String? tripId,
+  String? userId,
+  List<TripMember>? members,
+}) {
+  final effectiveUserId = userId ?? supabase.auth.currentUser?.id ?? kYouId;
+  final effectiveMembers = (members != null && members.isNotEmpty)
+      ? members
+      : kMockMembers.isNotEmpty
+          ? kMockMembers
+          : [TripMember(id: effectiveUserId, name: 'You')];
+
   final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
 
   if (isDesktop) {
@@ -14,11 +33,17 @@ Future<CashWithdrawal?> showAddCashSheet(BuildContext context) {
       builder: (dialogCtx) => Dialog(
         backgroundColor: kColorPaper,
         shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
-        insetPadding: const EdgeInsets.symmetric(horizontal: kSpace8, vertical: kSpace8),
+        insetPadding:
+            const EdgeInsets.symmetric(horizontal: kSpace8, vertical: kSpace8),
         child: SizedBox(
           width: 520,
           height: MediaQuery.sizeOf(dialogCtx).height * 0.90,
-          child: _AddCashContent(onSubmit: (w) => Navigator.pop(dialogCtx, w)),
+          child: _AddCashContent(
+            tripId:  tripId,
+            userId:  effectiveUserId,
+            members: effectiveMembers,
+            onSubmit: (w) => Navigator.pop(dialogCtx, w),
+          ),
         ),
       ),
     );
@@ -29,13 +54,27 @@ Future<CashWithdrawal?> showAddCashSheet(BuildContext context) {
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: Colors.transparent,
-    builder: (ctx) => _AddCashSheet(onSubmit: (w) => Navigator.pop(ctx, w)),
+    builder: (ctx) => _AddCashSheet(
+      tripId:  tripId,
+      userId:  effectiveUserId,
+      members: effectiveMembers,
+      onSubmit: (w) => Navigator.pop(ctx, w),
+    ),
   );
 }
 
 class _AddCashSheet extends StatelessWidget {
-  const _AddCashSheet({required this.onSubmit});
+  const _AddCashSheet({
+    required this.onSubmit,
+    required this.tripId,
+    required this.userId,
+    required this.members,
+  });
+
   final ValueChanged<CashWithdrawal> onSubmit;
+  final String? tripId;
+  final String userId;
+  final List<TripMember> members;
 
   @override
   Widget build(BuildContext context) {
@@ -48,7 +87,14 @@ class _AddCashSheet extends StatelessWidget {
           color: kColorPaper,
           borderRadius: kRadiusSheet,
         ),
-        child: _AddCashContent(scrollController: ctrl, onSubmit: onSubmit, showDragHandle: true),
+        child: _AddCashContent(
+          tripId:          tripId,
+          userId:          userId,
+          members:         members,
+          scrollController: ctrl,
+          onSubmit:        onSubmit,
+          showDragHandle:  true,
+        ),
       ),
     );
   }
@@ -57,11 +103,18 @@ class _AddCashSheet extends StatelessWidget {
 class _AddCashContent extends StatefulWidget {
   const _AddCashContent({
     required this.onSubmit,
+    required this.tripId,
+    required this.userId,
+    required this.members,
     this.scrollController,
     this.showDragHandle = false,
   });
 
   final ValueChanged<CashWithdrawal> onSubmit;
+  /// Null means local-only mode (no Supabase write).
+  final String? tripId;
+  final String userId;
+  final List<TripMember> members;
   final ScrollController? scrollController;
   final bool showDragHandle;
 
@@ -70,15 +123,26 @@ class _AddCashContent extends StatefulWidget {
 }
 
 class _AddCashContentState extends State<_AddCashContent> {
-  final _formKey = GlobalKey<FormState>();
+  final _formKey    = GlobalKey<FormState>();
   final _amountCtrl = TextEditingController();
   final _feeCtrl    = TextEditingController();
   final _notesCtrl  = TextEditingController();
-  String _currency = 'JPY';
-  String _withdrawnById = kYouId;
-  final Map<String, TextEditingController> _distCtrls = {
-    for (final m in kMockMembers) m.id: TextEditingController(),
-  };
+
+  late String _withdrawnById;
+  late Map<String, TextEditingController> _distCtrls;
+
+  String  _currency = 'JPY';
+  bool    _loading  = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _withdrawnById = widget.userId;
+    _distCtrls = {
+      for (final m in widget.members) m.id: TextEditingController(),
+    };
+  }
 
   @override
   void dispose() {
@@ -91,26 +155,51 @@ class _AddCashContentState extends State<_AddCashContent> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+
     final amount = double.tryParse(_amountCtrl.text.trim()) ?? 0;
     final fee    = double.tryParse(_feeCtrl.text.trim()) ?? 0;
+    final notes  =
+        _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim();
 
-    final distributions = kMockMembers.map((m) {
-      final v = double.tryParse(_distCtrls[m.id]!.text.trim()) ?? 0;
+    final distributions = widget.members.map((m) {
+      final v =
+          double.tryParse(_distCtrls[m.id]?.text.trim() ?? '') ?? 0;
       return CashDistribution(memberId: m.id, amount: v);
     }).where((d) => d.amount > 0).toList();
 
-    widget.onSubmit(CashWithdrawal(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      withdrawnById: _withdrawnById,
-      amount: amount,
-      currency: _currency,
-      atmFee: fee,
-      date: DateTime.now(),
-      notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
-      distributions: distributions,
-    ));
+    // Local-only mode when tripId was not provided.
+    if (widget.tripId == null) {
+      widget.onSubmit(CashWithdrawal(
+        id:           DateTime.now().millisecondsSinceEpoch.toString(),
+        withdrawnById: _withdrawnById,
+        amount:       amount,
+        currency:     _currency,
+        atmFee:       fee,
+        date:         DateTime.now(),
+        notes:        notes,
+        distributions: distributions,
+      ));
+      return;
+    }
+
+    setState(() { _loading = true; _error = null; });
+    try {
+      final withdrawal = await MoneyService.createWithdrawal(
+        tripId:        widget.tripId!,
+        withdrawnBy:   _withdrawnById,
+        amount:        amount,
+        currency:      _currency,
+        atmFee:        fee,
+        date:          DateTime.now(),
+        distributions: distributions,
+        notes:         notes,
+      );
+      if (mounted) widget.onSubmit(withdrawal);
+    } catch (_) {
+      if (mounted) setState(() { _loading = false; _error = 'Could not save withdrawal.'; });
+    }
   }
 
   @override
@@ -141,7 +230,8 @@ class _AddCashContentState extends State<_AddCashContent> {
         Flexible(
           child: SingleChildScrollView(
             controller: widget.scrollController,
-            padding: EdgeInsets.fromLTRB(kSpace4, 0, kSpace4, kSpace6 + bottomPad),
+            padding: EdgeInsets.fromLTRB(
+                kSpace4, 0, kSpace4, kSpace6 + bottomPad),
             child: Form(
               key: _formKey,
               child: Column(
@@ -155,11 +245,14 @@ class _AddCashContentState extends State<_AddCashContent> {
                           label: 'Amount withdrawn',
                           hint: '0',
                           controller: _amountCtrl,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
                           textInputAction: TextInputAction.next,
                           validator: (v) {
                             if (v == null || v.trim().isEmpty) return 'Required';
-                            if (double.tryParse(v.trim()) == null) return 'Invalid';
+                            if (double.tryParse(v.trim()) == null) {
+                              return 'Invalid';
+                            }
                             return null;
                           },
                         ),
@@ -170,7 +263,8 @@ class _AddCashContentState extends State<_AddCashContent> {
                         child: WabwaySelectField<String>(
                           label: 'Currency',
                           value: _currency,
-                          onChanged: (v) => setState(() => _currency = v ?? 'JPY'),
+                          onChanged: (v) =>
+                              setState(() => _currency = v ?? 'JPY'),
                           items: const [
                             WabwaySelectItem(value: 'JPY', label: 'JPY ¥'),
                             WabwaySelectItem(value: 'USD', label: 'USD \$'),
@@ -186,7 +280,8 @@ class _AddCashContentState extends State<_AddCashContent> {
                     label: 'ATM fee (optional)',
                     hint: '0',
                     controller: _feeCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
                     textInputAction: TextInputAction.next,
                     prefixIcon: Icons.atm_rounded,
                   ),
@@ -195,8 +290,9 @@ class _AddCashContentState extends State<_AddCashContent> {
                   WabwaySelectField<String>(
                     label: 'Withdrawn by',
                     value: _withdrawnById,
-                    onChanged: (v) => setState(() => _withdrawnById = v ?? kYouId),
-                    items: kMockMembers
+                    onChanged: (v) =>
+                        setState(() => _withdrawnById = v ?? widget.userId),
+                    items: widget.members
                         .map((m) => WabwaySelectItem(
                               value: m.id,
                               label: m.isYou ? 'You' : m.name,
@@ -205,7 +301,6 @@ class _AddCashContentState extends State<_AddCashContent> {
                   ),
                   const SizedBox(height: kSpace4),
 
-                  // Distribution
                   Text(
                     'Distribute cash to',
                     style: kStyleCaptionMedium.copyWith(color: kColorInk),
@@ -216,7 +311,7 @@ class _AddCashContentState extends State<_AddCashContent> {
                   ),
                   const SizedBox(height: kSpace3),
 
-                  ...kMockMembers.map((m) => Padding(
+                  ...widget.members.map((m) => Padding(
                         padding: const EdgeInsets.only(bottom: kSpace3),
                         child: Row(
                           children: [
@@ -234,7 +329,9 @@ class _AddCashContentState extends State<_AddCashContent> {
                               child: WabwayTextField(
                                 hint: '0',
                                 controller: _distCtrls[m.id],
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
                                 textInputAction: TextInputAction.next,
                               ),
                             ),
@@ -251,6 +348,13 @@ class _AddCashContentState extends State<_AddCashContent> {
                     maxLines: 3,
                     textInputAction: TextInputAction.newline,
                   ),
+
+                  if (_error != null) ...[
+                    const SizedBox(height: kSpace3),
+                    Text(_error!,
+                        style: kStyleBody.copyWith(color: kColorDanger)),
+                  ],
+
                   const SizedBox(height: kSpace6),
 
                   WabwayButton(
@@ -258,8 +362,19 @@ class _AddCashContentState extends State<_AddCashContent> {
                     icon: Icons.atm_rounded,
                     fullWidth: true,
                     size: WabwayButtonSize.lg,
-                    onPressed: _submit,
+                    onPressed: _loading ? null : _submit,
                   ),
+
+                  if (_loading) ...[
+                    const SizedBox(height: kSpace4),
+                    const Center(
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

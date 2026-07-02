@@ -1,4 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'
+    show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
+import '../core/supabase/client.dart';
+import '../core/supabase/money_service.dart';
+import '../core/trip/trip_state.dart';
 import '../data/money_data.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
@@ -22,18 +29,144 @@ class MoneyScreen extends StatefulWidget {
 }
 
 class _MoneyScreenState extends State<MoneyScreen> {
-  final List<Receipt> _receipts = List.from(kMockReceipts);
-  final List<CashWithdrawal> _withdrawals = List.from(kMockWithdrawals);
+  List<Receipt> _receipts = [];
+  List<CashWithdrawal> _withdrawals = [];
+  bool _loading = true;
+  bool _error = false;
+
   _MoneyTab _tab = _MoneyTab.receipts;
   String? _selectedReceiptId;
   String? _selectedWithdrawalId;
 
-  static const _currency = 'JPY';
+  String? _activeTripId;
+  RealtimeChannel? _realtimeChannel;
+  Timer? _debounce;
 
-  List<MemberBalance> get _balances =>
-      calculateBalances(_receipts, _withdrawals);
-  List<SettlementSuggestion> get _settlements =>
-      suggestSettlements(_balances, _currency);
+  // Captured in didChangeDependencies and passed to add sheets.
+  List<TripMember> _members = [];
+  String _userId = '';
+
+  // ── Lifecycle ─────────────────────────────────────────────────────────────────
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // Update module-level money context so all money UI (tiles, detail, balances)
+    // uses real UUIDs and real display names.
+    final myId = supabase.auth.currentUser?.id ?? '';
+    final appMembers = TripState.membersOf(context);
+    _userId = myId;
+    kYouId = myId.isEmpty ? 'you' : myId;
+    kMockMembers = appMembers.isEmpty
+        ? [TripMember(id: kYouId, name: 'You')]
+        : appMembers
+            .map((m) => TripMember(
+                  id:   m.userId,
+                  name: m.userId == myId ? 'You' : m.profile.displayName,
+                ))
+            .toList();
+    _members = List.from(kMockMembers);
+
+    final tripId = TripState.tripOf(context).id;
+    if (tripId != _activeTripId) {
+      _activeTripId = tripId;
+      _loadAll();
+      _subscribeRealtime(tripId);
+    }
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _realtimeChannel?.unsubscribe();
+    super.dispose();
+  }
+
+  // ── Data loading ──────────────────────────────────────────────────────────────
+
+  Future<void> _loadAll({bool silent = false}) async {
+    final tripId = _activeTripId;
+    if (tripId == null) return;
+    if (!silent) setState(() { _loading = true; _error = false; });
+    try {
+      final futures = await Future.wait([
+        MoneyService.loadReceipts(tripId),
+        MoneyService.loadWithdrawals(tripId),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _receipts   = List<Receipt>.from(futures[0] as List);
+        _withdrawals = List<CashWithdrawal>.from(futures[1] as List);
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      if (silent) return;
+      setState(() { _loading = false; _error = true; });
+    }
+  }
+
+  // ── Realtime ──────────────────────────────────────────────────────────────────
+
+  void _subscribeRealtime(String tripId) {
+    _realtimeChannel?.unsubscribe();
+    _realtimeChannel = supabase
+        .channel('money-$tripId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'receipts',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'trip_id',
+            value: tripId,
+          ),
+          callback: (_) => _scheduleReload(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'receipt_splits',
+          callback: (_) => _scheduleReload(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'cash_withdrawals',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'trip_id',
+            value: tripId,
+          ),
+          callback: (_) => _scheduleReload(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'cash_distributions',
+          callback: (_) => _scheduleReload(),
+        )
+        .subscribe();
+  }
+
+  void _scheduleReload() {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 400), () {
+      if (mounted) _loadAll(silent: true);
+    });
+  }
+
+  // ── Derived state ─────────────────────────────────────────────────────────────
+
+  String get _currency {
+    if (_receipts.isNotEmpty)    return _receipts.first.currency;
+    if (_withdrawals.isNotEmpty) return _withdrawals.first.currency;
+    return 'JPY';
+  }
+
+  List<MemberBalance> get _balances => calculateBalances(_receipts, _withdrawals);
+  List<SettlementSuggestion> get _settlements => suggestSettlements(_balances, _currency);
 
   Receipt? get _selectedReceipt => _selectedReceiptId == null
       ? null
@@ -43,9 +176,17 @@ class _MoneyScreenState extends State<MoneyScreen> {
       ? null
       : _withdrawals.where((w) => w.id == _selectedWithdrawalId).firstOrNull;
 
-  void _addReceipt(BuildContext context) async {
-    final receipt = await showAddReceiptSheet(context);
-    if (receipt != null) {
+  // ── Mutations ─────────────────────────────────────────────────────────────────
+
+  Future<void> _addReceipt(BuildContext context) async {
+    if (_activeTripId == null) return;
+    final receipt = await showAddReceiptSheet(
+      context,
+      tripId:  _activeTripId!,
+      userId:  _userId,
+      members: _members,
+    );
+    if (receipt != null && mounted) {
       setState(() {
         _receipts.insert(0, receipt);
         _selectedReceiptId = receipt.id;
@@ -54,9 +195,15 @@ class _MoneyScreenState extends State<MoneyScreen> {
     }
   }
 
-  void _addWithdrawal(BuildContext context) async {
-    final w = await showAddCashSheet(context);
-    if (w != null) {
+  Future<void> _addWithdrawal(BuildContext context) async {
+    if (_activeTripId == null) return;
+    final w = await showAddCashSheet(
+      context,
+      tripId:  _activeTripId!,
+      userId:  _userId,
+      members: _members,
+    );
+    if (w != null && mounted) {
       setState(() {
         _withdrawals.insert(0, w);
         _selectedWithdrawalId = w.id;
@@ -69,6 +216,40 @@ class _MoneyScreenState extends State<MoneyScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(
+        backgroundColor: kColorCream,
+        body: Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation(kColorPrimary),
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_error) {
+      return Scaffold(
+        backgroundColor: kColorCream,
+        body: Center(
+          child: WabwayEmptyState(
+            icon: Icons.wifi_off_rounded,
+            title: 'Could not load money data',
+            description: 'Check your connection and try again.',
+            action: WabwayButton(
+              label: 'Retry',
+              icon: Icons.refresh_rounded,
+              onPressed: _loadAll,
+            ),
+          ),
+        ),
+      );
+    }
+
     final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
     return isDesktop ? _buildDesktop(context) : _buildMobile(context);
   }

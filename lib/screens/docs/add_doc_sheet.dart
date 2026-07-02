@@ -1,13 +1,22 @@
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import '../../core/supabase/doc_service.dart';
 import '../../data/docs_data.dart';
-import '../../data/money_data.dart';
 import '../../data/spot_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 
-Future<TripDocument?> showAddDocSheet(BuildContext context) {
+Future<TripDocument?> showAddDocSheet(
+  BuildContext context, {
+  required String tripId,
+  required String tripName,
+  required String userId,
+  required List<Spot> availableSpots,
+}) {
   final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
 
   if (isDesktop) {
@@ -16,11 +25,18 @@ Future<TripDocument?> showAddDocSheet(BuildContext context) {
       builder: (ctx) => Dialog(
         backgroundColor: kColorPaper,
         shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
-        insetPadding: const EdgeInsets.symmetric(horizontal: kSpace8, vertical: kSpace8),
+        insetPadding:
+            const EdgeInsets.symmetric(horizontal: kSpace8, vertical: kSpace8),
         child: SizedBox(
           width: 520,
           height: MediaQuery.sizeOf(ctx).height * 0.90,
-          child: _AddDocContent(onSubmit: (d) => Navigator.pop(ctx, d)),
+          child: _AddDocContent(
+            tripId: tripId,
+            tripName: tripName,
+            userId: userId,
+            availableSpots: availableSpots,
+            onSubmit: (d) => Navigator.pop(ctx, d),
+          ),
         ),
       ),
     );
@@ -31,12 +47,29 @@ Future<TripDocument?> showAddDocSheet(BuildContext context) {
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: Colors.transparent,
-    builder: (ctx) => _AddDocSheet(onSubmit: (d) => Navigator.pop(ctx, d)),
+    builder: (ctx) => _AddDocSheet(
+      tripId: tripId,
+      tripName: tripName,
+      userId: userId,
+      availableSpots: availableSpots,
+      onSubmit: (d) => Navigator.pop(ctx, d),
+    ),
   );
 }
 
 class _AddDocSheet extends StatelessWidget {
-  const _AddDocSheet({required this.onSubmit});
+  const _AddDocSheet({
+    required this.tripId,
+    required this.tripName,
+    required this.userId,
+    required this.availableSpots,
+    required this.onSubmit,
+  });
+
+  final String tripId;
+  final String tripName;
+  final String userId;
+  final List<Spot> availableSpots;
   final ValueChanged<TripDocument> onSubmit;
 
   @override
@@ -51,6 +84,10 @@ class _AddDocSheet extends StatelessWidget {
           borderRadius: kRadiusSheet,
         ),
         child: _AddDocContent(
+          tripId: tripId,
+          tripName: tripName,
+          userId: userId,
+          availableSpots: availableSpots,
           scrollController: ctrl,
           onSubmit: onSubmit,
           showDragHandle: true,
@@ -62,11 +99,19 @@ class _AddDocSheet extends StatelessWidget {
 
 class _AddDocContent extends StatefulWidget {
   const _AddDocContent({
+    required this.tripId,
+    required this.tripName,
+    required this.userId,
+    required this.availableSpots,
     required this.onSubmit,
     this.scrollController,
     this.showDragHandle = false,
   });
 
+  final String tripId;
+  final String tripName;
+  final String userId;
+  final List<Spot> availableSpots;
   final ValueChanged<TripDocument> onSubmit;
   final ScrollController? scrollController;
   final bool showDragHandle;
@@ -83,7 +128,14 @@ class _AddDocContentState extends State<_AddDocContent> {
   DocType _type = DocType.other;
   DocLinkedType? _linkType;
   String? _linkedId;
-  bool _fileSelected = false;
+
+  Uint8List? _fileBytes;
+  String? _fileName;
+  String? _fileExt;
+  int? _fileSizeKb;
+
+  bool _loading = false;
+  String? _error;
 
   @override
   void dispose() {
@@ -92,20 +144,78 @@ class _AddDocContentState extends State<_AddDocContent> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _pickFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'docx', 'xlsx', 'webp'],
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    if (file.bytes == null) return;
+
+    setState(() {
+      _fileBytes = file.bytes;
+      _fileName = file.name;
+      _fileExt = file.extension?.toLowerCase();
+      _fileSizeKb = (file.size / 1024).round();
+      // Auto-fill title from filename if still empty
+      if (_titleCtrl.text.isEmpty && file.name.isNotEmpty) {
+        _titleCtrl.text = file.name.replaceAll(RegExp(r'\.[^.]+$'), '');
+      }
+    });
+  }
+
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    widget.onSubmit(TripDocument(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      title: _titleCtrl.text.trim(),
-      type: _type,
-      ext: 'pdf',
-      uploadedById: 'you',
-      uploadedAt: DateTime.now(),
-      notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
-      links: (_linkType != null && _linkedId != null)
-          ? [DocumentLink(type: _linkType!, linkedId: _linkedId!)]
-          : const [],
-    ));
+    setState(() { _loading = true; _error = null; });
+
+    try {
+      final ext = (_fileExt ?? 'pdf').toLowerCase();
+      final TripDocument doc;
+
+      if (_fileBytes != null) {
+        // Safe ordered flow: UUID generated → file uploaded → row inserted.
+        // If row insert fails, the service cleans up the orphaned storage file.
+        doc = await DocService.uploadAndCreate(
+          tripId:     widget.tripId,
+          userId:     widget.userId,
+          title:      _titleCtrl.text.trim(),
+          type:       _type,
+          ext:        ext,
+          bytes:      _fileBytes!,
+          fileSizeKb: _fileSizeKb,
+          notes:      _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
+        );
+      } else {
+        doc = await DocService.createDocument(
+          tripId: widget.tripId,
+          userId: widget.userId,
+          title:  _titleCtrl.text.trim(),
+          type:   _type,
+          ext:    ext,
+          notes:  _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
+        );
+      }
+
+      if (_linkType != null && _linkedId != null) {
+        await DocService.addLink(
+          documentId: doc.id,
+          linkedType: _linkType!,
+          linkedId:   _linkedId!,
+          createdBy:  widget.userId,
+        );
+      }
+
+      if (mounted) widget.onSubmit(doc);
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = 'Could not save document. Please try again.';
+        });
+      }
+    }
   }
 
   @override
@@ -136,7 +246,8 @@ class _AddDocContentState extends State<_AddDocContent> {
         Flexible(
           child: SingleChildScrollView(
             controller: widget.scrollController,
-            padding: EdgeInsets.fromLTRB(kSpace4, 0, kSpace4, kSpace6 + bottomPad),
+            padding:
+                EdgeInsets.fromLTRB(kSpace4, 0, kSpace4, kSpace6 + bottomPad),
             child: Form(
               key: _formKey,
               child: Column(
@@ -148,34 +259,39 @@ class _AddDocContentState extends State<_AddDocContent> {
                     controller: _titleCtrl,
                     textInputAction: TextInputAction.next,
                     validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'Title is required' : null,
+                        (v == null || v.trim().isEmpty)
+                            ? 'Title is required'
+                            : null,
                   ),
                   const SizedBox(height: kSpace4),
 
                   WabwaySelectField<DocType>(
                     label: 'Document type',
                     value: _type,
-                    onChanged: (v) => setState(() => _type = v ?? DocType.other),
+                    onChanged: (v) =>
+                        setState(() => _type = v ?? DocType.other),
                     items: DocType.values
                         .map((t) => WabwaySelectItem(value: t, label: t.label))
                         .toList(),
                   ),
                   const SizedBox(height: kSpace4),
 
-                  // File upload zone
                   _FileUploadZone(
-                    selected: _fileSelected,
-                    onTap: () => setState(() => _fileSelected = !_fileSelected),
+                    fileName: _fileName,
+                    fileSizeKb: _fileSizeKb,
+                    onTap: _pickFile,
                   ),
                   const SizedBox(height: kSpace4),
 
-                  // Link to section
                   _LinkSection(
                     linkType: _linkType,
                     linkedId: _linkedId,
+                    availableSpots: widget.availableSpots,
+                    tripName: widget.tripName,
                     onLinkTypeChanged: (t) => setState(() {
                       _linkType = t;
-                      _linkedId = t == DocLinkedType.trip ? 'trip1' : null;
+                      _linkedId =
+                          t == DocLinkedType.trip ? widget.tripId : null;
                     }),
                     onLinkItemChanged: (id) => setState(() => _linkedId = id),
                   ),
@@ -188,6 +304,13 @@ class _AddDocContentState extends State<_AddDocContent> {
                     maxLines: 3,
                     textInputAction: TextInputAction.newline,
                   ),
+
+                  if (_error != null) ...[
+                    const SizedBox(height: kSpace3),
+                    Text(_error!,
+                        style: kStyleCaption.copyWith(color: kColorDanger)),
+                  ],
+
                   const SizedBox(height: kSpace6),
 
                   WabwayButton(
@@ -195,7 +318,8 @@ class _AddDocContentState extends State<_AddDocContent> {
                     icon: Icons.insert_drive_file_rounded,
                     fullWidth: true,
                     size: WabwayButtonSize.lg,
-                    onPressed: _submit,
+                    loading: _loading,
+                    onPressed: _loading ? null : _submit,
                   ),
                 ],
               ),
@@ -207,15 +331,28 @@ class _AddDocContentState extends State<_AddDocContent> {
   }
 }
 
-// ─── File upload zone ─────────────────────────────────────────────────────────
+// ── File upload zone ──────────────────────────────────────────────────────────
 
 class _FileUploadZone extends StatelessWidget {
-  const _FileUploadZone({required this.selected, required this.onTap});
-  final bool selected;
+  const _FileUploadZone({
+    required this.fileName,
+    required this.fileSizeKb,
+    required this.onTap,
+  });
+
+  final String? fileName;
+  final int? fileSizeKb;
   final VoidCallback onTap;
+
+  String get _sizeLabel {
+    if (fileSizeKb == null) return '';
+    if (fileSizeKb! < 1024) return '$fileSizeKb KB';
+    return '${(fileSizeKb! / 1024).toStringAsFixed(1)} MB';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final selected = fileName != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -226,13 +363,12 @@ class _FileUploadZone extends StatelessWidget {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: kSpace6),
+            padding: const EdgeInsets.symmetric(vertical: kSpace5),
             decoration: BoxDecoration(
               color: selected ? kColorPrimarySoft : kColorSurfaceSunken,
               borderRadius: kRadiusMd,
               border: Border.all(
                 color: selected ? kColorPrimary : kColorBorder,
-                style: BorderStyle.solid,
               ),
             ),
             child: Column(
@@ -246,17 +382,35 @@ class _FileUploadZone extends StatelessWidget {
                 ),
                 const SizedBox(height: kSpace2),
                 Text(
-                  selected ? 'File selected (mock)' : 'Tap to choose a file',
+                  selected ? fileName! : 'Tap to choose a file',
                   style: kStyleBodyMedium.copyWith(
                     color: selected ? kColorPrimary : kColorInkSoft,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                if (!selected)
+                if (selected && fileSizeKb != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: kSpace1),
+                    child: Text(
+                      _sizeLabel,
+                      style: kStyleCaption.copyWith(color: kColorInkSoft),
+                    ),
+                  )
+                else if (!selected)
                   Padding(
                     padding: const EdgeInsets.only(top: kSpace1),
                     child: Text(
                       'PDF, JPG, PNG, DOCX…',
                       style: kStyleCaption.copyWith(color: kColorInkSoft),
+                    ),
+                  ),
+                if (selected)
+                  Padding(
+                    padding: const EdgeInsets.only(top: kSpace2),
+                    child: Text(
+                      'Tap to change',
+                      style: kStyleCaption.copyWith(color: kColorPrimary),
                     ),
                   ),
               ],
@@ -268,86 +422,62 @@ class _FileUploadZone extends StatelessWidget {
   }
 }
 
-// ─── Link section ─────────────────────────────────────────────────────────────
+// ── Link section ──────────────────────────────────────────────────────────────
 
 class _LinkSection extends StatelessWidget {
   const _LinkSection({
     required this.linkType,
     required this.linkedId,
+    required this.availableSpots,
+    required this.tripName,
     required this.onLinkTypeChanged,
     required this.onLinkItemChanged,
   });
 
   final DocLinkedType? linkType;
   final String? linkedId;
+  final List<Spot> availableSpots;
+  final String tripName;
   final ValueChanged<DocLinkedType?> onLinkTypeChanged;
   final ValueChanged<String> onLinkItemChanged;
+
+  // Only offer link types that are currently connectable
+  static const _supportedLinkTypes = [
+    DocLinkedType.trip,
+    DocLinkedType.spot,
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Link to (optional)', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
+        Text('Link to (optional)',
+            style: kStyleCaptionMedium.copyWith(color: kColorInk)),
         const SizedBox(height: kSpace2),
 
-        // Type selector
         WabwaySelectField<DocLinkedType?>(
           label: 'Link type',
           value: linkType,
           onChanged: onLinkTypeChanged,
           items: [
             const WabwaySelectItem(value: null, label: 'None'),
-            ...DocLinkedType.values.map(
+            ..._supportedLinkTypes.map(
               (t) => WabwaySelectItem(value: t, label: t.label),
             ),
           ],
         ),
 
-        // Item selector based on type
         if (linkType != null) ...[
           const SizedBox(height: kSpace3),
-          _buildItemSelector(context),
+          _buildItemSelector(),
         ],
       ],
     );
   }
 
-  Widget _buildItemSelector(BuildContext context) {
+  Widget _buildItemSelector() {
     switch (linkType!) {
-      case DocLinkedType.spot:
-        return WabwaySelectField<String?>(
-          label: 'Spot',
-          value: linkedId,
-          onChanged: (id) { if (id != null) onLinkItemChanged(id); },
-          items: kMockSpots
-              .map((s) => WabwaySelectItem(value: s.id, label: s.name))
-              .toList(),
-        );
-
-      case DocLinkedType.receipt:
-        return WabwaySelectField<String?>(
-          label: 'Receipt',
-          value: linkedId,
-          onChanged: (id) { if (id != null) onLinkItemChanged(id); },
-          items: kMockReceipts
-              .map((r) => WabwaySelectItem(value: r.id, label: r.title))
-              .toList(),
-        );
-
-      case DocLinkedType.cashWithdrawal:
-        return WabwaySelectField<String?>(
-          label: 'Withdrawal',
-          value: linkedId,
-          onChanged: (id) { if (id != null) onLinkItemChanged(id); },
-          items: kMockWithdrawals
-              .map((w) => WabwaySelectItem(
-                    value: w.id,
-                    label: 'ATM ${fmtAmount(w.amount, w.currency)} · ${w.withdrawnById}',
-                  ))
-              .toList(),
-        );
-
       case DocLinkedType.trip:
         return Container(
           padding: const EdgeInsets.all(kSpace3),
@@ -359,17 +489,34 @@ class _LinkSection extends StatelessWidget {
             children: [
               const Icon(Icons.luggage_rounded, size: 16, color: kColorInkSoft),
               const SizedBox(width: kSpace2),
-              Text('Japan Nov 2024', style: kStyleBodyMedium),
+              Text(tripName, style: kStyleBodyMedium),
             ],
           ),
         );
 
-      default:
-        return WabwayTextField(
-          label: 'Item name',
-          hint: 'Enter a label for this link',
-          onChanged: (v) => onLinkItemChanged('custom'),
+      case DocLinkedType.spot:
+        if (availableSpots.isEmpty) {
+          return Container(
+            padding: const EdgeInsets.all(kSpace3),
+            decoration: const BoxDecoration(
+              color: kColorSurfaceSunken,
+              borderRadius: kRadiusMd,
+            ),
+            child: Text('No spots yet — add spots first.',
+                style: kStyleCaption),
+          );
+        }
+        return WabwaySelectField<String?>(
+          label: 'Spot',
+          value: linkedId,
+          onChanged: (id) { if (id != null) onLinkItemChanged(id); },
+          items: availableSpots
+              .map((s) => WabwaySelectItem(value: s.id, label: s.name))
+              .toList(),
         );
+
+      default:
+        return const SizedBox.shrink();
     }
   }
 }

@@ -120,6 +120,7 @@ class TripDocument {
     required this.ext,
     required this.uploadedById,
     required this.uploadedAt,
+    this.storagePath,
     this.fileSizeKb,
     this.amount,
     this.currency,
@@ -133,6 +134,7 @@ class TripDocument {
   final String ext;
   final String uploadedById;
   final DateTime uploadedAt;
+  final String? storagePath;
   final int? fileSizeKb;
   final double? amount;
   final String? currency;

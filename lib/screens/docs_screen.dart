@@ -1,7 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'
+    show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
+import '../core/auth/profile_state.dart';
+import '../core/supabase/client.dart';
+import '../core/supabase/doc_service.dart';
+import '../core/supabase/spot_service.dart';
+import '../core/trip/trip_state.dart';
 import '../data/docs_data.dart';
-import '../data/member_data.dart';
+import '../data/spot_data.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
@@ -18,7 +27,19 @@ class DocsScreen extends StatefulWidget {
 }
 
 class _DocsScreenState extends State<DocsScreen> {
-  final List<TripDocument> _docs = List.from(kMockDocuments);
+  List<TripDocument> _docs = [];
+  List<Spot> _availableSpots = [];
+
+  bool _loading = true;
+  bool _error = false;
+
+  String? _activeTripId;
+  RealtimeChannel? _realtimeChannel;
+  Timer? _debounce;
+
+  // Uploader name resolver (built from TripState in didChangeDependencies)
+  String Function(String) _memberName = (id) => id;
+
   String? _selectedDocId;
   DocType? _filterType;
   String _search = '';
@@ -27,11 +48,139 @@ class _DocsScreenState extends State<DocsScreen> {
   final _filterScrollCtrl = ScrollController();
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final tripId = TripState.tripOf(context).id;
+    if (tripId != _activeTripId) {
+      _activeTripId = tripId;
+      _loadDocs();
+      _loadAvailableSpots();
+      _subscribeRealtime(tripId);
+    }
+
+    // Rebuild member name resolver whenever TripState changes
+    final members = TripState.membersOf(context);
+    final myId = supabase.auth.currentUser?.id;
+    _memberName = (userId) {
+      if (userId == myId) return 'You';
+      final m = members.where((m) => m.userId == userId).firstOrNull;
+      return m?.profile.displayName ?? userId;
+    };
+  }
+
+  @override
   void dispose() {
+    _debounce?.cancel();
+    _realtimeChannel?.unsubscribe();
     _searchCtrl.dispose();
     _filterScrollCtrl.dispose();
     super.dispose();
   }
+
+  // ── Data loading ─────────────────────────────────────────────────────────────
+
+  Future<void> _loadDocs({bool silent = false}) async {
+    if (!silent) setState(() { _loading = true; _error = false; });
+    try {
+      final tripId = TripState.tripOf(context).id;
+      final docs = await DocService.loadDocuments(tripId);
+      if (!mounted) return;
+      setState(() { _docs = docs; _loading = false; });
+    } catch (_) {
+      if (!mounted) return;
+      if (silent) return;
+      setState(() { _loading = false; _error = true; });
+    }
+  }
+
+  Future<void> _loadAvailableSpots() async {
+    try {
+      final tripId = TripState.tripOf(context).id;
+      final spots = await SpotService.loadSpots(tripId);
+      if (mounted) setState(() => _availableSpots = spots);
+    } catch (_) {}
+  }
+
+  // ── Realtime ─────────────────────────────────────────────────────────────────
+
+  void _subscribeRealtime(String tripId) {
+    _realtimeChannel?.unsubscribe();
+    _realtimeChannel = supabase
+        .channel('docs-$tripId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'documents',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'trip_id',
+            value: tripId,
+          ),
+          callback: (_) => _scheduleReload(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'document_links',
+          callback: (_) => _scheduleReload(),
+        )
+        .subscribe();
+  }
+
+  void _scheduleReload() {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 400), () {
+      if (mounted) _loadDocs(silent: true);
+    });
+  }
+
+  // ── Mutations ────────────────────────────────────────────────────────────────
+
+  Future<void> _addDoc(BuildContext context) async {
+    final tripId = TripState.tripOf(context).id;
+    final tripName = TripState.tripOf(context).name;
+    final userId = ProfileState.of(context).id;
+
+    final doc = await showAddDocSheet(
+      context,
+      tripId: tripId,
+      tripName: tripName,
+      userId: userId,
+      availableSpots: _availableSpots,
+    );
+    if (doc != null && mounted) {
+      setState(() {
+        _docs.insert(0, doc);
+        _selectedDocId = doc.id;
+      });
+    }
+  }
+
+  Future<void> _deleteDoc(TripDocument doc) async {
+    try {
+      await DocService.deleteDocument(doc.id);
+      if (doc.storagePath != null) {
+        await DocService.deleteStorageFile(doc.storagePath!);
+      }
+      if (mounted) {
+        setState(() {
+          _docs.removeWhere((d) => d.id == doc.id);
+          if (_selectedDocId == doc.id) _selectedDocId = null;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Could not delete document.',
+              style: kStyleBody.copyWith(color: Colors.white)),
+          backgroundColor: kColorDanger,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    }
+  }
+
+  // ── Derived state ────────────────────────────────────────────────────────────
 
   TripDocument? get _selectedDoc =>
       _selectedDocId == null
@@ -45,28 +194,54 @@ class _DocsScreenState extends State<DocsScreen> {
       final matchSearch = q.isEmpty ||
           d.title.toLowerCase().contains(q) ||
           d.type.label.toLowerCase().contains(q) ||
-          memberById(d.uploadedById).name.toLowerCase().contains(q);
+          _memberName(d.uploadedById).toLowerCase().contains(q);
       return matchType && matchSearch;
     }).toList();
   }
 
-  void _addDoc(BuildContext context) async {
-    final doc = await showAddDocSheet(context);
-    if (doc != null && mounted) {
-      setState(() {
-        _docs.insert(0, doc);
-        _selectedDocId = doc.id;
-      });
-    }
-  }
+  // ── Build ────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(
+        backgroundColor: kColorCream,
+        body: Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation(kColorPrimary),
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_error) {
+      return Scaffold(
+        backgroundColor: kColorCream,
+        body: Center(
+          child: WabwayEmptyState(
+            icon: Icons.wifi_off_rounded,
+            title: 'Could not load documents',
+            description: 'Check your connection and try again.',
+            action: WabwayButton(
+              label: 'Retry',
+              icon: Icons.refresh_rounded,
+              onPressed: _loadDocs,
+            ),
+          ),
+        ),
+      );
+    }
+
     final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
     return isDesktop ? _buildDesktop(context) : _buildMobile(context);
   }
 
-  // ─── Desktop ──────────────────────────────────────────────────────────────────
+  // ── Desktop ───────────────────────────────────────────────────────────────────
 
   Widget _buildDesktop(BuildContext context) {
     return Scaffold(
@@ -97,7 +272,7 @@ class _DocsScreenState extends State<DocsScreen> {
                   ),
                 ),
                 const VerticalDivider(width: 1, thickness: 1, color: kColorBorder),
-                Expanded(child: _buildDesktopDetail()),
+                Expanded(child: _buildDesktopDetail(context)),
               ],
             ),
           ),
@@ -131,7 +306,7 @@ class _DocsScreenState extends State<DocsScreen> {
     );
   }
 
-  Widget _buildDesktopDetail() {
+  Widget _buildDesktopDetail(BuildContext context) {
     final doc = _selectedDoc;
     if (doc == null) {
       return const Center(
@@ -142,12 +317,20 @@ class _DocsScreenState extends State<DocsScreen> {
         ),
       );
     }
+    final trip = TripState.tripOf(context);
     return SingleChildScrollView(
-      child: DocDetailContent(key: ValueKey(doc.id), doc: doc),
+      child: DocDetailContent(
+        key: ValueKey(doc.id),
+        doc: doc,
+        tripId: trip.id,
+        tripName: trip.name,
+        availableSpots: _availableSpots,
+        onDelete: () => _deleteDoc(doc),
+      ),
     );
   }
 
-  // ─── Mobile ───────────────────────────────────────────────────────────────────
+  // ── Mobile ────────────────────────────────────────────────────────────────────
 
   Widget _buildMobile(BuildContext context) {
     final items = _filtered;
@@ -208,12 +391,21 @@ class _DocsScreenState extends State<DocsScreen> {
                     itemCount: items.length,
                     itemBuilder: (ctx, i) => DocGridCard(
                       doc: items[i],
-                      onTap: () => Navigator.push(
-                        ctx,
-                        MaterialPageRoute(
-                          builder: (_) => DocDetailScreen(doc: items[i]),
-                        ),
-                      ),
+                      onTap: () {
+                        final trip = TripState.tripOf(context);
+                        Navigator.push(
+                          ctx,
+                          MaterialPageRoute(
+                            builder: (_) => DocDetailScreen(
+                              doc: items[i],
+                              tripId: trip.id,
+                              tripName: trip.name,
+                              availableSpots: _availableSpots,
+                              onDelete: () => _deleteDoc(items[i]),
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
           ),
@@ -232,13 +424,10 @@ class _DocsScreenState extends State<DocsScreen> {
   }
 }
 
-// ─── Desktop top bar ──────────────────────────────────────────────────────────
+// ── Desktop top bar ───────────────────────────────────────────────────────────
 
 class _DesktopDocsBar extends StatelessWidget {
-  const _DesktopDocsBar({
-    required this.onSearchChanged,
-    required this.onAdd,
-  });
+  const _DesktopDocsBar({required this.onSearchChanged, required this.onAdd});
 
   final ValueChanged<String> onSearchChanged;
   final VoidCallback onAdd;
@@ -277,7 +466,7 @@ class _DesktopDocsBar extends StatelessWidget {
   }
 }
 
-// ─── Filter strip ─────────────────────────────────────────────────────────────
+// ── Filter strip ─────────────────────────────────────────────────────────────
 
 class _FilterStrip extends StatelessWidget {
   const _FilterStrip({
@@ -309,7 +498,8 @@ class _FilterStrip extends StatelessWidget {
         child: ListView.separated(
           controller: scrollController,
           scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: kSpace2),
+          padding: const EdgeInsets.symmetric(
+              horizontal: kSpace3, vertical: kSpace2),
           itemCount: DocType.values.length,
           separatorBuilder: (_, __) => const SizedBox(width: kSpace1),
           itemBuilder: (_, i) {

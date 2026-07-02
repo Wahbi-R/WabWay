@@ -51,16 +51,6 @@ class MapScreen extends StatelessWidget {
   );
 }
 
-class TravelScreen extends StatelessWidget {
-  const TravelScreen({super.key});
-  @override
-  Widget build(BuildContext context) => const PlaceholderScreen(
-    title: 'Travel',
-    icon: Icons.flight_rounded,
-    body: 'Flights, trains, and accommodation bookings will appear here.',
-  );
-}
-
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
   @override

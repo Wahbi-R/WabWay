@@ -9,6 +9,7 @@ import '../screens/docs_screen.dart';
 import '../screens/more_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/members_screen.dart';
+import '../screens/travel_screen.dart';
 import '../screens/placeholder_screen.dart';
 
 // ─── Navigation destination models ───────────────────────────────────────────

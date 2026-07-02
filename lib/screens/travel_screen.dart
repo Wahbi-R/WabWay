@@ -1,5 +1,15 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'
+    show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
+import '../core/supabase/client.dart';
+import '../core/supabase/travel_service.dart';
+import '../core/supabase/doc_service.dart';
+import '../core/supabase/plan_service.dart';
+import '../core/trip/trip_state.dart';
 import '../data/travel_data.dart';
+import '../data/docs_data.dart';
+import '../data/plan_data.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
@@ -16,8 +26,19 @@ class TravelScreen extends StatefulWidget {
 }
 
 class _TravelScreenState extends State<TravelScreen> {
-  final List<TravelItem> _items = List.from(kMockTravelItems);
-  TravelItemType? _filter; // null = All
+  final List<TravelItem> _items = [];
+  final List<TripDocument> _docs = [];
+  final List<TripDay> _days = [];
+
+  bool _loading = false;
+  String? _error;
+  String _activeTripId = '';
+  String _userId = '';
+
+  RealtimeChannel? _channel;
+  Timer? _debounce;
+
+  TravelItemType? _filter;
   String? _selectedId;
 
   TravelItem? get _selectedItem =>
@@ -26,6 +47,107 @@ class _TravelScreenState extends State<TravelScreen> {
   List<TravelItem> get _filtered =>
       _filter == null ? _items : _items.where((i) => i.type == _filter).toList();
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _userId = supabase.auth.currentUser?.id ?? '';
+    final tripId = TripState.tripOf(context).id;
+    if (tripId != _activeTripId) {
+      _activeTripId = tripId;
+      _loadAll();
+      _subscribeRealtime(tripId);
+    }
+  }
+
+  @override
+  void dispose() {
+    _channel?.unsubscribe();
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  // ─── Data loading ─────────────────────────────────────────────────────────────
+
+  Future<void> _loadAll() async {
+    if (_activeTripId.isEmpty) return;
+    setState(() { _loading = true; _error = null; });
+    try {
+      final itemsFuture = TravelService.loadItems(_activeTripId);
+      final docsFuture  = DocService.loadDocuments(_activeTripId);
+      final daysFuture  = PlanService.loadAll(_activeTripId);
+      final items = await itemsFuture;
+      final docs  = await docsFuture;
+      final days  = await daysFuture;
+      if (!mounted) return;
+      setState(() {
+        _items
+          ..clear()
+          ..addAll(items);
+        _docs
+          ..clear()
+          ..addAll(docs);
+        _days
+          ..clear()
+          ..addAll(days);
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { _loading = false; _error = e.toString(); });
+    }
+  }
+
+  Future<void> _silentReload() async {
+    if (!mounted || _activeTripId.isEmpty) return;
+    try {
+      final itemsFuture = TravelService.loadItems(_activeTripId);
+      final docsFuture  = DocService.loadDocuments(_activeTripId);
+      final daysFuture  = PlanService.loadAll(_activeTripId);
+      final items = await itemsFuture;
+      final docs  = await docsFuture;
+      final days  = await daysFuture;
+      if (!mounted) return;
+      setState(() {
+        _items
+          ..clear()
+          ..addAll(items);
+        _docs
+          ..clear()
+          ..addAll(docs);
+        _days
+          ..clear()
+          ..addAll(days);
+      });
+    } catch (_) {}
+  }
+
+  // ─── Realtime ─────────────────────────────────────────────────────────────────
+
+  void _subscribeRealtime(String tripId) {
+    _channel?.unsubscribe();
+    _channel = supabase
+        .channel('travel-$tripId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'travel_items',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'trip_id',
+            value: tripId,
+          ),
+          callback: (_) => _debounceReload(),
+        )
+        .subscribe();
+  }
+
+  void _debounceReload() {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 400), _silentReload);
+  }
+
+  // ─── UI actions ───────────────────────────────────────────────────────────────
+
   void _select(String id) => setState(() => _selectedId = id);
 
   void _delete(String id) {
@@ -33,25 +155,77 @@ class _TravelScreenState extends State<TravelScreen> {
       _items.removeWhere((i) => i.id == id);
       if (_selectedId == id) _selectedId = null;
     });
+    TravelService.deleteItem(id).catchError((_) => _silentReload());
   }
 
   Future<void> _addItem(BuildContext context) async {
-    final item = await showAddTravelSheet(context);
-    if (item != null && mounted) {
+    final messenger = ScaffoldMessenger.of(context);
+    final formItem = await showAddTravelSheet(context, docs: _docs);
+    if (formItem == null || !mounted) return;
+    if (_activeTripId.isEmpty || _userId.isEmpty) return;
+
+    try {
+      final created = await TravelService.createItem(
+        tripId:             _activeTripId,
+        title:              formItem.title,
+        type:               formItem.type,
+        createdBy:          _userId,
+        date:               formItem.date,
+        endDate:            formItem.endDate,
+        time:               formItem.time,
+        endTime:            formItem.endTime,
+        location:           formItem.location,
+        destination:        formItem.destination,
+        confirmationNumber: formItem.confirmationNumber,
+        address:            formItem.address,
+        notes:              formItem.notes,
+        linkedDocIds:       formItem.linkedDocIds,
+      );
+      if (!mounted) return;
       setState(() {
-        _items.add(item);
-        _selectedId = item.id;
+        _items.add(created);
+        _selectedId = created.id;
       });
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(
+        content: Text(
+          'Failed to add travel item: $e',
+          style: kStyleBody.copyWith(color: Colors.white),
+        ),
+        backgroundColor: kColorDanger,
+        behavior: SnackBarBehavior.floating,
+      ));
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(
+        backgroundColor: kColorCream,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_error != null) {
+      return Scaffold(
+        backgroundColor: kColorCream,
+        body: Center(
+          child: WabwayEmptyState(
+            icon: Icons.error_outline_rounded,
+            title: 'Could not load travel',
+            description: _error!,
+          ),
+        ),
+      );
+    }
+
     final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
     return isDesktop ? _buildDesktop(context) : _buildMobile(context);
   }
 
-  // ─── Desktop ──────────────────────────────────────────────────────────────
+  // ─── Desktop ──────────────────────────────────────────────────────────────────
 
   Widget _buildDesktop(BuildContext context) {
     return Scaffold(
@@ -99,6 +273,8 @@ class _TravelScreenState extends State<TravelScreen> {
         child: TravelItemDetailContent(
           key: ValueKey(item.id),
           item: item,
+          docs: _docs,
+          days: _days,
           onDelete: () => _delete(item.id),
         ),
       );
@@ -112,7 +288,7 @@ class _TravelScreenState extends State<TravelScreen> {
     );
   }
 
-  // ─── Mobile ───────────────────────────────────────────────────────────────
+  // ─── Mobile ───────────────────────────────────────────────────────────────────
 
   Widget _buildMobile(BuildContext context) {
     return Scaffold(
@@ -141,7 +317,7 @@ class _TravelScreenState extends State<TravelScreen> {
     );
   }
 
-  // ─── Shared list ──────────────────────────────────────────────────────────
+  // ─── Shared list ──────────────────────────────────────────────────────────────
 
   Widget _buildList({required bool desktop}) {
     final items = _filtered;
@@ -171,7 +347,8 @@ class _TravelScreenState extends State<TravelScreen> {
             : WabwayEmptyState(
                 icon: _filter!.icon,
                 title: 'No ${_filter!.label.toLowerCase()}s',
-                description: 'No ${_filter!.label.toLowerCase()} items added yet.',
+                description:
+                    'No ${_filter!.label.toLowerCase()} items added yet.',
               ),
       );
     }
@@ -187,6 +364,9 @@ class _TravelScreenState extends State<TravelScreen> {
       separatorBuilder: (_, __) => const SizedBox(height: kSpace3),
       itemBuilder: (ctx, i) {
         final item = items[i];
+        // Capture docs/days at build time so they're available in the pushed route.
+        final docsSnapshot = List<TripDocument>.unmodifiable(_docs);
+        final daysSnapshot = List<TripDay>.unmodifiable(_days);
         return TravelItemCard(
           item: item,
           isSelected: desktop && _selectedId == item.id,
@@ -197,6 +377,8 @@ class _TravelScreenState extends State<TravelScreen> {
                     MaterialPageRoute(
                       builder: (_) => TravelItemDetailScreen(
                         item: item,
+                        docs: docsSnapshot,
+                        days: daysSnapshot,
                         onDelete: () => _delete(item.id),
                       ),
                     ),

@@ -8,7 +8,10 @@ import '../../widgets/widgets.dart';
 
 // ─── Entry point ──────────────────────────────────────────────────────────────
 
-Future<TravelItem?> showAddTravelSheet(BuildContext context) {
+Future<TravelItem?> showAddTravelSheet(
+  BuildContext context, {
+  List<TripDocument> docs = const [],
+}) {
   final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
 
   if (isDesktop) {
@@ -23,6 +26,7 @@ Future<TravelItem?> showAddTravelSheet(BuildContext context) {
           width: 520,
           height: MediaQuery.sizeOf(ctx).height * 0.90,
           child: _AddTravelContent(
+            docs: docs,
             onSubmit: (item) => Navigator.pop(ctx, item),
           ),
         ),
@@ -36,14 +40,16 @@ Future<TravelItem?> showAddTravelSheet(BuildContext context) {
     useSafeArea: true,
     backgroundColor: Colors.transparent,
     builder: (ctx) => _AddTravelSheet(
+      docs: docs,
       onSubmit: (item) => Navigator.pop(ctx, item),
     ),
   );
 }
 
 class _AddTravelSheet extends StatelessWidget {
-  const _AddTravelSheet({required this.onSubmit});
+  const _AddTravelSheet({required this.onSubmit, required this.docs});
   final ValueChanged<TravelItem> onSubmit;
+  final List<TripDocument> docs;
 
   @override
   Widget build(BuildContext context) {
@@ -57,6 +63,7 @@ class _AddTravelSheet extends StatelessWidget {
           borderRadius: kRadiusSheet,
         ),
         child: _AddTravelContent(
+          docs: docs,
           scrollController: ctrl,
           onSubmit: onSubmit,
           showDragHandle: true,
@@ -71,11 +78,13 @@ class _AddTravelSheet extends StatelessWidget {
 class _AddTravelContent extends StatefulWidget {
   const _AddTravelContent({
     required this.onSubmit,
+    required this.docs,
     this.scrollController,
     this.showDragHandle = false,
   });
 
   final ValueChanged<TravelItem> onSubmit;
+  final List<TripDocument> docs;
   final ScrollController? scrollController;
   final bool showDragHandle;
 
@@ -352,6 +361,7 @@ class _AddTravelContentState extends State<_AddTravelContent> {
                   const SizedBox(height: kSpace4),
 
                   _DocsPicker(
+                    docs: widget.docs,
                     selectedIds: _linkedDocIds,
                     onChanged: (id, checked) => setState(() {
                       if (checked) {
@@ -512,19 +522,25 @@ class _TimePicker extends StatelessWidget {
 // ─── Document multi-picker ────────────────────────────────────────────────────
 
 class _DocsPicker extends StatelessWidget {
-  const _DocsPicker({required this.selectedIds, required this.onChanged});
+  const _DocsPicker({
+    required this.docs,
+    required this.selectedIds,
+    required this.onChanged,
+  });
+  final List<TripDocument> docs;
   final Set<String> selectedIds;
   final void Function(String id, bool checked) onChanged;
 
   @override
   Widget build(BuildContext context) {
+    if (docs.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('Attach documents (optional)',
             style: kStyleCaptionMedium.copyWith(color: kColorInk)),
         const SizedBox(height: kSpace2),
-        ...kMockDocuments.map((d) {
+        ...docs.map((d) {
           final checked = selectedIds.contains(d.id);
           return CheckboxListTile(
             value: checked,

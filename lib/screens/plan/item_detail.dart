@@ -15,11 +15,15 @@ class ItemDetailScreen extends StatelessWidget {
     super.key,
     required this.item,
     required this.day,
+    this.spots = const [],
+    this.docs = const [],
     this.onDelete,
   });
 
   final ItineraryItem item;
   final TripDay day;
+  final List<Spot> spots;
+  final List<TripDocument> docs;
   final VoidCallback? onDelete;
 
   @override
@@ -38,7 +42,13 @@ class ItemDetailScreen extends StatelessWidget {
         ],
       ),
       body: SingleChildScrollView(
-        child: ItemDetailContent(item: item, day: day, onDelete: onDelete),
+        child: ItemDetailContent(
+          item: item,
+          day: day,
+          spots: spots,
+          docs: docs,
+          onDelete: onDelete,
+        ),
       ),
     );
   }
@@ -51,20 +61,24 @@ class ItemDetailContent extends StatelessWidget {
     super.key,
     required this.item,
     required this.day,
+    this.spots = const [],
+    this.docs = const [],
     this.onDelete,
   });
 
   final ItineraryItem item;
   final TripDay day;
+  final List<Spot> spots;
+  final List<TripDocument> docs;
   final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
     final linkedSpot = item.linkedSpotId != null
-        ? kMockSpots.where((s) => s.id == item.linkedSpotId).firstOrNull
+        ? spots.where((s) => s.id == item.linkedSpotId).firstOrNull
         : null;
     final linkedDocs = item.linkedDocIds
-        .map((id) => kMockDocuments.where((d) => d.id == id).firstOrNull)
+        .map((id) => docs.where((d) => d.id == id).firstOrNull)
         .whereType<TripDocument>()
         .toList();
 

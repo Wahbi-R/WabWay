@@ -1,6 +1,16 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'
+    show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
+import '../core/supabase/client.dart';
+import '../core/supabase/plan_service.dart';
+import '../core/supabase/spot_service.dart';
+import '../core/supabase/doc_service.dart';
+import '../core/trip/trip_state.dart';
 import '../data/plan_data.dart';
+import '../data/spot_data.dart';
+import '../data/docs_data.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
@@ -17,14 +27,136 @@ class PlanScreen extends StatefulWidget {
 }
 
 class _PlanScreenState extends State<PlanScreen> {
-  final List<TripDay> _days = List.from(kMockTripDays);
+  final List<TripDay> _days = [];
+  final List<Spot> _spots = [];
+  final List<TripDocument> _docs = [];
+
+  bool _loading = false;
+  String? _error;
+  String _activeTripId = '';
+  String _userId = '';
+
+  RealtimeChannel? _channel;
+  Timer? _debounce;
+
   String? _selectedItemId;
   String? _selectedDayId;
 
   ItineraryItem? get _selectedItem => itemById(_days, _selectedItemId ?? '');
-  TripDay? get _selectedDay => _selectedItem == null
-      ? null
-      : dayForItem(_days, _selectedItemId ?? '');
+  TripDay? get _selectedDay =>
+      _selectedItem == null ? null : dayForItem(_days, _selectedItemId ?? '');
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _userId = supabase.auth.currentUser?.id ?? '';
+    final tripId = TripState.tripOf(context).id;
+    if (tripId != _activeTripId) {
+      _activeTripId = tripId;
+      _loadAll();
+      _subscribeRealtime(tripId);
+    }
+  }
+
+  @override
+  void dispose() {
+    _channel?.unsubscribe();
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  // ─── Data loading ─────────────────────────────────────────────────────────────
+
+  Future<void> _loadAll() async {
+    if (_activeTripId.isEmpty) return;
+    setState(() { _loading = true; _error = null; });
+    try {
+      final daysFuture  = PlanService.loadAll(_activeTripId);
+      final spotsFuture = SpotService.loadSpots(_activeTripId);
+      final docsFuture  = DocService.loadDocuments(_activeTripId);
+      final days  = await daysFuture;
+      final spots = await spotsFuture;
+      final docs  = await docsFuture;
+      if (!mounted) return;
+      setState(() {
+        _days
+          ..clear()
+          ..addAll(days);
+        _spots
+          ..clear()
+          ..addAll(spots);
+        _docs
+          ..clear()
+          ..addAll(docs);
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { _loading = false; _error = e.toString(); });
+    }
+  }
+
+  Future<void> _silentReload() async {
+    if (!mounted || _activeTripId.isEmpty) return;
+    try {
+      final daysFuture  = PlanService.loadAll(_activeTripId);
+      final spotsFuture = SpotService.loadSpots(_activeTripId);
+      final docsFuture  = DocService.loadDocuments(_activeTripId);
+      final days  = await daysFuture;
+      final spots = await spotsFuture;
+      final docs  = await docsFuture;
+      if (!mounted) return;
+      setState(() {
+        _days
+          ..clear()
+          ..addAll(days);
+        _spots
+          ..clear()
+          ..addAll(spots);
+        _docs
+          ..clear()
+          ..addAll(docs);
+      });
+    } catch (_) {}
+  }
+
+  // ─── Realtime ─────────────────────────────────────────────────────────────────
+
+  void _subscribeRealtime(String tripId) {
+    _channel?.unsubscribe();
+    _channel = supabase
+        .channel('plan-$tripId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'itinerary_days',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'trip_id',
+            value: tripId,
+          ),
+          callback: (_) => _debounceReload(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'itinerary_items',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'trip_id',
+            value: tripId,
+          ),
+          callback: (_) => _debounceReload(),
+        )
+        .subscribe();
+  }
+
+  void _debounceReload() {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 400), _silentReload);
+  }
+
+  // ─── UI actions ───────────────────────────────────────────────────────────────
 
   void _selectItem(String id) =>
       setState(() { _selectedItemId = id; _selectedDayId = null; });
@@ -39,34 +171,96 @@ class _PlanScreenState extends State<PlanScreen> {
       }
       if (_selectedItemId == itemId) _selectedItemId = null;
     });
+    PlanService.deleteItem(itemId).catchError((_) => _silentReload());
   }
 
   Future<void> _addItem(BuildContext context, String dayId) async {
-    final item = await showAddItemSheet(context, dayId: dayId);
-    if (item != null && mounted) {
+    final messenger = ScaffoldMessenger.of(context);
+    final draft = await showAddItemSheet(
+      context,
+      dayId: dayId,
+      spots: _spots,
+      docs: _docs,
+    );
+    if (draft == null || !mounted) return;
+
+    final day = _days.where((d) => d.id == dayId).firstOrNull;
+    if (day == null) return;
+
+    if (_activeTripId.isEmpty || _userId.isEmpty) {
       setState(() {
-        final day = _days.where((d) => d.id == dayId).firstOrNull;
-        day?.items.add(item);
+        day.items.add(draft);
+        _selectedItemId = draft.id;
+      });
+      return;
+    }
+
+    try {
+      final item = await PlanService.createItem(
+        tripId:          _activeTripId,
+        dayId:           dayId,
+        title:           draft.title,
+        type:            draft.type,
+        createdBy:       _userId,
+        time:            draft.time,
+        city:            draft.city,
+        location:        draft.location,
+        mapsUrl:         draft.mapsUrl,
+        confirmationUrl: draft.confirmationUrl,
+        notes:           draft.notes,
+        linkedSpotId:    draft.linkedSpotId,
+        linkedDocIds:    draft.linkedDocIds,
+        sortOrder:       day.items.length,
+      );
+      if (!mounted) return;
+      setState(() {
+        day.items.add(item);
         _selectedItemId = item.id;
       });
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(
+        content: Text(
+          'Failed to add item: $e',
+          style: kStyleBody.copyWith(color: Colors.white),
+        ),
+        backgroundColor: kColorDanger,
+        behavior: SnackBarBehavior.floating,
+      ));
     }
   }
 
   Future<void> _addDay(BuildContext context) async {
-    final day = await _showAddDayDialog(context);
-    if (day != null && mounted) {
-      setState(() {
-        final newDay = TripDay(
-          id: day.id,
-          dayNumber: _days.length + 1,
-          date: day.date,
-          city: day.city,
-          notes: day.notes,
-        );
-        _days.add(newDay);
-      });
+    final messenger = ScaffoldMessenger.of(context);
+    final draft = await _showAddDayDialog(context);
+    if (draft == null || !mounted) return;
+    if (_activeTripId.isEmpty || _userId.isEmpty) return;
+
+    try {
+      final day = await PlanService.createDay(
+        tripId:    _activeTripId,
+        dayNumber: _days.length + 1,
+        date:      draft.date,
+        city:      draft.city,
+        createdBy: _userId,
+        notes:     draft.notes,
+      );
+      if (!mounted) return;
+      setState(() => _days.add(day));
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(
+        content: Text(
+          'Failed to add day: $e',
+          style: kStyleBody.copyWith(color: Colors.white),
+        ),
+        backgroundColor: kColorDanger,
+        behavior: SnackBarBehavior.floating,
+      ));
     }
   }
+
+  // ─── Build ────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -74,7 +268,7 @@ class _PlanScreenState extends State<PlanScreen> {
     return isDesktop ? _buildDesktop(context) : _buildMobile(context);
   }
 
-  // ─── Desktop ────────────────────────────────────────────────────────────────
+  // ─── Desktop ──────────────────────────────────────────────────────────────────
 
   Widget _buildDesktop(BuildContext context) {
     return Scaffold(
@@ -86,37 +280,47 @@ class _PlanScreenState extends State<PlanScreen> {
             onAddDay: () => _addDay(context),
           ),
           Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Left: scrollable timeline
-                SizedBox(
-                  width: 420,
-                  child: _days.isEmpty
-                      ? _buildEmptyTimeline(context)
-                      : ListView.separated(
-                          padding: const EdgeInsets.all(kSpace4),
-                          itemCount: _days.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: kSpace3),
-                          itemBuilder: (ctx, i) => TripDayCard(
-                            day: _days[i],
-                            selectedItemId: _selectedItemId,
-                            onItemTap: _selectItem,
-                            onAddItem: () => _addItem(context, _days[i].id),
-                            isDesktop: true,
-                            onDayTap: () => _selectDay(_days[i].id),
-                            daySelected: _selectedDayId == _days[i].id,
-                          ),
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                    ? Center(
+                        child: WabwayEmptyState(
+                          icon: Icons.error_outline_rounded,
+                          title: 'Could not load plan',
+                          description: _error!,
                         ),
-                ),
-                const VerticalDivider(
-                    width: 1, thickness: 1, color: kColorBorder),
-
-                // Right: detail panel
-                Expanded(child: _buildDesktopDetail()),
-              ],
-            ),
+                      )
+                    : Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          SizedBox(
+                            width: 420,
+                            child: _days.isEmpty
+                                ? _buildEmptyTimeline(context)
+                                : ListView.separated(
+                                    padding: const EdgeInsets.all(kSpace4),
+                                    itemCount: _days.length,
+                                    separatorBuilder: (_, __) =>
+                                        const SizedBox(height: kSpace3),
+                                    itemBuilder: (ctx, i) => TripDayCard(
+                                      day: _days[i],
+                                      selectedItemId: _selectedItemId,
+                                      onItemTap: _selectItem,
+                                      onAddItem: () =>
+                                          _addItem(context, _days[i].id),
+                                      isDesktop: true,
+                                      onDayTap: () =>
+                                          _selectDay(_days[i].id),
+                                      daySelected:
+                                          _selectedDayId == _days[i].id,
+                                    ),
+                                  ),
+                          ),
+                          const VerticalDivider(
+                              width: 1, thickness: 1, color: kColorBorder),
+                          Expanded(child: _buildDesktopDetail()),
+                        ],
+                      ),
           ),
         ],
       ),
@@ -125,7 +329,7 @@ class _PlanScreenState extends State<PlanScreen> {
 
   Widget _buildDesktopDetail() {
     final item = _selectedItem;
-    final day = _selectedDay;
+    final day  = _selectedDay;
 
     if (item != null && day != null) {
       return SingleChildScrollView(
@@ -133,6 +337,8 @@ class _PlanScreenState extends State<PlanScreen> {
           key: ValueKey(item.id),
           item: item,
           day: day,
+          spots: _spots,
+          docs: _docs,
           onDelete: () => _deleteItem(item.id),
         ),
       );
@@ -183,7 +389,7 @@ class _PlanScreenState extends State<PlanScreen> {
     );
   }
 
-  // ─── Mobile ──────────────────────────────────────────────────────────────────
+  // ─── Mobile ───────────────────────────────────────────────────────────────────
 
   Widget _buildMobile(BuildContext context) {
     return Scaffold(
@@ -200,50 +406,66 @@ class _PlanScreenState extends State<PlanScreen> {
           const SizedBox(width: kSpace2),
         ],
       ),
-      body: _days.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const WabwayEmptyState(
-                    icon: Icons.calendar_today_rounded,
-                    title: 'No days yet',
-                    description: 'Add your first trip day to start planning.',
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(
+                  child: WabwayEmptyState(
+                    icon: Icons.error_outline_rounded,
+                    title: 'Could not load plan',
+                    description: _error!,
                   ),
-                  const SizedBox(height: kSpace4),
-                  WabwayButton(
-                    label: 'Add Day',
-                    icon: Icons.add_rounded,
-                    onPressed: () => _addDay(context),
-                  ),
-                ],
-              ),
-            )
-          : ListView.separated(
-              padding: const EdgeInsets.all(kSpace4),
-              itemCount: _days.length,
-              separatorBuilder: (_, __) => const SizedBox(height: kSpace3),
-              itemBuilder: (ctx, i) => TripDayCard(
-                day: _days[i],
-                onItemTap: (id) {
-                  final item = itemById(_days, id);
-                  final day = dayForItem(_days, id);
-                  if (item != null && day != null) {
-                    Navigator.push(
-                      ctx,
-                      MaterialPageRoute(
-                        builder: (_) => ItemDetailScreen(
-                          item: item,
-                          day: day,
-                          onDelete: () => _deleteItem(id),
-                        ),
+                )
+              : _days.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const WabwayEmptyState(
+                            icon: Icons.calendar_today_rounded,
+                            title: 'No days yet',
+                            description:
+                                'Add your first trip day to start planning.',
+                          ),
+                          const SizedBox(height: kSpace4),
+                          WabwayButton(
+                            label: 'Add Day',
+                            icon: Icons.add_rounded,
+                            onPressed: () => _addDay(context),
+                          ),
+                        ],
                       ),
-                    );
-                  }
-                },
-                onAddItem: () => _addItem(context, _days[i].id),
-              ),
-            ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.all(kSpace4),
+                      itemCount: _days.length,
+                      separatorBuilder: (_, __) =>
+                          const SizedBox(height: kSpace3),
+                      itemBuilder: (ctx, i) => TripDayCard(
+                        day: _days[i],
+                        onItemTap: (id) {
+                          final item = itemById(_days, id);
+                          final day  = dayForItem(_days, id);
+                          if (item != null && day != null) {
+                            final spots = _spots;
+                            final docs  = _docs;
+                            Navigator.push(
+                              ctx,
+                              MaterialPageRoute(
+                                builder: (_) => ItemDetailScreen(
+                                  item: item,
+                                  day: day,
+                                  spots: spots,
+                                  docs: docs,
+                                  onDelete: () => _deleteItem(id),
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                        onAddItem: () => _addItem(context, _days[i].id),
+                      ),
+                    ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'plan_fab',
         onPressed: () {
@@ -263,7 +485,7 @@ class _PlanScreenState extends State<PlanScreen> {
   }
 }
 
-// ─── Desktop day detail panel ────────────────────────────────────────────────
+// ─── Desktop day detail panel ─────────────────────────────────────────────────
 
 class _DayDetailPanel extends StatelessWidget {
   const _DayDetailPanel({
@@ -285,7 +507,6 @@ class _DayDetailPanel extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Header band
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(kSpace5),
@@ -343,15 +564,15 @@ class _DayDetailPanel extends StatelessWidget {
             ],
           ),
         ),
-
         Padding(
           padding: const EdgeInsets.all(kSpace5),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Notes
               if (day.notes != null && day.notes!.isNotEmpty) ...[
-                Text('Notes', style: kStyleCaptionMedium.copyWith(color: kColorInkSoft)),
+                Text('Notes',
+                    style:
+                        kStyleCaptionMedium.copyWith(color: kColorInkSoft)),
                 const SizedBox(height: kSpace2),
                 Container(
                   width: double.infinity,
@@ -368,11 +589,11 @@ class _DayDetailPanel extends StatelessWidget {
                 ),
                 const SizedBox(height: kSpace5),
               ],
-
-              // Item summary
               if (day.items.isNotEmpty) ...[
-                Text('${day.items.length} item${day.items.length == 1 ? '' : 's'}',
-                    style: kStyleCaptionMedium.copyWith(color: kColorInkSoft)),
+                Text(
+                  '${day.items.length} item${day.items.length == 1 ? '' : 's'}',
+                  style: kStyleCaptionMedium.copyWith(color: kColorInkSoft),
+                ),
                 const SizedBox(height: kSpace2),
                 Wrap(
                   spacing: kSpace2,
@@ -408,7 +629,6 @@ class _DayDetailPanel extends StatelessWidget {
                 ),
                 const SizedBox(height: kSpace5),
               ],
-
               WabwayButton(
                 label: 'Add item to this day',
                 icon: Icons.add_rounded,
@@ -449,7 +669,8 @@ class _DesktopPlanBar extends StatelessWidget {
           const SizedBox(width: kSpace3),
           if (dayCount > 0)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: const BoxDecoration(
                 color: kColorSurfaceSunken,
                 borderRadius: kRadiusPill,
@@ -521,7 +742,7 @@ class _AddDayDialogState extends State<_AddDayDialog> {
     Navigator.pop(
       context,
       TripDay(
-        id: 'day_${DateTime.now().millisecondsSinceEpoch}',
+        id: '',
         dayNumber: 0,
         date: _date,
         city: _cityCtrl.text.trim(),
@@ -551,7 +772,8 @@ class _AddDayDialogState extends State<_AddDayDialog> {
                 onTap: _pickDate,
                 child: Container(
                   height: 48,
-                  padding: const EdgeInsets.symmetric(horizontal: kSpace3),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: kSpace3),
                   decoration: BoxDecoration(
                     color: kColorSurfaceSunken,
                     borderRadius: kRadiusMd,
@@ -576,9 +798,10 @@ class _AddDayDialogState extends State<_AddDayDialog> {
                 hint: 'e.g. Tokyo',
                 controller: _cityCtrl,
                 textInputAction: TextInputAction.next,
-                validator: (v) => (v == null || v.trim().isEmpty)
-                    ? 'City is required'
-                    : null,
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty)
+                        ? 'City is required'
+                        : null,
               ),
               const SizedBox(height: kSpace3),
               WabwayTextField(

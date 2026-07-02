@@ -14,10 +14,14 @@ class TravelItemDetailScreen extends StatelessWidget {
   const TravelItemDetailScreen({
     super.key,
     required this.item,
+    this.docs = const [],
+    this.days = const [],
     this.onDelete,
   });
 
   final TravelItem item;
+  final List<TripDocument> docs;
+  final List<TripDay> days;
   final VoidCallback? onDelete;
 
   @override
@@ -36,7 +40,12 @@ class TravelItemDetailScreen extends StatelessWidget {
         ],
       ),
       body: SingleChildScrollView(
-        child: TravelItemDetailContent(item: item, onDelete: onDelete),
+        child: TravelItemDetailContent(
+          item: item,
+          docs: docs,
+          days: days,
+          onDelete: onDelete,
+        ),
       ),
     );
   }
@@ -48,30 +57,32 @@ class TravelItemDetailContent extends StatelessWidget {
   const TravelItemDetailContent({
     super.key,
     required this.item,
+    this.docs = const [],
+    this.days = const [],
     this.onDelete,
   });
 
   final TravelItem item;
+  final List<TripDocument> docs;
+  final List<TripDay> days;
   final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
     final linkedDocs = item.linkedDocIds
-        .map((id) => kMockDocuments.where((d) => d.id == id).firstOrNull)
+        .map((id) => docs.where((d) => d.id == id).firstOrNull)
         .whereType<TripDocument>()
         .toList();
 
     ItineraryItem? linkedPlanItem;
     TripDay? linkedDay;
     if (item.linkedItineraryItemId != null) {
-      linkedPlanItem = itemById(kMockTripDays, item.linkedItineraryItemId!);
+      linkedPlanItem = itemById(days, item.linkedItineraryItemId!);
       if (linkedPlanItem != null) {
-        linkedDay = dayForItem(kMockTripDays, item.linkedItineraryItemId!);
+        linkedDay = dayForItem(days, item.linkedItineraryItemId!);
       }
     } else if (item.linkedDayId != null) {
-      linkedDay = kMockTripDays
-          .where((d) => d.id == item.linkedDayId)
-          .firstOrNull;
+      linkedDay = days.where((d) => d.id == item.linkedDayId).firstOrNull;
     }
 
     return Column(

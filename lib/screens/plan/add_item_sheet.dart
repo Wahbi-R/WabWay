@@ -12,6 +12,8 @@ import '../../widgets/widgets.dart';
 Future<ItineraryItem?> showAddItemSheet(
   BuildContext context, {
   required String dayId,
+  List<Spot> spots = const [],
+  List<TripDocument> docs = const [],
 }) {
   final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
 
@@ -28,6 +30,8 @@ Future<ItineraryItem?> showAddItemSheet(
           height: MediaQuery.sizeOf(ctx).height * 0.90,
           child: _AddItemContent(
             dayId: dayId,
+            spots: spots,
+            docs: docs,
             onSubmit: (item) => Navigator.pop(ctx, item),
           ),
         ),
@@ -42,14 +46,23 @@ Future<ItineraryItem?> showAddItemSheet(
     backgroundColor: Colors.transparent,
     builder: (ctx) => _AddItemSheet(
       dayId: dayId,
+      spots: spots,
+      docs: docs,
       onSubmit: (item) => Navigator.pop(ctx, item),
     ),
   );
 }
 
 class _AddItemSheet extends StatelessWidget {
-  const _AddItemSheet({required this.dayId, required this.onSubmit});
+  const _AddItemSheet({
+    required this.dayId,
+    required this.spots,
+    required this.docs,
+    required this.onSubmit,
+  });
   final String dayId;
+  final List<Spot> spots;
+  final List<TripDocument> docs;
   final ValueChanged<ItineraryItem> onSubmit;
 
   @override
@@ -65,6 +78,8 @@ class _AddItemSheet extends StatelessWidget {
         ),
         child: _AddItemContent(
           dayId: dayId,
+          spots: spots,
+          docs: docs,
           scrollController: ctrl,
           onSubmit: onSubmit,
           showDragHandle: true,
@@ -79,12 +94,16 @@ class _AddItemSheet extends StatelessWidget {
 class _AddItemContent extends StatefulWidget {
   const _AddItemContent({
     required this.dayId,
+    required this.spots,
+    required this.docs,
     required this.onSubmit,
     this.scrollController,
     this.showDragHandle = false,
   });
 
   final String dayId;
+  final List<Spot> spots;
+  final List<TripDocument> docs;
   final ValueChanged<ItineraryItem> onSubmit;
   final ScrollController? scrollController;
   final bool showDragHandle;
@@ -248,7 +267,7 @@ class _AddItemContentState extends State<_AddItemContent> {
                     onChanged: (v) => setState(() => _linkedSpotId = v),
                     items: [
                       const WabwaySelectItem(value: null, label: 'None'),
-                      ...kMockSpots.map(
+                      ...widget.spots.map(
                         (s) => WabwaySelectItem(
                             value: s.id, label: '${s.name} — ${s.city}'),
                       ),
@@ -258,6 +277,7 @@ class _AddItemContentState extends State<_AddItemContent> {
 
                   // Linked documents
                   _DocsPicker(
+                    docs: widget.docs,
                     selectedIds: _linkedDocIds,
                     onChanged: (id, checked) => setState(() {
                       if (checked) {
@@ -409,19 +429,25 @@ class _TimePicker extends StatelessWidget {
 // ─── Document multi-picker ────────────────────────────────────────────────────
 
 class _DocsPicker extends StatelessWidget {
-  const _DocsPicker({required this.selectedIds, required this.onChanged});
+  const _DocsPicker({
+    required this.docs,
+    required this.selectedIds,
+    required this.onChanged,
+  });
+  final List<TripDocument> docs;
   final Set<String> selectedIds;
   final void Function(String id, bool checked) onChanged;
 
   @override
   Widget build(BuildContext context) {
+    if (docs.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('Attach documents (optional)',
             style: kStyleCaptionMedium.copyWith(color: kColorInk)),
         const SizedBox(height: kSpace2),
-        ...kMockDocuments.map((d) {
+        ...docs.map((d) {
           final checked = selectedIds.contains(d.id);
           return CheckboxListTile(
             value: checked,

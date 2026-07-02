@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../data/plan_data.dart';
-import '../../data/docs_data.dart';
-import '../../data/spot_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
@@ -240,14 +238,3 @@ class _MiniChip extends StatelessWidget {
   }
 }
 
-// ─── Spot name lookup helper ──────────────────────────────────────────────────
-
-String? spotName(String? id) {
-  if (id == null) return null;
-  return kMockSpots.where((s) => s.id == id).firstOrNull?.name;
-}
-
-// ─── Doc title lookup helper ──────────────────────────────────────────────────
-
-TripDocument? docById(String id) =>
-    kMockDocuments.where((d) => d.id == id).firstOrNull;

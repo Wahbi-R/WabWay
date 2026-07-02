@@ -7,14 +7,23 @@ class TripMember {
   bool get isYou => id == kYouId;
 }
 
-// Updated at runtime with real auth/member data in MoneyScreen.didChangeDependencies.
-// Fallback values ensure the money UI doesn't crash before MoneyScreen initialises.
-String kYouId = 'you';
+// Mock fallback — used only for demo/test paths where live data is not loaded.
+// Never mutated at runtime; connected screens pass real members explicitly.
+const String kYouId = 'you';
 
-List<TripMember> kMockMembers = const [
-  TripMember(id: 'you', name: 'You'),
+const List<TripMember> kMockMembers = [
+  TripMember(id: 'you',    name: 'You'),
+  TripMember(id: 'alex',   name: 'Alex'),
+  TripMember(id: 'jordan', name: 'Jordan'),
+  TripMember(id: 'sam',    name: 'Sam'),
 ];
 
-TripMember memberById(String id) =>
-    kMockMembers.firstWhere((m) => m.id == id,
-        orElse: () => TripMember(id: id, name: id));
+/// Looks up a member by ID.
+///
+/// Pass the active [members] list so the lookup uses real data. Falls back to
+/// [kMockMembers] when [members] is omitted (demo / non-connected paths).
+TripMember memberById(String id, [List<TripMember>? members]) =>
+    (members ?? kMockMembers).firstWhere(
+      (m) => m.id == id,
+      orElse: () => TripMember(id: id, name: id),
+    );

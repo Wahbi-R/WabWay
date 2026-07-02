@@ -12,12 +12,14 @@ class SettleUpPanel extends StatefulWidget {
     required this.balances,
     required this.suggestions,
     required this.currency,
+    required this.members,
     this.scrollController,
   });
 
   final List<MemberBalance> balances;
   final List<SettlementSuggestion> suggestions;
   final String currency;
+  final List<TripMember> members;
   final ScrollController? scrollController;
 
   @override
@@ -174,8 +176,9 @@ class _SettleUpPanelState extends State<SettleUpPanel> {
             const SizedBox(height: kSpace2),
             ..._suggestions.map((s) => _SettlementRow(
                   suggestion: s,
-                  currency: widget.currency,
-                  onMark: () => _markSettled(s),
+                  currency:   widget.currency,
+                  members:    widget.members,
+                  onMark:     () => _markSettled(s),
                 )),
           ],
         ],
@@ -292,17 +295,19 @@ class _SettlementRow extends StatelessWidget {
   const _SettlementRow({
     required this.suggestion,
     required this.currency,
+    required this.members,
     required this.onMark,
   });
 
   final SettlementSuggestion suggestion;
   final String currency;
+  final List<TripMember> members;
   final VoidCallback onMark;
 
   @override
   Widget build(BuildContext context) {
-    final from = memberById(suggestion.fromMemberId);
-    final to   = memberById(suggestion.toMemberId);
+    final from = memberById(suggestion.fromMemberId, members);
+    final to   = memberById(suggestion.toMemberId, members);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: kSpace2),

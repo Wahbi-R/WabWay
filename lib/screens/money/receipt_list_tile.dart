@@ -10,18 +10,22 @@ class ReceiptListTile extends StatelessWidget {
   const ReceiptListTile({
     super.key,
     required this.receipt,
+    required this.myId,
+    required this.members,
     this.selected = false,
     this.onTap,
   });
 
   final Receipt receipt;
+  final String myId;
+  final List<TripMember> members;
   final bool selected;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final payer = memberById(receipt.paidById);
-    final net = receipt.myNet;
+    final payer = memberById(receipt.paidById, members);
+    final net   = receipt.myNetFor(myId);
     final isPositive = net > 0;
     final netColor = net > 0.01
         ? kColorSuccess
@@ -66,7 +70,7 @@ class ReceiptListTile extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${payer.isYou ? 'You' : payer.name} paid · ${fmtDate(receipt.date)} · ÷${receipt.splits.length}',
+                    '${payer.name} paid · ${fmtDate(receipt.date)} · ÷${receipt.splits.length}',
                     style: kStyleCaption,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,

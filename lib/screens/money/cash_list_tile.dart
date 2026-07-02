@@ -10,18 +10,22 @@ class CashListTile extends StatelessWidget {
   const CashListTile({
     super.key,
     required this.withdrawal,
+    required this.myId,
+    required this.members,
     this.selected = false,
     this.onTap,
   });
 
   final CashWithdrawal withdrawal;
+  final String myId;
+  final List<TripMember> members;
   final bool selected;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final who = memberById(withdrawal.withdrawnById);
-    final net = withdrawal.myNet;
+    final who = memberById(withdrawal.withdrawnById, members);
+    final net = withdrawal.myNetFor(myId);
     final netColor = net > 0.01
         ? kColorSuccess
         : net < -0.01
@@ -56,7 +60,7 @@ class CashListTile extends StatelessWidget {
                   Text('ATM Withdrawal', style: kStyleBodySemibold),
                   const SizedBox(height: 2),
                   Text(
-                    '${who.isYou ? 'You' : who.name} withdrew · ${fmtDate(withdrawal.date)}'
+                    '${who.name} withdrew · ${fmtDate(withdrawal.date)}'
                     '${withdrawal.atmFee > 0 ? ' · Fee: ${fmtAmount(withdrawal.atmFee, withdrawal.currency)}' : ''}',
                     style: kStyleCaption,
                     maxLines: 1,

@@ -9,8 +9,16 @@ import '../../widgets/widgets.dart';
 // ─── Mobile full-screen route ─────────────────────────────────────────────────
 
 class ReceiptDetailScreen extends StatelessWidget {
-  const ReceiptDetailScreen({super.key, required this.receipt});
+  const ReceiptDetailScreen({
+    super.key,
+    required this.receipt,
+    required this.myId,
+    required this.members,
+  });
+
   final Receipt receipt;
+  final String myId;
+  final List<TripMember> members;
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +34,7 @@ class ReceiptDetailScreen extends StatelessWidget {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.only(bottom: kSpace12),
-        child: ReceiptDetailContent(receipt: receipt),
+        child: ReceiptDetailContent(receipt: receipt, myId: myId, members: members),
       ),
     );
   }
@@ -35,13 +43,21 @@ class ReceiptDetailScreen extends StatelessWidget {
 // ─── Shared detail content ────────────────────────────────────────────────────
 
 class ReceiptDetailContent extends StatelessWidget {
-  const ReceiptDetailContent({super.key, required this.receipt});
+  const ReceiptDetailContent({
+    super.key,
+    required this.receipt,
+    required this.myId,
+    required this.members,
+  });
+
   final Receipt receipt;
+  final String myId;
+  final List<TripMember> members;
 
   @override
   Widget build(BuildContext context) {
-    final payer = memberById(receipt.paidById);
-    final net = receipt.myNet;
+    final payer = memberById(receipt.paidById, members);
+    final net   = receipt.myNetFor(myId);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -99,7 +115,7 @@ class ReceiptDetailContent extends StatelessWidget {
               _InfoRow(
                 icon: Icons.person_rounded,
                 label: 'Paid by',
-                value: payer.isYou ? 'You' : payer.name,
+                value: payer.name,
               ),
 
               // Net for you
@@ -130,9 +146,10 @@ class ReceiptDetailContent extends StatelessWidget {
               Text('Split', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
               const SizedBox(height: kSpace3),
               ...receipt.splits.map((s) => _SplitRow(
-                    split: s,
+                    split:    s,
                     currency: receipt.currency,
                     paidById: receipt.paidById,
+                    members:  members,
                   )),
 
               const SizedBox(height: kSpace5),
@@ -191,29 +208,31 @@ class _SplitRow extends StatelessWidget {
     required this.split,
     required this.currency,
     required this.paidById,
+    required this.members,
   });
 
   final ReceiptSplit split;
   final String currency;
   final String paidById;
+  final List<TripMember> members;
 
   @override
   Widget build(BuildContext context) {
-    final member = memberById(split.memberId);
+    final member  = memberById(split.memberId, members);
     final isPayer = split.memberId == paidById;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: kSpace3),
       child: Row(
         children: [
-          WabwayAvatar(name: member.isYou ? 'You' : member.name, size: WabwayAvatarSize.sm),
+          WabwayAvatar(name: member.name, size: WabwayAvatarSize.sm),
           const SizedBox(width: kSpace3),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  member.isYou ? 'You' : member.name,
+                  member.name,
                   style: kStyleBodyMedium,
                 ),
                 if (isPayer)

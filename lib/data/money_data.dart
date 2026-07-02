@@ -78,15 +78,18 @@ class Receipt {
   final DateTime date;
   final String? notes;
 
-  double get myShare =>
-      splits.where((s) => s.memberId == kYouId).fold(0.0, (a, s) => a + s.amount);
+  double get myShare => myShareFor(kYouId);
+  double get myNet   => myNetFor(kYouId);
 
-  // Positive = net owed to you, Negative = you owe someone
-  double get myNet {
-    if (paidById == kYouId) {
-      return splits.where((s) => s.memberId != kYouId).fold(0.0, (a, s) => a + s.amount);
+  double myShareFor(String myId) =>
+      splits.where((s) => s.memberId == myId).fold(0.0, (a, s) => a + s.amount);
+
+  // Positive = net owed to you, Negative = you owe someone.
+  double myNetFor(String myId) {
+    if (paidById == myId) {
+      return splits.where((s) => s.memberId != myId).fold(0.0, (a, s) => a + s.amount);
     }
-    final yours = splits.where((s) => s.memberId == kYouId);
+    final yours = splits.where((s) => s.memberId == myId);
     return yours.isEmpty ? 0.0 : -yours.first.amount;
   }
 }
@@ -123,11 +126,13 @@ class CashWithdrawal {
   double get totalDistributed =>
       distributions.fold(0.0, (a, d) => a + d.amount);
 
-  double get myNet {
-    if (withdrawnById == kYouId) {
-      return distributions.where((d) => d.memberId != kYouId).fold(0.0, (a, d) => a + d.amount);
+  double get myNet => myNetFor(kYouId);
+
+  double myNetFor(String myId) {
+    if (withdrawnById == myId) {
+      return distributions.where((d) => d.memberId != myId).fold(0.0, (a, d) => a + d.amount);
     }
-    final yours = distributions.where((d) => d.memberId == kYouId);
+    final yours = distributions.where((d) => d.memberId == myId);
     return yours.isEmpty ? 0.0 : -yours.first.amount;
   }
 }
@@ -140,40 +145,48 @@ class MemberBalance {
   final double net; // positive = they owe you, negative = you owe them
 }
 
+/// Computes per-member net balances relative to the current user.
+///
+/// Pass [myId] and [members] for live Supabase data. When omitted they default
+/// to the mock-only fallbacks [kYouId] and [kMockMembers].
 List<MemberBalance> calculateBalances(
   List<Receipt> receipts,
-  List<CashWithdrawal> withdrawals,
-) {
+  List<CashWithdrawal> withdrawals, {
+  String? myId,
+  List<TripMember>? members,
+}) {
+  final me = myId ?? kYouId;
+  final peers = members ?? kMockMembers;
   final Map<String, double> net = {};
 
   for (final r in receipts) {
     for (final split in r.splits) {
-      if (r.paidById == kYouId && split.memberId != kYouId) {
+      if (r.paidById == me && split.memberId != me) {
         net[split.memberId] = (net[split.memberId] ?? 0) + split.amount;
-      } else if (r.paidById != kYouId && split.memberId == kYouId) {
+      } else if (r.paidById != me && split.memberId == me) {
         net[r.paidById] = (net[r.paidById] ?? 0) - split.amount;
       }
     }
   }
 
   for (final w in withdrawals) {
-    if (w.withdrawnById == kYouId) {
+    if (w.withdrawnById == me) {
       for (final d in w.distributions) {
-        if (d.memberId != kYouId) {
+        if (d.memberId != me) {
           net[d.memberId] = (net[d.memberId] ?? 0) + d.amount;
         }
       }
     } else {
       for (final d in w.distributions) {
-        if (d.memberId == kYouId) {
+        if (d.memberId == me) {
           net[w.withdrawnById] = (net[w.withdrawnById] ?? 0) - d.amount;
         }
       }
     }
   }
 
-  return kMockMembers
-      .where((m) => !m.isYou)
+  return peers
+      .where((m) => m.id != me)
       .map((m) => MemberBalance(member: m, net: net[m.id] ?? 0))
       .toList();
 }
@@ -195,24 +208,29 @@ class SettlementSuggestion {
   bool isSettled;
 }
 
+/// Turns balances into concrete payment suggestions.
+///
+/// Pass [myId] for live Supabase data; defaults to [kYouId] for mock paths.
 List<SettlementSuggestion> suggestSettlements(
   List<MemberBalance> balances,
-  String currency,
-) {
+  String currency, {
+  String? myId,
+}) {
+  final me = myId ?? kYouId;
   return balances
       .where((b) => b.net.abs() > 0.5)
       .map((b) => b.net > 0
           ? SettlementSuggestion(
               fromMemberId: b.member.id,
-              toMemberId: kYouId,
-              amount: b.net,
-              currency: currency,
+              toMemberId:   me,
+              amount:       b.net,
+              currency:     currency,
             )
           : SettlementSuggestion(
-              fromMemberId: kYouId,
-              toMemberId: b.member.id,
-              amount: -b.net,
-              currency: currency,
+              fromMemberId: me,
+              toMemberId:   b.member.id,
+              amount:       -b.net,
+              currency:     currency,
             ))
       .toList();
 }

@@ -52,21 +52,19 @@ class _MoneyScreenState extends State<MoneyScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
 
-    // Update module-level money context so all money UI (tiles, detail, balances)
-    // uses real UUIDs and real display names.
+    // Capture real identity and member list from the inherited widget tree.
+    // These are stored as instance fields — no global mutation.
     final myId = supabase.auth.currentUser?.id ?? '';
     final appMembers = TripState.membersOf(context);
-    _userId = myId;
-    kYouId = myId.isEmpty ? 'you' : myId;
-    kMockMembers = appMembers.isEmpty
-        ? [TripMember(id: kYouId, name: 'You')]
+    _userId  = myId;
+    _members = appMembers.isEmpty
+        ? [TripMember(id: myId.isEmpty ? 'you' : myId, name: 'You')]
         : appMembers
             .map((m) => TripMember(
                   id:   m.userId,
                   name: m.userId == myId ? 'You' : m.profile.displayName,
                 ))
             .toList();
-    _members = List.from(kMockMembers);
 
     final tripId = TripState.tripOf(context).id;
     if (tripId != _activeTripId) {
@@ -165,8 +163,10 @@ class _MoneyScreenState extends State<MoneyScreen> {
     return 'JPY';
   }
 
-  List<MemberBalance> get _balances => calculateBalances(_receipts, _withdrawals);
-  List<SettlementSuggestion> get _settlements => suggestSettlements(_balances, _currency);
+  List<MemberBalance> get _balances =>
+      calculateBalances(_receipts, _withdrawals, myId: _userId, members: _members);
+  List<SettlementSuggestion> get _settlements =>
+      suggestSettlements(_balances, _currency, myId: _userId);
 
   Receipt? get _selectedReceipt => _selectedReceiptId == null
       ? null
@@ -298,7 +298,9 @@ class _MoneyScreenState extends State<MoneyScreen> {
         itemCount: _receipts.length,
         separatorBuilder: (_, __) => const SizedBox(height: kSpace2),
         itemBuilder: (_, i) => ReceiptListTile(
-          receipt: _receipts[i],
+          receipt:  _receipts[i],
+          myId:     _userId,
+          members:  _members,
           selected: _selectedReceiptId == _receipts[i].id,
           onTap: () => setState(() => _selectedReceiptId = _receipts[i].id),
         ),
@@ -318,7 +320,9 @@ class _MoneyScreenState extends State<MoneyScreen> {
         separatorBuilder: (_, __) => const SizedBox(height: kSpace2),
         itemBuilder: (_, i) => CashListTile(
           withdrawal: _withdrawals[i],
-          selected: _selectedWithdrawalId == _withdrawals[i].id,
+          myId:       _userId,
+          members:    _members,
+          selected:   _selectedWithdrawalId == _withdrawals[i].id,
           onTap: () =>
               setState(() => _selectedWithdrawalId = _withdrawals[i].id),
         ),
@@ -327,9 +331,10 @@ class _MoneyScreenState extends State<MoneyScreen> {
 
     // Settle up: full content in left panel
     return SettleUpPanel(
-      balances: _balances,
+      balances:    _balances,
       suggestions: _settlements,
-      currency: _currency,
+      currency:    _currency,
+      members:     _members,
     );
   }
 
@@ -350,8 +355,12 @@ class _MoneyScreenState extends State<MoneyScreen> {
         );
       }
       return SingleChildScrollView(
-        child:
-            ReceiptDetailContent(key: ValueKey(receipt.id), receipt: receipt),
+        child: ReceiptDetailContent(
+          key:     ValueKey(receipt.id),
+          receipt: receipt,
+          myId:    _userId,
+          members: _members,
+        ),
       );
     }
 
@@ -367,7 +376,11 @@ class _MoneyScreenState extends State<MoneyScreen> {
     }
     return SingleChildScrollView(
       child: CashDetailContent(
-          key: ValueKey(withdrawal.id), withdrawal: withdrawal),
+        key:        ValueKey(withdrawal.id),
+        withdrawal: withdrawal,
+        myId:       _userId,
+        members:    _members,
+      ),
     );
   }
 
@@ -416,16 +429,24 @@ class _MoneyScreenState extends State<MoneyScreen> {
                     itemCount: _receipts.length,
                     separatorBuilder: (_, __) =>
                         const SizedBox(height: kSpace2),
-                    itemBuilder: (ctx, i) => ReceiptListTile(
-                      receipt: _receipts[i],
-                      onTap: () => Navigator.push(
-                        ctx,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              ReceiptDetailScreen(receipt: _receipts[i]),
+                    itemBuilder: (ctx, i) {
+                      final r = _receipts[i];
+                      return ReceiptListTile(
+                        receipt: r,
+                        myId:    _userId,
+                        members: _members,
+                        onTap: () => Navigator.push(
+                          ctx,
+                          MaterialPageRoute(
+                            builder: (_) => ReceiptDetailScreen(
+                              receipt: r,
+                              myId:    _userId,
+                              members: _members,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
+                      );
+                    },
                   ),
 
             // Cash tab
@@ -440,23 +461,32 @@ class _MoneyScreenState extends State<MoneyScreen> {
                     itemCount: _withdrawals.length,
                     separatorBuilder: (_, __) =>
                         const SizedBox(height: kSpace2),
-                    itemBuilder: (ctx, i) => CashListTile(
-                      withdrawal: _withdrawals[i],
-                      onTap: () => Navigator.push(
-                        ctx,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              CashDetailScreen(withdrawal: _withdrawals[i]),
+                    itemBuilder: (ctx, i) {
+                      final w = _withdrawals[i];
+                      return CashListTile(
+                        withdrawal: w,
+                        myId:       _userId,
+                        members:    _members,
+                        onTap: () => Navigator.push(
+                          ctx,
+                          MaterialPageRoute(
+                            builder: (_) => CashDetailScreen(
+                              withdrawal: w,
+                              myId:       _userId,
+                              members:    _members,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
+                      );
+                    },
                   ),
 
             // Settle Up tab
             SettleUpPanel(
-              balances: _balances,
+              balances:    _balances,
               suggestions: _settlements,
-              currency: _currency,
+              currency:    _currency,
+              members:     _members,
             ),
           ],
         ),

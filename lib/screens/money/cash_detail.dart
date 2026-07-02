@@ -9,8 +9,16 @@ import '../../widgets/widgets.dart';
 // ─── Mobile full-screen route ─────────────────────────────────────────────────
 
 class CashDetailScreen extends StatelessWidget {
-  const CashDetailScreen({super.key, required this.withdrawal});
+  const CashDetailScreen({
+    super.key,
+    required this.withdrawal,
+    required this.myId,
+    required this.members,
+  });
+
   final CashWithdrawal withdrawal;
+  final String myId;
+  final List<TripMember> members;
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +34,7 @@ class CashDetailScreen extends StatelessWidget {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.only(bottom: kSpace12),
-        child: CashDetailContent(withdrawal: withdrawal),
+        child: CashDetailContent(withdrawal: withdrawal, myId: myId, members: members),
       ),
     );
   }
@@ -35,13 +43,21 @@ class CashDetailScreen extends StatelessWidget {
 // ─── Shared content ───────────────────────────────────────────────────────────
 
 class CashDetailContent extends StatelessWidget {
-  const CashDetailContent({super.key, required this.withdrawal});
+  const CashDetailContent({
+    super.key,
+    required this.withdrawal,
+    required this.myId,
+    required this.members,
+  });
+
   final CashWithdrawal withdrawal;
+  final String myId;
+  final List<TripMember> members;
 
   @override
   Widget build(BuildContext context) {
-    final who = memberById(withdrawal.withdrawnById);
-    final net = withdrawal.myNet;
+    final who = memberById(withdrawal.withdrawnById, members);
+    final net = withdrawal.myNetFor(myId);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -106,7 +122,7 @@ class CashDetailContent extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('Withdrawn by', style: kStyleCaption),
-                      Text(who.isYou ? 'You' : who.name, style: kStyleBodyMedium),
+                      Text(who.name, style: kStyleBodyMedium),
                     ],
                   ),
                 ],
@@ -165,8 +181,9 @@ class CashDetailContent extends StatelessWidget {
               Text('Cash distributed', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
               const SizedBox(height: kSpace3),
               ...withdrawal.distributions.map((d) => _DistRow(
-                    dist: d,
+                    dist:     d,
                     currency: withdrawal.currency,
+                    members:  members,
                   )),
 
               const SizedBox(height: kSpace5),
@@ -184,21 +201,22 @@ class CashDetailContent extends StatelessWidget {
 }
 
 class _DistRow extends StatelessWidget {
-  const _DistRow({required this.dist, required this.currency});
+  const _DistRow({required this.dist, required this.currency, required this.members});
   final CashDistribution dist;
   final String currency;
+  final List<TripMember> members;
 
   @override
   Widget build(BuildContext context) {
-    final member = memberById(dist.memberId);
+    final member = memberById(dist.memberId, members);
     return Padding(
       padding: const EdgeInsets.only(bottom: kSpace3),
       child: Row(
         children: [
-          WabwayAvatar(name: member.isYou ? 'You' : member.name, size: WabwayAvatarSize.sm),
+          WabwayAvatar(name: member.name, size: WabwayAvatarSize.sm),
           const SizedBox(width: kSpace3),
           Expanded(
-            child: Text(member.isYou ? 'You' : member.name, style: kStyleBodyMedium),
+            child: Text(member.name, style: kStyleBodyMedium),
           ),
           Text(
             fmtAmount(dist.amount, currency),

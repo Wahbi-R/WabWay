@@ -1,13 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../data/member_data.dart';
+import '../../core/auth/profile_state.dart';
+import '../../core/supabase/client.dart';
+import '../../core/supabase/spot_service.dart';
+import '../../core/trip/trip_state.dart';
 import '../../data/spot_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 import 'spot_vote_chip.dart';
+
+// ─── Member name helper ────────────────────────────────────────────────────────
+
+String _memberName(BuildContext context, String userId) {
+  final me = ProfileState.maybeOf(context);
+  if (me?.id == userId) return 'You';
+  final members = TripState.membersOf(context);
+  final match = members.where((m) => m.userId == userId).firstOrNull;
+  if (match != null) return match.profile.displayName;
+  return userId.length >= 8 ? userId.substring(0, 8) : userId;
+}
 
 // ─── Full-screen route for mobile ─────────────────────────────────────────────
 
@@ -17,11 +31,15 @@ class SpotDetailScreen extends StatelessWidget {
     required this.spot,
     this.myVote,
     this.onVote,
+    this.canDelete = false,
+    this.onDelete,
   });
 
   final Spot spot;
   final VoteType? myVote;
   final ValueChanged<VoteType?>? onVote;
+  final bool canDelete;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -40,6 +58,12 @@ class SpotDetailScreen extends StatelessWidget {
             color: kColorInkSoft,
             onPressed: () => _openLink(context, spot.mapsUrl ?? spot.name),
           ),
+          if (canDelete && onDelete != null)
+            IconButton(
+              icon: const Icon(Icons.delete_outline_rounded),
+              color: kColorDanger,
+              onPressed: () => _confirmDelete(context, onDelete!),
+            ),
           const SizedBox(width: kSpace2),
         ],
       ),
@@ -64,12 +88,16 @@ class SpotDetailContent extends StatefulWidget {
     this.myVote,
     this.onVote,
     this.showHeader = false,
+    this.canDelete = false,
+    this.onDelete,
   });
 
   final Spot spot;
   final VoteType? myVote;
   final ValueChanged<VoteType?>? onVote;
   final bool showHeader;
+  final bool canDelete;
+  final VoidCallback? onDelete;
 
   @override
   State<SpotDetailContent> createState() => _SpotDetailContentState();
@@ -79,6 +107,7 @@ class _SpotDetailContentState extends State<SpotDetailContent> {
   late VoteType? _myVote;
   final _commentCtrl = TextEditingController();
   final List<SpotComment> _extraComments = [];
+  bool _commentLoading = false;
 
   @override
   void initState() {
@@ -106,37 +135,47 @@ class _SpotDetailContentState extends State<SpotDetailContent> {
     widget.onVote?.call(type);
   }
 
-  void _submitComment() {
+  Future<void> _submitComment() async {
     final text = _commentCtrl.text.trim();
-    if (text.isEmpty) return;
-    setState(() {
-      _extraComments.add(SpotComment(
-        id: 'local_${DateTime.now().millisecondsSinceEpoch}',
-        authorId: kYouId,
+    if (text.isEmpty || _commentLoading) return;
+    final authorId = supabase.auth.currentUser?.id;
+    if (authorId == null) return;
+
+    setState(() => _commentLoading = true);
+    try {
+      final comment = await SpotService.addComment(
+        spotId: widget.spot.id,
+        authorId: authorId,
+        body: text,
         vote: _myVote,
-        text: text,
-        createdAt: DateTime.now(),
-      ));
-      _commentCtrl.clear();
-    });
+      );
+      if (mounted) {
+        setState(() {
+          _extraComments.add(comment);
+          _commentCtrl.clear();
+          _commentLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _commentLoading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final allComments = [...widget.spot.comments, ..._extraComments];
+    final myName = ProfileState.maybeOf(context)?.displayName ?? 'You';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── Photo placeholder
         _PhotoHeader(category: widget.spot.category),
-
         Padding(
           padding: const EdgeInsets.fromLTRB(kSpace4, kSpace4, kSpace4, 0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Title + badge
+              // ── Title + badge + optional delete
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -148,6 +187,17 @@ class _SpotDetailContentState extends State<SpotDetailContent> {
                     label: widget.spot.status.label,
                     tone: widget.spot.status.tone,
                   ),
+                  if (widget.canDelete && widget.onDelete != null) ...[
+                    const SizedBox(width: kSpace2),
+                    GestureDetector(
+                      onTap: () => _confirmDelete(context, widget.onDelete!),
+                      child: const Icon(
+                        Icons.delete_outline_rounded,
+                        size: 18,
+                        color: kColorDanger,
+                      ),
+                    ),
+                  ],
                 ],
               ),
               const SizedBox(height: kSpace2),
@@ -155,7 +205,8 @@ class _SpotDetailContentState extends State<SpotDetailContent> {
               // ── City / area / category
               Row(
                 children: [
-                  const Icon(Icons.place_rounded, size: 14, color: kColorInkSoft),
+                  const Icon(Icons.place_rounded,
+                      size: 14, color: kColorInkSoft),
                   const SizedBox(width: 4),
                   Text(
                     '${widget.spot.city}, ${widget.spot.area}',
@@ -170,8 +221,10 @@ class _SpotDetailContentState extends State<SpotDetailContent> {
               const SizedBox(height: kSpace4),
 
               // ── Links
-              if (widget.spot.mapsUrl != null || widget.spot.sourceUrl != null) ...[
-                Text('Links', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
+              if (widget.spot.mapsUrl != null ||
+                  widget.spot.sourceUrl != null) ...[
+                Text('Links',
+                    style: kStyleCaptionMedium.copyWith(color: kColorInk)),
                 const SizedBox(height: kSpace2),
                 Wrap(
                   spacing: kSpace2,
@@ -183,7 +236,8 @@ class _SpotDetailContentState extends State<SpotDetailContent> {
                         icon: Icons.map_rounded,
                         variant: WabwayButtonVariant.ghost,
                         size: WabwayButtonSize.sm,
-                        onPressed: () => _openLink(context, widget.spot.mapsUrl!),
+                        onPressed: () =>
+                            _openLink(context, widget.spot.mapsUrl!),
                       ),
                     if (widget.spot.sourceUrl != null)
                       WabwayButton(
@@ -191,7 +245,8 @@ class _SpotDetailContentState extends State<SpotDetailContent> {
                         icon: Icons.link_rounded,
                         variant: WabwayButtonVariant.ghost,
                         size: WabwayButtonSize.sm,
-                        onPressed: () => _openLink(context, widget.spot.sourceUrl!),
+                        onPressed: () =>
+                            _openLink(context, widget.spot.sourceUrl!),
                       ),
                   ],
                 ),
@@ -202,7 +257,8 @@ class _SpotDetailContentState extends State<SpotDetailContent> {
 
               // ── Notes
               if (widget.spot.notes != null) ...[
-                Text('Notes', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
+                Text('Notes',
+                    style: kStyleCaptionMedium.copyWith(color: kColorInk)),
                 const SizedBox(height: kSpace2),
                 Text(widget.spot.notes!, style: kStyleBody),
                 const SizedBox(height: kSpace4),
@@ -211,7 +267,8 @@ class _SpotDetailContentState extends State<SpotDetailContent> {
               ],
 
               // ── Vote
-              Text('Your vote', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
+              Text('Your vote',
+                  style: kStyleCaptionMedium.copyWith(color: kColorInk)),
               const SizedBox(height: kSpace2),
               SpotVoteChipGroup(
                 selected: _myVote,
@@ -264,6 +321,8 @@ class _SpotDetailContentState extends State<SpotDetailContent> {
               const SizedBox(height: kSpace3),
               _CommentInput(
                 controller: _commentCtrl,
+                myName: myName,
+                loading: _commentLoading,
                 onSubmit: _submitComment,
               ),
               const SizedBox(height: kSpace8),
@@ -275,16 +334,44 @@ class _SpotDetailContentState extends State<SpotDetailContent> {
   }
 }
 
+// ─── Delete confirmation ───────────────────────────────────────────────────────
+
+Future<void> _confirmDelete(
+    BuildContext context, VoidCallback onConfirmed) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Delete spot?'),
+      content:
+          const Text('This will remove the spot for everyone in the trip.'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text('Delete', style: TextStyle(color: kColorDanger)),
+        ),
+      ],
+    ),
+  );
+  if (confirmed == true) onConfirmed();
+}
+
+// ─── Link launcher ─────────────────────────────────────────────────────────────
+
 Future<void> _openLink(BuildContext context, String url) async {
   final uri = Uri.tryParse(url);
   if (uri != null && await canLaunchUrl(uri)) {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   } else {
-    Clipboard.setData(ClipboardData(text: url));
+    await Clipboard.setData(ClipboardData(text: url));
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Link copied', style: kStyleBody.copyWith(color: Colors.white)),
+          content: Text('Link copied',
+              style: kStyleBody.copyWith(color: Colors.white)),
           backgroundColor: kColorInk,
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 2),
@@ -345,7 +432,7 @@ class _GroupVotesSummary extends StatelessWidget {
                     (id) => Padding(
                       padding: const EdgeInsets.only(right: 6),
                       child: WabwayAvatar(
-                        name: memberById(id).name,
+                        name: _memberName(context, id),
                         size: WabwayAvatarSize.xs,
                       ),
                     ),
@@ -378,12 +465,13 @@ class _CommentRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final name = _memberName(context, comment.authorId);
     return Padding(
       padding: const EdgeInsets.only(bottom: kSpace4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          WabwayAvatar(name: memberById(comment.authorId).name, size: WabwayAvatarSize.sm),
+          WabwayAvatar(name: name, size: WabwayAvatarSize.sm),
           const SizedBox(width: kSpace3),
           Expanded(
             child: Column(
@@ -391,10 +479,7 @@ class _CommentRow extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(
-                      memberById(comment.authorId).name,
-                      style: kStyleBodySemibold,
-                    ),
+                    Text(name, style: kStyleBodySemibold),
                     if (comment.vote != null) ...[
                       const SizedBox(width: kSpace2),
                       SpotVoteChip(
@@ -404,7 +489,8 @@ class _CommentRow extends StatelessWidget {
                       ),
                     ],
                     const Spacer(),
-                    Text(fmtCommentTime(comment.createdAt), style: kStyleOverline),
+                    Text(fmtCommentTime(comment.createdAt),
+                        style: kStyleOverline),
                   ],
                 ),
                 const SizedBox(height: kSpace1),
@@ -419,8 +505,15 @@ class _CommentRow extends StatelessWidget {
 }
 
 class _CommentInput extends StatelessWidget {
-  const _CommentInput({required this.controller, required this.onSubmit});
+  const _CommentInput({
+    required this.controller,
+    required this.myName,
+    required this.loading,
+    required this.onSubmit,
+  });
   final TextEditingController controller;
+  final String myName;
+  final bool loading;
   final VoidCallback onSubmit;
 
   @override
@@ -428,7 +521,7 @@ class _CommentInput extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        WabwayAvatar(name: memberById(kYouId).name, size: WabwayAvatarSize.sm),
+        WabwayAvatar(name: myName, size: WabwayAvatarSize.sm),
         const SizedBox(width: kSpace3),
         Expanded(
           child: TextField(
@@ -464,11 +557,11 @@ class _CommentInput extends StatelessWidget {
         ),
         const SizedBox(width: kSpace2),
         WabwayIconButton(
-          icon: Icons.send_rounded,
+          icon: loading ? Icons.hourglass_empty_rounded : Icons.send_rounded,
           label: 'Send',
           variant: WabwayIconButtonVariant.solid,
           size: WabwayIconButtonSize.sm,
-          onPressed: onSubmit,
+          onPressed: loading ? null : onSubmit,
         ),
       ],
     );

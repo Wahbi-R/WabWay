@@ -11,6 +11,7 @@ import '../screens/home_screen.dart';
 import '../screens/members_screen.dart';
 import '../screens/travel_screen.dart';
 import '../screens/placeholder_screen.dart';
+import '../core/trip/trip_state.dart';
 
 // ─── Navigation destination models ───────────────────────────────────────────
 
@@ -404,11 +405,11 @@ class _WabwaySidebar extends StatelessWidget {
 class _SidebarHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final trip = TripState.maybeOf(context)?.trip;
     return Padding(
       padding: const EdgeInsets.all(kSpace5),
       child: Row(
         children: [
-          // "W" wordmark mark — terracotta square with Lora serif initial
           Container(
             width: 30,
             height: 30,
@@ -433,14 +434,18 @@ class _SidebarHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Japan, November',
+                  trip?.name ?? 'Wabway',
                   style: kStyleBodyBold,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  'Wabway trip',
+                  trip?.subtitle.isNotEmpty == true
+                      ? trip!.subtitle
+                      : 'Your trip',
                   style: kStyleOverline,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),

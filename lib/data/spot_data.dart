@@ -118,6 +118,21 @@ class SpotVotes {
 
   List<VoteType> get activeTypes =>
       VoteType.values.where((t) => count(t) > 0).toList();
+
+  SpotVotes copyWithVote(String userId, VoteType? type) {
+    final mu = List<String>.from(mustDo)..remove(userId);
+    final wa = List<String>.from(want)..remove(userId);
+    final ma = List<String>.from(maybe)..remove(userId);
+    final sk = List<String>.from(skip)..remove(userId);
+    switch (type) {
+      case VoteType.mustDo: mu.add(userId);
+      case VoteType.want:   wa.add(userId);
+      case VoteType.maybe:  ma.add(userId);
+      case VoteType.skip:   sk.add(userId);
+      case null: break;
+    }
+    return SpotVotes(mustDo: mu, want: wa, maybe: ma, skip: sk);
+  }
 }
 
 class SpotComment {
@@ -164,6 +179,26 @@ class Spot {
   final SpotVotes votes;
   final List<SpotComment> comments;
   final String addedById;
+
+  Spot copyWith({
+    SpotStatus? status,
+    SpotVotes? votes,
+    List<SpotComment>? comments,
+    String? notes,
+  }) => Spot(
+        id: id,
+        name: name,
+        city: city,
+        area: area,
+        category: category,
+        status: status ?? this.status,
+        sourceUrl: sourceUrl,
+        mapsUrl: mapsUrl,
+        notes: notes ?? this.notes,
+        votes: votes ?? this.votes,
+        comments: comments ?? this.comments,
+        addedById: addedById,
+      );
 }
 
 // ─── Mock data ────────────────────────────────────────────────────────────────

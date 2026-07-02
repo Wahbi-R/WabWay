@@ -1,5 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'
+    show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
+import '../core/auth/profile_state.dart';
+import '../core/supabase/client.dart';
+import '../core/supabase/spot_service.dart';
+import '../core/trip/trip_state.dart';
 import '../data/spot_data.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
@@ -17,8 +25,15 @@ class SpotsScreen extends StatefulWidget {
 }
 
 class _SpotsScreenState extends State<SpotsScreen> {
-  final List<Spot> _spots = List.from(kMockSpots);
-  final Map<String, VoteType> _myVotes = {};
+  List<Spot> _spots = [];
+  Map<String, VoteType> _myVotes = {};
+  bool _loading = true;
+  bool _error = false;
+
+  String? _activeTripId;
+  RealtimeChannel? _realtimeChannel;
+  Timer? _debounce;
+
   String? _selectedId;
   SpotCategory? _filterCategory;
   String _searchQuery = '';
@@ -26,9 +41,87 @@ class _SpotsScreenState extends State<SpotsScreen> {
   final _searchCtrl = TextEditingController();
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final tripId = TripState.tripOf(context).id;
+    if (tripId != _activeTripId) {
+      _activeTripId = tripId;
+      _loadSpots();
+      _subscribeRealtime(tripId);
+    }
+  }
+
+  @override
   void dispose() {
+    _debounce?.cancel();
+    _realtimeChannel?.unsubscribe();
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  void _subscribeRealtime(String tripId) {
+    _realtimeChannel?.unsubscribe();
+    _realtimeChannel = supabase
+        .channel('spots-$tripId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'spots',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'trip_id',
+            value: tripId,
+          ),
+          callback: (_) => _scheduleReload(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'spot_votes',
+          callback: (_) => _scheduleReload(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'spot_comments',
+          callback: (_) => _scheduleReload(),
+        )
+        .subscribe();
+  }
+
+  void _scheduleReload() {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 400), () {
+      if (mounted) _loadSpots(silent: true);
+    });
+  }
+
+  Future<void> _loadSpots({bool silent = false}) async {
+    if (!silent) setState(() { _loading = true; _error = false; });
+    try {
+      final tripId = TripState.tripOf(context).id;
+      final spots = await SpotService.loadSpots(tripId);
+      if (!mounted) return;
+
+      final myId = supabase.auth.currentUser?.id;
+      final myVotes = <String, VoteType>{};
+      if (myId != null) {
+        for (final spot in spots) {
+          for (final type in VoteType.values) {
+            if (spot.votes.voters(type).contains(myId)) {
+              myVotes[spot.id] = type;
+              break;
+            }
+          }
+        }
+      }
+
+      setState(() { _spots = spots; _myVotes = myVotes; _loading = false; });
+    } catch (_) {
+      if (!mounted) return;
+      if (silent) return; // keep existing list visible, don't replace with error screen
+      setState(() { _loading = false; _error = true; });
+    }
   }
 
   List<Spot> get _filtered {
@@ -47,9 +140,20 @@ class _SpotsScreenState extends State<SpotsScreen> {
   Spot? get _selected =>
       _selectedId == null ? null : _spots.where((s) => s.id == _selectedId).firstOrNull;
 
-  void _addSpot(BuildContext context) async {
-    final spot = await showAddSpotSheet(context);
-    if (spot != null) {
+  bool _canDelete(Spot spot) {
+    final myId = supabase.auth.currentUser?.id;
+    if (myId == null) return false;
+    if (spot.addedById == myId) return true;
+    return TripState.membersOf(context).any((m) => m.userId == myId && m.isOwner);
+  }
+
+  // ─── Mutations ───────────────────────────────────────────────────────────────
+
+  Future<void> _addSpot(BuildContext context) async {
+    final tripId = TripState.tripOf(context).id;
+    final userId = ProfileState.of(context).id;
+    final spot = await showAddSpotSheet(context, tripId: tripId, userId: userId);
+    if (spot != null && mounted) {
       setState(() {
         _spots.insert(0, spot);
         _selectedId = spot.id;
@@ -57,17 +161,59 @@ class _SpotsScreenState extends State<SpotsScreen> {
     }
   }
 
-  void _onVote(String spotId, VoteType? type) {
+  Future<void> _onVote(String spotId, VoteType? type) async {
+    final myId = supabase.auth.currentUser?.id;
+    if (myId == null) return;
+
+    // Optimistic update
     setState(() {
       if (type == null) {
         _myVotes.remove(spotId);
       } else {
         _myVotes[spotId] = type;
       }
+      final idx = _spots.indexWhere((s) => s.id == spotId);
+      if (idx != -1) {
+        _spots[idx] = _spots[idx].copyWith(
+          votes: _spots[idx].votes.copyWithVote(myId, type),
+        );
+      }
     });
+
+    try {
+      if (type == null) {
+        await SpotService.deleteVote(spotId: spotId, userId: myId);
+      } else {
+        await SpotService.upsertVote(spotId: spotId, userId: myId, vote: type);
+      }
+    } catch (_) {
+      // Revert on failure
+      await _loadSpots();
+    }
   }
 
-  // ─── Mobile: push detail screen ───────────────────────────────────────────
+  Future<void> _deleteSpot(String spotId) async {
+    try {
+      await SpotService.deleteSpot(spotId);
+      if (!mounted) return;
+      setState(() {
+        _spots.removeWhere((s) => s.id == spotId);
+        if (_selectedId == spotId) _selectedId = null;
+      });
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not delete spot.', style: kStyleBody.copyWith(color: Colors.white)),
+            backgroundColor: kColorDanger,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  // ─── Mobile detail ────────────────────────────────────────────────────────────
 
   void _openDetailMobile(BuildContext context, Spot spot) {
     Navigator.push(
@@ -77,6 +223,11 @@ class _SpotsScreenState extends State<SpotsScreen> {
           spot: spot,
           myVote: _myVotes[spot.id],
           onVote: (v) => _onVote(spot.id, v),
+          canDelete: _canDelete(spot),
+          onDelete: () {
+            _deleteSpot(spot.id);
+            Navigator.pop(context);
+          },
         ),
       ),
     );
@@ -84,8 +235,41 @@ class _SpotsScreenState extends State<SpotsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDesktop =
-        MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
+    if (_loading) {
+      return const Scaffold(
+        backgroundColor: kColorCream,
+        body: Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation(kColorPrimary),
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_error) {
+      return Scaffold(
+        backgroundColor: kColorCream,
+        body: Center(
+          child: WabwayEmptyState(
+            icon: Icons.wifi_off_rounded,
+            title: 'Could not load spots',
+            description: 'Check your connection and try again.',
+            action: WabwayButton(
+              label: 'Retry',
+              icon: Icons.refresh_rounded,
+              onPressed: _loadSpots,
+            ),
+          ),
+        ),
+      );
+    }
+
+    final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
 
     return isDesktop
         ? _DesktopLayout(
@@ -97,6 +281,7 @@ class _SpotsScreenState extends State<SpotsScreen> {
             searchQuery: _searchQuery,
             searchCtrl: _searchCtrl,
             showSearch: _showSearch,
+            canDelete: _canDelete,
             onSelectSpot: (s) => setState(() => _selectedId = s?.id),
             onFilterCategory: (c) => setState(() => _filterCategory = c),
             onSearch: (q) => setState(() => _searchQuery = q),
@@ -108,6 +293,7 @@ class _SpotsScreenState extends State<SpotsScreen> {
               }
             }),
             onVote: _onVote,
+            onDelete: _deleteSpot,
             onAdd: () => _addSpot(context),
           )
         : _MobileLayout(
@@ -132,7 +318,7 @@ class _SpotsScreenState extends State<SpotsScreen> {
   }
 }
 
-// ─── Mobile layout ─────────────────────────────────────────────────────────
+// ─── Mobile layout ─────────────────────────────────────────────────────────────
 
 class _MobileLayout extends StatelessWidget {
   const _MobileLayout({
@@ -243,7 +429,7 @@ class _MobileLayout extends StatelessWidget {
   }
 }
 
-// ─── Desktop layout ────────────────────────────────────────────────────────
+// ─── Desktop layout ────────────────────────────────────────────────────────────
 
 class _DesktopLayout extends StatelessWidget {
   const _DesktopLayout({
@@ -255,11 +441,13 @@ class _DesktopLayout extends StatelessWidget {
     required this.searchQuery,
     required this.searchCtrl,
     required this.showSearch,
+    required this.canDelete,
     required this.onSelectSpot,
     required this.onFilterCategory,
     required this.onSearch,
     required this.onToggleSearch,
     required this.onVote,
+    required this.onDelete,
     required this.onAdd,
   });
 
@@ -271,11 +459,13 @@ class _DesktopLayout extends StatelessWidget {
   final String searchQuery;
   final TextEditingController searchCtrl;
   final bool showSearch;
+  final bool Function(Spot) canDelete;
   final ValueChanged<Spot?> onSelectSpot;
   final ValueChanged<SpotCategory?> onFilterCategory;
   final ValueChanged<String> onSearch;
   final VoidCallback onToggleSearch;
   final void Function(String, VoteType?) onVote;
+  final Future<void> Function(String) onDelete;
   final VoidCallback onAdd;
 
   @override
@@ -284,7 +474,6 @@ class _DesktopLayout extends StatelessWidget {
       backgroundColor: kColorCream,
       body: Column(
         children: [
-          // ── Top bar
           _DesktopTopBar(
             showSearch: showSearch,
             searchCtrl: searchCtrl,
@@ -293,12 +482,10 @@ class _DesktopLayout extends StatelessWidget {
             onAdd: onAdd,
           ),
 
-          // ── Main split
           Expanded(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Left: list
                 SizedBox(
                   width: 380,
                   child: Column(
@@ -340,10 +527,8 @@ class _DesktopLayout extends StatelessWidget {
                   ),
                 ),
 
-                // Divider
                 const VerticalDivider(width: 1, thickness: 1),
 
-                // Right: detail or empty state
                 Expanded(
                   child: selected == null
                       ? _DesktopEmptyDetail(onAdd: onAdd)
@@ -353,6 +538,8 @@ class _DesktopLayout extends StatelessWidget {
                             spot: selected!,
                             myVote: myVotes[selected!.id],
                             onVote: (v) => onVote(selected!.id, v),
+                            canDelete: canDelete(selected!),
+                            onDelete: () => onDelete(selected!.id),
                           ),
                         ),
                 ),
@@ -427,7 +614,8 @@ class _DesktopEmptyDetail extends StatelessWidget {
       child: WabwayEmptyState(
         icon: Icons.place_rounded,
         title: 'Select a spot',
-        description: 'Pick a spot from the list to see details, vote, and leave a comment.',
+        description:
+            'Pick a spot from the list to see details, vote, and leave a comment.',
         action: WabwayButton(
           label: 'Add a spot',
           icon: Icons.add_rounded,
@@ -440,7 +628,7 @@ class _DesktopEmptyDetail extends StatelessWidget {
   }
 }
 
-// ─── Shared sub-widgets ────────────────────────────────────────────────────
+// ─── Shared sub-widgets ────────────────────────────────────────────────────────
 
 class _CategoryFilterStrip extends StatefulWidget {
   const _CategoryFilterStrip({
@@ -469,8 +657,8 @@ class _CategoryFilterStripState extends State<_CategoryFilterStrip> {
   void _onScroll() {
     if (!_scrollCtrl.hasClients) return;
     final pos = _scrollCtrl.position;
-    final atEnd = pos.maxScrollExtent <= 0 ||
-        pos.pixels >= pos.maxScrollExtent - 1;
+    final atEnd =
+        pos.maxScrollExtent <= 0 || pos.pixels >= pos.maxScrollExtent - 1;
     if (atEnd == _showFade) setState(() => _showFade = !atEnd);
   }
 
@@ -524,7 +712,6 @@ class _CategoryFilterStripState extends State<_CategoryFilterStrip> {
             ),
           ),
 
-          // Right-edge fade hint
           if (_showFade)
             Positioned(
               right: 0,
@@ -571,7 +758,8 @@ class _SearchField extends StatelessWidget {
       decoration: InputDecoration(
         hintText: 'Search spots…',
         hintStyle: kStyleBody.copyWith(color: kColorInkSoft),
-        prefixIcon: const Icon(Icons.search_rounded, size: 18, color: kColorInkSoft),
+        prefixIcon:
+            const Icon(Icons.search_rounded, size: 18, color: kColorInkSoft),
         isDense: true,
         filled: true,
         fillColor: kColorSurfaceSunken,

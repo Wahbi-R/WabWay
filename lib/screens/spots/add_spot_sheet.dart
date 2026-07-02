@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
+import '../../core/supabase/spot_service.dart';
 import '../../data/spot_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 
-Future<Spot?> showAddSpotSheet(BuildContext context) {
-  final isDesktop =
-      MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
+Future<Spot?> showAddSpotSheet(
+  BuildContext context, {
+  required String tripId,
+  required String userId,
+}) {
+  final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
 
   if (isDesktop) {
     return showDialog<Spot>(
@@ -15,11 +19,16 @@ Future<Spot?> showAddSpotSheet(BuildContext context) {
       builder: (dialogCtx) => Dialog(
         backgroundColor: kColorPaper,
         shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
-        insetPadding: const EdgeInsets.symmetric(horizontal: kSpace8, vertical: kSpace8),
+        insetPadding: const EdgeInsets.symmetric(
+            horizontal: kSpace8, vertical: kSpace8),
         child: SizedBox(
           width: 520,
           height: MediaQuery.sizeOf(dialogCtx).height * 0.85,
-          child: _AddSpotContent(onSubmit: (spot) => Navigator.pop(dialogCtx, spot)),
+          child: _AddSpotContent(
+            tripId: tripId,
+            userId: userId,
+            onSubmit: (spot) => Navigator.pop(dialogCtx, spot),
+          ),
         ),
       ),
     );
@@ -31,15 +40,23 @@ Future<Spot?> showAddSpotSheet(BuildContext context) {
     useSafeArea: true,
     backgroundColor: Colors.transparent,
     builder: (ctx) => _AddSpotSheet(
+      tripId: tripId,
+      userId: userId,
       onSubmit: (spot) => Navigator.pop(ctx, spot),
     ),
   );
 }
 
-// ─── Mobile bottom sheet container ────────────────────────────────────────
+// ─── Mobile bottom sheet container ────────────────────────────────────────────
 
 class _AddSpotSheet extends StatelessWidget {
-  const _AddSpotSheet({required this.onSubmit});
+  const _AddSpotSheet({
+    required this.tripId,
+    required this.userId,
+    required this.onSubmit,
+  });
+  final String tripId;
+  final String userId;
   final ValueChanged<Spot> onSubmit;
 
   @override
@@ -54,6 +71,8 @@ class _AddSpotSheet extends StatelessWidget {
           borderRadius: kRadiusSheet,
         ),
         child: _AddSpotContent(
+          tripId: tripId,
+          userId: userId,
           scrollController: scrollCtrl,
           onSubmit: onSubmit,
           showDragHandle: true,
@@ -63,15 +82,19 @@ class _AddSpotSheet extends StatelessWidget {
   }
 }
 
-// ─── Shared form content ───────────────────────────────────────────────────
+// ─── Shared form content ──────────────────────────────────────────────────────
 
 class _AddSpotContent extends StatefulWidget {
   const _AddSpotContent({
+    required this.tripId,
+    required this.userId,
     required this.onSubmit,
     this.scrollController,
     this.showDragHandle = false,
   });
 
+  final String tripId;
+  final String userId;
   final ValueChanged<Spot> onSubmit;
   final ScrollController? scrollController;
   final bool showDragHandle;
@@ -81,7 +104,7 @@ class _AddSpotContent extends StatefulWidget {
 }
 
 class _AddSpotContentState extends State<_AddSpotContent> {
-  final _formKey = GlobalKey<FormState>();
+  final _formKey   = GlobalKey<FormState>();
   final _nameCtrl   = TextEditingController();
   final _cityCtrl   = TextEditingController();
   final _areaCtrl   = TextEditingController();
@@ -90,6 +113,8 @@ class _AddSpotContentState extends State<_AddSpotContent> {
   final _notesCtrl  = TextEditingController();
   SpotCategory? _category;
   SpotStatus _status = SpotStatus.idea;
+  bool _loading = false;
+  String? _error;
 
   @override
   void dispose() {
@@ -102,21 +127,26 @@ class _AddSpotContentState extends State<_AddSpotContent> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    final spot = Spot(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      name: _nameCtrl.text.trim(),
-      city: _cityCtrl.text.trim().isEmpty ? 'Unknown' : _cityCtrl.text.trim(),
-      area: _areaCtrl.text.trim().isEmpty ? '' : _areaCtrl.text.trim(),
-      category: _category ?? SpotCategory.landmark,
-      status: _status,
-      mapsUrl: _mapsCtrl.text.trim().isEmpty ? null : _mapsCtrl.text.trim(),
-      sourceUrl: _sourceCtrl.text.trim().isEmpty ? null : _sourceCtrl.text.trim(),
-      notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
-      addedById: 'you',
-    );
-    widget.onSubmit(spot);
+    setState(() { _loading = true; _error = null; });
+    try {
+      final spot = await SpotService.createSpot(
+        tripId:    widget.tripId,
+        name:      _nameCtrl.text.trim(),
+        city:      _cityCtrl.text.trim(),
+        area:      _areaCtrl.text.trim(),
+        category:  _category ?? SpotCategory.landmark,
+        status:    _status,
+        addedBy:   widget.userId,
+        sourceUrl: _sourceCtrl.text.trim().isEmpty ? null : _sourceCtrl.text.trim(),
+        mapsUrl:   _mapsCtrl.text.trim().isEmpty   ? null : _mapsCtrl.text.trim(),
+        notes:     _notesCtrl.text.trim().isEmpty   ? null : _notesCtrl.text.trim(),
+      );
+      widget.onSubmit(spot);
+    } catch (e) {
+      if (mounted) setState(() { _loading = false; _error = e.toString(); });
+    }
   }
 
   @override
@@ -126,10 +156,8 @@ class _AddSpotContentState extends State<_AddSpotContent> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Drag handle (mobile only)
         if (widget.showDragHandle) const WabwayDragHandle(),
 
-        // Header
         Padding(
           padding: const EdgeInsets.fromLTRB(kSpace4, kSpace3, kSpace4, 0),
           child: Row(
@@ -147,7 +175,6 @@ class _AddSpotContentState extends State<_AddSpotContent> {
 
         const Divider(height: kSpace5),
 
-        // Form
         Flexible(
           child: SingleChildScrollView(
             controller: widget.scrollController,
@@ -244,6 +271,15 @@ class _AddSpotContentState extends State<_AddSpotContent> {
                     maxLines: 4,
                     textInputAction: TextInputAction.newline,
                   ),
+
+                  if (_error != null) ...[
+                    const SizedBox(height: kSpace3),
+                    Text(
+                      _error!,
+                      style: kStyleCaption.copyWith(color: kColorDanger),
+                    ),
+                  ],
+
                   const SizedBox(height: kSpace6),
 
                   WabwayButton(
@@ -251,7 +287,8 @@ class _AddSpotContentState extends State<_AddSpotContent> {
                     icon: Icons.add_rounded,
                     fullWidth: true,
                     size: WabwayButtonSize.lg,
-                    onPressed: _submit,
+                    loading: _loading,
+                    onPressed: _loading ? null : _submit,
                   ),
                 ],
               ),

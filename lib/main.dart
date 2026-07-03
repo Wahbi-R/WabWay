@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'core/share/share_handler.dart';
 import 'screens/auth/auth_gate.dart';
 import 'theme/wabway_theme.dart';
 
@@ -27,6 +28,8 @@ Future<void> main() async {
   if (kDebugMode) {
     debugPrint('[Supabase] initialized → $_supabaseUrl');
   }
+
+  await ShareHandler.instance.init();
 
   runApp(const WabwayApp());
 }

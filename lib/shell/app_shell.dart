@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../core/share/share_handler.dart';
+import '../screens/share/incoming_share_screen.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_theme.dart';
 import '../theme/app_decorations.dart';
@@ -172,6 +174,32 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int _mobileIndex = 0;
   int _desktopIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    ShareHandler.instance.addListener(_onSharePending);
+    // Process a share that arrived before this widget was mounted.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _onSharePending());
+  }
+
+  @override
+  void dispose() {
+    ShareHandler.instance.removeListener(_onSharePending);
+    super.dispose();
+  }
+
+  void _onSharePending() {
+    final share = ShareHandler.instance.pending;
+    if (share == null || !mounted) return;
+    ShareHandler.instance.consume();
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => IncomingShareScreen(
+        share: share,
+        onDone: () => Navigator.of(context).pop(),
+      ),
+    ));
+  }
 
   @override
   Widget build(BuildContext context) {

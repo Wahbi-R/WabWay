@@ -5,6 +5,29 @@ import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 
+/// Data collected by the form, passed to the [ShareForm.onSave] callback.
+class ShareSaveData {
+  const ShareSaveData({
+    required this.title,
+    required this.notes,
+    this.location,
+    this.category,
+    this.docType,
+    this.travelType,
+    this.amount,
+    this.date,
+  });
+
+  final String title;
+  final String notes;
+  final String? location;
+  final String? category;
+  final String? docType;
+  final String? travelType;
+  final double? amount;
+  final DateTime? date;
+}
+
 class ShareForm extends StatefulWidget {
   const ShareForm({
     super.key,
@@ -16,7 +39,9 @@ class ShareForm extends StatefulWidget {
 
   final IncomingShare share;
   final ShareDestination destination;
-  final VoidCallback onSave;
+  /// Called with the collected form data when the user taps Save.
+  /// Throw to show an inline error; complete normally to dismiss.
+  final Future<void> Function(ShareSaveData data) onSave;
   final VoidCallback onDiscard;
 
   @override
@@ -34,6 +59,8 @@ class _ShareFormState extends State<ShareForm> {
   String? _docType;
   String? _travelType;
   DateTime? _date;
+  bool _saving = false;
+  String? _saveError;
 
   @override
   void initState() {
@@ -63,9 +90,22 @@ class _ShareFormState extends State<ShareForm> {
     if (picked != null) setState(() => _date = picked);
   }
 
-  void _submit() {
-    if (_formKey.currentState?.validate() ?? false) {
-      widget.onSave();
+  Future<void> _submit() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    setState(() { _saving = true; _saveError = null; });
+    try {
+      await widget.onSave(ShareSaveData(
+        title: _titleCtrl.text.trim(),
+        notes: _notesCtrl.text.trim(),
+        location: _locationCtrl.text.trim().isEmpty ? null : _locationCtrl.text.trim(),
+        category: _category,
+        docType: _docType,
+        travelType: _travelType,
+        amount: double.tryParse(_amountCtrl.text.trim()),
+        date: _date,
+      ));
+    } catch (e) {
+      if (mounted) setState(() { _saving = false; _saveError = e.toString(); });
     }
   }
 
@@ -101,6 +141,10 @@ class _ShareFormState extends State<ShareForm> {
             controller: _notesCtrl,
             maxLines: 3,
           ),
+          if (_saveError != null) ...[
+            const SizedBox(height: kSpace3),
+            Text(_saveError!, style: kStyleCaption.copyWith(color: kColorDanger)),
+          ],
           const SizedBox(height: kSpace5),
           Row(
             children: [
@@ -108,7 +152,7 @@ class _ShareFormState extends State<ShareForm> {
                 child: WabwayButton(
                   label: 'Discard',
                   variant: WabwayButtonVariant.ghost,
-                  onPressed: widget.onDiscard,
+                  onPressed: _saving ? null : widget.onDiscard,
                   fullWidth: true,
                 ),
               ),
@@ -118,7 +162,8 @@ class _ShareFormState extends State<ShareForm> {
                 child: WabwayButton(
                   label: _saveLabel,
                   icon: Icons.check_rounded,
-                  onPressed: _submit,
+                  onPressed: _saving ? null : _submit,
+                  loading: _saving,
                   fullWidth: true,
                 ),
               ),

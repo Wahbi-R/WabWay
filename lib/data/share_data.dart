@@ -167,6 +167,7 @@ class IncomingShare {
     required this.detectedTitle,
     this.detectedDescription,
     this.sharedAt,
+    this.filePath,
   });
 
   final String id;
@@ -175,6 +176,8 @@ class IncomingShare {
   final String detectedTitle;
   final String? detectedDescription;
   final DateTime? sharedAt;
+  /// Local file path for image/PDF shares. Null for text/URL shares.
+  final String? filePath;
 }
 
 // ─── Content type detection (mock) ───────────────────────────────────────────

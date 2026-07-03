@@ -1,5 +1,12 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import '../../core/auth/profile_state.dart';
+import '../../core/supabase/doc_service.dart';
+import '../../core/supabase/spot_service.dart';
+import '../../core/trip/trip_state.dart';
+import '../../data/docs_data.dart';
 import '../../data/share_data.dart';
+import '../../data/spot_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
@@ -29,31 +36,103 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
     setState(() => _destination = dest);
   }
 
-  void _handleSave() {
+  Future<void> _handleSave(ShareSaveData data) async {
     final dest = _destination;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          dest != null
-              ? 'Saved as ${dest.label.toLowerCase()}'
-              : 'Saved',
-          style: kStyleBodyMedium.copyWith(color: kColorTextOnPrimary),
-        ),
-        backgroundColor: kColorPrimary,
-        behavior: SnackBarBehavior.floating,
-        shape: const RoundedRectangleBorder(borderRadius: kRadiusMd),
-        margin: const EdgeInsets.all(kSpace4),
-        duration: const Duration(seconds: 2),
+    if (dest == null) return;
+
+    final tripId = TripState.tripOf(context).id;
+    final userId = ProfileState.of(context).id;
+
+    switch (dest) {
+      case ShareDestination.spot:
+        await SpotService.createSpot(
+          tripId: tripId,
+          name: data.title,
+          city: data.location ?? 'Unknown',
+          area: '',
+          category: _spotCategory(data.category),
+          status: SpotStatus.idea,
+          addedBy: userId,
+          sourceUrl: widget.share.rawContent,
+          notes: data.notes.isEmpty ? null : data.notes,
+        );
+
+      case ShareDestination.document:
+        final filePath = widget.share.filePath;
+        if (filePath != null) {
+          final bytes = await File(filePath).readAsBytes();
+          final ext = filePath.split('.').last.toLowerCase();
+          await DocService.uploadAndCreate(
+            tripId: tripId,
+            userId: userId,
+            title: data.title,
+            type: _docType(data.docType),
+            ext: ext,
+            bytes: bytes,
+            fileSizeKb: (bytes.length / 1024).round(),
+            notes: data.notes.isEmpty ? null : data.notes,
+          );
+        } else {
+          await DocService.createDocument(
+            tripId: tripId,
+            userId: userId,
+            title: data.title,
+            type: _docType(data.docType),
+            ext: 'url',
+            notes: data.notes.isEmpty ? null : data.notes,
+          );
+        }
+
+      default:
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+            '${dest.label} saving coming soon',
+            style: kStyleBodyMedium.copyWith(color: kColorTextOnPrimary),
+          ),
+          backgroundColor: kColorPrimary,
+          behavior: SnackBarBehavior.floating,
+          shape: const RoundedRectangleBorder(borderRadius: kRadiusMd),
+          margin: const EdgeInsets.all(kSpace4),
+        ));
+        return;
+    }
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(
+        'Saved as ${dest.label.toLowerCase()}',
+        style: kStyleBodyMedium.copyWith(color: kColorTextOnPrimary),
       ),
-    );
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) widget.onDone?.call();
-    });
+      backgroundColor: kColorPrimary,
+      behavior: SnackBarBehavior.floating,
+      shape: const RoundedRectangleBorder(borderRadius: kRadiusMd),
+      margin: const EdgeInsets.all(kSpace4),
+      duration: const Duration(seconds: 2),
+    ));
+    widget.onDone?.call();
   }
 
   void _handleDiscard() {
     widget.onDone?.call();
   }
+
+  static SpotCategory _spotCategory(String? raw) => switch (raw) {
+        'food'          => SpotCategory.food,
+        'shopping'      => SpotCategory.shopping,
+        'accommodation' => SpotCategory.experience,
+        'attraction'    => SpotCategory.landmark,
+        _               => SpotCategory.landmark,
+      };
+
+  static DocType _docType(String? raw) => switch (raw) {
+        'flight'      => DocType.flight,
+        'hotel'       => DocType.hotel,
+        'ticket'      => DocType.ticket,
+        'insurance'   => DocType.insurance,
+        'screenshot'  => DocType.screenshot,
+        _             => DocType.other,
+      };
 
   @override
   Widget build(BuildContext context) {

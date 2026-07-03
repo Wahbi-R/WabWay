@@ -212,6 +212,22 @@ class _MoneyScreenState extends State<MoneyScreen> {
     }
   }
 
+  void _deleteReceipt(String id) {
+    setState(() {
+      _receipts.removeWhere((r) => r.id == id);
+      if (_selectedReceiptId == id) _selectedReceiptId = null;
+    });
+    MoneyService.deleteReceipt(id).catchError((_) => _loadAll(silent: true));
+  }
+
+  void _deleteWithdrawal(String id) {
+    setState(() {
+      _withdrawals.removeWhere((w) => w.id == id);
+      if (_selectedWithdrawalId == id) _selectedWithdrawalId = null;
+    });
+    MoneyService.deleteWithdrawal(id).catchError((_) => _loadAll(silent: true));
+  }
+
   // ─── Build ────────────────────────────────────────────────────────────────────
 
   @override
@@ -356,10 +372,11 @@ class _MoneyScreenState extends State<MoneyScreen> {
       }
       return SingleChildScrollView(
         child: ReceiptDetailContent(
-          key:     ValueKey(receipt.id),
-          receipt: receipt,
-          myId:    _userId,
-          members: _members,
+          key:      ValueKey(receipt.id),
+          receipt:  receipt,
+          myId:     _userId,
+          members:  _members,
+          onDelete: () => _deleteReceipt(receipt.id),
         ),
       );
     }
@@ -380,6 +397,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
         withdrawal: withdrawal,
         myId:       _userId,
         members:    _members,
+        onDelete:   () => _deleteWithdrawal(withdrawal.id),
       ),
     );
   }
@@ -439,9 +457,10 @@ class _MoneyScreenState extends State<MoneyScreen> {
                           ctx,
                           MaterialPageRoute(
                             builder: (_) => ReceiptDetailScreen(
-                              receipt: r,
-                              myId:    _userId,
-                              members: _members,
+                              receipt:  r,
+                              myId:     _userId,
+                              members:  _members,
+                              onDelete: () => _deleteReceipt(r.id),
                             ),
                           ),
                         ),
@@ -474,6 +493,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
                               withdrawal: w,
                               myId:       _userId,
                               members:    _members,
+                              onDelete:   () => _deleteWithdrawal(w.id),
                             ),
                           ),
                         ),

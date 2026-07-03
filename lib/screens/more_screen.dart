@@ -7,6 +7,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_text_theme.dart';
 import '../theme/app_decorations.dart';
 import 'members/add_member_sheet.dart';
+import 'members/invite_sheet.dart';
 import 'share/incoming_share_screen.dart';
 
 class MoreScreen extends StatelessWidget {
@@ -92,38 +93,65 @@ class MoreScreen extends StatelessWidget {
 
           // Invite section — owner only
           if (isOwner) ...[
-            const _SectionHeader(title: 'Members'),
+            const _SectionHeader(title: 'Invite'),
             const SizedBox(height: kSpace3),
             DecoratedBox(
               decoration: kCardDecoration(),
               child: Material(
                 color: Colors.transparent,
-                child: ListTile(
-                  contentPadding: const EdgeInsets.all(kSpace4),
-                  leading: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: const BoxDecoration(
-                      color: kColorPrimarySoft,
-                      borderRadius: kRadiusMd,
+                child: Column(
+                  children: [
+                    ListTile(
+                      contentPadding: const EdgeInsets.all(kSpace4),
+                      leading: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: const BoxDecoration(
+                          color: kColorPrimarySoft,
+                          borderRadius: kRadiusMd,
+                        ),
+                        child: const Icon(Icons.person_add_rounded,
+                            size: 20, color: kColorPrimary),
+                      ),
+                      title: Text('Add a member', style: kStyleBodySemibold),
+                      subtitle: Padding(
+                        padding: const EdgeInsets.only(top: kSpace1),
+                        child: Text('Add an existing Wabway user by email',
+                            style: kStyleCaption),
+                      ),
+                      trailing: Icon(Icons.chevron_right_rounded,
+                          color: kColorTextTertiary()),
+                      onTap: () => showAddMemberSheet(
+                        context,
+                        tripId: trip.id,
+                        existingMemberIds: members.map((m) => m.userId).toSet(),
+                        onMemberAdded: () => TripState.refresh(context),
+                      ),
                     ),
-                    child: const Icon(Icons.person_add_rounded,
-                        size: 20, color: kColorPrimary),
-                  ),
-                  title: Text('Add a member', style: kStyleBodySemibold),
-                  subtitle: Padding(
-                    padding: const EdgeInsets.only(top: kSpace1),
-                    child: Text('Add an existing Wabway user by email',
-                        style: kStyleCaption),
-                  ),
-                  trailing: Icon(Icons.chevron_right_rounded,
-                      color: kColorTextTertiary()),
-                  onTap: () => showAddMemberSheet(
-                    context,
-                    tripId: trip.id,
-                    existingMemberIds: members.map((m) => m.userId).toSet(),
-                    onMemberAdded: () => TripState.refresh(context),
-                  ),
+                    const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
+                    ListTile(
+                      contentPadding: const EdgeInsets.all(kSpace4),
+                      leading: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: const BoxDecoration(
+                          color: kColorPrimarySoft,
+                          borderRadius: kRadiusMd,
+                        ),
+                        child: const Icon(Icons.key_rounded,
+                            size: 20, color: kColorPrimary),
+                      ),
+                      title: Text('Create invite code', style: kStyleBodySemibold),
+                      subtitle: Padding(
+                        padding: const EdgeInsets.only(top: kSpace1),
+                        child: Text('Generate a code anyone can use to join',
+                            style: kStyleCaption),
+                      ),
+                      trailing: Icon(Icons.chevron_right_rounded,
+                          color: kColorTextTertiary()),
+                      onTap: () => showInviteSheet(context, tripId: trip.id),
+                    ),
+                  ],
                 ),
               ),
             ),

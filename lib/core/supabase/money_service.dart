@@ -172,6 +172,16 @@ abstract final class MoneyService {
     return _withdrawalFromRow(full);
   }
 
+  static Future<void> deleteReceipt(String receiptId) async {
+    await supabase.from('receipt_splits').delete().eq('receipt_id', receiptId);
+    await supabase.from('receipts').delete().eq('id', receiptId);
+  }
+
+  static Future<void> deleteWithdrawal(String withdrawalId) async {
+    await supabase.from('cash_distributions').delete().eq('withdrawal_id', withdrawalId);
+    await supabase.from('cash_withdrawals').delete().eq('id', withdrawalId);
+  }
+
   // ── Helpers ───────────────────────────────────────────────────────────────────
 
   static String _fmtDate(DateTime d) =>

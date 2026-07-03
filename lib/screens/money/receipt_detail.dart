@@ -6,6 +6,31 @@ import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 
+// ─── Confirmation helper ──────────────────────────────────────────────────────
+
+Future<bool> _confirmDelete(BuildContext context, String title) async {
+  return await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Delete?'),
+          content: Text(
+              'This will permanently remove "$title" for everyone in the trip.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Delete',
+                  style: TextStyle(color: kColorDanger)),
+            ),
+          ],
+        ),
+      ) ??
+      false;
+}
+
 // ─── Mobile full-screen route ─────────────────────────────────────────────────
 
 class ReceiptDetailScreen extends StatelessWidget {
@@ -14,11 +39,13 @@ class ReceiptDetailScreen extends StatelessWidget {
     required this.receipt,
     required this.myId,
     required this.members,
+    this.onDelete,
   });
 
   final Receipt receipt;
   final String myId;
   final List<TripMember> members;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -31,10 +58,26 @@ class ReceiptDetailScreen extends StatelessWidget {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(receipt.title, style: kStyleTitle),
+        actions: [
+          if (onDelete != null)
+            IconButton(
+              icon: const Icon(Icons.delete_outline_rounded),
+              color: kColorDanger,
+              onPressed: () async {
+                final ok = await _confirmDelete(context, receipt.title);
+                if (ok && context.mounted) {
+                  Navigator.pop(context);
+                  onDelete!();
+                }
+              },
+            ),
+          const SizedBox(width: kSpace2),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.only(bottom: kSpace12),
-        child: ReceiptDetailContent(receipt: receipt, myId: myId, members: members),
+        child: ReceiptDetailContent(
+            receipt: receipt, myId: myId, members: members),
       ),
     );
   }
@@ -48,11 +91,13 @@ class ReceiptDetailContent extends StatelessWidget {
     required this.receipt,
     required this.myId,
     required this.members,
+    this.onDelete,
   });
 
   final Receipt receipt;
   final String myId;
   final List<TripMember> members;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -158,6 +203,20 @@ class ReceiptDetailContent extends StatelessWidget {
 
               // Attach receipt placeholder
               const WabwayAttachPlaceholder(label: 'Attach receipt photo'),
+
+              if (onDelete != null) ...[
+                const SizedBox(height: kSpace5),
+                WabwayButton(
+                  label: 'Delete receipt',
+                  icon: Icons.delete_outline_rounded,
+                  variant: WabwayButtonVariant.ghost,
+                  fullWidth: true,
+                  onPressed: () async {
+                    final ok = await _confirmDelete(context, receipt.title);
+                    if (ok && context.mounted) onDelete!();
+                  },
+                ),
+              ],
             ],
           ),
         ),

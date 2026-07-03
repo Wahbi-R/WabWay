@@ -121,6 +121,10 @@ class _SpotDetailContentState extends State<SpotDetailContent> {
     if (old.spot.id != widget.spot.id) {
       _myVote = widget.myVote;
       _extraComments.clear();
+    } else {
+      // Remove optimistic comments that the server reload now includes.
+      final serverIds = widget.spot.comments.map((c) => c.id).toSet();
+      _extraComments.removeWhere((c) => serverIds.contains(c.id));
     }
   }
 

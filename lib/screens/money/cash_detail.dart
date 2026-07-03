@@ -6,6 +6,31 @@ import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 
+// ─── Confirmation helper ──────────────────────────────────────────────────────
+
+Future<bool> _confirmDelete(BuildContext context) async {
+  return await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Delete withdrawal?'),
+          content: const Text(
+              'This will permanently remove this ATM withdrawal for everyone in the trip.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Delete',
+                  style: TextStyle(color: kColorDanger)),
+            ),
+          ],
+        ),
+      ) ??
+      false;
+}
+
 // ─── Mobile full-screen route ─────────────────────────────────────────────────
 
 class CashDetailScreen extends StatelessWidget {
@@ -14,11 +39,13 @@ class CashDetailScreen extends StatelessWidget {
     required this.withdrawal,
     required this.myId,
     required this.members,
+    this.onDelete,
   });
 
   final CashWithdrawal withdrawal;
   final String myId;
   final List<TripMember> members;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -31,10 +58,26 @@ class CashDetailScreen extends StatelessWidget {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text('ATM Withdrawal', style: kStyleTitle),
+        actions: [
+          if (onDelete != null)
+            IconButton(
+              icon: const Icon(Icons.delete_outline_rounded),
+              color: kColorDanger,
+              onPressed: () async {
+                final ok = await _confirmDelete(context);
+                if (ok && context.mounted) {
+                  Navigator.pop(context);
+                  onDelete!();
+                }
+              },
+            ),
+          const SizedBox(width: kSpace2),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.only(bottom: kSpace12),
-        child: CashDetailContent(withdrawal: withdrawal, myId: myId, members: members),
+        child: CashDetailContent(
+            withdrawal: withdrawal, myId: myId, members: members),
       ),
     );
   }
@@ -48,11 +91,13 @@ class CashDetailContent extends StatelessWidget {
     required this.withdrawal,
     required this.myId,
     required this.members,
+    this.onDelete,
   });
 
   final CashWithdrawal withdrawal;
   final String myId;
   final List<TripMember> members;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -192,6 +237,20 @@ class CashDetailContent extends StatelessWidget {
 
               // Attach placeholder
               const WabwayAttachPlaceholder(label: 'Attach ATM slip'),
+
+              if (onDelete != null) ...[
+                const SizedBox(height: kSpace5),
+                WabwayButton(
+                  label: 'Delete withdrawal',
+                  icon: Icons.delete_outline_rounded,
+                  variant: WabwayButtonVariant.ghost,
+                  fullWidth: true,
+                  onPressed: () async {
+                    final ok = await _confirmDelete(context);
+                    if (ok && context.mounted) onDelete!();
+                  },
+                ),
+              ],
             ],
           ),
         ),

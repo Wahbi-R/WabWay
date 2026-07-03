@@ -122,7 +122,7 @@ abstract final class SpotService {
         .select('*, spot_votes(*), spot_comments(*)')
         .eq('trip_id', tripId)
         .order('created_at', ascending: false);
-    return (data as List)
+    return data
         .map((r) => _spotFromRow(r))
         .toList();
   }

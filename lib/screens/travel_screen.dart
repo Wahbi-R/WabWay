@@ -30,7 +30,7 @@ class _TravelScreenState extends State<TravelScreen> {
   final List<TripDocument> _docs = [];
   final List<TripDay> _days = [];
 
-  bool _loading = false;
+  bool _loading = true;
   String? _error;
   String _activeTripId = '';
   String _userId = '';

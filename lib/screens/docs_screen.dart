@@ -157,17 +157,9 @@ class _DocsScreenState extends State<DocsScreen> {
   }
 
   Future<void> _deleteDoc(TripDocument doc) async {
+    // Step 1: delete the DB row (cascades document_links). Show error if this fails.
     try {
       await DocService.deleteDocument(doc.id);
-      if (doc.storagePath != null) {
-        await DocService.deleteStorageFile(doc.storagePath!);
-      }
-      if (mounted) {
-        setState(() {
-          _docs.removeWhere((d) => d.id == doc.id);
-          if (_selectedDocId == doc.id) _selectedDocId = null;
-        });
-      }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -177,6 +169,22 @@ class _DocsScreenState extends State<DocsScreen> {
           behavior: SnackBarBehavior.floating,
         ));
       }
+      return;
+    }
+
+    // Step 2: update UI immediately after successful DB delete.
+    if (mounted) {
+      setState(() {
+        _docs.removeWhere((d) => d.id == doc.id);
+        if (_selectedDocId == doc.id) _selectedDocId = null;
+      });
+    }
+
+    // Step 3: best-effort storage cleanup — swallow errors silently.
+    if (doc.storagePath != null) {
+      try {
+        await DocService.deleteStorageFile(doc.storagePath!);
+      } catch (_) {}
     }
   }
 

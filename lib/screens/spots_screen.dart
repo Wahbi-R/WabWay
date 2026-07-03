@@ -6,8 +6,10 @@ import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
 import '../core/auth/profile_state.dart';
 import '../core/supabase/client.dart';
+import '../core/supabase/doc_service.dart';
 import '../core/supabase/spot_service.dart';
 import '../core/trip/trip_state.dart';
+import '../data/docs_data.dart';
 import '../data/spot_data.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
@@ -26,6 +28,7 @@ class SpotsScreen extends StatefulWidget {
 
 class _SpotsScreenState extends State<SpotsScreen> {
   List<Spot> _spots = [];
+  List<TripDocument> _docs = [];
   Map<String, VoteType> _myVotes = {};
   bool _loading = true;
   bool _error = false;
@@ -100,7 +103,12 @@ class _SpotsScreenState extends State<SpotsScreen> {
     if (!silent) setState(() { _loading = true; _error = false; });
     try {
       final tripId = TripState.tripOf(context).id;
-      final spots = await SpotService.loadSpots(tripId);
+      final results = await Future.wait([
+        SpotService.loadSpots(tripId),
+        DocService.loadDocuments(tripId),
+      ]);
+      final spots = results[0] as List<Spot>;
+      final docs = results[1] as List<TripDocument>;
       if (!mounted) return;
 
       final myId = supabase.auth.currentUser?.id;
@@ -116,7 +124,7 @@ class _SpotsScreenState extends State<SpotsScreen> {
         }
       }
 
-      setState(() { _spots = spots; _myVotes = myVotes; _loading = false; });
+      setState(() { _spots = spots; _docs = docs; _myVotes = myVotes; _loading = false; });
     } catch (_) {
       if (!mounted) return;
       if (silent) return; // keep existing list visible, don't replace with error screen
@@ -216,6 +224,7 @@ class _SpotsScreenState extends State<SpotsScreen> {
   // ─── Mobile detail ────────────────────────────────────────────────────────────
 
   void _openDetailMobile(BuildContext context, Spot spot) {
+    final docs = _docs;
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -224,6 +233,7 @@ class _SpotsScreenState extends State<SpotsScreen> {
           myVote: _myVotes[spot.id],
           onVote: (v) => _onVote(spot.id, v),
           canDelete: _canDelete(spot),
+          docs: docs,
           onDelete: () {
             _deleteSpot(spot.id);
             Navigator.pop(context);
@@ -275,6 +285,7 @@ class _SpotsScreenState extends State<SpotsScreen> {
         ? _DesktopLayout(
             spots: _filtered,
             allSpots: _spots,
+            docs: _docs,
             selected: _selected,
             myVotes: _myVotes,
             filterCategory: _filterCategory,
@@ -369,6 +380,9 @@ class _MobileLayout extends StatelessWidget {
               IconButton(
                 icon: const Icon(Icons.tune_rounded),
                 color: kColorInkSoft,
+                // TODO: Spots filter panel — show bottom sheet with multi-select chips
+                // for category, city, and maybe tags. Replace _CategoryFilterStrip or
+                // augment it. State lives in _SpotsScreenState._filterCategory.
                 onPressed: () {},
               ),
               const SizedBox(width: kSpace2),
@@ -435,6 +449,7 @@ class _DesktopLayout extends StatelessWidget {
   const _DesktopLayout({
     required this.spots,
     required this.allSpots,
+    required this.docs,
     required this.selected,
     required this.myVotes,
     required this.filterCategory,
@@ -453,6 +468,7 @@ class _DesktopLayout extends StatelessWidget {
 
   final List<Spot> spots;
   final List<Spot> allSpots;
+  final List<TripDocument> docs;
   final Spot? selected;
   final Map<String, VoteType> myVotes;
   final SpotCategory? filterCategory;
@@ -539,6 +555,7 @@ class _DesktopLayout extends StatelessWidget {
                             myVote: myVotes[selected!.id],
                             onVote: (v) => onVote(selected!.id, v),
                             canDelete: canDelete(selected!),
+                            docs: docs,
                             onDelete: () => onDelete(selected!.id),
                           ),
                         ),

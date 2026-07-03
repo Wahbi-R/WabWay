@@ -75,7 +75,7 @@ class CashDetailScreen extends StatelessWidget {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.only(bottom: kSpace12),
+        padding: EdgeInsets.only(bottom: kSpace12 + MediaQuery.paddingOf(context).bottom),
         child: CashDetailContent(
             withdrawal: withdrawal, myId: myId, members: members),
       ),

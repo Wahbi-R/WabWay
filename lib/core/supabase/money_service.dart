@@ -35,15 +35,16 @@ abstract final class MoneyService {
       );
     }).toList();
     return Receipt(
-      id:       row['id'] as String,
-      title:    row['title'] as String,
-      amount:   (row['amount'] as num).toDouble(),
-      currency: row['currency'] as String,
-      paidById: row['paid_by'] as String,
-      category: _catFrom(row['category'] as String),
-      date:     DateTime.parse(row['date'] as String),
-      notes:    row['notes'] as String?,
-      splits:   splits,
+      id:          row['id'] as String,
+      title:       row['title'] as String,
+      amount:      (row['amount'] as num).toDouble(),
+      currency:    row['currency'] as String,
+      paidById:    row['paid_by'] as String,
+      category:    _catFrom(row['category'] as String),
+      date:        DateTime.parse(row['date'] as String),
+      notes:       row['notes'] as String?,
+      storagePath: row['storage_path'] as String?,
+      splits:      splits,
     );
   }
 
@@ -170,6 +171,43 @@ abstract final class MoneyService {
         .eq('id', withdrawalId)
         .single();
     return _withdrawalFromRow(full);
+  }
+
+  static Future<Receipt> updateReceipt({
+    required String receiptId,
+    required String title,
+    required double amount,
+    required String currency,
+    required ReceiptCategory category,
+    required String paidBy,
+    required DateTime date,
+    required List<ReceiptSplit> splits,
+    String? notes,
+  }) async {
+    await supabase.from('receipts').update({
+      'title':    title.trim(),
+      'amount':   amount,
+      'currency': currency,
+      'paid_by':  paidBy,
+      'category': _catToDb(category),
+      'date':     _fmtDate(date),
+      'notes':    (notes != null && notes.isNotEmpty) ? notes : null,
+    }).eq('id', receiptId);
+
+    for (final split in splits) {
+      await supabase
+          .from('receipt_splits')
+          .update({'amount': split.amount})
+          .eq('receipt_id', receiptId)
+          .eq('user_id', split.memberId);
+    }
+
+    final full = await supabase
+        .from('receipts')
+        .select('*, receipt_splits(*)')
+        .eq('id', receiptId)
+        .single();
+    return _receiptFromRow(full);
   }
 
   static Future<void> deleteReceipt(String receiptId) async {

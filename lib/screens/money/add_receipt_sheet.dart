@@ -1,23 +1,27 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../core/supabase/client.dart';
+import '../../core/supabase/doc_service.dart';
 import '../../core/supabase/money_service.dart';
+import '../../data/docs_data.dart';
 import '../../data/money_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 
-/// Opens the Add Receipt form.
+/// Opens the Add Receipt form, or Edit Receipt when [existingReceipt] is passed.
 ///
 /// Pass [tripId], [userId], and [members] from MoneyScreen so the form can
-/// save to Supabase. When called without those params (e.g. from doc_detail as
-/// a placeholder) the form returns a locally-constructed Receipt and skips the
-/// Supabase write.
+/// save to Supabase. When called without those params the form returns a
+/// locally-constructed Receipt and skips the Supabase write.
 Future<Receipt?> showAddReceiptSheet(
   BuildContext context, {
   String? tripId,
   String? userId,
   List<TripMember>? members,
+  Receipt? existingReceipt,
 }) {
   final effectiveUserId = userId ?? supabase.auth.currentUser?.id ?? kYouId;
   final effectiveMembers = (members != null && members.isNotEmpty)
@@ -40,9 +44,10 @@ Future<Receipt?> showAddReceiptSheet(
           width: 520,
           height: MediaQuery.sizeOf(dialogCtx).height * 0.90,
           child: _AddReceiptContent(
-            tripId:  tripId,
-            userId:  effectiveUserId,
-            members: effectiveMembers,
+            tripId:          tripId,
+            userId:          effectiveUserId,
+            members:         effectiveMembers,
+            existingReceipt: existingReceipt,
             onSubmit: (r) => Navigator.pop(dialogCtx, r),
           ),
         ),
@@ -56,9 +61,10 @@ Future<Receipt?> showAddReceiptSheet(
     useSafeArea: true,
     backgroundColor: Colors.transparent,
     builder: (ctx) => _AddReceiptSheet(
-      tripId:  tripId,
-      userId:  effectiveUserId,
-      members: effectiveMembers,
+      tripId:          tripId,
+      userId:          effectiveUserId,
+      members:         effectiveMembers,
+      existingReceipt: existingReceipt,
       onSubmit: (r) => Navigator.pop(ctx, r),
     ),
   );
@@ -70,12 +76,14 @@ class _AddReceiptSheet extends StatelessWidget {
     required this.tripId,
     required this.userId,
     required this.members,
+    this.existingReceipt,
   });
 
   final ValueChanged<Receipt> onSubmit;
   final String? tripId;
   final String userId;
   final List<TripMember> members;
+  final Receipt? existingReceipt;
 
   @override
   Widget build(BuildContext context) {
@@ -89,12 +97,13 @@ class _AddReceiptSheet extends StatelessWidget {
           borderRadius: kRadiusSheet,
         ),
         child: _AddReceiptContent(
-          tripId:          tripId,
-          userId:          userId,
-          members:         members,
+          tripId:           tripId,
+          userId:           userId,
+          members:          members,
+          existingReceipt:  existingReceipt,
           scrollController: ctrl,
-          onSubmit:        onSubmit,
-          showDragHandle:  true,
+          onSubmit:         onSubmit,
+          showDragHandle:   true,
         ),
       ),
     );
@@ -109,6 +118,7 @@ class _AddReceiptContent extends StatefulWidget {
     required this.tripId,
     required this.userId,
     required this.members,
+    this.existingReceipt,
     this.scrollController,
     this.showDragHandle = false,
   });
@@ -118,6 +128,8 @@ class _AddReceiptContent extends StatefulWidget {
   final String? tripId;
   final String userId;
   final List<TripMember> members;
+  /// When set, the form pre-fills with this receipt and updates rather than creates.
+  final Receipt? existingReceipt;
   final ScrollController? scrollController;
   final bool showDragHandle;
 
@@ -141,14 +153,59 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
   bool            _loading   = false;
   String?         _error;
 
+  Uint8List? _photoBytes;
+  String?    _photoExt;
+  String?    _existingStoragePath;
+
+  // Unified list of linked documents shown in the sheet.
+  // Pre-populated with existing links in edit mode; diffed on submit.
+  List<TripDocument> _linkedDocs    = [];
+  Set<String>        _originalDocIds = {};
+
+  bool get _isEditing => widget.existingReceipt != null;
+
   @override
   void initState() {
     super.initState();
-    _paidById  = widget.userId;
-    _splitWith = {for (final m in widget.members) m.id};
-    _customCtrls = {
-      for (final m in widget.members) m.id: TextEditingController(),
-    };
+    final ex = widget.existingReceipt;
+    if (ex != null) {
+      _titleCtrl.text      = ex.title;
+      _amountCtrl.text     = ex.amount.toStringAsFixed(ex.amount.truncateToDouble() == ex.amount ? 0 : 2);
+      _notesCtrl.text      = ex.notes ?? '';
+      _category            = ex.category;
+      _currency            = ex.currency;
+      _paidById            = ex.paidById;
+      _existingStoragePath = ex.storagePath;
+      _splitWith           = {for (final s in ex.splits) s.memberId};
+      _customCtrls         = {
+        for (final m in widget.members) m.id: TextEditingController(
+          text: ex.splits
+              .where((s) => s.memberId == m.id)
+              .fold(0.0, (a, s) => a + s.amount)
+              .toStringAsFixed(2),
+        ),
+      };
+      _splitMode = _SplitMode.custom;
+
+      // Pre-load existing linked documents so the user can see and remove them.
+      DocService.loadLinkedDocuments(
+        linkedType: DocLinkedType.receipt,
+        linkedId:   ex.id,
+      ).then((docs) {
+        if (mounted) {
+          setState(() {
+            _linkedDocs     = List.of(docs);
+            _originalDocIds = docs.map((d) => d.id).toSet();
+          });
+        }
+      }).catchError((_) {});
+    } else {
+      _paidById  = widget.userId;
+      _splitWith = {for (final m in widget.members) m.id};
+      _customCtrls = {
+        for (final m in widget.members) m.id: TextEditingController(),
+      };
+    }
   }
 
   @override
@@ -201,17 +258,79 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
 
     setState(() { _loading = true; _error = null; });
     try {
-      final receipt = await MoneyService.createReceipt(
-        tripId:   widget.tripId!,
-        paidBy:   _paidById,
-        title:    title,
-        amount:   total,
-        currency: _currency,
-        category: _category,
-        date:     DateTime.now(),
-        splits:   splits,
-        notes:    notes,
-      );
+      Receipt receipt;
+      if (_isEditing) {
+        receipt = await MoneyService.updateReceipt(
+          receiptId: widget.existingReceipt!.id,
+          paidBy:    _paidById,
+          title:     title,
+          amount:    total,
+          currency:  _currency,
+          category:  _category,
+          date:      widget.existingReceipt!.date,
+          splits:    splits,
+          notes:     notes,
+        );
+      } else {
+        receipt = await MoneyService.createReceipt(
+          tripId:   widget.tripId!,
+          paidBy:   _paidById,
+          title:    title,
+          amount:   total,
+          currency: _currency,
+          category: _category,
+          date:     DateTime.now(),
+          splits:   splits,
+          notes:    notes,
+        );
+      }
+      // Upload photo as a linked document (non-fatal — receipt already saved).
+      if (_photoBytes != null && widget.tripId != null) {
+        try {
+          final userId = supabase.auth.currentUser?.id ?? '';
+          final doc = await DocService.uploadAndCreate(
+            tripId:    widget.tripId!,
+            userId:    userId,
+            title:     title,
+            type:      DocType.receipt,
+            ext:       _photoExt ?? 'jpg',
+            bytes:     _photoBytes!,
+            fileSizeKb: (_photoBytes!.lengthInBytes / 1024).round(),
+          );
+          await DocService.addLink(
+            documentId: doc.id,
+            linkedType: DocLinkedType.receipt,
+            linkedId:   receipt.id,
+            createdBy:  userId,
+          );
+        } catch (_) {}
+      }
+      // Sync document links: add new ones, remove deleted ones (non-fatal).
+      final userId       = supabase.auth.currentUser?.id ?? '';
+      final currentIds   = _linkedDocs.map((d) => d.id).toSet();
+      for (final doc in _linkedDocs) {
+        if (!_originalDocIds.contains(doc.id)) {
+          try {
+            await DocService.addLink(
+              documentId: doc.id,
+              linkedType: DocLinkedType.receipt,
+              linkedId:   receipt.id,
+              createdBy:  userId,
+            );
+          } catch (_) {}
+        }
+      }
+      for (final removedId in _originalDocIds) {
+        if (!currentIds.contains(removedId)) {
+          try {
+            await DocService.deleteLink(
+              documentId: removedId,
+              linkedType: DocLinkedType.receipt,
+              linkedId:   receipt.id,
+            );
+          } catch (_) {}
+        }
+      }
       if (mounted) widget.onSubmit(receipt);
     } catch (_) {
       if (mounted) setState(() { _loading = false; _error = 'Could not save receipt.'; });
@@ -220,7 +339,8 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
 
   @override
   Widget build(BuildContext context) {
-    final bottomPad = MediaQuery.viewInsetsOf(context).bottom;
+    final keyboardPad = MediaQuery.viewInsetsOf(context).bottom;
+    final navBarPad   = MediaQuery.paddingOf(context).bottom;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -231,7 +351,7 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
           padding: const EdgeInsets.fromLTRB(kSpace4, kSpace3, kSpace4, 0),
           child: Row(
             children: [
-              Text('Add receipt', style: kStyleTitle),
+              Text(_isEditing ? 'Edit receipt' : 'Add receipt', style: kStyleTitle),
               const Spacer(),
               WabwayIconButton(
                 icon: Icons.close_rounded,
@@ -246,8 +366,7 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
         Flexible(
           child: SingleChildScrollView(
             controller: widget.scrollController,
-            padding: EdgeInsets.fromLTRB(
-                kSpace4, 0, kSpace4, kSpace6 + bottomPad),
+            padding: EdgeInsets.fromLTRB(kSpace4, 0, kSpace4, kSpace4 + keyboardPad),
             child: Form(
               key: _formKey,
               child: Column(
@@ -367,35 +486,349 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
                     maxLines: 3,
                     textInputAction: TextInputAction.newline,
                   ),
+                  const SizedBox(height: kSpace4),
 
-                  if (_error != null) ...[
-                    const SizedBox(height: kSpace3),
-                    Text(_error!,
-                        style: kStyleBody.copyWith(color: kColorDanger)),
-                  ],
-
-                  const SizedBox(height: kSpace6),
-
-                  WabwayButton(
-                    label: 'Add receipt',
-                    icon: Icons.receipt_long_rounded,
-                    fullWidth: true,
-                    size: WabwayButtonSize.lg,
-                    onPressed: _loading ? null : _submit,
+                  _PhotoUploadZone(
+                    photoBytes:          _photoBytes,
+                    existingStoragePath: _existingStoragePath,
+                    onPicked: (bytes, ext) => setState(() {
+                      _photoBytes = bytes;
+                      _photoExt   = ext;
+                    }),
+                    onRemoved: () => setState(() {
+                      _photoBytes          = null;
+                      _photoExt            = null;
+                      _existingStoragePath = null;
+                    }),
                   ),
+                  const SizedBox(height: kSpace4),
 
-                  if (_loading) ...[
-                    const SizedBox(height: kSpace4),
-                    const Center(
-                      child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
+                  if (widget.tripId != null)
+                    _DocLinkSection(
+                      tripId:     widget.tripId!,
+                      linkedDocs: _linkedDocs,
+                      onAdd:      (doc) => setState(() => _linkedDocs.add(doc)),
+                      onRemove:   (doc) => setState(() => _linkedDocs.remove(doc)),
                     ),
-                  ],
                 ],
               ),
+            ),
+          ),
+        ),
+
+        // Sticky footer — always visible above nav bar
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(kSpace4, kSpace2, kSpace4, 0),
+            child: Text(_error!, style: kStyleBody.copyWith(color: kColorDanger)),
+          ),
+        Padding(
+          padding: EdgeInsets.fromLTRB(kSpace4, kSpace3, kSpace4, kSpace4 + navBarPad),
+          child: WabwayButton(
+            label: _isEditing ? 'Save changes' : 'Add receipt',
+            icon: Icons.receipt_long_rounded,
+            fullWidth: true,
+            size: WabwayButtonSize.lg,
+            loading: _loading,
+            onPressed: _loading ? null : _submit,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Photo upload zone ────────────────────────────────────────────────────────
+
+class _PhotoUploadZone extends StatelessWidget {
+  const _PhotoUploadZone({
+    required this.onPicked,
+    required this.onRemoved,
+    this.photoBytes,
+    this.existingStoragePath,
+  });
+
+  final Uint8List? photoBytes;
+  final String? existingStoragePath;
+  final void Function(Uint8List bytes, String ext) onPicked;
+  final VoidCallback onRemoved;
+
+  bool get _hasPhoto => photoBytes != null || existingStoragePath != null;
+
+  Future<void> _pick(BuildContext context, ImageSource source) async {
+    final picker = ImagePicker();
+    final file = await picker.pickImage(
+      source: source,
+      imageQuality: 85,
+      maxWidth: 2048,
+    );
+    if (file == null) return;
+    final bytes = await file.readAsBytes();
+    final ext   = file.name.contains('.')
+        ? file.name.split('.').last.toLowerCase()
+        : 'jpg';
+    onPicked(bytes, ext);
+  }
+
+  void _showSourcePicker(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: kColorPaper,
+      shape: const RoundedRectangleBorder(borderRadius: kRadiusSheet),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const WabwayDragHandle(),
+            ListTile(
+              leading: const Icon(Icons.camera_alt_rounded),
+              title: const Text('Take photo'),
+              onTap: () { Navigator.pop(ctx); _pick(context, ImageSource.camera); },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded),
+              title: const Text('Choose from gallery'),
+              onTap: () { Navigator.pop(ctx); _pick(context, ImageSource.gallery); },
+            ),
+            if (_hasPhoto)
+              ListTile(
+                leading: const Icon(Icons.delete_outline_rounded, color: kColorDanger),
+                title: const Text('Remove photo', style: TextStyle(color: kColorDanger)),
+                onTap: () { Navigator.pop(ctx); onRemoved(); },
+              ),
+            const SizedBox(height: kSpace2),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Photo', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
+        const SizedBox(height: kSpace2),
+        GestureDetector(
+          onTap: () => _showSourcePicker(context),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            width: double.infinity,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: _hasPhoto ? kColorPrimarySoft : kColorSurfaceSunken,
+              borderRadius: kRadiusMd,
+              border: Border.all(
+                color: _hasPhoto ? kColorPrimary : kColorBorder,
+              ),
+            ),
+            child: photoBytes != null
+                // New photo picked — show thumbnail with remove ✕
+                ? Stack(
+                    alignment: Alignment.topRight,
+                    children: [
+                      Image.memory(
+                        photoBytes!,
+                        height: 180,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(kSpace2),
+                        child: Material(
+                          color: Colors.black54,
+                          borderRadius: kRadiusPill,
+                          child: InkWell(
+                            borderRadius: kRadiusPill,
+                            onTap: onRemoved,
+                            child: const Padding(
+                              padding: EdgeInsets.all(4),
+                              child: Icon(Icons.close_rounded, size: 16, color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                // No new photo — show icon + label (existing or empty)
+                : Padding(
+                    padding: const EdgeInsets.symmetric(vertical: kSpace5),
+                    child: Column(
+                      children: [
+                        Icon(
+                          _hasPhoto
+                              ? Icons.check_circle_outline_rounded
+                              : Icons.add_photo_alternate_rounded,
+                          size: 32,
+                          color: _hasPhoto ? kColorPrimary : kColorInkSoft,
+                        ),
+                        const SizedBox(height: kSpace2),
+                        Text(
+                          _hasPhoto
+                              ? 'Photo attached — tap to replace'
+                              : 'Tap to add a photo',
+                          style: kStyleBodyMedium.copyWith(
+                            color: _hasPhoto ? kColorPrimary : kColorInkSoft,
+                          ),
+                        ),
+                        if (!_hasPhoto) ...[
+                          const SizedBox(height: kSpace1),
+                          Text('Camera or gallery', style: kStyleCaption),
+                        ],
+                      ],
+                    ),
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Document link section ────────────────────────────────────────────────────
+
+class _DocLinkSection extends StatefulWidget {
+  const _DocLinkSection({
+    required this.tripId,
+    required this.linkedDocs,
+    required this.onAdd,
+    required this.onRemove,
+  });
+
+  final String tripId;
+  final List<TripDocument> linkedDocs;
+  final ValueChanged<TripDocument> onAdd;
+  final ValueChanged<TripDocument> onRemove;
+
+  @override
+  State<_DocLinkSection> createState() => _DocLinkSectionState();
+}
+
+class _DocLinkSectionState extends State<_DocLinkSection> {
+  List<TripDocument>? _allDocs;
+
+  @override
+  void initState() {
+    super.initState();
+    DocService.loadDocuments(widget.tripId).then((docs) {
+      if (mounted) setState(() => _allDocs = docs);
+    }).catchError((_) {
+      if (mounted) setState(() => _allDocs = []);
+    });
+  }
+
+  void _showPicker() {
+    if (_allDocs == null || _allDocs!.isEmpty) return;
+    final available = _allDocs!
+        .where((d) => !widget.linkedDocs.any((l) => l.id == d.id))
+        .toList();
+    if (available.isEmpty) return;
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: kColorPaper,
+      shape: const RoundedRectangleBorder(borderRadius: kRadiusSheet),
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.6,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        builder: (_, ctrl) => Column(
+          children: [
+            const WabwayDragHandle(),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(kSpace4, 0, kSpace4, kSpace3),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Select document', style: kStyleTitle),
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: ListView.builder(
+                controller: ctrl,
+                itemCount: available.length,
+                itemBuilder: (_, i) {
+                  final doc = available[i];
+                  return ListTile(
+                    leading: Icon(doc.type.icon, color: kColorInkSoft),
+                    title: Text(doc.title, style: kStyleBodyMedium),
+                    subtitle: Text(doc.type.label, style: kStyleCaption),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      widget.onAdd(doc);
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Documents', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
+        const SizedBox(height: kSpace2),
+
+        if (widget.linkedDocs.isNotEmpty) ...[
+          ...widget.linkedDocs.map((doc) => Padding(
+            padding: const EdgeInsets.only(bottom: kSpace2),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: kSpace2),
+              decoration: BoxDecoration(
+                color: kColorSurfaceSunken,
+                borderRadius: kRadiusMd,
+                border: Border.all(color: kColorBorder),
+              ),
+              child: Row(
+                children: [
+                  Icon(doc.type.icon, size: 16, color: kColorInkSoft),
+                  const SizedBox(width: kSpace2),
+                  Expanded(
+                    child: Text(doc.title, style: kStyleBodyMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ),
+                  GestureDetector(
+                    onTap: () => widget.onRemove(doc),
+                    child: const Icon(Icons.close_rounded, size: 16, color: kColorInkSoft),
+                  ),
+                ],
+              ),
+            ),
+          )),
+          const SizedBox(height: kSpace2),
+        ],
+
+        GestureDetector(
+          onTap: _allDocs == null ? null : _showPicker,
+          child: Container(
+            padding: const EdgeInsets.all(kSpace3),
+            decoration: BoxDecoration(
+              color: kColorSurfaceSunken,
+              borderRadius: kRadiusMd,
+              border: Border.all(color: kColorBorder),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.attach_file_rounded, size: 18, color: kColorInkSoft),
+                const SizedBox(width: kSpace2),
+                Text(
+                  _allDocs == null
+                      ? 'Loading documents…'
+                      : (_allDocs!.isEmpty
+                          ? 'No documents in this trip'
+                          : 'Attach a document'),
+                  style: kStyleBody.copyWith(color: kColorInkSoft),
+                ),
+              ],
             ),
           ),
         ),
@@ -403,6 +836,8 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
     );
   }
 }
+
+// ─── Split controls ───────────────────────────────────────────────────────────
 
 class _SplitToggle extends StatelessWidget {
   const _SplitToggle({required this.mode, required this.onChanged});

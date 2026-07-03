@@ -19,10 +19,14 @@ class IncomingShareScreen extends StatefulWidget {
   const IncomingShareScreen({
     super.key,
     required this.share,
+    required this.tripId,
+    required this.userId,
     this.onDone,
   });
 
   final IncomingShare share;
+  final String tripId;
+  final String userId;
   final VoidCallback? onDone;
 
   @override
@@ -40,8 +44,8 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
     final dest = _destination;
     if (dest == null) return;
 
-    final tripId = TripState.tripOf(context).id;
-    final userId = ProfileState.of(context).id;
+    final tripId = widget.tripId;
+    final userId = widget.userId;
 
     switch (dest) {
       case ShareDestination.spot:
@@ -275,11 +279,15 @@ class _IncomingShareDemoLauncherState
       kMockIncomingShares[_shareIndex % kMockIncomingShares.length];
 
   void _launch() {
+    final tripId = TripState.tripOf(context).id;
+    final userId = ProfileState.of(context).id;
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => IncomingShareScreen(
           share: _currentShare,
+          tripId: tripId,
+          userId: userId,
           onDone: () => Navigator.pop(context),
         ),
       ),

@@ -139,6 +139,22 @@ abstract final class TravelService {
     return _fromRow(row, linkedDocIds);
   }
 
+  static Future<void> updateItem(TravelItem item) async {
+    await supabase.from('travel_items').update({
+      'title':               item.title,
+      'type':                _typeToDb(item.type),
+      'date':                item.date != null ? _fmtDate(item.date!) : null,
+      'end_date':            item.endDate != null ? _fmtDate(item.endDate!) : null,
+      'time':                item.time,
+      'end_time':            item.endTime,
+      'location':            item.location,
+      'destination':         item.destination,
+      'confirmation_number': item.confirmationNumber,
+      'address':             item.address,
+      'notes':               item.notes,
+    }).eq('id', item.id);
+  }
+
   static Future<void> deleteItem(String itemId) async {
     await supabase.from('travel_items').delete().eq('id', itemId);
   }

@@ -220,7 +220,8 @@ class _AddDocContentState extends State<_AddDocContent> {
 
   @override
   Widget build(BuildContext context) {
-    final bottomPad = MediaQuery.viewInsetsOf(context).bottom;
+    final keyboardPad = MediaQuery.viewInsetsOf(context).bottom;
+    final navBarPad = MediaQuery.paddingOf(context).bottom;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -246,8 +247,7 @@ class _AddDocContentState extends State<_AddDocContent> {
         Flexible(
           child: SingleChildScrollView(
             controller: widget.scrollController,
-            padding:
-                EdgeInsets.fromLTRB(kSpace4, 0, kSpace4, kSpace6 + bottomPad),
+            padding: EdgeInsets.fromLTRB(kSpace4, 0, kSpace4, kSpace4 + keyboardPad),
             child: Form(
               key: _formKey,
               child: Column(
@@ -310,20 +310,22 @@ class _AddDocContentState extends State<_AddDocContent> {
                     Text(_error!,
                         style: kStyleCaption.copyWith(color: kColorDanger)),
                   ],
-
-                  const SizedBox(height: kSpace6),
-
-                  WabwayButton(
-                    label: 'Add document',
-                    icon: Icons.insert_drive_file_rounded,
-                    fullWidth: true,
-                    size: WabwayButtonSize.lg,
-                    loading: _loading,
-                    onPressed: _loading ? null : _submit,
-                  ),
                 ],
               ),
             ),
+          ),
+        ),
+
+        // Sticky footer — always visible above nav bar
+        Padding(
+          padding: EdgeInsets.fromLTRB(kSpace4, kSpace3, kSpace4, kSpace4 + navBarPad),
+          child: WabwayButton(
+            label: 'Add document',
+            icon: Icons.insert_drive_file_rounded,
+            fullWidth: true,
+            size: WabwayButtonSize.lg,
+            loading: _loading,
+            onPressed: _loading ? null : _submit,
           ),
         ),
       ],

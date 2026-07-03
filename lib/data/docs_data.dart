@@ -164,6 +164,26 @@ class TripDocument {
         'docx' || 'doc' => const Color(0xFFE8EEF6),
         _ => const Color(0xFFEEEAE3),
       };
+
+  bool get isImage {
+    final e = ext.toLowerCase();
+    return e == 'jpg' || e == 'jpeg' || e == 'png' || e == 'webp' || e == 'gif';
+  }
+
+  TripDocument copyWith({String? title}) => TripDocument(
+        id: id,
+        title: title ?? this.title,
+        type: type,
+        ext: ext,
+        uploadedById: uploadedById,
+        uploadedAt: uploadedAt,
+        storagePath: storagePath,
+        fileSizeKb: fileSizeKb,
+        amount: amount,
+        currency: currency,
+        notes: notes,
+        links: links,
+      );
 }
 
 // ─── Mock data ────────────────────────────────────────────────────────────────

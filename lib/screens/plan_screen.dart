@@ -174,6 +174,20 @@ class _PlanScreenState extends State<PlanScreen> {
     PlanService.deleteItem(itemId).catchError((_) => _silentReload());
   }
 
+  void _updateItem(ItineraryItem updated) {
+    setState(() {
+      for (final day in _days) {
+        final idx = day.items.indexWhere((i) => i.id == updated.id);
+        if (idx != -1) {
+          day.items[idx] = updated;
+          break;
+        }
+      }
+      _selectedItemId = updated.id;
+    });
+    PlanService.updateItem(updated).catchError((_) => _silentReload());
+  }
+
   Future<void> _addItem(BuildContext context, String dayId) async {
     final messenger = ScaffoldMessenger.of(context);
     final draft = await showAddItemSheet(
@@ -340,6 +354,7 @@ class _PlanScreenState extends State<PlanScreen> {
           spots: _spots,
           docs: _docs,
           onDelete: () => _deleteItem(item.id),
+          onUpdated: _updateItem,
         ),
       );
     }
@@ -458,6 +473,7 @@ class _PlanScreenState extends State<PlanScreen> {
                                   spots: spots,
                                   docs: docs,
                                   onDelete: () => _deleteItem(id),
+                                  onUpdated: _updateItem,
                                 ),
                               ),
                             );

@@ -46,4 +46,24 @@ abstract final class TripService {
         .map((m) => AppTripMember.fromMap(m as Map<String, dynamic>))
         .toList();
   }
+
+  static Future<void> leaveTrip(String tripId) async {
+    final userId = supabase.auth.currentUser!.id;
+    final rows = await supabase
+        .from('trip_members')
+        .delete()
+        .eq('trip_id', tripId)
+        .eq('user_id', userId)
+        .select();
+    if (rows.isEmpty) throw Exception('Could not leave trip');
+  }
+
+  static Future<void> updateTripName(String tripId, String name) async {
+    final rows = await supabase
+        .from('trips')
+        .update({'name': name.trim()})
+        .eq('id', tripId)
+        .select();
+    if (rows.isEmpty) throw Exception('Could not update trip name');
+  }
 }

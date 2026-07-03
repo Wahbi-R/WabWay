@@ -14,6 +14,7 @@ Future<ItineraryItem?> showAddItemSheet(
   required String dayId,
   List<Spot> spots = const [],
   List<TripDocument> docs = const [],
+  ItineraryItem? initialItem,
 }) {
   final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
 
@@ -32,6 +33,7 @@ Future<ItineraryItem?> showAddItemSheet(
             dayId: dayId,
             spots: spots,
             docs: docs,
+            initialItem: initialItem,
             onSubmit: (item) => Navigator.pop(ctx, item),
           ),
         ),
@@ -48,6 +50,7 @@ Future<ItineraryItem?> showAddItemSheet(
       dayId: dayId,
       spots: spots,
       docs: docs,
+      initialItem: initialItem,
       onSubmit: (item) => Navigator.pop(ctx, item),
     ),
   );
@@ -59,11 +62,13 @@ class _AddItemSheet extends StatelessWidget {
     required this.spots,
     required this.docs,
     required this.onSubmit,
+    this.initialItem,
   });
   final String dayId;
   final List<Spot> spots;
   final List<TripDocument> docs;
   final ValueChanged<ItineraryItem> onSubmit;
+  final ItineraryItem? initialItem;
 
   @override
   Widget build(BuildContext context) {
@@ -80,6 +85,7 @@ class _AddItemSheet extends StatelessWidget {
           dayId: dayId,
           spots: spots,
           docs: docs,
+          initialItem: initialItem,
           scrollController: ctrl,
           onSubmit: onSubmit,
           showDragHandle: true,
@@ -99,6 +105,7 @@ class _AddItemContent extends StatefulWidget {
     required this.onSubmit,
     this.scrollController,
     this.showDragHandle = false,
+    this.initialItem,
   });
 
   final String dayId;
@@ -107,6 +114,7 @@ class _AddItemContent extends StatefulWidget {
   final ValueChanged<ItineraryItem> onSubmit;
   final ScrollController? scrollController;
   final bool showDragHandle;
+  final ItineraryItem? initialItem;
 
   @override
   State<_AddItemContent> createState() => _AddItemContentState();
@@ -129,6 +137,35 @@ class _AddItemContentState extends State<_AddItemContent> {
   bool _showAdvanced = false;
 
   @override
+  void initState() {
+    super.initState();
+    final item = widget.initialItem;
+    if (item != null) {
+      _titleCtrl.text = item.title;
+      _cityCtrl.text = item.city ?? '';
+      _locationCtrl.text = item.location ?? '';
+      _mapsCtrl.text = item.mapsUrl ?? '';
+      _confirmCtrl.text = item.confirmationUrl ?? '';
+      _notesCtrl.text = item.notes ?? '';
+      _type = item.type;
+      _linkedSpotId = item.linkedSpotId;
+      _linkedDocIds.addAll(item.linkedDocIds);
+      if (item.time != null) {
+        final parts = item.time!.split(':');
+        if (parts.length == 2) {
+          _time = TimeOfDay(
+            hour: int.tryParse(parts[0]) ?? 0,
+            minute: int.tryParse(parts[1]) ?? 0,
+          );
+        }
+      }
+      if (item.mapsUrl != null || item.confirmationUrl != null) {
+        _showAdvanced = true;
+      }
+    }
+  }
+
+  @override
   void dispose() {
     _titleCtrl.dispose();
     _cityCtrl.dispose();
@@ -145,8 +182,8 @@ class _AddItemContentState extends State<_AddItemContent> {
         ? null
         : '${_time!.hour.toString().padLeft(2, '0')}:${_time!.minute.toString().padLeft(2, '0')}';
     widget.onSubmit(ItineraryItem(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      dayId: widget.dayId,
+      id: widget.initialItem?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      dayId: widget.initialItem?.dayId ?? widget.dayId,
       title: _titleCtrl.text.trim(),
       type: _type,
       time: timeStr,
@@ -185,7 +222,7 @@ class _AddItemContentState extends State<_AddItemContent> {
           padding: const EdgeInsets.fromLTRB(kSpace4, kSpace3, kSpace4, 0),
           child: Row(
             children: [
-              Text('Add itinerary item', style: kStyleTitle),
+              Text(widget.initialItem != null ? 'Edit item' : 'Add itinerary item', style: kStyleTitle),
               const Spacer(),
               WabwayIconButton(
                 icon: Icons.close_rounded,
@@ -341,7 +378,7 @@ class _AddItemContentState extends State<_AddItemContent> {
                   const SizedBox(height: kSpace6),
 
                   WabwayButton(
-                    label: 'Add to itinerary',
+                    label: widget.initialItem != null ? 'Save changes' : 'Add to itinerary',
                     icon: Icons.event_note_rounded,
                     fullWidth: true,
                     size: WabwayButtonSize.lg,

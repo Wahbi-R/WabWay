@@ -43,7 +43,7 @@ class DocGridCard extends StatelessWidget {
         children: [
           // Icon area
           Container(
-            height: 100,
+            height: 80,
             decoration: BoxDecoration(
               color: doc.type.softColor,
               borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),

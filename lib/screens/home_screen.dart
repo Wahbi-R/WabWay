@@ -303,21 +303,25 @@ class _TripHero extends StatelessWidget {
             const SizedBox(height: kSpace5),
             Row(
               children: [
-                _HeroStat(
-                  label: 'Spots saved',
-                  value: data != null ? '${data!.spotCount}' : '—',
+                Expanded(
+                  child: _HeroStat(
+                    label: 'Spots saved',
+                    value: data != null ? '${data!.spotCount}' : '—',
+                  ),
                 ),
-                const SizedBox(width: kSpace6),
-                _HeroStat(
-                  label: 'Days planned',
-                  value: data != null ? '${data!.days.length}' : '—',
+                Expanded(
+                  child: _HeroStat(
+                    label: 'Days planned',
+                    value: data != null ? '${data!.days.length}' : '—',
+                  ),
                 ),
-                const SizedBox(width: kSpace6),
-                _HeroStat(
-                  label: 'Total spent',
-                  value: data != null
-                      ? fmtAmount(data!.totalSpent, data!.currency)
-                      : '—',
+                Expanded(
+                  child: _HeroStat(
+                    label: 'Total spent',
+                    value: data != null
+                        ? fmtAmount(data!.totalSpent, data!.currency)
+                        : '—',
+                  ),
                 ),
               ],
             ),
@@ -341,12 +345,14 @@ class _HeroStat extends StatelessWidget {
         Text(
           value,
           style: GoogleFonts.ibmPlexMono(
-            fontSize: kTextXl,
+            fontSize: kTextLg,
             fontWeight: FontWeight.w600,
             color: kColorInk,
           ),
+          overflow: TextOverflow.ellipsis,
+          maxLines: 1,
         ),
-        Text(label, style: kStyleCaption),
+        Text(label, style: kStyleCaption, overflow: TextOverflow.ellipsis, maxLines: 1),
       ],
     );
   }
@@ -358,6 +364,21 @@ class _QuickBalanceCard extends StatelessWidget {
   const _QuickBalanceCard({required this.data});
   final _HomeData? data;
 
+  // TODO: Settle up — build money settlement flow (calculate per-member balances,
+  // allow marking debts as paid). Needs new DB table or computed view.
+  Widget _settleUpButton() => TextButton(
+        onPressed: () {},
+        style: TextButton.styleFrom(
+          foregroundColor: kColorPrimaryDark,
+          backgroundColor: kColorPaper,
+          shape: const RoundedRectangleBorder(borderRadius: kRadiusMd),
+        ),
+        child: Text(
+          'Settle up',
+          style: kStyleBodySemibold.copyWith(color: kColorPrimaryDark),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
@@ -368,37 +389,61 @@ class _QuickBalanceCard extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.all(kSpace4),
-        child: Row(
-          children: [
-            const Icon(
+        child: LayoutBuilder(
+          builder: (_, constraints) {
+            final isNarrow = constraints.maxWidth < 400;
+            final content = _buildContent();
+            const walletIcon = Icon(
               Icons.account_balance_wallet_rounded,
               color: kColorPrimary,
               size: 20,
-            ),
-            const SizedBox(width: kSpace3),
-            Expanded(
-              child: Column(
+            );
+
+            if (isNarrow) {
+              return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Your balance', style: kStyleCaption),
-                  const SizedBox(height: kSpace1),
-                  _buildContent(),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      walletIcon,
+                      const SizedBox(width: kSpace3),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Your balance', style: kStyleCaption),
+                            const SizedBox(height: kSpace1),
+                            content,
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: kSpace3),
+                  SizedBox(width: double.infinity, child: _settleUpButton()),
                 ],
-              ),
-            ),
-            TextButton(
-              onPressed: () {},
-              style: TextButton.styleFrom(
-                foregroundColor: kColorPrimaryDark,
-                backgroundColor: kColorPaper,
-                shape: const RoundedRectangleBorder(borderRadius: kRadiusMd),
-              ),
-              child: Text(
-                'Settle up',
-                style: kStyleBodySemibold.copyWith(color: kColorPrimaryDark),
-              ),
-            ),
-          ],
+              );
+            }
+
+            return Row(
+              children: [
+                walletIcon,
+                const SizedBox(width: kSpace3),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Your balance', style: kStyleCaption),
+                      const SizedBox(height: kSpace1),
+                      content,
+                    ],
+                  ),
+                ),
+                _settleUpButton(),
+              ],
+            );
+          },
         ),
       ),
     );

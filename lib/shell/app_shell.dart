@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/auth/profile_state.dart';
 import '../core/share/share_handler.dart';
 import '../screens/share/incoming_share_screen.dart';
 import '../theme/app_colors.dart';
@@ -37,6 +38,13 @@ class _NavDest {
 
 const _mobileDestinations = [
   _NavDest(
+    key: 'home',
+    label: 'Home',
+    icon: Icons.home_outlined,
+    selectedIcon: Icons.home_rounded,
+    builder: _buildHome,
+  ),
+  _NavDest(
     key: 'spots',
     label: 'Spots',
     icon: Icons.place_outlined,
@@ -56,13 +64,6 @@ const _mobileDestinations = [
     icon: Icons.account_balance_wallet_outlined,
     selectedIcon: Icons.account_balance_wallet_rounded,
     builder: _buildMoney,
-  ),
-  _NavDest(
-    key: 'docs',
-    label: 'Docs',
-    icon: Icons.folder_outlined,
-    selectedIcon: Icons.folder_rounded,
-    builder: _buildDocs,
   ),
   _NavDest(
     key: 'more',
@@ -193,9 +194,13 @@ class _AppShellState extends State<AppShell> {
     final share = ShareHandler.instance.pending;
     if (share == null || !mounted) return;
     ShareHandler.instance.consume();
+    final tripId = TripState.tripOf(context).id;
+    final userId = ProfileState.of(context).id;
     Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => IncomingShareScreen(
         share: share,
+        tripId: tripId,
+        userId: userId,
         onDone: () => Navigator.of(context).pop(),
       ),
     ));

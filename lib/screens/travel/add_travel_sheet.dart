@@ -11,6 +11,7 @@ import '../../widgets/widgets.dart';
 Future<TravelItem?> showAddTravelSheet(
   BuildContext context, {
   List<TripDocument> docs = const [],
+  TravelItem? initialItem,
 }) {
   final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
 
@@ -27,6 +28,7 @@ Future<TravelItem?> showAddTravelSheet(
           height: MediaQuery.sizeOf(ctx).height * 0.90,
           child: _AddTravelContent(
             docs: docs,
+            initialItem: initialItem,
             onSubmit: (item) => Navigator.pop(ctx, item),
           ),
         ),
@@ -41,15 +43,17 @@ Future<TravelItem?> showAddTravelSheet(
     backgroundColor: Colors.transparent,
     builder: (ctx) => _AddTravelSheet(
       docs: docs,
+      initialItem: initialItem,
       onSubmit: (item) => Navigator.pop(ctx, item),
     ),
   );
 }
 
 class _AddTravelSheet extends StatelessWidget {
-  const _AddTravelSheet({required this.onSubmit, required this.docs});
+  const _AddTravelSheet({required this.onSubmit, required this.docs, this.initialItem});
   final ValueChanged<TravelItem> onSubmit;
   final List<TripDocument> docs;
+  final TravelItem? initialItem;
 
   @override
   Widget build(BuildContext context) {
@@ -64,6 +68,7 @@ class _AddTravelSheet extends StatelessWidget {
         ),
         child: _AddTravelContent(
           docs: docs,
+          initialItem: initialItem,
           scrollController: ctrl,
           onSubmit: onSubmit,
           showDragHandle: true,
@@ -81,12 +86,14 @@ class _AddTravelContent extends StatefulWidget {
     required this.docs,
     this.scrollController,
     this.showDragHandle = false,
+    this.initialItem,
   });
 
   final ValueChanged<TravelItem> onSubmit;
   final List<TripDocument> docs;
   final ScrollController? scrollController;
   final bool showDragHandle;
+  final TravelItem? initialItem;
 
   @override
   State<_AddTravelContent> createState() => _AddTravelContentState();
@@ -109,6 +116,36 @@ class _AddTravelContentState extends State<_AddTravelContent> {
   final Set<String> _linkedDocIds = {};
 
   @override
+  void initState() {
+    super.initState();
+    final item = widget.initialItem;
+    if (item != null) {
+      _titleCtrl.text = item.title;
+      _locationCtrl.text = item.location ?? '';
+      _destinationCtrl.text = item.destination ?? '';
+      _addressCtrl.text = item.address ?? '';
+      _confirmCtrl.text = item.confirmationNumber ?? '';
+      _notesCtrl.text = item.notes ?? '';
+      _type = item.type;
+      _date = item.date;
+      _endDate = item.endDate;
+      _time = _parseTime(item.time);
+      _endTime = _parseTime(item.endTime);
+      _linkedDocIds.addAll(item.linkedDocIds);
+    }
+  }
+
+  static TimeOfDay? _parseTime(String? s) {
+    if (s == null) return null;
+    final parts = s.split(':');
+    if (parts.length != 2) return null;
+    return TimeOfDay(
+      hour: int.tryParse(parts[0]) ?? 0,
+      minute: int.tryParse(parts[1]) ?? 0,
+    );
+  }
+
+  @override
   void dispose() {
     _titleCtrl.dispose();
     _locationCtrl.dispose();
@@ -122,7 +159,7 @@ class _AddTravelContentState extends State<_AddTravelContent> {
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
     widget.onSubmit(TravelItem(
-      id: 't_${DateTime.now().millisecondsSinceEpoch}',
+      id: widget.initialItem?.id ?? 't_${DateTime.now().millisecondsSinceEpoch}',
       title: _titleCtrl.text.trim(),
       type: _type,
       date: _date,
@@ -197,7 +234,7 @@ class _AddTravelContentState extends State<_AddTravelContent> {
           padding: const EdgeInsets.fromLTRB(kSpace4, kSpace3, kSpace4, 0),
           child: Row(
             children: [
-              Text('Add travel item', style: kStyleTitle),
+              Text(widget.initialItem != null ? 'Edit travel item' : 'Add travel item', style: kStyleTitle),
               const Spacer(),
               WabwayIconButton(
                 icon: Icons.close_rounded,
@@ -374,7 +411,7 @@ class _AddTravelContentState extends State<_AddTravelContent> {
                   const SizedBox(height: kSpace6),
 
                   WabwayButton(
-                    label: 'Add travel item',
+                    label: widget.initialItem != null ? 'Save changes' : 'Add travel item',
                     icon: Icons.flight_rounded,
                     fullWidth: true,
                     size: WabwayButtonSize.lg,

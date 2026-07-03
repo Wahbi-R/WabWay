@@ -66,6 +66,7 @@ class Receipt {
     required this.category,
     required this.date,
     this.notes,
+    this.storagePath,
   });
 
   final String id;
@@ -77,6 +78,7 @@ class Receipt {
   final ReceiptCategory category;
   final DateTime date;
   final String? notes;
+  final String? storagePath;
 
   double get myShare => myShareFor(kYouId);
   double get myNet   => myNetFor(kYouId);

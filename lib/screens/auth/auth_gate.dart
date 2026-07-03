@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/auth/app_profile.dart';
 import '../../core/auth/profile_state.dart';
+import '../../core/debug/app_logger.dart';
 import '../../core/supabase/auth_service.dart';
 import '../../core/supabase/client.dart';
 import '../trips/trip_gate.dart';
@@ -46,6 +47,7 @@ class _AuthGateState extends State<AuthGate> {
   }
 
   void _onAuthChange(AuthState state) {
+    AppLogger.instance.log('authStateChange → ${state.event}  uid=${state.session?.user.id}', tag: 'AUTH');
     switch (state.event) {
       case AuthChangeEvent.passwordRecovery:
         // User clicked a password-reset link — show the set-new-password form.

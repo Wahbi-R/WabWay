@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../../core/debug/app_logger.dart';
 import '../../core/supabase/auth_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
@@ -26,6 +28,7 @@ class _SignInScreenState extends State<SignInScreen> {
 
   bool    _loading            = false;
   String? _error;
+  String? _rawError;
   bool    _magicSent          = false;
   bool    _passwordSignUpSent = false;
   bool    _resetSent          = false;
@@ -50,7 +53,7 @@ class _SignInScreenState extends State<SignInScreen> {
       await AuthService.sendMagicLink(email);
       if (mounted) setState(() { _loading = false; _magicSent = true; });
     } catch (e) {
-      if (mounted) setState(() { _loading = false; _error = e.toString(); });
+      if (mounted) setState(() { _loading = false; _rawError = e.toString(); _error = _friendlyError(e.toString()); });
     }
   }
 
@@ -102,6 +105,14 @@ class _SignInScreenState extends State<SignInScreen> {
 
   String _friendlyError(String raw) {
     final lower = raw.toLowerCase();
+    if (lower.contains('authretryablefetchexception') ||
+        lower.contains('failed host lookup') ||
+        lower.contains('network') ||
+        lower.contains('socketexception') ||
+        lower.contains('connection refused') ||
+        lower.contains('connection timed out')) {
+      return 'Could not connect to the server. Check your internet connection and try again.';
+    }
     if (lower.contains('invalid login credentials') || lower.contains('invalid_credentials')) {
       return "Incorrect email or password. If you signed up with a magic link, use that to sign in instead.";
     }
@@ -122,7 +133,7 @@ class _SignInScreenState extends State<SignInScreen> {
       await AuthService.sendPasswordReset(email);
       if (mounted) setState(() { _loading = false; _resetSent = true; });
     } catch (e) {
-      if (mounted) setState(() { _loading = false; _error = e.toString(); });
+      if (mounted) setState(() { _loading = false; _error = _friendlyError(e.toString()); });
     }
   }
 
@@ -164,6 +175,7 @@ class _SignInScreenState extends State<SignInScreen> {
                             loading:   _loading,
                             sent:      _magicSent,
                             error:     _error,
+                            rawError:  _rawError,
                             onSend:    _sendMagicLink,
                             onSwitch:  () => _switchMode(_SignInMode.password),
                           ),
@@ -218,20 +230,23 @@ class _Logo extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Container(
-          width: 56,
-          height: 56,
-          decoration: const BoxDecoration(
-            color: kColorPrimary,
-            borderRadius: kRadiusMd,
-          ),
-          child: Center(
-            child: Text(
-              'W',
-              style: kStyleTitle.copyWith(
-                color: kColorTextOnPrimary,
-                fontSize: 26,
-                fontWeight: FontWeight.w700,
+        GestureDetector(
+          onLongPress: () => _showLogViewer(context),
+          child: Container(
+            width: 56,
+            height: 56,
+            decoration: const BoxDecoration(
+              color: kColorPrimary,
+              borderRadius: kRadiusMd,
+            ),
+            child: Center(
+              child: Text(
+                'W',
+                style: kStyleTitle.copyWith(
+                  color: kColorTextOnPrimary,
+                  fontSize: 26,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ),
@@ -241,6 +256,134 @@ class _Logo extends StatelessWidget {
         const SizedBox(height: 4),
         Text('Plan your trip together.', style: kStyleCaption),
       ],
+    );
+  }
+
+  void _showLogViewer(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _LogViewerSheet(),
+    );
+  }
+}
+
+class _LogViewerSheet extends StatefulWidget {
+  const _LogViewerSheet();
+
+  @override
+  State<_LogViewerSheet> createState() => _LogViewerSheetState();
+}
+
+class _LogViewerSheetState extends State<_LogViewerSheet> {
+  bool _copied = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = AppLogger.instance.entries;
+    final dump = AppLogger.instance.dump;
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.75,
+      maxChildSize: 0.95,
+      minChildSize: 0.4,
+      builder: (_, ctrl) => DecoratedBox(
+        decoration: const BoxDecoration(
+          color: Color(0xFF1A1A1A),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 36, height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Row(
+                children: [
+                  const Text('Debug Logs', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 15)),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () { AppLogger.instance.clear(); setState(() {}); },
+                    child: const Text('Clear', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: () async {
+                      await Clipboard.setData(ClipboardData(text: dump));
+                      setState(() => _copied = true);
+                      await Future<void>.delayed(const Duration(seconds: 2));
+                      if (mounted) setState(() => _copied = false);
+                    },
+                    child: Text(
+                      _copied ? 'Copied ✓' : 'Copy all',
+                      style: TextStyle(
+                        color: _copied ? Colors.greenAccent : Colors.blueAccent,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(color: Colors.white12, height: 1),
+            Expanded(
+              child: entries.isEmpty
+                  ? const Center(child: Text('No logs yet.', style: TextStyle(color: Colors.white38)))
+                  : ListView.builder(
+                      controller: ctrl,
+                      padding: const EdgeInsets.all(12),
+                      itemCount: entries.length,
+                      reverse: true,
+                      itemBuilder: (_, i) {
+                        final e = entries[entries.length - 1 - i];
+                        final timeStr =
+                            '${e.time.hour.toString().padLeft(2, '0')}:'
+                            '${e.time.minute.toString().padLeft(2, '0')}:'
+                            '${e.time.second.toString().padLeft(2, '0')}';
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(timeStr, style: const TextStyle(color: Colors.white38, fontSize: 11, fontFamily: 'monospace')),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: e.tag == 'AUTH' ? Colors.blueAccent.withValues(alpha: 0.25) : Colors.white12,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(e.tag, style: const TextStyle(color: Colors.white70, fontSize: 10, fontFamily: 'monospace')),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  e.message,
+                                  style: TextStyle(
+                                    color: e.message.contains('✗') ? Colors.redAccent : Colors.white,
+                                    fontSize: 12,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -256,12 +399,14 @@ class _MagicLinkForm extends StatelessWidget {
     required this.error,
     required this.onSend,
     required this.onSwitch,
+    this.rawError,
   });
 
   final TextEditingController emailCtrl;
   final bool loading;
   final bool sent;
   final String? error;
+  final String? rawError;
   final VoidCallback onSend;
   final VoidCallback onSwitch;
 
@@ -296,6 +441,18 @@ class _MagicLinkForm extends StatelessWidget {
           autofocus: true,
           error: error,
         ),
+        if (rawError != null) ...[
+          const SizedBox(height: 4),
+          GestureDetector(
+            onTap: () {
+              Clipboard.setData(ClipboardData(text: rawError!));
+            },
+            child: Text(
+              'Tap to copy error details',
+              style: TextStyle(fontSize: 11, color: Colors.grey[500], decoration: TextDecoration.underline),
+            ),
+          ),
+        ],
         const SizedBox(height: kSpace4),
         WabwayButton(
           label: 'Send magic link',

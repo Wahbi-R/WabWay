@@ -334,6 +334,10 @@ class _DocsScreenState extends State<DocsScreen> {
         tripName: trip.name,
         availableSpots: _availableSpots,
         onDelete: () => _deleteDoc(doc),
+        onRenamed: (title) => setState(() {
+          final idx = _docs.indexWhere((d) => d.id == doc.id);
+          if (idx != -1) _docs[idx] = _docs[idx].copyWith(title: title);
+        }),
       ),
     );
   }
@@ -394,22 +398,27 @@ class _DocsScreenState extends State<DocsScreen> {
                       crossAxisCount: 2,
                       crossAxisSpacing: kSpace3,
                       mainAxisSpacing: kSpace3,
-                      childAspectRatio: 0.78,
+                      childAspectRatio: 0.68,
                     ),
                     itemCount: items.length,
                     itemBuilder: (ctx, i) => DocGridCard(
                       doc: items[i],
                       onTap: () {
                         final trip = TripState.tripOf(context);
+                        final doc = items[i];
                         Navigator.push(
                           ctx,
                           MaterialPageRoute(
                             builder: (_) => DocDetailScreen(
-                              doc: items[i],
+                              doc: doc,
                               tripId: trip.id,
                               tripName: trip.name,
                               availableSpots: _availableSpots,
-                              onDelete: () => _deleteDoc(items[i]),
+                              onDelete: () => _deleteDoc(doc),
+                              onRenamed: (title) => setState(() {
+                                final idx = _docs.indexWhere((d) => d.id == doc.id);
+                                if (idx != -1) _docs[idx] = _docs[idx].copyWith(title: title);
+                              }),
                             ),
                           ),
                         );

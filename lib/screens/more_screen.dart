@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import '../core/auth/profile_state.dart';
 import '../core/supabase/auth_service.dart';
+import '../core/supabase/trip_service.dart';
 import '../core/trip/trip_state.dart';
 import 'account_sheets.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_theme.dart';
 import '../theme/app_decorations.dart';
+import '../widgets/wabway_button.dart';
+import '../widgets/wabway_text_field.dart';
+import 'docs_screen.dart';
 import 'members/add_member_sheet.dart';
 import 'members/invite_sheet.dart';
 import 'share/incoming_share_screen.dart';
@@ -159,6 +163,42 @@ class MoreScreen extends StatelessWidget {
 
           const SizedBox(height: kSpace4),
 
+          // Documents shortcut — visible on mobile only (docs tab removed from bottom nav)
+          const _SectionHeader(title: 'Documents'),
+          const SizedBox(height: kSpace3),
+          DecoratedBox(
+            decoration: kCardDecoration(),
+            child: Material(
+              color: Colors.transparent,
+              child: _SettingsRow(
+                icon: Icons.folder_rounded,
+                label: 'View documents',
+                onTap: () {
+                  // Capture providers before pushing — InheritedWidgets are not
+                  // available to new routes pushed on the root Navigator.
+                  final trip = TripState.tripOf(context);
+                  final members = TripState.membersOf(context);
+                  final profile = ProfileState.of(context);
+                  Navigator.push<void>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ProfileState(
+                        profile: profile,
+                        child: TripState(
+                          trip: trip,
+                          members: members,
+                          child: const DocsScreen(),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+
+          const SizedBox(height: kSpace4),
+
           // Settings
           const _SectionHeader(title: 'Trip settings'),
           const SizedBox(height: kSpace3),
@@ -171,21 +211,25 @@ class MoreScreen extends StatelessWidget {
                   _SettingsRow(
                     icon: Icons.edit_rounded,
                     label: 'Edit trip name',
-                    onTap: () {},
+                    onTap: () => _showEditTripNameSheet(context, trip),
                   ),
                   const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
                   _SettingsRow(
                     icon: Icons.notifications_rounded,
                     label: 'Notifications',
+                    // TODO: Notifications — needs a backend event system (Supabase
+                    // realtime or push via FCM). Show per-category toggles here.
                     onTap: () {},
                   ),
-                  const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
-                  _SettingsRow(
-                    icon: Icons.logout_rounded,
-                    label: 'Leave trip',
-                    color: kColorDanger,
-                    onTap: () {},
-                  ),
+                  if (!isOwner) ...[
+                    const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
+                    _SettingsRow(
+                      icon: Icons.logout_rounded,
+                      label: 'Leave trip',
+                      color: kColorDanger,
+                      onTap: () => _confirmLeaveTrip(context, trip),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -273,6 +317,155 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Text(title, style: kStyleOverline);
+}
+
+// ─── Trip actions ─────────────────────────────────────────────────────────────
+
+void _showEditTripNameSheet(BuildContext context, trip) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => _EditTripNameSheet(
+      initialName: trip.name,
+      tripId: trip.id,
+      onSaved: (_) => TripState.refresh(context),
+    ),
+  );
+}
+
+Future<void> _confirmLeaveTrip(BuildContext context, trip) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: kColorPaper,
+      shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
+      title: Text('Leave trip?', style: kStyleBodySemibold),
+      content: Text(
+        'You will lose access to "${trip.name}" and all its data.',
+        style: kStyleBody,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: Text('Cancel', style: kStyleBody.copyWith(color: kColorInkSoft)),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          child: Text('Leave', style: kStyleBodyMedium.copyWith(color: kColorDanger)),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true || !context.mounted) return;
+  try {
+    await TripService.leaveTrip(trip.id);
+    if (context.mounted) TripState.refresh(context);
+  } catch (_) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Could not leave trip.', style: kStyleBody.copyWith(color: Colors.white)),
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
+  }
+}
+
+class _EditTripNameSheet extends StatefulWidget {
+  const _EditTripNameSheet({
+    required this.initialName,
+    required this.tripId,
+    required this.onSaved,
+  });
+  final String initialName;
+  final String tripId;
+  final ValueChanged<String> onSaved;
+
+  @override
+  State<_EditTripNameSheet> createState() => _EditTripNameSheetState();
+}
+
+class _EditTripNameSheetState extends State<_EditTripNameSheet> {
+  late final TextEditingController _ctrl;
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: widget.initialName);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final name = _ctrl.text.trim();
+    if (name.isEmpty) {
+      setState(() => _error = 'Trip name cannot be empty.');
+      return;
+    }
+    setState(() { _loading = true; _error = null; });
+    try {
+      await TripService.updateTripName(widget.tripId, name);
+      if (mounted) {
+        widget.onSaved(name);
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (mounted) setState(() { _loading = false; _error = e.toString(); });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          color: kColorPaper,
+          borderRadius: kRadiusSheet,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(kSpace6, kSpace5, kSpace6, kSpace8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36, height: 4,
+                  decoration: const BoxDecoration(color: kColorBorder, borderRadius: kRadiusPill),
+                ),
+              ),
+              const SizedBox(height: kSpace4),
+              Text('Edit trip name', style: kStyleTitle),
+              const SizedBox(height: kSpace5),
+              WabwayTextField(
+                label: 'Trip name',
+                controller: _ctrl,
+                autofocus: true,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _save(),
+                error: _error,
+              ),
+              const SizedBox(height: kSpace4),
+              WabwayButton(
+                label: 'Save',
+                onPressed: _loading ? null : _save,
+                loading: _loading,
+                fullWidth: true,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _SettingsRow extends StatelessWidget {

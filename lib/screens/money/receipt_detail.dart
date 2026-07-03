@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../core/supabase/client.dart';
+import '../../core/supabase/doc_service.dart';
+import '../../data/docs_data.dart';
 import '../../data/money_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
+import 'add_receipt_sheet.dart';
 
 // ─── Confirmation helper ──────────────────────────────────────────────────────
 
@@ -33,19 +38,50 @@ Future<bool> _confirmDelete(BuildContext context, String title) async {
 
 // ─── Mobile full-screen route ─────────────────────────────────────────────────
 
-class ReceiptDetailScreen extends StatelessWidget {
+class ReceiptDetailScreen extends StatefulWidget {
   const ReceiptDetailScreen({
     super.key,
     required this.receipt,
     required this.myId,
     required this.members,
+    required this.tripId,
     this.onDelete,
+    this.onUpdated,
   });
 
   final Receipt receipt;
   final String myId;
   final List<TripMember> members;
+  final String tripId;
   final VoidCallback? onDelete;
+  final ValueChanged<Receipt>? onUpdated;
+
+  @override
+  State<ReceiptDetailScreen> createState() => _ReceiptDetailScreenState();
+}
+
+class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
+  late Receipt _receipt;
+
+  @override
+  void initState() {
+    super.initState();
+    _receipt = widget.receipt;
+  }
+
+  Future<void> _editReceipt() async {
+    final updated = await showAddReceiptSheet(
+      context,
+      tripId:          widget.tripId,
+      userId:          widget.myId,
+      members:         widget.members,
+      existingReceipt: _receipt,
+    );
+    if (updated != null && mounted) {
+      setState(() => _receipt = updated);
+      widget.onUpdated?.call(updated);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -57,17 +93,23 @@ class ReceiptDetailScreen extends StatelessWidget {
           color: kColorInkSoft,
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(receipt.title, style: kStyleTitle),
+        title: Text(_receipt.title, style: kStyleTitle),
         actions: [
-          if (onDelete != null)
+          IconButton(
+            icon: const Icon(Icons.edit_rounded),
+            color: kColorInkSoft,
+            tooltip: 'Edit',
+            onPressed: _editReceipt,
+          ),
+          if (widget.onDelete != null)
             IconButton(
               icon: const Icon(Icons.delete_outline_rounded),
               color: kColorDanger,
               onPressed: () async {
-                final ok = await _confirmDelete(context, receipt.title);
+                final ok = await _confirmDelete(context, _receipt.title);
                 if (ok && context.mounted) {
                   Navigator.pop(context);
-                  onDelete!();
+                  widget.onDelete!();
                 }
               },
             ),
@@ -75,9 +117,18 @@ class ReceiptDetailScreen extends StatelessWidget {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.only(bottom: kSpace12),
+        padding: EdgeInsets.only(bottom: kSpace12 + MediaQuery.paddingOf(context).bottom),
         child: ReceiptDetailContent(
-            receipt: receipt, myId: myId, members: members),
+          receipt:   _receipt,
+          myId:      widget.myId,
+          members:   widget.members,
+          tripId:    widget.tripId,
+          onDelete:  widget.onDelete,
+          onUpdated: (r) {
+            setState(() => _receipt = r);
+            widget.onUpdated?.call(r);
+          },
+        ),
       ),
     );
   }
@@ -91,13 +142,17 @@ class ReceiptDetailContent extends StatelessWidget {
     required this.receipt,
     required this.myId,
     required this.members,
+    required this.tripId,
     this.onDelete,
+    this.onUpdated,
   });
 
   final Receipt receipt;
   final String myId;
   final List<TripMember> members;
+  final String tripId;
   final VoidCallback? onDelete;
+  final ValueChanged<Receipt>? onUpdated;
 
   @override
   Widget build(BuildContext context) {
@@ -201,11 +256,33 @@ class ReceiptDetailContent extends StatelessWidget {
               const Divider(height: 1),
               const SizedBox(height: kSpace5),
 
-              // Attach receipt placeholder
-              const WabwayAttachPlaceholder(label: 'Attach receipt photo'),
+              _LinkedDocsSection(key: ValueKey(receipt.hashCode), receiptId: receipt.id),
+
+
+              if (onUpdated != null) ...[
+                WabwayButton(
+                  label: 'Edit receipt',
+                  icon: Icons.edit_rounded,
+                  variant: WabwayButtonVariant.ghost,
+                  fullWidth: true,
+                  onPressed: () async {
+                    final myId = supabase.auth.currentUser?.id ?? this.myId;
+                    final updated = await showAddReceiptSheet(
+                      context,
+                      tripId:          tripId,
+                      userId:          myId,
+                      members:         members,
+                      existingReceipt: receipt,
+                    );
+                    if (updated != null && context.mounted) {
+                      onUpdated!(updated);
+                    }
+                  },
+                ),
+                const SizedBox(height: kSpace3),
+              ],
 
               if (onDelete != null) ...[
-                const SizedBox(height: kSpace5),
                 WabwayButton(
                   label: 'Delete receipt',
                   icon: Icons.delete_outline_rounded,
@@ -224,6 +301,98 @@ class ReceiptDetailContent extends StatelessWidget {
     );
   }
 }
+
+// ─── Linked documents section ────────────────────────────────────────────────
+
+class _LinkedDocsSection extends StatefulWidget {
+  const _LinkedDocsSection({required this.receiptId});
+  final String receiptId;
+
+  @override
+  State<_LinkedDocsSection> createState() => _LinkedDocsSectionState();
+}
+
+class _LinkedDocsSectionState extends State<_LinkedDocsSection> {
+  List<TripDocument>? _docs;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final docs = await DocService.loadLinkedDocuments(
+        linkedType: DocLinkedType.receipt,
+        linkedId:   widget.receiptId,
+      );
+      if (mounted) setState(() => _docs = docs);
+    } catch (_) {
+      if (mounted) setState(() => _docs = []);
+    }
+  }
+
+  Future<void> _open(TripDocument doc) async {
+    if (doc.storagePath == null) return;
+    final url = await DocService.getSignedUrl(doc.storagePath!);
+    if (url == null) return;
+    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_docs == null || _docs!.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Documents', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
+        const SizedBox(height: kSpace3),
+        ..._docs!.map((doc) => Padding(
+          padding: const EdgeInsets.only(bottom: kSpace2),
+          child: _DocRow(doc: doc, onTap: () => _open(doc)),
+        )),
+        const SizedBox(height: kSpace3),
+      ],
+    );
+  }
+}
+
+class _DocRow extends StatelessWidget {
+  const _DocRow({required this.doc, required this.onTap});
+  final TripDocument doc;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: doc.storagePath != null ? onTap : null,
+      borderRadius: kRadiusMd,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: kSpace3),
+        decoration: BoxDecoration(
+          color: kColorSurfaceSunken,
+          borderRadius: kRadiusMd,
+          border: Border.all(color: kColorBorder),
+        ),
+        child: Row(
+          children: [
+            Icon(doc.type.icon, size: 18, color: kColorInkSoft),
+            const SizedBox(width: kSpace3),
+            Expanded(
+              child: Text(doc.title, style: kStyleBodyMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
+            if (doc.storagePath != null)
+              const Icon(Icons.open_in_new_rounded, size: 16, color: kColorInkSoft),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Info row ─────────────────────────────────────────────────────────────────
 
 class _InfoRow extends StatelessWidget {
   const _InfoRow({

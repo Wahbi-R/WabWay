@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../core/supabase/doc_service.dart';
 import '../../data/plan_data.dart';
 import '../../data/docs_data.dart';
 import '../../data/spot_data.dart';
@@ -7,6 +9,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
+import 'add_item_sheet.dart';
 
 // ─── Mobile screen ────────────────────────────────────────────────────────────
 
@@ -18,6 +21,7 @@ class ItemDetailScreen extends StatelessWidget {
     this.spots = const [],
     this.docs = const [],
     this.onDelete,
+    this.onUpdated,
   });
 
   final ItineraryItem item;
@@ -25,6 +29,7 @@ class ItemDetailScreen extends StatelessWidget {
   final List<Spot> spots;
   final List<TripDocument> docs;
   final VoidCallback? onDelete;
+  final ValueChanged<ItineraryItem>? onUpdated;
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +41,7 @@ class ItemDetailScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.more_vert_rounded),
             color: kColorInkSoft,
-            onPressed: () => _showActionsSheet(context, item, onDelete),
+            onPressed: () => _showActionsSheet(context, item, spots, docs, onDelete, onUpdated),
           ),
           const SizedBox(width: kSpace2),
         ],
@@ -48,6 +53,7 @@ class ItemDetailScreen extends StatelessWidget {
           spots: spots,
           docs: docs,
           onDelete: onDelete,
+          onUpdated: onUpdated,
         ),
       ),
     );
@@ -64,6 +70,7 @@ class ItemDetailContent extends StatelessWidget {
     this.spots = const [],
     this.docs = const [],
     this.onDelete,
+    this.onUpdated,
   });
 
   final ItineraryItem item;
@@ -71,6 +78,7 @@ class ItemDetailContent extends StatelessWidget {
   final List<Spot> spots;
   final List<TripDocument> docs;
   final VoidCallback? onDelete;
+  final ValueChanged<ItineraryItem>? onUpdated;
 
   @override
   Widget build(BuildContext context) {
@@ -109,7 +117,7 @@ class ItemDetailContent extends StatelessWidget {
               ],
 
               const SizedBox(height: kSpace4),
-              _ActionsSection(item: item, onDelete: onDelete),
+              _ActionsSection(item: item, spots: spots, docs: docs, onDelete: onDelete, onUpdated: onUpdated),
               const SizedBox(height: kSpace8),
             ],
           ),
@@ -355,14 +363,7 @@ class _DocChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Open "${doc.title}"',
-              style: kStyleBody.copyWith(color: Colors.white)),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-        ));
-      },
+      onTap: () => _openDoc(context, doc),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: kSpace2),
         decoration: BoxDecoration(
@@ -397,9 +398,18 @@ class _DocChip extends StatelessWidget {
 // ─── Actions section ──────────────────────────────────────────────────────────
 
 class _ActionsSection extends StatelessWidget {
-  const _ActionsSection({required this.item, this.onDelete});
+  const _ActionsSection({
+    required this.item,
+    this.spots = const [],
+    this.docs = const [],
+    this.onDelete,
+    this.onUpdated,
+  });
   final ItineraryItem item;
+  final List<Spot> spots;
+  final List<TripDocument> docs;
   final VoidCallback? onDelete;
+  final ValueChanged<ItineraryItem>? onUpdated;
 
   @override
   Widget build(BuildContext context) {
@@ -417,7 +427,7 @@ class _ActionsSection extends StatelessWidget {
                 label: 'Open Maps',
                 icon: Icons.map_rounded,
                 size: WabwayButtonSize.sm,
-                onPressed: () => _snack(context, 'Opening in Maps…'),
+                onPressed: () => _openMaps(context, item.mapsUrl!),
               ),
             WabwayButton(
               label: 'Attach Document',
@@ -431,7 +441,7 @@ class _ActionsSection extends StatelessWidget {
               icon: Icons.edit_rounded,
               variant: WabwayButtonVariant.ghost,
               size: WabwayButtonSize.sm,
-              onPressed: () => _snack(context, 'Edit "${item.title}"'),
+              onPressed: () => _editItem(context),
             ),
             WabwayButton(
               label: 'Delete',
@@ -444,6 +454,20 @@ class _ActionsSection extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  Future<void> _editItem(BuildContext context) async {
+    final updated = await showAddItemSheet(
+      context,
+      dayId: item.dayId,
+      spots: spots,
+      docs: docs,
+      initialItem: item,
+    );
+    if (updated != null && context.mounted) {
+      onUpdated?.call(updated);
+      Navigator.maybePop(context);
+    }
   }
 
   void _snack(BuildContext context, String msg) {
@@ -485,12 +509,58 @@ class _ActionsSection extends StatelessWidget {
   }
 }
 
+// ─── Shared helpers ───────────────────────────────────────────────────────────
+
+Future<void> _openMaps(BuildContext context, String url) async {
+  final uri = Uri.parse(url);
+  if (await canLaunchUrl(uri)) {
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  } else if (context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('Could not open Maps.', style: kStyleBody.copyWith(color: Colors.white)),
+      behavior: SnackBarBehavior.floating,
+    ));
+  }
+}
+
+Future<void> _openDoc(BuildContext context, TripDocument doc) async {
+  final String? url;
+  if (doc.ext == 'url') {
+    url = doc.notes;
+  } else if (doc.storagePath != null) {
+    url = await DocService.getSignedUrl(doc.storagePath!);
+  } else {
+    url = null;
+  }
+  if (url == null || url.isEmpty) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Could not open document.', style: kStyleBody.copyWith(color: Colors.white)),
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
+    return;
+  }
+  final uri = Uri.parse(url);
+  if (await canLaunchUrl(uri)) {
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  } else if (context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('Could not open document.', style: kStyleBody.copyWith(color: Colors.white)),
+      behavior: SnackBarBehavior.floating,
+    ));
+  }
+}
+
 // ─── Mobile actions sheet ─────────────────────────────────────────────────────
 
 void _showActionsSheet(
   BuildContext context,
   ItineraryItem item,
+  List<Spot> spots,
+  List<TripDocument> docs,
   VoidCallback? onDelete,
+  ValueChanged<ItineraryItem>? onUpdated,
 ) {
   showModalBottomSheet<void>(
     context: context,
@@ -507,11 +577,7 @@ void _showActionsSheet(
               label: 'Open in Maps',
               onTap: () {
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text('Opening in Maps…',
-                      style: kStyleBody.copyWith(color: Colors.white)),
-                  behavior: SnackBarBehavior.floating,
-                ));
+                _openMaps(context, item.mapsUrl!);
               },
             ),
           WabwayActionTile(
@@ -522,7 +588,20 @@ void _showActionsSheet(
           WabwayActionTile(
             icon: Icons.edit_rounded,
             label: 'Edit item',
-            onTap: () => Navigator.pop(ctx),
+            onTap: () async {
+              Navigator.pop(ctx);
+              final updated = await showAddItemSheet(
+                context,
+                dayId: item.dayId,
+                spots: spots,
+                docs: docs,
+                initialItem: item,
+              );
+              if (updated != null && context.mounted) {
+                onUpdated?.call(updated);
+                Navigator.maybePop(context);
+              }
+            },
           ),
           WabwayActionTile(
             icon: Icons.delete_outline_rounded,

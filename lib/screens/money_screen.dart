@@ -372,11 +372,16 @@ class _MoneyScreenState extends State<MoneyScreen> {
       }
       return SingleChildScrollView(
         child: ReceiptDetailContent(
-          key:      ValueKey(receipt.id),
-          receipt:  receipt,
-          myId:     _userId,
-          members:  _members,
-          onDelete: () => _deleteReceipt(receipt.id),
+          key:       ValueKey(receipt.id),
+          receipt:   receipt,
+          myId:      _userId,
+          members:   _members,
+          tripId:    _activeTripId!,
+          onDelete:  () => _deleteReceipt(receipt.id),
+          onUpdated: (r) => setState(() {
+            final idx = _receipts.indexWhere((x) => x.id == r.id);
+            if (idx >= 0) _receipts[idx] = r;
+          }),
         ),
       );
     }
@@ -457,10 +462,19 @@ class _MoneyScreenState extends State<MoneyScreen> {
                           ctx,
                           MaterialPageRoute(
                             builder: (_) => ReceiptDetailScreen(
-                              receipt:  r,
-                              myId:     _userId,
-                              members:  _members,
-                              onDelete: () => _deleteReceipt(r.id),
+                              receipt:   r,
+                              myId:      _userId,
+                              members:   _members,
+                              tripId:    _activeTripId!,
+                              onDelete:  () => _deleteReceipt(r.id),
+                              onUpdated: (updated) {
+                                if (mounted) {
+                                  setState(() {
+                                    final idx = _receipts.indexWhere((x) => x.id == updated.id);
+                                    if (idx >= 0) _receipts[idx] = updated;
+                                  });
+                                }
+                              },
                             ),
                           ),
                         ),

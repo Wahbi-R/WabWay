@@ -177,6 +177,20 @@ abstract final class PlanService {
     return _itemFromRow(row, linkedDocIds);
   }
 
+  static Future<void> updateItem(ItineraryItem item) async {
+    await supabase.from('itinerary_items').update({
+      'title':            item.title,
+      'type':             _typeToDb(item.type),
+      'time':             item.time,
+      'city':             item.city,
+      'location':         item.location,
+      'maps_url':         item.mapsUrl,
+      'confirmation_url': item.confirmationUrl,
+      'notes':            item.notes,
+      'linked_spot_id':   item.linkedSpotId,
+    }).eq('id', item.id);
+  }
+
   static Future<void> deleteItem(String itemId) async {
     await supabase.from('itinerary_items').delete().eq('id', itemId);
   }

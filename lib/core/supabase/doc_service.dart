@@ -133,6 +133,24 @@ abstract final class DocService {
     });
   }
 
+  static Future<List<TripDocument>> loadLinkedDocuments({
+    required DocLinkedType linkedType,
+    required String linkedId,
+  }) async {
+    final links = await supabase
+        .from('document_links')
+        .select('document_id')
+        .eq('linked_type', _linkedTypeToDb(linkedType))
+        .eq('linked_id', linkedId);
+    if (links.isEmpty) return [];
+    final ids = links.map((l) => l['document_id'] as String).toList();
+    final docs = await supabase
+        .from('documents')
+        .select('*, document_links(*)')
+        .inFilter('id', ids);
+    return docs.map<TripDocument>((r) => _docFromRow(r)).toList();
+  }
+
   static Future<void> deleteLink({
     required String documentId,
     required DocLinkedType linkedType,
@@ -146,8 +164,22 @@ abstract final class DocService {
         .eq('linked_id', linkedId);
   }
 
+  static Future<void> renameDocument(String docId, String newTitle) async {
+    final rows = await supabase
+        .from('documents')
+        .update({'title': newTitle.trim()})
+        .eq('id', docId)
+        .select();
+    if (rows.isEmpty) throw Exception('Could not rename document');
+  }
+
   static Future<void> deleteDocument(String docId) async {
-    await supabase.from('documents').delete().eq('id', docId);
+    final rows = await supabase
+        .from('documents')
+        .delete()
+        .eq('id', docId)
+        .select();
+    if (rows.isEmpty) throw Exception('Could not delete document');
   }
 
   // ── File upload + document creation (safe ordered flow) ─────────────────────

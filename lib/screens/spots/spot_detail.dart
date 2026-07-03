@@ -3,8 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/auth/profile_state.dart';
 import '../../core/supabase/client.dart';
+import '../../core/supabase/doc_service.dart';
 import '../../core/supabase/spot_service.dart';
 import '../../core/trip/trip_state.dart';
+import '../../data/docs_data.dart';
 import '../../data/spot_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
@@ -33,6 +35,7 @@ class SpotDetailScreen extends StatelessWidget {
     this.onVote,
     this.canDelete = false,
     this.onDelete,
+    this.docs = const [],
   });
 
   final Spot spot;
@@ -40,6 +43,7 @@ class SpotDetailScreen extends StatelessWidget {
   final ValueChanged<VoteType?>? onVote;
   final bool canDelete;
   final VoidCallback? onDelete;
+  final List<TripDocument> docs;
 
   @override
   Widget build(BuildContext context) {
@@ -68,11 +72,12 @@ class SpotDetailScreen extends StatelessWidget {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.only(bottom: kSpace12),
+        padding: EdgeInsets.only(bottom: kSpace12 + MediaQuery.paddingOf(context).bottom),
         child: SpotDetailContent(
           spot: spot,
           myVote: myVote,
           onVote: onVote,
+          docs: docs,
         ),
       ),
     );
@@ -90,6 +95,7 @@ class SpotDetailContent extends StatefulWidget {
     this.showHeader = false,
     this.canDelete = false,
     this.onDelete,
+    this.docs = const [],
   });
 
   final Spot spot;
@@ -98,6 +104,7 @@ class SpotDetailContent extends StatefulWidget {
   final bool showHeader;
   final bool canDelete;
   final VoidCallback? onDelete;
+  final List<TripDocument> docs;
 
   @override
   State<SpotDetailContent> createState() => _SpotDetailContentState();
@@ -259,6 +266,27 @@ class _SpotDetailContentState extends State<SpotDetailContent> {
                 const SizedBox(height: kSpace4),
               ],
 
+              // ── Linked documents
+              Builder(builder: (context) {
+                final linked = widget.docs.where((d) => d.links.any(
+                    (l) => l.type == DocLinkedType.spot && l.linkedId == widget.spot.id)).toList();
+                if (linked.isEmpty) return const SizedBox.shrink();
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Documents', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
+                    const SizedBox(height: kSpace2),
+                    ...linked.map((doc) => Padding(
+                      padding: const EdgeInsets.only(bottom: kSpace2),
+                      child: _LinkedDocTile(doc: doc),
+                    )),
+                    const SizedBox(height: kSpace4),
+                    const Divider(height: 1),
+                    const SizedBox(height: kSpace4),
+                  ],
+                );
+              }),
+
               // ── Notes
               if (widget.spot.notes != null) ...[
                 Text('Notes',
@@ -382,6 +410,78 @@ Future<void> _openLink(BuildContext context, String url) async {
         ),
       );
     }
+  }
+}
+
+// ─── Linked doc tile ──────────────────────────────────────────────────────────
+
+class _LinkedDocTile extends StatefulWidget {
+  const _LinkedDocTile({required this.doc});
+  final TripDocument doc;
+
+  @override
+  State<_LinkedDocTile> createState() => _LinkedDocTileState();
+}
+
+class _LinkedDocTileState extends State<_LinkedDocTile> {
+  bool _loading = false;
+
+  Future<void> _open() async {
+    if (_loading) return;
+    setState(() => _loading = true);
+    try {
+      String? url;
+      if (widget.doc.ext == 'url') {
+        url = widget.doc.notes;
+      } else if (widget.doc.storagePath != null) {
+        url = await DocService.getSignedUrl(widget.doc.storagePath!);
+      }
+      if (!mounted) return;
+      if (url != null) {
+        final uri = Uri.tryParse(url);
+        if (uri != null && await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        }
+      }
+    } catch (_) {}
+    if (mounted) setState(() => _loading = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return WabwayCard(
+      hoverable: true,
+      onTap: _open,
+      padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: kSpace3),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: widget.doc.type.softColor,
+              borderRadius: kRadiusMd,
+            ),
+            child: Icon(widget.doc.type.icon, size: 16, color: widget.doc.type.color),
+          ),
+          const SizedBox(width: kSpace3),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(widget.doc.title, style: kStyleBodyMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(widget.doc.type.label, style: kStyleCaption.copyWith(fontSize: 12)),
+              ],
+            ),
+          ),
+          const SizedBox(width: kSpace2),
+          if (_loading)
+            const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(kColorPrimary)))
+          else
+            const Icon(Icons.open_in_new_rounded, size: 16, color: kColorInkSoft),
+        ],
+      ),
+    );
   }
 }
 

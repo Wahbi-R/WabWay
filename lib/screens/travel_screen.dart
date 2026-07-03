@@ -158,6 +158,15 @@ class _TravelScreenState extends State<TravelScreen> {
     TravelService.deleteItem(id).catchError((_) => _silentReload());
   }
 
+  void _updateItem(TravelItem updated) {
+    setState(() {
+      final idx = _items.indexWhere((i) => i.id == updated.id);
+      if (idx != -1) _items[idx] = updated;
+      _selectedId = updated.id;
+    });
+    TravelService.updateItem(updated).catchError((_) => _silentReload());
+  }
+
   Future<void> _addItem(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
     final formItem = await showAddTravelSheet(context, docs: _docs);
@@ -276,6 +285,7 @@ class _TravelScreenState extends State<TravelScreen> {
           docs: _docs,
           days: _days,
           onDelete: () => _delete(item.id),
+          onUpdated: _updateItem,
         ),
       );
     }
@@ -380,6 +390,7 @@ class _TravelScreenState extends State<TravelScreen> {
                         docs: docsSnapshot,
                         days: daysSnapshot,
                         onDelete: () => _delete(item.id),
+                        onUpdated: _updateItem,
                       ),
                     ),
                   ),

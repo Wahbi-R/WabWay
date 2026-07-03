@@ -12,6 +12,7 @@ void showEditNameSheet(BuildContext context) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
+    useSafeArea: true,
     backgroundColor: Colors.transparent,
     builder: (_) => _EditNameSheet(
       initialName: profile?.displayName ?? '',
@@ -24,6 +25,7 @@ void showSetPasswordSheet(BuildContext context) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
+    useSafeArea: true,
     backgroundColor: Colors.transparent,
     builder: (_) => const _SetPasswordSheet(),
   );

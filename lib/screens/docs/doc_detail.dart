@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/auth/profile_state.dart';
 import '../../core/supabase/client.dart';
 import '../../core/supabase/doc_service.dart';
+import '../../core/supabase/trip_service.dart';
 import '../../core/trip/trip_state.dart';
 import '../../data/docs_data.dart';
 import '../../data/money_data.dart';
@@ -55,6 +56,7 @@ class DocDetailScreen extends StatelessWidget {
     required this.tripName,
     this.availableSpots = const [],
     this.onDelete,
+    this.onRenamed,
   });
 
   final TripDocument doc;
@@ -62,6 +64,7 @@ class DocDetailScreen extends StatelessWidget {
   final String tripName;
   final List<Spot> availableSpots;
   final VoidCallback? onDelete;
+  final ValueChanged<String>? onRenamed;
 
   @override
   Widget build(BuildContext context) {
@@ -76,7 +79,9 @@ class DocDetailScreen extends StatelessWidget {
             onPressed: () => _showActionsSheet(
               context,
               doc: doc,
+              tripId: tripId,
               onDelete: onDelete,
+              onRenamed: onRenamed,
             ),
           ),
           const SizedBox(width: kSpace2),
@@ -89,6 +94,7 @@ class DocDetailScreen extends StatelessWidget {
           tripName: tripName,
           availableSpots: availableSpots,
           onDelete: onDelete,
+          onRenamed: onRenamed,
         ),
       ),
     );
@@ -105,6 +111,7 @@ class DocDetailContent extends StatefulWidget {
     required this.tripName,
     this.availableSpots = const [],
     this.onDelete,
+    this.onRenamed,
   });
 
   final TripDocument doc;
@@ -112,6 +119,7 @@ class DocDetailContent extends StatefulWidget {
   final String tripName;
   final List<Spot> availableSpots;
   final VoidCallback? onDelete;
+  final ValueChanged<String>? onRenamed;
 
   @override
   State<DocDetailContent> createState() => _DocDetailContentState();
@@ -238,6 +246,10 @@ class _DocDetailContentState extends State<DocDetailContent> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _FileMetaCard(doc: widget.doc),
+              if (widget.doc.isImage && widget.doc.storagePath != null) ...[
+                const SizedBox(height: kSpace4),
+                _ImagePreview(storagePath: widget.doc.storagePath!),
+              ],
               const SizedBox(height: kSpace4),
               _LinkedSection(
                 links: _links,
@@ -254,7 +266,17 @@ class _DocDetailContentState extends State<DocDetailContent> {
                 WabwayNotesSection(notes: widget.doc.notes!),
               ],
               const SizedBox(height: kSpace4),
-              _ActionsSection(doc: widget.doc, onDelete: widget.onDelete),
+              _ActionsSection(
+                doc: widget.doc,
+                tripId: widget.tripId,
+                onDelete: widget.onDelete,
+                onRenamed: widget.onRenamed,
+                onLinkAdded: (type, linkedId) {
+                  if (!_links.any((l) => l.type == type && l.linkedId == linkedId)) {
+                    setState(() => _links = [..._links, DocumentLink(type: type, linkedId: linkedId)]);
+                  }
+                },
+              ),
               const SizedBox(height: kSpace8),
             ],
           ),
@@ -627,12 +649,94 @@ class _LinkPickerSheet extends StatelessWidget {
   }
 }
 
+// ── Image preview ─────────────────────────────────────────────────────────────
+
+class _ImagePreview extends StatefulWidget {
+  const _ImagePreview({required this.storagePath});
+  final String storagePath;
+
+  @override
+  State<_ImagePreview> createState() => _ImagePreviewState();
+}
+
+class _ImagePreviewState extends State<_ImagePreview> {
+  String? _url;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final url = await DocService.getSignedUrl(widget.storagePath);
+      if (mounted) setState(() { _url = url; _loading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: kRadiusLg,
+      child: Container(
+        width: double.infinity,
+        constraints: const BoxConstraints(maxHeight: 320),
+        color: kColorSurfaceSunken,
+        child: _loading
+            ? const SizedBox(
+                height: 160,
+                child: Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation(kColorPrimary),
+                    ),
+                  ),
+                ),
+              )
+            : _url != null
+                ? Image.network(
+                    _url!,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const SizedBox(
+                      height: 80,
+                      child: Center(
+                        child: Icon(Icons.broken_image_rounded, color: kColorInkSoft, size: 32),
+                      ),
+                    ),
+                  )
+                : const SizedBox(
+                    height: 80,
+                    child: Center(
+                      child: Icon(Icons.broken_image_rounded, color: kColorInkSoft, size: 32),
+                    ),
+                  ),
+      ),
+    );
+  }
+}
+
 // ── Actions section ───────────────────────────────────────────────────────────
 
 class _ActionsSection extends StatefulWidget {
-  const _ActionsSection({required this.doc, this.onDelete});
+  const _ActionsSection({
+    required this.doc,
+    required this.tripId,
+    this.onDelete,
+    this.onRenamed,
+    this.onLinkAdded,
+  });
   final TripDocument doc;
+  final String tripId;
   final VoidCallback? onDelete;
+  final ValueChanged<String>? onRenamed;
+  final void Function(DocLinkedType type, String linkedId)? onLinkAdded;
 
   @override
   State<_ActionsSection> createState() => _ActionsSectionState();
@@ -651,16 +755,56 @@ class _ActionsSectionState extends State<_ActionsSection> {
         _snack('Could not generate link for this file.');
         return;
       }
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        _snack('Could not open file.');
-      }
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     } catch (_) {
       if (mounted) _snack('Could not open file.');
     } finally {
       if (mounted) setState(() => _openLoading = false);
+    }
+  }
+
+  Future<void> _createReceipt() async {
+    final myId = supabase.auth.currentUser?.id ?? '';
+    List<TripMember> members;
+    try {
+      final appMembers = await TripService.loadTripMembers(widget.tripId);
+      members = appMembers.isEmpty
+          ? [TripMember(id: myId.isEmpty ? 'you' : myId, name: 'You')]
+          : appMembers
+              .map((m) => TripMember(
+                    id: m.userId,
+                    name: m.userId == myId ? 'You' : m.profile.displayName,
+                  ))
+              .toList();
+    } catch (_) {
+      members = [TripMember(id: myId.isEmpty ? 'you' : myId, name: 'You')];
+    }
+    if (!mounted) return;
+    final r = await showAddReceiptSheet(
+      context,
+      tripId: widget.tripId,
+      userId: myId,
+      members: members,
+    );
+    if (r != null && mounted) {
+      try {
+        await DocService.addLink(
+          documentId: widget.doc.id,
+          linkedType: DocLinkedType.receipt,
+          linkedId: r.id,
+          createdBy: myId,
+        );
+        widget.onLinkAdded?.call(DocLinkedType.receipt, r.id);
+      } catch (_) {}
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Receipt "${r.title}" created',
+              style: kStyleBody.copyWith(color: Colors.white)),
+          backgroundColor: kColorSuccess,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ));
+      }
     }
   }
 
@@ -672,9 +816,9 @@ class _ActionsSectionState extends State<_ActionsSection> {
     ));
   }
 
-  void _showRenameDialog() {
+  Future<void> _showRenameDialog() async {
     final ctrl = TextEditingController(text: widget.doc.title);
-    showDialog<void>(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: kColorPaper,
@@ -688,24 +832,31 @@ class _ActionsSectionState extends State<_ActionsSection> {
             hintStyle: kStyleBody.copyWith(color: kColorInkSoft),
           ),
           style: kStyleBody,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => Navigator.pop(ctx, true),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('Cancel',
-                style: kStyleBody.copyWith(color: kColorInkSoft)),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Cancel', style: kStyleBody.copyWith(color: kColorInkSoft)),
           ),
           TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _snack('Rename coming soon.');
-            },
-            child: Text('Rename',
-                style: kStyleBodyMedium.copyWith(color: kColorPrimary)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Rename', style: kStyleBodyMedium.copyWith(color: kColorPrimary)),
           ),
         ],
       ),
     );
+    if (confirmed != true) return;
+    final newTitle = ctrl.text.trim();
+    if (newTitle.isEmpty || newTitle == widget.doc.title) return;
+    try {
+      await DocService.renameDocument(widget.doc.id, newTitle);
+      widget.onRenamed?.call(newTitle);
+      if (mounted) _snack('Renamed to "$newTitle".');
+    } catch (_) {
+      if (mounted) _snack('Could not rename. Please try again.');
+    }
   }
 
   void _confirmDelete() {
@@ -778,20 +929,7 @@ class _ActionsSectionState extends State<_ActionsSection> {
               icon: Icons.receipt_long_rounded,
               variant: WabwayButtonVariant.secondary,
               size: WabwayButtonSize.sm,
-              onPressed: () async {
-                final r = await showAddReceiptSheet(context);
-                if (r != null && context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text(
-                      'Receipt "${r.title}" created',
-                      style: kStyleBody.copyWith(color: Colors.white),
-                    ),
-                    backgroundColor: kColorSuccess,
-                    behavior: SnackBarBehavior.floating,
-                    duration: const Duration(seconds: 2),
-                  ));
-                }
-              },
+              onPressed: _createReceipt,
             ),
             WabwayButton(
               label: 'Delete',
@@ -812,7 +950,9 @@ class _ActionsSectionState extends State<_ActionsSection> {
 void _showActionsSheet(
   BuildContext context, {
   required TripDocument doc,
+  required String tripId,
   VoidCallback? onDelete,
+  ValueChanged<String>? onRenamed,
 }) {
   showModalBottomSheet<void>(
     context: context,
@@ -821,7 +961,9 @@ void _showActionsSheet(
     builder: (ctx) => _ActionsSheetContent(
       context: context,
       doc: doc,
+      tripId: tripId,
       onDelete: onDelete,
+      onRenamed: onRenamed,
     ),
   );
 }
@@ -830,12 +972,16 @@ class _ActionsSheetContent extends StatefulWidget {
   const _ActionsSheetContent({
     required this.context,
     required this.doc,
+    required this.tripId,
     this.onDelete,
+    this.onRenamed,
   });
 
   final BuildContext context;
   final TripDocument doc;
+  final String tripId;
   final VoidCallback? onDelete;
+  final ValueChanged<String>? onRenamed;
 
   @override
   State<_ActionsSheetContent> createState() => _ActionsSheetContentState();
@@ -851,10 +997,7 @@ class _ActionsSheetContentState extends State<_ActionsSheetContent> {
     try {
       final url = await DocService.getSignedUrl(widget.doc.storagePath!);
       if (url == null) return;
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     } catch (_) {}
     if (mounted) setState(() => _openLoading = false);
   }
@@ -882,14 +1025,91 @@ class _ActionsSheetContentState extends State<_ActionsSheetContent> {
           WabwayActionTile(
             icon: Icons.edit_rounded,
             label: 'Rename',
-            onTap: () => Navigator.pop(context),
+            onTap: () async {
+              Navigator.pop(context);
+              final ctrl = TextEditingController(text: widget.doc.title);
+              final confirmed = await showDialog<bool>(
+                context: widget.context,
+                builder: (ctx) => AlertDialog(
+                  backgroundColor: kColorPaper,
+                  shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
+                  title: Text('Rename document', style: kStyleBodySemibold),
+                  content: TextField(
+                    controller: ctrl,
+                    autofocus: true,
+                    style: kStyleBody,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => Navigator.pop(ctx, true),
+                    decoration: InputDecoration(
+                      hintText: 'Document title',
+                      hintStyle: kStyleBody.copyWith(color: kColorInkSoft),
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: Text('Cancel', style: kStyleBody.copyWith(color: kColorInkSoft)),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: Text('Rename', style: kStyleBodyMedium.copyWith(color: kColorPrimary)),
+                    ),
+                  ],
+                ),
+              );
+              if (confirmed != true) return;
+              final newTitle = ctrl.text.trim();
+              if (newTitle.isEmpty || newTitle == widget.doc.title) return;
+              try {
+                await DocService.renameDocument(widget.doc.id, newTitle);
+                widget.onRenamed?.call(newTitle);
+              } catch (_) {}
+            },
           ),
           WabwayActionTile(
             icon: Icons.receipt_long_rounded,
             label: 'Create Receipt from document',
             onTap: () async {
               Navigator.pop(context);
-              await showAddReceiptSheet(widget.context);
+              final outerCtx = widget.context;
+              if (!outerCtx.mounted) return;
+              final myId = supabase.auth.currentUser?.id ?? '';
+              List<TripMember> members;
+              try {
+                final appMembers = await TripService.loadTripMembers(widget.tripId);
+                members = appMembers.isEmpty
+                    ? [TripMember(id: myId.isEmpty ? 'you' : myId, name: 'You')]
+                    : appMembers
+                        .map((m) => TripMember(
+                              id: m.userId,
+                              name: m.userId == myId ? 'You' : m.profile.displayName,
+                            ))
+                        .toList();
+              } catch (_) {
+                members = [TripMember(id: myId.isEmpty ? 'you' : myId, name: 'You')];
+              }
+              if (!outerCtx.mounted) return;
+              final r = await showAddReceiptSheet(outerCtx,
+                  tripId: widget.tripId, userId: myId, members: members);
+              if (r != null && outerCtx.mounted) {
+                try {
+                  await DocService.addLink(
+                    documentId: widget.doc.id,
+                    linkedType: DocLinkedType.receipt,
+                    linkedId: r.id,
+                    createdBy: myId,
+                  );
+                } catch (_) {}
+                if (outerCtx.mounted) {
+                  ScaffoldMessenger.of(outerCtx).showSnackBar(SnackBar(
+                    content: Text('Receipt "${r.title}" created',
+                        style: kStyleBody.copyWith(color: Colors.white)),
+                    backgroundColor: kColorSuccess,
+                    behavior: SnackBarBehavior.floating,
+                    duration: const Duration(seconds: 2),
+                  ));
+                }
+              }
             },
           ),
           WabwayActionTile(

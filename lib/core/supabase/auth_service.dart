@@ -1,12 +1,27 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../debug/app_logger.dart';
 import 'client.dart';
 
 abstract final class AuthService {
-  static Future<void> sendMagicLink(String email) =>
-      supabase.auth.signInWithOtp(
-        email: email.trim(),
+  static Future<void> sendMagicLink(String email) async {
+    final trimmed = email.trim();
+    AppLogger.instance.log('sendMagicLink → $trimmed', tag: 'AUTH');
+    try {
+      final isMobile = defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS;
+      await supabase.auth.signInWithOtp(
+        email: trimmed,
         shouldCreateUser: true,
+        emailRedirectTo:
+            isMobile ? 'com.example.wabway://login-callback' : null,
       );
+      AppLogger.instance.log('sendMagicLink ✓ (OTP queued)', tag: 'AUTH');
+    } catch (e) {
+      AppLogger.instance.error('sendMagicLink ✗', tag: 'AUTH', error: e);
+      rethrow;
+    }
+  }
 
   static Future<void> signInWithPassword({
     required String email,

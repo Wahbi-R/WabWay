@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../core/supabase/doc_service.dart';
 import '../../data/travel_data.dart';
 import '../../data/docs_data.dart';
 import '../../data/plan_data.dart';
@@ -7,6 +9,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
+import 'add_travel_sheet.dart';
 
 // ─── Mobile screen ────────────────────────────────────────────────────────────
 
@@ -17,12 +20,14 @@ class TravelItemDetailScreen extends StatelessWidget {
     this.docs = const [],
     this.days = const [],
     this.onDelete,
+    this.onUpdated,
   });
 
   final TravelItem item;
   final List<TripDocument> docs;
   final List<TripDay> days;
   final VoidCallback? onDelete;
+  final ValueChanged<TravelItem>? onUpdated;
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +39,7 @@ class TravelItemDetailScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.more_vert_rounded),
             color: kColorInkSoft,
-            onPressed: () => _showActionsSheet(context, item, onDelete),
+            onPressed: () => _showActionsSheet(context, item, docs, onDelete, onUpdated),
           ),
           const SizedBox(width: kSpace2),
         ],
@@ -45,6 +50,7 @@ class TravelItemDetailScreen extends StatelessWidget {
           docs: docs,
           days: days,
           onDelete: onDelete,
+          onUpdated: onUpdated,
         ),
       ),
     );
@@ -60,12 +66,14 @@ class TravelItemDetailContent extends StatelessWidget {
     this.docs = const [],
     this.days = const [],
     this.onDelete,
+    this.onUpdated,
   });
 
   final TravelItem item;
   final List<TripDocument> docs;
   final List<TripDay> days;
   final VoidCallback? onDelete;
+  final ValueChanged<TravelItem>? onUpdated;
 
   @override
   Widget build(BuildContext context) {
@@ -115,7 +123,7 @@ class TravelItemDetailContent extends StatelessWidget {
               ],
 
               const SizedBox(height: kSpace4),
-              _ActionsSection(item: item, onDelete: onDelete),
+              _ActionsSection(item: item, docs: docs, onDelete: onDelete, onUpdated: onUpdated),
               const SizedBox(height: kSpace8),
             ],
           ),
@@ -383,7 +391,7 @@ class _DocTile extends StatelessWidget {
       child: WabwayCard(
         hoverable: true,
         padding: const EdgeInsets.all(kSpace3),
-        onTap: () => _snack(context, 'Open "${doc.title}"'),
+        onTap: () => _openDoc(context, doc),
         child: Row(
           children: [
             Container(
@@ -415,13 +423,6 @@ class _DocTile extends StatelessWidget {
     );
   }
 
-  void _snack(BuildContext context, String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg, style: kStyleBody.copyWith(color: Colors.white)),
-      behavior: SnackBarBehavior.floating,
-      duration: const Duration(seconds: 2),
-    ));
-  }
 }
 
 // ─── Linked plan item ─────────────────────────────────────────────────────────
@@ -574,12 +575,24 @@ class _NotesSection extends StatelessWidget {
 // ─── Actions section ──────────────────────────────────────────────────────────
 
 class _ActionsSection extends StatelessWidget {
-  const _ActionsSection({required this.item, this.onDelete});
+  const _ActionsSection({
+    required this.item,
+    this.docs = const [],
+    this.onDelete,
+    this.onUpdated,
+  });
   final TravelItem item;
+  final List<TripDocument> docs;
   final VoidCallback? onDelete;
+  final ValueChanged<TravelItem>? onUpdated;
 
   @override
   Widget build(BuildContext context) {
+    final linkedDocs = item.linkedDocIds
+        .map((id) => docs.where((d) => d.id == id).firstOrNull)
+        .whereType<TripDocument>()
+        .toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -589,12 +602,12 @@ class _ActionsSection extends StatelessWidget {
           spacing: kSpace2,
           runSpacing: kSpace2,
           children: [
-            if (item.linkedDocIds.isNotEmpty)
+            if (linkedDocs.isNotEmpty)
               WabwayButton(
                 label: 'Open document',
                 icon: Icons.open_in_new_rounded,
                 size: WabwayButtonSize.sm,
-                onPressed: () => _snack(context, 'Opening document…'),
+                onPressed: () => _openDoc(context, linkedDocs.first),
               ),
             WabwayButton(
               label: 'Attach document',
@@ -615,7 +628,7 @@ class _ActionsSection extends StatelessWidget {
               icon: Icons.edit_rounded,
               variant: WabwayButtonVariant.ghost,
               size: WabwayButtonSize.sm,
-              onPressed: () => _snack(context, 'Edit "${item.title}"'),
+              onPressed: () => _editItem(context),
             ),
             WabwayButton(
               label: 'Delete',
@@ -628,6 +641,18 @@ class _ActionsSection extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  Future<void> _editItem(BuildContext context) async {
+    final updated = await showAddTravelSheet(
+      context,
+      docs: docs,
+      initialItem: item,
+    );
+    if (updated != null && context.mounted) {
+      onUpdated?.call(updated);
+      Navigator.maybePop(context);
+    }
   }
 
   void _snack(BuildContext context, String msg) {
@@ -670,12 +695,45 @@ class _ActionsSection extends StatelessWidget {
   }
 }
 
+// ─── Shared helpers ───────────────────────────────────────────────────────────
+
+Future<void> _openDoc(BuildContext context, TripDocument doc) async {
+  final String? url;
+  if (doc.ext == 'url') {
+    url = doc.notes;
+  } else if (doc.storagePath != null) {
+    url = await DocService.getSignedUrl(doc.storagePath!);
+  } else {
+    url = null;
+  }
+  if (url == null || url.isEmpty) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Could not open document.', style: kStyleBody.copyWith(color: Colors.white)),
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
+    return;
+  }
+  final uri = Uri.parse(url);
+  if (await canLaunchUrl(uri)) {
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  } else if (context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('Could not open document.', style: kStyleBody.copyWith(color: Colors.white)),
+      behavior: SnackBarBehavior.floating,
+    ));
+  }
+}
+
 // ─── Mobile actions sheet ─────────────────────────────────────────────────────
 
 void _showActionsSheet(
   BuildContext context,
   TravelItem item,
+  List<TripDocument> docs,
   VoidCallback? onDelete,
+  ValueChanged<TravelItem>? onUpdated,
 ) {
   showModalBottomSheet<void>(
     context: context,
@@ -700,11 +758,10 @@ void _showActionsSheet(
               label: 'Open document',
               onTap: () {
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text('Opening document…',
-                      style: kStyleBody.copyWith(color: Colors.white)),
-                  behavior: SnackBarBehavior.floating,
-                ));
+                final linkedDoc = docs
+                    .where((d) => item.linkedDocIds.contains(d.id))
+                    .firstOrNull;
+                if (linkedDoc != null) _openDoc(context, linkedDoc);
               },
             ),
           _SheetTile(
@@ -720,7 +777,18 @@ void _showActionsSheet(
           _SheetTile(
             icon: Icons.edit_rounded,
             label: 'Edit',
-            onTap: () => Navigator.pop(ctx),
+            onTap: () async {
+              Navigator.pop(ctx);
+              final updated = await showAddTravelSheet(
+                context,
+                docs: docs,
+                initialItem: item,
+              );
+              if (updated != null && context.mounted) {
+                onUpdated?.call(updated);
+                Navigator.maybePop(context);
+              }
+            },
           ),
           _SheetTile(
             icon: Icons.delete_outline_rounded,

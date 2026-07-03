@@ -23,14 +23,14 @@ class ShareHandler extends ChangeNotifier {
 
     // Cold-start: app was launched by a share intent.
     final initial = await ReceiveSharingIntent.instance.getInitialMedia();
-    if (initial.isNotEmpty) {
+    if (initial.isNotEmpty && !_isAuthCallback(initial.first)) {
       _pending = _convert(initial.first);
       notifyListeners();
     }
 
     // While-running: app receives a share while already open.
     _sub = ReceiveSharingIntent.instance.getMediaStream().listen((files) {
-      if (files.isNotEmpty) {
+      if (files.isNotEmpty && !_isAuthCallback(files.first)) {
         _pending = _convert(files.first);
         notifyListeners();
       }
@@ -73,6 +73,9 @@ class ShareHandler extends ChangeNotifier {
       sharedAt: DateTime.now(),
     );
   }
+
+  static bool _isAuthCallback(SharedMediaFile f) =>
+      f.path.startsWith('com.example.wabway://');
 
   static ShareContentType _fileContentType(SharedMediaFile f) {
     if (f.type == SharedMediaType.image) return ShareContentType.screenshot;

@@ -168,7 +168,13 @@ class _TravelDetailHeader extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _TypeBadge(type: item.type),
+                    Row(
+                      children: [
+                        _TypeBadge(type: item.type),
+                        const SizedBox(width: kSpace2),
+                        _StatusBadge(status: item.status),
+                      ],
+                    ),
                     if (item.hasDate) ...[
                       const SizedBox(height: kSpace1),
                       Row(
@@ -855,6 +861,40 @@ class _TypeBadge extends StatelessWidget {
             style: kStyleCaption.copyWith(
               color: type.color,
               fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Status badge ─────────────────────────────────────────────────────────────
+
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({required this.status});
+  final TravelBookingStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: status.softColor,
+        borderRadius: kRadiusPill,
+        border: Border.all(color: status.color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(status.icon, size: 11, color: status.color),
+          const SizedBox(width: 4),
+          Text(
+            status.label,
+            style: kStyleCaption.copyWith(
+              color: status.color,
+              fontWeight: FontWeight.w600,
+              fontSize: 11,
             ),
           ),
         ],

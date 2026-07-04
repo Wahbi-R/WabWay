@@ -1,0 +1,83 @@
+name: Build & Deploy
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write   # create GitHub releases
+  pages: write      # deploy to GitHub Pages
+  id-token: write   # Pages OIDC token
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy-pages.outputs.page_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      # Write secrets to .env so --dart-define-from-file=.env works in CI
+      - name: Create .env
+        run: |
+          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" > .env
+          echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      # Parse version from pubspec.yaml → e.g. "1.0.0+1" → tag "v1.0.0+1"
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}')
+          echo "full=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+          echo "name=WabWay v$(echo $VERSION | cut -d'+' -f1)" >> $GITHUB_OUTPUT
+
+      # ── Android APK ──────────────────────────────────────────────────────────
+
+      - name: Build APK
+        run: flutter build apk --debug --dart-define-from-file=.env
+
+      - name: Rename APK
+        run: |
+          cp build/app/outputs/flutter-apk/app-debug.apk \
+             build/app/outputs/flutter-apk/wabway-${{ steps.version.outputs.tag }}.apk
+
+      - name: Create / update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.name }}
+          body: |
+            Install on Android: download the APK below, tap it, and follow the prompts.
+            Enable "Install from unknown sources" if prompted.
+          files: build/app/outputs/flutter-apk/wabway-${{ steps.version.outputs.tag }}.apk
+          make_latest: true
+
+      # ── Web → GitHub Pages ───────────────────────────────────────────────────
+
+      - name: Build web
+        run: flutter build web --dart-define-from-file=.env
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+      - name: Deploy to GitHub Pages
+        id: deploy-pages
+        uses: actions/deploy-pages@v4

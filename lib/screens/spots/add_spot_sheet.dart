@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../core/place_search_service.dart';
 import '../../core/supabase/spot_service.dart';
+import '../../data/japan_places.dart';
 import '../../data/spot_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
@@ -104,20 +106,38 @@ class _AddSpotContent extends StatefulWidget {
 }
 
 class _AddSpotContentState extends State<_AddSpotContent> {
-  final _formKey   = GlobalKey<FormState>();
+  final _formKey    = GlobalKey<FormState>();
+  final _searchCtrl = TextEditingController();
   final _nameCtrl   = TextEditingController();
   final _cityCtrl   = TextEditingController();
   final _areaCtrl   = TextEditingController();
   final _mapsCtrl   = TextEditingController();
   final _sourceCtrl = TextEditingController();
   final _notesCtrl  = TextEditingController();
+
   SpotCategory? _category;
-  SpotStatus _status = SpotStatus.idea;
-  bool _loading = false;
-  String? _error;
+  SpotStatus    _status    = SpotStatus.idea;
+  bool          _loading   = false;
+  String?       _error;
+
+  // Location from suggestion or Maps URL
+  double? _latitude;
+  double? _longitude;
+  String? _address;
+  String? _placeSource;
+
+  List<PlaceSuggestion> _suggestions = [];
+  bool _showSuggestions = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _mapsCtrl.addListener(_onMapsUrlChanged);
+  }
 
   @override
   void dispose() {
+    _searchCtrl.dispose();
     _nameCtrl.dispose();
     _cityCtrl.dispose();
     _areaCtrl.dispose();
@@ -127,21 +147,62 @@ class _AddSpotContentState extends State<_AddSpotContent> {
     super.dispose();
   }
 
+  void _onSearchChanged(String query) {
+    final results = PlaceSearchService.search(query);
+    setState(() {
+      _suggestions      = results;
+      _showSuggestions  = query.isNotEmpty;
+    });
+  }
+
+  void _onMapsUrlChanged() {
+    final url = _mapsCtrl.text;
+    if (!PlaceSearchService.isMapsUrl(url)) return;
+    final coords = PlaceSearchService.parseLatLng(url);
+    if (coords != null) {
+      setState(() {
+        _latitude  = coords.lat;
+        _longitude = coords.lng;
+      });
+    }
+  }
+
+  void _applySuggestion(PlaceSuggestion place) {
+    _nameCtrl.text   = place.name;
+    _cityCtrl.text   = place.city;
+    _areaCtrl.text   = place.area;
+    _mapsCtrl.text   = place.mapsUrl;
+    _searchCtrl.clear();
+    setState(() {
+      _category       = place.category;
+      _latitude       = place.latitude;
+      _longitude      = place.longitude;
+      _address        = place.address;
+      _placeSource    = 'local_suggestion';
+      _suggestions    = [];
+      _showSuggestions = false;
+    });
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() { _loading = true; _error = null; });
     try {
       final spot = await SpotService.createSpot(
-        tripId:    widget.tripId,
-        name:      _nameCtrl.text.trim(),
-        city:      _cityCtrl.text.trim(),
-        area:      _areaCtrl.text.trim(),
-        category:  _category ?? SpotCategory.landmark,
-        status:    _status,
-        addedBy:   widget.userId,
-        sourceUrl: _sourceCtrl.text.trim().isEmpty ? null : _sourceCtrl.text.trim(),
-        mapsUrl:   _mapsCtrl.text.trim().isEmpty   ? null : _mapsCtrl.text.trim(),
-        notes:     _notesCtrl.text.trim().isEmpty   ? null : _notesCtrl.text.trim(),
+        tripId:      widget.tripId,
+        name:        _nameCtrl.text.trim(),
+        city:        _cityCtrl.text.trim(),
+        area:        _areaCtrl.text.trim(),
+        category:    _category ?? SpotCategory.landmark,
+        status:      _status,
+        addedBy:     widget.userId,
+        sourceUrl:   _sourceCtrl.text.trim().isEmpty ? null : _sourceCtrl.text.trim(),
+        mapsUrl:     _mapsCtrl.text.trim().isEmpty   ? null : _mapsCtrl.text.trim(),
+        notes:       _notesCtrl.text.trim().isEmpty   ? null : _notesCtrl.text.trim(),
+        address:     _address,
+        latitude:    _latitude,
+        longitude:   _longitude,
+        placeSource: _placeSource,
       );
       widget.onSubmit(spot);
     } catch (e) {
@@ -173,7 +234,85 @@ class _AddSpotContentState extends State<_AddSpotContent> {
           ),
         ),
 
-        const Divider(height: kSpace5),
+        // ── Place search bar ─────────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.fromLTRB(kSpace4, kSpace3, kSpace4, 0),
+          child: TextField(
+            controller: _searchCtrl,
+            onChanged: _onSearchChanged,
+            textInputAction: TextInputAction.search,
+            decoration: InputDecoration(
+              hintText: 'Search a place (Senso-ji, Shibuya…)',
+              hintStyle: kStyleBody.copyWith(color: kColorInkSoft),
+              prefixIcon: const Icon(Icons.search_rounded, color: kColorInkSoft),
+              suffixIcon: _searchCtrl.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear_rounded, size: 18),
+                      color: kColorInkSoft,
+                      onPressed: () {
+                        _searchCtrl.clear();
+                        setState(() {
+                          _suggestions     = [];
+                          _showSuggestions = false;
+                        });
+                      },
+                    )
+                  : null,
+              filled: true,
+              fillColor: kColorSurfaceSunken,
+              contentPadding: const EdgeInsets.symmetric(
+                  horizontal: kSpace3, vertical: 10),
+              border: const OutlineInputBorder(
+                borderRadius: kRadiusMd,
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+        ),
+
+        // ── Suggestion list ──────────────────────────────────────────────
+        if (_showSuggestions) ...[
+          const SizedBox(height: kSpace2),
+          if (_suggestions.isEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(kSpace4, 0, kSpace4, kSpace2),
+              child: Text(
+                'No matches — fill the form manually',
+                style: kStyleCaption.copyWith(color: kColorInkSoft),
+              ),
+            )
+          else
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 240),
+              child: ListView.separated(
+                shrinkWrap: true,
+                padding: const EdgeInsets.symmetric(horizontal: kSpace4),
+                itemCount: _suggestions.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (_, i) {
+                  final place = _suggestions[i];
+                  return ListTile(
+                    dense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: kSpace2, vertical: 2),
+                    leading: Icon(
+                      _categoryIcon(place.category),
+                      size: 18,
+                      color: kColorInkSoft,
+                    ),
+                    title: Text(place.name, style: kStyleBody),
+                    subtitle: Text(
+                      '${place.area}, ${place.city}',
+                      style: kStyleCaption.copyWith(color: kColorInkSoft),
+                    ),
+                    onTap: () => _applySuggestion(place),
+                  );
+                },
+              ),
+            ),
+        ],
+
+        const Divider(height: kSpace4),
 
         Flexible(
           child: SingleChildScrollView(
@@ -189,6 +328,22 @@ class _AddSpotContentState extends State<_AddSpotContent> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Map-ready badge
+                  if (_latitude != null && _longitude != null) ...[
+                    Row(
+                      children: [
+                        const Icon(Icons.location_on_rounded,
+                            size: 14, color: kColorSuccess),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Map ready · ${_latitude!.toStringAsFixed(4)}, ${_longitude!.toStringAsFixed(4)}',
+                          style: kStyleCaption.copyWith(color: kColorSuccess),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: kSpace3),
+                  ],
+
                   WabwayTextField(
                     label: 'Name',
                     hint: 'e.g. Senso-ji Temple',
@@ -298,4 +453,13 @@ class _AddSpotContentState extends State<_AddSpotContent> {
       ],
     );
   }
+
+  IconData _categoryIcon(SpotCategory cat) => switch (cat) {
+        SpotCategory.food       => Icons.restaurant_rounded,
+        SpotCategory.landmark   => Icons.account_balance_rounded,
+        SpotCategory.nature     => Icons.park_rounded,
+        SpotCategory.experience => Icons.star_rounded,
+        SpotCategory.shopping   => Icons.shopping_bag_rounded,
+        SpotCategory.nightlife  => Icons.nightlife_rounded,
+      };
 }

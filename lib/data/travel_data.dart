@@ -1,5 +1,49 @@
 import 'package:flutter/material.dart';
 
+// ─── Booking status ───────────────────────────────────────────────────────────
+
+enum TravelBookingStatus {
+  booked,
+  tentative,
+  cancelled;
+
+  String get label => switch (this) {
+        TravelBookingStatus.booked    => 'Booked',
+        TravelBookingStatus.tentative => 'Tentative',
+        TravelBookingStatus.cancelled => 'Cancelled',
+      };
+
+  IconData get icon => switch (this) {
+        TravelBookingStatus.booked    => Icons.check_circle_rounded,
+        TravelBookingStatus.tentative => Icons.schedule_rounded,
+        TravelBookingStatus.cancelled => Icons.cancel_rounded,
+      };
+
+  Color get color => switch (this) {
+        TravelBookingStatus.booked    => const Color(0xFF3A8C5A),
+        TravelBookingStatus.tentative => const Color(0xFFD6A84F),
+        TravelBookingStatus.cancelled => const Color(0xFFB04040),
+      };
+
+  Color get softColor => switch (this) {
+        TravelBookingStatus.booked    => const Color(0xFFE8F5EE),
+        TravelBookingStatus.tentative => const Color(0xFFF8F0E2),
+        TravelBookingStatus.cancelled => const Color(0xFFF5E8E8),
+      };
+
+  static TravelBookingStatus fromDb(String? s) => switch (s) {
+        'tentative' => TravelBookingStatus.tentative,
+        'cancelled' => TravelBookingStatus.cancelled,
+        _           => TravelBookingStatus.booked,
+      };
+
+  String get toDb => switch (this) {
+        TravelBookingStatus.booked    => 'booked',
+        TravelBookingStatus.tentative => 'tentative',
+        TravelBookingStatus.cancelled => 'cancelled',
+      };
+}
+
 // ─── Travel item type ─────────────────────────────────────────────────────────
 
 enum TravelItemType {
@@ -54,6 +98,7 @@ class TravelItem {
     required this.id,
     required this.title,
     required this.type,
+    this.status = TravelBookingStatus.booked,
     this.date,
     this.endDate,
     this.time,
@@ -71,6 +116,7 @@ class TravelItem {
   final String id;
   final String title;
   final TravelItemType type;
+  final TravelBookingStatus status;
 
   // Primary date (departure / check-in / event date)
   final DateTime? date;

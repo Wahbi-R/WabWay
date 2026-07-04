@@ -1309,3 +1309,53 @@ Danger: #B94A48
 This project is intentionally small in user count but broad in features. The goal is not to build a commercial travel app immediately. The goal is to create a useful private tool and gain practical experience building a real full-stack app.
 
 The app should prioritize simplicity, maintainability, and usefulness over feature complexity.
+
+---
+
+## Setup & Build
+
+### Prerequisites
+
+- Flutter SDK (stable)
+- Android SDK with `adb` on PATH (or use the full adb path)
+- A Supabase project
+
+### Environment
+
+Create a `.env` file in the project root (never commit this file):
+
+```env
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-anon-key-here
+```
+
+See `.env.example` for the required keys. The anon key is safe for client-side use — it is protected by Row Level Security policies.
+
+### Run (development)
+
+```bash
+flutter run --dart-define-from-file=.env
+```
+
+### Build (release APK)
+
+```bash
+flutter build apk --dart-define-from-file=.env
+```
+
+The APK is output to `build/app/outputs/flutter-apk/app-release.apk`.
+
+### Install to a connected Android device
+
+```bash
+adb install -r build/app/outputs/flutter-apk/app-release.apk
+```
+
+### Required Supabase migrations
+
+Run the migration files in order in the Supabase SQL editor:
+
+1. `supabase/migrations/001_initial_schema.sql` — base schema (trips, spots, docs, money, travel, plan)
+2. `supabase/migrations/002_trip_invites.sql` — invite codes + RPCs
+3. `supabase/migrations/003_rls_fixes_and_settlements.sql` — RLS fixes, settlements table, trip_links table, ownership transfer RPC
+4. `supabase/migrations/004_activity_events_and_travel_status.sql` — activity feed table + triggers, travel_items.status column

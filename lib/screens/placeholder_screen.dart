@@ -35,26 +35,6 @@ class PlaceholderScreen extends StatelessWidget {
   }
 }
 
-class LinksScreen extends StatelessWidget {
-  const LinksScreen({super.key});
-  @override
-  Widget build(BuildContext context) => const PlaceholderScreen(
-    title: 'Links',
-    icon: Icons.link_rounded,
-    body: 'Saved Instagram, TikTok, and Maps links will appear here.',
-  );
-}
-
-class MapScreen extends StatelessWidget {
-  const MapScreen({super.key});
-  @override
-  Widget build(BuildContext context) => const PlaceholderScreen(
-    title: 'Map',
-    icon: Icons.map_rounded,
-    body: 'A shared map with all your saved spots will appear here.',
-  );
-}
-
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 

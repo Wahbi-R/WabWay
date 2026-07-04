@@ -245,11 +245,16 @@ class ReceiptDetailContent extends StatelessWidget {
               // Split breakdown
               Text('Split', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
               const SizedBox(height: kSpace3),
+              if (receipt.splits.length > 1 && receipt.amount > 0) ...[
+                _SplitBar(splits: receipt.splits, total: receipt.amount),
+                const SizedBox(height: kSpace3),
+              ],
               ...receipt.splits.map((s) => _SplitRow(
                     split:    s,
                     currency: receipt.currency,
                     paidById: receipt.paidById,
                     members:  members,
+                    total:    receipt.amount,
                   )),
 
               const SizedBox(height: kSpace5),
@@ -305,7 +310,7 @@ class ReceiptDetailContent extends StatelessWidget {
 // ─── Linked documents section ────────────────────────────────────────────────
 
 class _LinkedDocsSection extends StatefulWidget {
-  const _LinkedDocsSection({required this.receiptId});
+  const _LinkedDocsSection({super.key, required this.receiptId});
   final String receiptId;
 
   @override
@@ -334,11 +339,20 @@ class _LinkedDocsSectionState extends State<_LinkedDocsSection> {
   }
 
   Future<void> _open(TripDocument doc) async {
-    if (doc.storagePath == null) return;
-    final url = await DocService.getSignedUrl(doc.storagePath!);
-    if (url == null) return;
-    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    String? url;
+    if (doc.ext == 'url') {
+      url = doc.notes;
+    } else if (doc.storagePath != null) {
+      url = await DocService.getSignedUrl(doc.storagePath!);
+    }
+    if (url == null || url.isEmpty) return;
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
+
+  bool _canOpen(TripDocument doc) =>
+      (doc.ext == 'url' && doc.notes != null) || doc.storagePath != null;
 
   @override
   Widget build(BuildContext context) {
@@ -351,7 +365,7 @@ class _LinkedDocsSectionState extends State<_LinkedDocsSection> {
         const SizedBox(height: kSpace3),
         ..._docs!.map((doc) => Padding(
           padding: const EdgeInsets.only(bottom: kSpace2),
-          child: _DocRow(doc: doc, onTap: () => _open(doc)),
+          child: _DocRow(doc: doc, canOpen: _canOpen(doc), onTap: () => _open(doc)),
         )),
         const SizedBox(height: kSpace3),
       ],
@@ -360,14 +374,15 @@ class _LinkedDocsSectionState extends State<_LinkedDocsSection> {
 }
 
 class _DocRow extends StatelessWidget {
-  const _DocRow({required this.doc, required this.onTap});
+  const _DocRow({required this.doc, required this.onTap, this.canOpen = false});
   final TripDocument doc;
   final VoidCallback onTap;
+  final bool canOpen;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: doc.storagePath != null ? onTap : null,
+      onTap: canOpen ? onTap : null,
       borderRadius: kRadiusMd,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: kSpace3),
@@ -383,7 +398,7 @@ class _DocRow extends StatelessWidget {
             Expanded(
               child: Text(doc.title, style: kStyleBodyMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
             ),
-            if (doc.storagePath != null)
+            if (canOpen)
               const Icon(Icons.open_in_new_rounded, size: 16, color: kColorInkSoft),
           ],
         ),
@@ -431,18 +446,51 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
+// ─── Split proportion bar ─────────────────────────────────────────────────────
+
+class _SplitBar extends StatelessWidget {
+  const _SplitBar({required this.splits, required this.total});
+  final List<ReceiptSplit> splits;
+  final double total;
+
+  @override
+  Widget build(BuildContext context) {
+    const barColors = [
+      Color(0xFF4A7AB5), Color(0xFFD6A84F), Color(0xFF7D9A75),
+      Color(0xFFA97BB5), Color(0xFF4A9B8A), Color(0xFF6F665D),
+    ];
+    return ClipRRect(
+      borderRadius: kRadiusPill,
+      child: SizedBox(
+        height: 8,
+        child: Row(
+          children: splits.asMap().entries.map((e) {
+            final fraction = total > 0 ? (e.value.amount / total).clamp(0.0, 1.0) : 0.0;
+            return Expanded(
+              flex: (fraction * 1000).round(),
+              child: Container(color: barColors[e.key % barColors.length]),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+}
+
 class _SplitRow extends StatelessWidget {
   const _SplitRow({
     required this.split,
     required this.currency,
     required this.paidById,
     required this.members,
+    this.total = 0,
   });
 
   final ReceiptSplit split;
   final String currency;
   final String paidById;
   final List<TripMember> members;
+  final double total;
 
   @override
   Widget build(BuildContext context) {
@@ -473,14 +521,24 @@ class _SplitRow extends StatelessWidget {
               padding: EdgeInsets.only(right: kSpace2),
               child: Icon(Icons.check_circle_rounded, size: 14, color: kColorSuccess),
             ),
-          Text(
-            fmtAmount(split.amount, currency),
-            style: GoogleFonts.ibmPlexMono(
-              fontSize: kTextSm,
-              fontWeight: FontWeight.w500,
-              color: split.isSettled ? kColorInkSoft : kColorInk,
-              decoration: split.isSettled ? TextDecoration.lineThrough : null,
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                fmtAmount(split.amount, currency),
+                style: GoogleFonts.ibmPlexMono(
+                  fontSize: kTextSm,
+                  fontWeight: FontWeight.w500,
+                  color: split.isSettled ? kColorInkSoft : kColorInk,
+                  decoration: split.isSettled ? TextDecoration.lineThrough : null,
+                ),
+              ),
+              if (total > 0)
+                Text(
+                  '${(split.amount / total * 100).toStringAsFixed(0)}%',
+                  style: kStyleCaption.copyWith(color: kColorInkSoft, fontSize: 11),
+                ),
+            ],
           ),
         ],
       ),

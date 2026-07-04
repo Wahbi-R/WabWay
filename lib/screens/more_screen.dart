@@ -10,9 +10,13 @@ import '../theme/app_decorations.dart';
 import '../widgets/wabway_button.dart';
 import '../widgets/wabway_text_field.dart';
 import 'docs_screen.dart';
+import 'import/import_sheet.dart';
 import 'members/add_member_sheet.dart';
 import 'members/invite_sheet.dart';
 import 'share/incoming_share_screen.dart';
+import 'trips/trip_settings_sheet.dart';
+import 'trips/trip_switcher_sheet.dart';
+import 'notification_settings_screen.dart';
 
 class MoreScreen extends StatelessWidget {
   const MoreScreen({super.key});
@@ -30,6 +34,40 @@ class MoreScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(kSpace4),
         children: [
+          // Trip switcher
+          DecoratedBox(
+            decoration: kCardDecoration(),
+            child: Material(
+              color: Colors.transparent,
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: kSpace4,
+                  vertical: kSpace1,
+                ),
+                leading: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: const BoxDecoration(
+                    color: kColorPrimarySoft,
+                    borderRadius: kRadiusMd,
+                  ),
+                  child: const Icon(Icons.swap_horiz_rounded,
+                      size: 20, color: kColorPrimary),
+                ),
+                title: Text(trip.name, style: kStyleBodyMedium),
+                subtitle: Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text('Tap to switch trip', style: kStyleCaption),
+                ),
+                trailing: Icon(Icons.chevron_right_rounded,
+                    color: kColorTextTertiary(), size: 18),
+                onTap: () => showTripSwitcherSheet(context),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: kSpace4),
+
           // Members section
           Text('Members', style: kStyleOverline),
           const SizedBox(height: kSpace3),
@@ -200,6 +238,21 @@ class MoreScreen extends StatelessWidget {
           const SizedBox(height: kSpace4),
 
           // Settings
+          const _SectionHeader(title: 'Import'),
+          const SizedBox(height: kSpace3),
+          DecoratedBox(
+            decoration: kCardDecoration(),
+            child: Material(
+              color: Colors.transparent,
+              child: _SettingsRow(
+                icon: Icons.download_rounded,
+                label: 'Import file or link',
+                onTap: () => showImportSheet(context),
+              ),
+            ),
+          ),
+          const SizedBox(height: kSpace4),
+
           const _SectionHeader(title: 'Trip settings'),
           const SizedBox(height: kSpace3),
           DecoratedBox(
@@ -208,19 +261,40 @@ class MoreScreen extends StatelessWidget {
               color: Colors.transparent,
               child: Column(
                 children: [
-                  _SettingsRow(
-                    icon: Icons.edit_rounded,
-                    label: 'Edit trip name',
-                    onTap: () => _showEditTripNameSheet(context, trip),
-                  ),
-                  const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
+                  if (isOwner) ...[
+                    _SettingsRow(
+                      icon: Icons.settings_rounded,
+                      label: 'Edit trip details',
+                      onTap: () => showTripSettingsSheet(context, trip: trip),
+                    ),
+                    const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
+                  ],
                   _SettingsRow(
                     icon: Icons.notifications_rounded,
                     label: 'Notifications',
-                    // TODO: Notifications — needs a backend event system (Supabase
-                    // realtime or push via FCM). Show per-category toggles here.
-                    onTap: () {},
+                    onTap: () => Navigator.push<void>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const NotificationSettingsScreen(),
+                      ),
+                    ),
                   ),
+                  if (isOwner) ...[
+                    const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
+                    _SettingsRow(
+                      icon: Icons.swap_horiz_rounded,
+                      label: 'Transfer ownership',
+                      onTap: () => _showTransferOwnershipSheet(
+                          context, trip, members, currentUserId),
+                    ),
+                    const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
+                    _SettingsRow(
+                      icon: Icons.delete_rounded,
+                      label: 'Delete trip',
+                      color: kColorDanger,
+                      onTap: () => _confirmDeleteTrip(context, trip),
+                    ),
+                  ],
                   if (!isOwner) ...[
                     const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
                     _SettingsRow(
@@ -368,6 +442,223 @@ Future<void> _confirmLeaveTrip(BuildContext context, trip) async {
         content: Text('Could not leave trip.', style: kStyleBody.copyWith(color: Colors.white)),
         behavior: SnackBarBehavior.floating,
       ));
+    }
+  }
+}
+
+Future<void> _confirmDeleteTrip(BuildContext context, trip) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: kColorPaper,
+      shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
+      title: Text('Delete trip?', style: kStyleBodySemibold),
+      content: Text(
+        'This will permanently delete "${trip.name}" and all its data for every member. This cannot be undone.',
+        style: kStyleBody,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: Text('Cancel', style: kStyleBody.copyWith(color: kColorInkSoft)),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          child: Text('Delete', style: kStyleBodyMedium.copyWith(color: kColorDanger)),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true || !context.mounted) return;
+  try {
+    await TripService.deleteTrip(trip.id);
+    if (context.mounted) TripState.refresh(context);
+  } catch (_) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Could not delete trip.', style: kStyleBody.copyWith(color: Colors.white)),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: kColorDanger,
+      ));
+    }
+  }
+}
+
+void _showTransferOwnershipSheet(
+  BuildContext context,
+  trip,
+  List members,
+  String? currentUserId,
+) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => _TransferOwnershipSheet(
+      trip: trip,
+      members: members,
+      currentUserId: currentUserId,
+      onTransferred: () => TripState.refresh(context),
+    ),
+  );
+}
+
+class _TransferOwnershipSheet extends StatefulWidget {
+  const _TransferOwnershipSheet({
+    required this.trip,
+    required this.members,
+    required this.currentUserId,
+    required this.onTransferred,
+  });
+
+  final dynamic trip;
+  final List members;
+  final String? currentUserId;
+  final VoidCallback onTransferred;
+
+  @override
+  State<_TransferOwnershipSheet> createState() =>
+      _TransferOwnershipSheetState();
+}
+
+class _TransferOwnershipSheetState extends State<_TransferOwnershipSheet> {
+  String? _selectedId;
+  bool _saving = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final candidates = (widget.members as List)
+        .where((m) => m.userId != widget.currentUserId)
+        .toList();
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: kColorPaper,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.viewInsetsOf(context).bottom + kSpace4,
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: kSpace2),
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: kColorBorder,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: kSpace4),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: kSpace4),
+              child: Text('Transfer ownership', style: kStyleTitle),
+            ),
+            const SizedBox(height: kSpace1),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: kSpace4),
+              child: Text(
+                'Choose a member to become the new organiser. You will become a regular member.',
+                style: kStyleCaption,
+              ),
+            ),
+            const SizedBox(height: kSpace4),
+            if (candidates.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(kSpace4),
+                child: Text('No other members to transfer to.', style: kStyleBody),
+              )
+            else
+              ...candidates.map((m) {
+                final isSelected = _selectedId == m.userId;
+                return InkWell(
+                  onTap: () => setState(() => _selectedId = m.userId),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: kSpace4, vertical: kSpace3),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 18,
+                          backgroundColor: kColorPrimarySoft,
+                          child: Text(
+                            m.profile.initials,
+                            style: kStyleBodySemibold.copyWith(
+                                color: kColorPrimaryDark),
+                          ),
+                        ),
+                        const SizedBox(width: kSpace3),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(m.profile.displayName, style: kStyleBodyMedium),
+                              Text(m.profile.email, style: kStyleCaption),
+                            ],
+                          ),
+                        ),
+                        if (isSelected)
+                          const Icon(Icons.check_circle_rounded,
+                              color: kColorPrimary, size: 20),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            const SizedBox(height: kSpace4),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: kSpace4),
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor:
+                      _selectedId == null ? kColorBorder : kColorPrimary,
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(borderRadius: kRadiusMd),
+                ),
+                onPressed: _selectedId == null || _saving ? null : _transfer,
+                child: _saving
+                    ? const SizedBox(
+                        width: 18, height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation(Colors.white),
+                        ),
+                      )
+                    : Text('Transfer',
+                        style: kStyleBodySemibold.copyWith(color: Colors.white)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _transfer() async {
+    if (_selectedId == null) return;
+    setState(() => _saving = true);
+    try {
+      await TripService.transferOwnership(widget.trip.id, _selectedId!);
+      widget.onTransferred();
+      if (mounted) Navigator.pop(context);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Transfer failed. Try again.',
+              style: kStyleBody.copyWith(color: Colors.white)),
+          backgroundColor: kColorDanger,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
     }
   }
 }

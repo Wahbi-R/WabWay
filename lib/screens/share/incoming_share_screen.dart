@@ -1,12 +1,16 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
+import '../../core/platform/platform_file.dart';
 import '../../core/auth/profile_state.dart';
 import '../../core/supabase/doc_service.dart';
+import '../../core/supabase/money_service.dart';
 import '../../core/supabase/spot_service.dart';
+import '../../core/supabase/travel_service.dart';
 import '../../core/trip/trip_state.dart';
 import '../../data/docs_data.dart';
+import '../../data/money_data.dart';
 import '../../data/share_data.dart';
 import '../../data/spot_data.dart';
+import '../../data/travel_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
@@ -49,22 +53,27 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
 
     switch (dest) {
       case ShareDestination.spot:
+        final isMaps = widget.share.contentType == ShareContentType.googleMapsLink;
         await SpotService.createSpot(
-          tripId: tripId,
-          name: data.title,
-          city: data.location ?? 'Unknown',
-          area: '',
-          category: _spotCategory(data.category),
-          status: SpotStatus.idea,
-          addedBy: userId,
-          sourceUrl: widget.share.rawContent,
-          notes: data.notes.isEmpty ? null : data.notes,
+          tripId:      tripId,
+          name:        data.title,
+          city:        data.location ?? 'Unknown',
+          area:        '',
+          category:    _spotCategory(data.category),
+          status:      SpotStatus.idea,
+          addedBy:     userId,
+          sourceUrl:   isMaps ? null : widget.share.rawContent,
+          mapsUrl:     data.mapsUrl,
+          notes:       data.notes.isEmpty ? null : data.notes,
+          latitude:    data.latitude,
+          longitude:   data.longitude,
+          placeSource: data.placeSource,
         );
 
       case ShareDestination.document:
         final filePath = widget.share.filePath;
         if (filePath != null) {
-          final bytes = await File(filePath).readAsBytes();
+          final bytes = await readFileAsBytes(filePath);
           final ext = filePath.split('.').last.toLowerCase();
           await DocService.uploadAndCreate(
             tripId: tripId,
@@ -84,6 +93,77 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
             type: _docType(data.docType),
             ext: 'url',
             notes: data.notes.isEmpty ? null : data.notes,
+          );
+        }
+
+      case ShareDestination.travelItem:
+        TripDocument? travelDoc;
+        final filePath = widget.share.filePath;
+        if (filePath != null) {
+          final bytes = await readFileAsBytes(filePath);
+          final ext   = filePath.split('.').last.toLowerCase();
+          travelDoc = await DocService.uploadAndCreate(
+            tripId:     tripId,
+            userId:     userId,
+            title:      data.title,
+            type:       _docType(data.docType),
+            ext:        ext,
+            bytes:      bytes,
+            fileSizeKb: (bytes.length / 1024).round(),
+            notes:      data.notes.isEmpty ? null : data.notes,
+          );
+        }
+        final travelItem = await TravelService.createItem(
+          tripId:    tripId,
+          title:     data.title,
+          type:      _travelItemType(data.travelType),
+          createdBy: userId,
+          date:      data.date,
+          notes:     data.notes.isEmpty ? null : data.notes,
+        );
+        if (travelDoc != null) {
+          await DocService.addLink(
+            documentId: travelDoc.id,
+            linkedType: DocLinkedType.travelItem,
+            linkedId:   travelItem.id,
+            createdBy:  userId,
+          );
+        }
+
+      case ShareDestination.receipt:
+        TripDocument? receiptDoc;
+        final receiptFilePath = widget.share.filePath;
+        if (receiptFilePath != null) {
+          final bytes = await readFileAsBytes(receiptFilePath);
+          final ext   = receiptFilePath.split('.').last.toLowerCase();
+          receiptDoc = await DocService.uploadAndCreate(
+            tripId:     tripId,
+            userId:     userId,
+            title:      data.title,
+            type:       DocType.receipt,
+            ext:        ext,
+            bytes:      bytes,
+            fileSizeKb: (bytes.length / 1024).round(),
+          );
+        }
+        final amount = data.amount ?? 0.0;
+        final receipt = await MoneyService.createReceipt(
+          tripId:   tripId,
+          paidBy:   userId,
+          title:    data.title,
+          amount:   amount,
+          currency: 'JPY',
+          category: _receiptCategory(data.category),
+          date:     data.date ?? DateTime.now(),
+          notes:    data.notes.isEmpty ? null : data.notes,
+          splits:   [ReceiptSplit(memberId: userId, amount: amount)],
+        );
+        if (receiptDoc != null) {
+          await DocService.addLink(
+            documentId: receiptDoc.id,
+            linkedType: DocLinkedType.receipt,
+            linkedId:   receipt.id,
+            createdBy:  userId,
           );
         }
 
@@ -136,6 +216,24 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
         'insurance'   => DocType.insurance,
         'screenshot'  => DocType.screenshot,
         _             => DocType.other,
+      };
+
+  static TravelItemType _travelItemType(String? raw) => switch (raw) {
+        'flight'      => TravelItemType.flight,
+        'hotel'       => TravelItemType.hotel,
+        'train'       => TravelItemType.train,
+        'ticket'      => TravelItemType.ticket,
+        'reservation' => TravelItemType.reservation,
+        _             => TravelItemType.other,
+      };
+
+  static ReceiptCategory _receiptCategory(String? raw) => switch (raw) {
+        'food'          => ReceiptCategory.food,
+        'transport'     => ReceiptCategory.transport,
+        'accommodation' => ReceiptCategory.accommodation,
+        'activity'      => ReceiptCategory.activity,
+        'shopping'      => ReceiptCategory.shopping,
+        _               => ReceiptCategory.other,
       };
 
   @override

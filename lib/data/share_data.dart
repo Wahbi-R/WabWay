@@ -184,7 +184,9 @@ class IncomingShare {
 
 ShareContentType detectContentType(String rawContent) {
   final lower = rawContent.toLowerCase();
-  if (lower.contains('maps.google.com') || lower.contains('goo.gl/maps')) {
+  if (lower.contains('maps.google.com') ||
+      lower.contains('goo.gl/maps') ||
+      lower.contains('maps.app.goo.gl')) {
     return ShareContentType.googleMapsLink;
   }
   if (lower.contains('instagram.com')) return ShareContentType.instagramLink;

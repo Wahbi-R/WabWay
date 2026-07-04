@@ -91,18 +91,22 @@ abstract final class SpotService {
         )).toList();
 
     return Spot(
-      id:        row['id'] as String,
-      name:      row['name'] as String,
-      city:      row['city'] as String,
-      area:      row['area'] as String? ?? '',
-      category:  _catFrom(row['category'] as String),
-      status:    _statusFrom(row['status'] as String),
-      sourceUrl: row['source_url'] as String?,
-      mapsUrl:   row['maps_url'] as String?,
-      notes:     row['notes'] as String?,
-      addedById: row['added_by'] as String,
-      votes:     SpotVotes(mustDo: mustDo, want: want, maybe: maybe, skip: skip),
-      comments:  comments,
+      id:          row['id'] as String,
+      name:        row['name'] as String,
+      city:        row['city'] as String,
+      area:        row['area'] as String? ?? '',
+      category:    _catFrom(row['category'] as String),
+      status:      _statusFrom(row['status'] as String),
+      sourceUrl:   row['source_url'] as String?,
+      mapsUrl:     row['maps_url'] as String?,
+      notes:       row['notes'] as String?,
+      address:     row['address'] as String?,
+      latitude:    (row['latitude'] as num?)?.toDouble(),
+      longitude:   (row['longitude'] as num?)?.toDouble(),
+      placeSource: row['place_source'] as String?,
+      addedById:   row['added_by'] as String,
+      votes:       SpotVotes(mustDo: mustDo, want: want, maybe: maybe, skip: skip),
+      comments:    comments,
     );
   }
 
@@ -138,6 +142,10 @@ abstract final class SpotService {
     String? sourceUrl,
     String? mapsUrl,
     String? notes,
+    String? address,
+    double? latitude,
+    double? longitude,
+    String? placeSource,
   }) async {
     final inserted = await supabase.from('spots').insert({
       'trip_id':  tripId,
@@ -147,9 +155,13 @@ abstract final class SpotService {
       'category': _catToDb(category),
       'status':   _statusToDb(status),
       'added_by': addedBy,
-      if (sourceUrl != null && sourceUrl.trim().isNotEmpty) 'source_url': sourceUrl.trim(),
-      if (mapsUrl   != null && mapsUrl.trim().isNotEmpty)   'maps_url':   mapsUrl.trim(),
-      if (notes     != null && notes.trim().isNotEmpty)     'notes':      notes.trim(),
+      if (sourceUrl   != null && sourceUrl.trim().isNotEmpty)   'source_url':   sourceUrl.trim(),
+      if (mapsUrl     != null && mapsUrl.trim().isNotEmpty)     'maps_url':     mapsUrl.trim(),
+      if (notes       != null && notes.trim().isNotEmpty)       'notes':        notes.trim(),
+      if (address     != null && address.trim().isNotEmpty)     'address':      address.trim(),
+      if (latitude    != null)                                  'latitude':     latitude,
+      if (longitude   != null)                                  'longitude':    longitude,
+      if (placeSource != null && placeSource.trim().isNotEmpty) 'place_source': placeSource.trim(),
     }).select('*, spot_votes(*), spot_comments(*)').single();
     return _spotFromRow(inserted);
   }

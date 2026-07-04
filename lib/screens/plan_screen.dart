@@ -244,6 +244,57 @@ class _PlanScreenState extends State<PlanScreen> {
     }
   }
 
+  void _onEditDay(TripDay day) {
+    _showEditDaySheet(context, day: day, onSaved: (city, date, notes, clearNotes) {
+      setState(() {
+        final idx = _days.indexWhere((d) => d.id == day.id);
+        if (idx != -1) {
+          _days[idx] = TripDay(
+            id: day.id,
+            dayNumber: day.dayNumber,
+            date: date ?? day.date,
+            city: city ?? day.city,
+            notes: clearNotes ? null : (notes ?? day.notes),
+            items: _days[idx].items,
+          );
+        }
+      });
+      PlanService.updateDay(
+        day.id, city: city, date: date, notes: notes, clearNotes: clearNotes,
+      ).catchError((_) => _silentReload());
+    });
+  }
+
+  void _onMoveItem(ItineraryItem item, String newDayId) {
+    final fromDay = _days.where((d) => d.id == item.dayId).firstOrNull;
+    final toDay   = _days.where((d) => d.id == newDayId).firstOrNull;
+    if (fromDay == null || toDay == null) return;
+    final moved = ItineraryItem(
+      id: item.id, dayId: newDayId, title: item.title, type: item.type,
+      time: item.time, city: item.city, location: item.location,
+      mapsUrl: item.mapsUrl, confirmationUrl: item.confirmationUrl,
+      notes: item.notes, linkedSpotId: item.linkedSpotId,
+      linkedDocIds: item.linkedDocIds,
+    );
+    setState(() {
+      fromDay.items.removeWhere((i) => i.id == item.id);
+      toDay.items.add(moved);
+      _selectedItemId = item.id;
+    });
+    PlanService.moveItem(item.id, newDayId).catchError((_) => _silentReload());
+  }
+
+  Future<void> _onDuplicateItem(ItineraryItem item) async {
+    if (_userId.isEmpty) return;
+    try {
+      final copy = await PlanService.duplicateItem(item, createdBy: _userId);
+      if (!mounted) return;
+      final day = _days.where((d) => d.id == copy.dayId).firstOrNull;
+      if (day == null) return;
+      setState(() => day.items.add(copy));
+    } catch (_) {}
+  }
+
   Future<void> _addDay(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
     final draft = await _showAddDayDialog(context);
@@ -327,6 +378,7 @@ class _PlanScreenState extends State<PlanScreen> {
                                           _selectDay(_days[i].id),
                                       daySelected:
                                           _selectedDayId == _days[i].id,
+                                      onEditDay: () => _onEditDay(_days[i]),
                                     ),
                                   ),
                           ),
@@ -353,8 +405,11 @@ class _PlanScreenState extends State<PlanScreen> {
           day: day,
           spots: _spots,
           docs: _docs,
+          days: _days,
           onDelete: () => _deleteItem(item.id),
           onUpdated: _updateItem,
+          onMove: (newDayId) => _onMoveItem(item, newDayId),
+          onDuplicate: () => _onDuplicateItem(item),
         ),
       );
     }
@@ -464,6 +519,7 @@ class _PlanScreenState extends State<PlanScreen> {
                           if (item != null && day != null) {
                             final spots = _spots;
                             final docs  = _docs;
+                            final days  = List<TripDay>.from(_days);
                             Navigator.push(
                               ctx,
                               MaterialPageRoute(
@@ -472,14 +528,18 @@ class _PlanScreenState extends State<PlanScreen> {
                                   day: day,
                                   spots: spots,
                                   docs: docs,
+                                  days: days,
                                   onDelete: () => _deleteItem(id),
                                   onUpdated: _updateItem,
+                                  onMove: (newDayId) => _onMoveItem(item, newDayId),
+                                  onDuplicate: () => _onDuplicateItem(item),
                                 ),
                               ),
                             );
                           }
                         },
                         onAddItem: () => _addItem(context, _days[i].id),
+                        onEditDay: () => _onEditDay(_days[i]),
                       ),
                     ),
       floatingActionButton: FloatingActionButton.extended(
@@ -655,6 +715,153 @@ class _DayDetailPanel extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ─── Edit day sheet ───────────────────────────────────────────────────────────
+
+typedef _EditDaySaved = void Function(
+  String? city, DateTime? date, String? notes, bool clearNotes);
+
+void _showEditDaySheet(
+  BuildContext context, {
+  required TripDay day,
+  required _EditDaySaved onSaved,
+}) {
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => _EditDaySheet(day: day, onSaved: onSaved),
+  );
+}
+
+class _EditDaySheet extends StatefulWidget {
+  const _EditDaySheet({required this.day, required this.onSaved});
+  final TripDay day;
+  final _EditDaySaved onSaved;
+
+  @override
+  State<_EditDaySheet> createState() => _EditDaySheetState();
+}
+
+class _EditDaySheetState extends State<_EditDaySheet> {
+  late final TextEditingController _cityCtrl;
+  late final TextEditingController _notesCtrl;
+  late DateTime _date;
+
+  @override
+  void initState() {
+    super.initState();
+    _cityCtrl  = TextEditingController(text: widget.day.city);
+    _notesCtrl = TextEditingController(text: widget.day.notes ?? '');
+    _date      = widget.day.date;
+  }
+
+  @override
+  void dispose() {
+    _cityCtrl.dispose();
+    _notesCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _date,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2035),
+    );
+    if (picked != null) setState(() => _date = picked);
+  }
+
+  void _save() {
+    final city  = _cityCtrl.text.trim();
+    final notes = _notesCtrl.text.trim();
+    final origNotes = widget.day.notes ?? '';
+    widget.onSaved(
+      city.isNotEmpty && city != widget.day.city ? city : null,
+      _date != widget.day.date ? _date : null,
+      notes.isNotEmpty ? notes : null,
+      notes.isEmpty && origNotes.isNotEmpty,
+    );
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.65,
+      minChildSize: 0.4,
+      maxChildSize: 0.9,
+      expand: false,
+      builder: (_, ctrl) => DecoratedBox(
+        decoration: const BoxDecoration(
+          color: kColorPaper,
+          borderRadius: kRadiusSheet,
+        ),
+        child: ListView(
+          controller: ctrl,
+          padding: EdgeInsets.fromLTRB(
+            kSpace4, kSpace2, kSpace4,
+            kSpace4 + MediaQuery.paddingOf(context).bottom,
+          ),
+          children: [
+            const WabwayDragHandle(),
+            const SizedBox(height: kSpace3),
+            Text('Edit Day ${widget.day.dayNumber}', style: kStyleTitle),
+            const SizedBox(height: kSpace5),
+
+            Text('Date', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
+            const SizedBox(height: kSpace2),
+            GestureDetector(
+              onTap: _pickDate,
+              child: Container(
+                height: 48,
+                padding: const EdgeInsets.symmetric(horizontal: kSpace3),
+                decoration: BoxDecoration(
+                  color: kColorSurfaceSunken,
+                  borderRadius: kRadiusMd,
+                  border: Border.all(color: kColorBorder),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.calendar_today_rounded, size: 16, color: kColorInkSoft),
+                    const SizedBox(width: kSpace2),
+                    Text(
+                      '${_date.year}-${_date.month.toString().padLeft(2, '0')}-${_date.day.toString().padLeft(2, '0')}',
+                      style: kStyleBody,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: kSpace4),
+            WabwayTextField(
+              label: 'City',
+              hint: 'e.g. Tokyo',
+              controller: _cityCtrl,
+              textInputAction: TextInputAction.next,
+            ),
+
+            const SizedBox(height: kSpace4),
+            WabwayTextField(
+              label: 'Notes (optional)',
+              hint: 'Any notes for this day',
+              controller: _notesCtrl,
+              maxLines: 3,
+            ),
+
+            const SizedBox(height: kSpace5),
+            WabwayButton(
+              label: 'Save changes',
+              onPressed: _save,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

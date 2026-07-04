@@ -77,6 +77,25 @@ class _TravelItemCardState extends State<TravelItemCard> {
                         Row(
                           children: [
                             _TypeChip(type: item.type),
+                            if (item.status != TravelBookingStatus.booked) ...[
+                              const SizedBox(width: kSpace2),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: item.status.softColor,
+                                  borderRadius: kRadiusPill,
+                                  border: Border.all(color: item.status.color.withValues(alpha: 0.3)),
+                                ),
+                                child: Text(
+                                  item.status.label,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: item.status.color,
+                                  ),
+                                ),
+                              ),
+                            ],
                             const Spacer(),
                             if (item.time != null)
                               Text(

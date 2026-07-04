@@ -5,6 +5,7 @@ import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/wabway_button.dart';
 import '../../widgets/wabway_text_field.dart';
+import '../../widgets/destination_autocomplete.dart';
 
 class CreateTripScreen extends StatefulWidget {
   const CreateTripScreen({super.key, required this.onCreated});
@@ -138,11 +139,10 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                             textInputAction: TextInputAction.next,
                           ),
                           const SizedBox(height: kSpace4),
-                          WabwayTextField(
+                          DestinationAutocomplete(
+                            controller: _destinationCtrl,
                             label: 'Destination (optional)',
                             hint: 'e.g. Tokyo, Japan',
-                            controller: _destinationCtrl,
-                            textInputAction: TextInputAction.next,
                           ),
                           const SizedBox(height: kSpace4),
                           Row(

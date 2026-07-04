@@ -8,12 +8,16 @@ class TripState extends InheritedWidget {
     required this.trip,
     required this.members,
     required super.child,
+    this.allTrips = const [],
     this.onRefresh,
+    this.onSwitchTrip,
   });
 
   final AppTrip trip;
   final List<AppTripMember> members;
+  final List<AppTrip> allTrips;
   final VoidCallback? onRefresh;
+  final void Function(AppTrip)? onSwitchTrip;
 
   static TripState? maybeOf(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<TripState>();
@@ -27,10 +31,18 @@ class TripState extends InheritedWidget {
   static List<AppTripMember> membersOf(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<TripState>()?.members ?? [];
 
+  static List<AppTrip> allTripsOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<TripState>()?.allTrips ?? [];
+
   static void refresh(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<TripState>()?.onRefresh?.call();
 
+  static void switchTrip(BuildContext context, AppTrip trip) =>
+      context.dependOnInheritedWidgetOfExactType<TripState>()?.onSwitchTrip?.call(trip);
+
   @override
   bool updateShouldNotify(TripState old) =>
-      trip.id != old.trip.id || members != old.members;
+      trip.id != old.trip.id ||
+      members != old.members ||
+      allTrips.length != old.allTrips.length;
 }

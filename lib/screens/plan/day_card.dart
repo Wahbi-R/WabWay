@@ -19,6 +19,7 @@ class TripDayCard extends StatefulWidget {
     this.isDesktop = false,
     this.onDayTap,
     this.daySelected = false,
+    this.onEditDay,
   });
 
   final TripDay day;
@@ -28,6 +29,7 @@ class TripDayCard extends StatefulWidget {
   final bool isDesktop;
   final VoidCallback? onDayTap;
   final bool daySelected;
+  final VoidCallback? onEditDay;
 
   @override
   State<TripDayCard> createState() => _TripDayCardState();
@@ -62,6 +64,7 @@ class _TripDayCardState extends State<TripDayCard> {
             isDesktop: widget.isDesktop,
             selected: widget.daySelected,
             onTap: headerTappable ? _handleHeaderTap : null,
+            onEdit: widget.onEditDay,
           ),
           const Divider(height: 1, color: kColorBorder),
           if (items.isEmpty)
@@ -103,6 +106,7 @@ class _DayHeader extends StatelessWidget {
     required this.isDesktop,
     required this.selected,
     this.onTap,
+    this.onEdit,
   });
 
   final TripDay day;
@@ -111,6 +115,7 @@ class _DayHeader extends StatelessWidget {
   final bool isDesktop;
   final bool selected;
   final VoidCallback? onTap;
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -224,6 +229,14 @@ class _DayHeader extends StatelessWidget {
                     ),
                   ),
                 ),
+              if (onEdit != null) ...[
+                const SizedBox(width: kSpace2),
+                GestureDetector(
+                  onTap: onEdit,
+                  child: const Icon(Icons.edit_outlined,
+                      size: 16, color: kColorInkSoft),
+                ),
+              ],
             ],
           ),
 

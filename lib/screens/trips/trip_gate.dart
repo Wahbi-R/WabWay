@@ -24,6 +24,7 @@ class _TripGateState extends State<TripGate> {
   bool _error = false;
   List<AppTrip> _trips = [];
   List<AppTripMember> _members = [];
+  int _selectedIndex = 0;
 
   @override
   void initState() {
@@ -40,11 +41,31 @@ class _TripGateState extends State<TripGate> {
         setState(() { _trips = []; _loading = false; });
         return;
       }
-      final members = await TripService.loadTripMembers(trips.first.id);
+      // Keep selection index valid after refresh
+      final idx = _selectedIndex.clamp(0, trips.length - 1);
+      final members = await TripService.loadTripMembers(trips[idx].id);
       if (!mounted) return;
-      setState(() { _trips = trips; _members = members; _loading = false; });
+      setState(() {
+        _trips = trips;
+        _members = members;
+        _selectedIndex = idx;
+        _loading = false;
+      });
     } catch (_) {
       if (mounted) setState(() { _loading = false; _error = true; });
+    }
+  }
+
+  Future<void> _switchTrip(AppTrip trip) async {
+    final idx = _trips.indexWhere((t) => t.id == trip.id);
+    if (idx < 0 || idx == _selectedIndex) return;
+    setState(() { _loading = true; });
+    try {
+      final members = await TripService.loadTripMembers(trip.id);
+      if (!mounted) return;
+      setState(() { _selectedIndex = idx; _members = members; _loading = false; });
+    } catch (_) {
+      if (mounted) setState(() { _loading = false; });
     }
   }
 
@@ -64,9 +85,11 @@ class _TripGateState extends State<TripGate> {
     }
 
     return TripState(
-      trip: _trips.first,
+      trip: _trips[_selectedIndex],
       members: _members,
+      allTrips: _trips,
       onRefresh: _load,
+      onSwitchTrip: _switchTrip,
       child: const AppShell(),
     );
   }
@@ -89,7 +112,7 @@ class _NoTripsScreen extends StatelessWidget {
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => const _JoinWithCodeSheet(),
+      builder: (_) => const JoinWithCodeSheet(),
     );
     if (tripId != null) {
       await onTripJoined(tripId);
@@ -188,14 +211,14 @@ class _NoTripsScreen extends StatelessWidget {
 
 // ─── Join-with-code sheet ─────────────────────────────────────────────────────
 
-class _JoinWithCodeSheet extends StatefulWidget {
-  const _JoinWithCodeSheet();
+class JoinWithCodeSheet extends StatefulWidget {
+  const JoinWithCodeSheet();
 
   @override
-  State<_JoinWithCodeSheet> createState() => _JoinWithCodeSheetState();
+  State<JoinWithCodeSheet> createState() => _JoinWithCodeSheetState();
 }
 
-class _JoinWithCodeSheetState extends State<_JoinWithCodeSheet> {
+class _JoinWithCodeSheetState extends State<JoinWithCodeSheet> {
   final _codeCtrl = TextEditingController();
   bool _loading = false;
   String? _error;

@@ -13,7 +13,10 @@ import '../screens/more_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/members_screen.dart';
 import '../screens/travel_screen.dart';
+import '../screens/map_screen.dart';
+import '../screens/links_screen.dart';
 import '../screens/placeholder_screen.dart';
+import '../screens/trips/trip_switcher_sheet.dart';
 import '../core/trip/trip_state.dart';
 
 // ─── Navigation destination models ───────────────────────────────────────────
@@ -438,52 +441,59 @@ class _WabwaySidebar extends StatelessWidget {
 class _SidebarHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final trip = TripState.maybeOf(context)?.trip;
-    return Padding(
-      padding: const EdgeInsets.all(kSpace5),
-      child: Row(
-        children: [
-          Container(
-            width: 30,
-            height: 30,
-            decoration: const BoxDecoration(
-              color: kColorPrimary,
-              borderRadius: kRadiusXs,
-            ),
-            child: Center(
-              child: Text(
-                'W',
-                style: kStyleTitle.copyWith(
-                  color: kColorTextOnPrimary,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
+    final trip    = TripState.maybeOf(context)?.trip;
+    final hasMany = (TripState.allTripsOf(context)).length > 1;
+
+    return GestureDetector(
+      onTap: () => showTripSwitcherSheet(context),
+      child: Padding(
+        padding: const EdgeInsets.all(kSpace5),
+        child: Row(
+          children: [
+            Container(
+              width: 30,
+              height: 30,
+              decoration: const BoxDecoration(
+                color: kColorPrimary,
+                borderRadius: kRadiusXs,
+              ),
+              child: Center(
+                child: Text(
+                  'W',
+                  style: kStyleTitle.copyWith(
+                    color: kColorTextOnPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: kSpace3),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  trip?.name ?? 'Wabway',
-                  style: kStyleBodyBold,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  trip?.subtitle.isNotEmpty == true
-                      ? trip!.subtitle
-                      : 'Your trip',
-                  style: kStyleOverline,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+            const SizedBox(width: kSpace3),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    trip?.name ?? 'Wabway',
+                    style: kStyleBodyBold,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    trip?.subtitle.isNotEmpty == true
+                        ? trip!.subtitle
+                        : 'Your trip',
+                    style: kStyleOverline,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+            if (hasMany)
+              Icon(Icons.unfold_more_rounded, size: 16, color: kColorInkSoft),
+          ],
+        ),
       ),
     );
   }

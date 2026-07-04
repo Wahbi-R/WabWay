@@ -20,16 +20,22 @@ class ItemDetailScreen extends StatelessWidget {
     required this.day,
     this.spots = const [],
     this.docs = const [],
+    this.days = const [],
     this.onDelete,
     this.onUpdated,
+    this.onMove,
+    this.onDuplicate,
   });
 
   final ItineraryItem item;
   final TripDay day;
   final List<Spot> spots;
   final List<TripDocument> docs;
+  final List<TripDay> days;
   final VoidCallback? onDelete;
   final ValueChanged<ItineraryItem>? onUpdated;
+  final ValueChanged<String>? onMove;
+  final VoidCallback? onDuplicate;
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +47,10 @@ class ItemDetailScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.more_vert_rounded),
             color: kColorInkSoft,
-            onPressed: () => _showActionsSheet(context, item, spots, docs, onDelete, onUpdated),
+            onPressed: () => _showActionsSheet(
+              context, item, spots, docs, onDelete, onUpdated,
+              days: days, onMove: onMove, onDuplicate: onDuplicate,
+            ),
           ),
           const SizedBox(width: kSpace2),
         ],
@@ -52,8 +61,11 @@ class ItemDetailScreen extends StatelessWidget {
           day: day,
           spots: spots,
           docs: docs,
+          days: days,
           onDelete: onDelete,
           onUpdated: onUpdated,
+          onMove: onMove,
+          onDuplicate: onDuplicate,
         ),
       ),
     );
@@ -69,16 +81,22 @@ class ItemDetailContent extends StatelessWidget {
     required this.day,
     this.spots = const [],
     this.docs = const [],
+    this.days = const [],
     this.onDelete,
     this.onUpdated,
+    this.onMove,
+    this.onDuplicate,
   });
 
   final ItineraryItem item;
   final TripDay day;
   final List<Spot> spots;
   final List<TripDocument> docs;
+  final List<TripDay> days;
   final VoidCallback? onDelete;
   final ValueChanged<ItineraryItem>? onUpdated;
+  final ValueChanged<String>? onMove;
+  final VoidCallback? onDuplicate;
 
   @override
   Widget build(BuildContext context) {
@@ -117,7 +135,11 @@ class ItemDetailContent extends StatelessWidget {
               ],
 
               const SizedBox(height: kSpace4),
-              _ActionsSection(item: item, spots: spots, docs: docs, onDelete: onDelete, onUpdated: onUpdated),
+              _ActionsSection(
+                item: item, spots: spots, docs: docs, days: days,
+                onDelete: onDelete, onUpdated: onUpdated,
+                onMove: onMove, onDuplicate: onDuplicate,
+              ),
               const SizedBox(height: kSpace8),
             ],
           ),
@@ -402,14 +424,20 @@ class _ActionsSection extends StatelessWidget {
     required this.item,
     this.spots = const [],
     this.docs = const [],
+    this.days = const [],
     this.onDelete,
     this.onUpdated,
+    this.onMove,
+    this.onDuplicate,
   });
   final ItineraryItem item;
   final List<Spot> spots;
   final List<TripDocument> docs;
+  final List<TripDay> days;
   final VoidCallback? onDelete;
   final ValueChanged<ItineraryItem>? onUpdated;
+  final ValueChanged<String>? onMove;
+  final VoidCallback? onDuplicate;
 
   @override
   Widget build(BuildContext context) {
@@ -443,6 +471,22 @@ class _ActionsSection extends StatelessWidget {
               size: WabwayButtonSize.sm,
               onPressed: () => _editItem(context),
             ),
+            if (onDuplicate != null)
+              WabwayButton(
+                label: 'Duplicate',
+                icon: Icons.copy_rounded,
+                variant: WabwayButtonVariant.ghost,
+                size: WabwayButtonSize.sm,
+                onPressed: onDuplicate,
+              ),
+            if (onMove != null && days.length > 1)
+              WabwayButton(
+                label: 'Move day',
+                icon: Icons.swap_vert_rounded,
+                variant: WabwayButtonVariant.ghost,
+                size: WabwayButtonSize.sm,
+                onPressed: () => _moveItem(context),
+              ),
             WabwayButton(
               label: 'Delete',
               icon: Icons.delete_outline_rounded,
@@ -468,6 +512,17 @@ class _ActionsSection extends StatelessWidget {
       onUpdated?.call(updated);
       Navigator.maybePop(context);
     }
+  }
+
+  Future<void> _moveItem(BuildContext context) async {
+    final otherDays = days.where((d) => d.id != item.dayId).toList();
+    if (otherDays.isEmpty || !context.mounted) return;
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _MoveToDaySheet(days: otherDays),
+    );
+    if (picked != null && context.mounted) onMove?.call(picked);
   }
 
   void _snack(BuildContext context, String msg) {
@@ -560,8 +615,11 @@ void _showActionsSheet(
   List<Spot> spots,
   List<TripDocument> docs,
   VoidCallback? onDelete,
-  ValueChanged<ItineraryItem>? onUpdated,
-) {
+  ValueChanged<ItineraryItem>? onUpdated, {
+  List<TripDay> days = const [],
+  ValueChanged<String>? onMove, // newDayId
+  VoidCallback? onDuplicate,
+}) {
   showModalBottomSheet<void>(
     context: context,
     backgroundColor: kColorPaper,
@@ -581,11 +639,6 @@ void _showActionsSheet(
               },
             ),
           WabwayActionTile(
-            icon: Icons.attach_file_rounded,
-            label: 'Attach Document',
-            onTap: () => Navigator.pop(ctx),
-          ),
-          WabwayActionTile(
             icon: Icons.edit_rounded,
             label: 'Edit item',
             onTap: () async {
@@ -603,6 +656,32 @@ void _showActionsSheet(
               }
             },
           ),
+          if (onDuplicate != null)
+            WabwayActionTile(
+              icon: Icons.copy_rounded,
+              label: 'Duplicate item',
+              onTap: () {
+                Navigator.pop(ctx);
+                onDuplicate();
+              },
+            ),
+          if (onMove != null && days.length > 1)
+            WabwayActionTile(
+              icon: Icons.swap_vert_rounded,
+              label: 'Move to another day',
+              onTap: () async {
+                Navigator.pop(ctx);
+                final otherDays =
+                    days.where((d) => d.id != item.dayId).toList();
+                if (otherDays.isEmpty || !context.mounted) return;
+                final picked = await showModalBottomSheet<String>(
+                  context: context,
+                  backgroundColor: Colors.transparent,
+                  builder: (_) => _MoveToDaySheet(days: otherDays),
+                );
+                if (picked != null && context.mounted) onMove(picked);
+              },
+            ),
           WabwayActionTile(
             icon: Icons.delete_outline_rounded,
             label: 'Delete',
@@ -618,5 +697,80 @@ void _showActionsSheet(
       ),
     ),
   );
+}
+
+// ─── Move-to-day picker ────────────────────────────────────────────────────────
+
+class _MoveToDaySheet extends StatelessWidget {
+  const _MoveToDaySheet({required this.days});
+  final List<TripDay> days;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: kColorPaper,
+        borderRadius: kRadiusSheet,
+      ),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          kSpace4, kSpace3, kSpace4,
+          kSpace6 + MediaQuery.paddingOf(context).bottom),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const WabwayDragHandle(),
+            const SizedBox(height: kSpace3),
+            Text('Move to day', style: kStyleTitle),
+            const SizedBox(height: kSpace4),
+            DecoratedBox(
+              decoration: kCardDecoration(),
+              child: Column(
+                children: days.asMap().entries.map((e) {
+                  final i   = e.key;
+                  final day = e.value;
+                  return Column(
+                    children: [
+                      ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: kSpace4, vertical: kSpace2),
+                        leading: Container(
+                          width: 30,
+                          height: 30,
+                          decoration: const BoxDecoration(
+                            color: kColorPrimarySoft,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: Text(
+                              '${day.dayNumber}',
+                              style: kStyleCaptionMedium.copyWith(
+                                color: kColorPrimaryDark,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
+                        title: Text(
+                          'Day ${day.dayNumber} · ${day.city}',
+                          style: kStyleBodyMedium,
+                        ),
+                        subtitle: Text(fmtDayDate(day.date),
+                            style: kStyleCaption),
+                        onTap: () => Navigator.pop(context, day.id),
+                      ),
+                      if (i < days.length - 1)
+                        const Divider(height: 1, indent: kSpace4 + 30 + kSpace3),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 

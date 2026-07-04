@@ -4,11 +4,16 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/auth/profile_state.dart';
 import '../../core/supabase/client.dart';
 import '../../core/supabase/doc_service.dart';
+import '../../core/supabase/money_service.dart';
+import '../../core/supabase/plan_service.dart';
+import '../../core/supabase/travel_service.dart';
 import '../../core/supabase/trip_service.dart';
 import '../../core/trip/trip_state.dart';
 import '../../data/docs_data.dart';
 import '../../data/money_data.dart';
+import '../../data/plan_data.dart';
 import '../../data/spot_data.dart';
+import '../../data/travel_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
@@ -207,25 +212,20 @@ class _DocDetailContentState extends State<DocDetailContent> {
   }
 
   void _showLinkPicker() {
-    final alreadyTripIds = _links
-        .where((l) => l.type == DocLinkedType.trip)
-        .map((l) => l.linkedId)
-        .toSet();
-    final alreadySpotIds = _links
-        .where((l) => l.type == DocLinkedType.spot)
-        .map((l) => l.linkedId)
+    final alreadyLinked = _links
+        .map((l) => '${l.type.name}_${l.linkedId}')
         .toSet();
 
     showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: kColorPaper,
       shape: const RoundedRectangleBorder(borderRadius: kRadiusSheet),
       builder: (ctx) => _LinkPickerSheet(
         tripId: widget.tripId,
         tripName: widget.tripName,
         availableSpots: widget.availableSpots,
-        alreadyLinkedTripIds: alreadyTripIds,
-        alreadyLinkedSpotIds: alreadySpotIds,
+        alreadyLinked: alreadyLinked,
         onPick: (type, linkedId) {
           Navigator.pop(ctx);
           _addLink(type, linkedId);
@@ -562,88 +562,208 @@ class _LinkedRow extends StatelessWidget {
 
 // ── Link picker sheet ─────────────────────────────────────────────────────────
 
-class _LinkPickerSheet extends StatelessWidget {
+class _LinkPickerSheet extends StatefulWidget {
   const _LinkPickerSheet({
     required this.tripId,
     required this.tripName,
     required this.availableSpots,
-    required this.alreadyLinkedTripIds,
-    required this.alreadyLinkedSpotIds,
+    required this.alreadyLinked,
     required this.onPick,
   });
 
   final String tripId;
   final String tripName;
   final List<Spot> availableSpots;
-  final Set<String> alreadyLinkedTripIds;
-  final Set<String> alreadyLinkedSpotIds;
+  final Set<String> alreadyLinked; // "$type_$linkedId" keys
   final void Function(DocLinkedType type, String linkedId) onPick;
 
-  bool get _tripAvailable => !alreadyLinkedTripIds.contains(tripId);
+  @override
+  State<_LinkPickerSheet> createState() => _LinkPickerSheetState();
+}
 
-  List<Spot> get _pickableSpots =>
-      availableSpots.where((s) => !alreadyLinkedSpotIds.contains(s.id)).toList();
+class _LinkPickerSheetState extends State<_LinkPickerSheet> {
+  List<Receipt>? _receipts;
+  List<CashWithdrawal>? _withdrawals;
+  List<TravelItem>? _travelItems;
+  List<TripDay>? _days;
+  bool _loading = true;
 
-  bool get _hasOptions => _tripAvailable || _pickableSpots.isNotEmpty;
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final results = await Future.wait([
+        MoneyService.loadReceipts(widget.tripId),
+        MoneyService.loadWithdrawals(widget.tripId),
+        TravelService.loadItems(widget.tripId),
+        PlanService.loadAll(widget.tripId),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _receipts     = results[0] as List<Receipt>;
+        _withdrawals  = results[1] as List<CashWithdrawal>;
+        _travelItems  = results[2] as List<TravelItem>;
+        _days         = results[3] as List<TripDay>;
+        _loading      = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  bool _linked(DocLinkedType type, String id) =>
+      widget.alreadyLinked.contains('${type.name}_$id');
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return DraggableScrollableSheet(
+      initialChildSize: 0.7,
+      minChildSize: 0.4,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (_, ctrl) => Column(
         children: [
           const WabwayDragHandle(),
           Padding(
             padding: const EdgeInsets.fromLTRB(kSpace4, 0, kSpace4, kSpace3),
-            child: Text('Add link', style: kStyleTitle),
+            child: Row(
+              children: [
+                Text('Link to…', style: kStyleTitle),
+              ],
+            ),
           ),
-          if (!_hasOptions)
-            Padding(
-              padding:
-                  const EdgeInsets.fromLTRB(kSpace4, 0, kSpace4, kSpace4),
-              child: Text(
-                'All available links have been added.',
-                style: kStyleBody.copyWith(color: kColorInkSoft),
-              ),
-            )
-          else ...[
-            if (_tripAvailable) ...[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                    kSpace4, 0, kSpace4, kSpace2),
-                child: Text('Trip',
-                    style: kStyleCaptionMedium.copyWith(
-                        color: kColorInkSoft)),
-              ),
-              WabwayActionTile(
-                icon: DocLinkedType.trip.icon,
-                label: tripName,
-                onTap: () => onPick(DocLinkedType.trip, tripId),
-              ),
-            ],
-            if (_pickableSpots.isNotEmpty) ...[
-              if (_tripAvailable)
-                const Divider(
-                    height: kSpace4, thickness: 1, color: kColorBorder),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                    kSpace4, 0, kSpace4, kSpace2),
-                child: Text('Spots',
-                    style: kStyleCaptionMedium.copyWith(
-                        color: kColorInkSoft)),
-              ),
-              ..._pickableSpots.map(
-                (spot) => WabwayActionTile(
-                  icon: DocLinkedType.spot.icon,
-                  label: spot.name,
-                  onTap: () => onPick(DocLinkedType.spot, spot.id),
-                ),
-              ),
-            ],
-          ],
-          const SizedBox(height: kSpace4),
+          const Divider(height: 1, color: kColorBorder),
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : ListView(
+                    controller: ctrl,
+                    padding: const EdgeInsets.only(bottom: kSpace8),
+                    children: [
+                      // ── Trip ───────────────────────────────────────────
+                      if (!_linked(DocLinkedType.trip, widget.tripId)) ...[
+                        const _SectionHeader(label: 'Trip'),
+                        WabwayActionTile(
+                          icon: DocLinkedType.trip.icon,
+                          label: widget.tripName,
+                          onTap: () => widget.onPick(DocLinkedType.trip, widget.tripId),
+                        ),
+                      ],
+
+                      // ── Spots ──────────────────────────────────────────
+                      ..._buildSection(
+                        label: 'Spots',
+                        items: widget.availableSpots,
+                        linked: (s) => _linked(DocLinkedType.spot, s.id),
+                        icon: (_) => DocLinkedType.spot.icon,
+                        title: (s) => s.name,
+                        subtitle: (s) => '${s.city}, ${s.area}',
+                        onTap: (s) => widget.onPick(DocLinkedType.spot, s.id),
+                      ),
+
+                      // ── Receipts ───────────────────────────────────────
+                      ..._buildSection(
+                        label: 'Receipts',
+                        items: _receipts ?? [],
+                        linked: (r) => _linked(DocLinkedType.receipt, r.id),
+                        icon: (_) => DocLinkedType.receipt.icon,
+                        title: (r) => r.title,
+                        subtitle: (r) => fmtAmount(r.amount, r.currency),
+                        onTap: (r) => widget.onPick(DocLinkedType.receipt, r.id),
+                      ),
+
+                      // ── Cash withdrawals ────────────────────────────────
+                      ..._buildSection(
+                        label: 'Cash withdrawals',
+                        items: _withdrawals ?? [],
+                        linked: (w) => _linked(DocLinkedType.cashWithdrawal, w.id),
+                        icon: (_) => DocLinkedType.cashWithdrawal.icon,
+                        title: (w) => fmtAmount(w.amount, w.currency),
+                        subtitle: (w) => _fmtShortDate(w.date),
+                        onTap: (w) => widget.onPick(DocLinkedType.cashWithdrawal, w.id),
+                      ),
+
+                      // ── Travel items ────────────────────────────────────
+                      ..._buildSection(
+                        label: 'Travel',
+                        items: _travelItems ?? [],
+                        linked: (t) => _linked(DocLinkedType.travelItem, t.id),
+                        icon: (_) => DocLinkedType.travelItem.icon,
+                        title: (t) => t.title,
+                        subtitle: (t) => t.type.label,
+                        onTap: (t) => widget.onPick(DocLinkedType.travelItem, t.id),
+                      ),
+
+                      // ── Plan days ───────────────────────────────────────
+                      if ((_days ?? []).isNotEmpty) ...[
+                        const _SectionHeader(label: 'Plan'),
+                        for (final day in _days!) ...[
+                          // Day itself
+                          if (!_linked(DocLinkedType.itineraryDay, day.id))
+                            WabwayActionTile(
+                              icon: DocLinkedType.itineraryDay.icon,
+                              label: 'Day ${day.dayNumber} — ${day.city}',
+                              subtitle: _fmtShortDate(day.date),
+                              onTap: () => widget.onPick(DocLinkedType.itineraryDay, day.id),
+                            ),
+                          // Items within the day
+                          for (final item in day.items)
+                            if (!_linked(DocLinkedType.itineraryItem, item.id))
+                              WabwayActionTile(
+                                icon: DocLinkedType.itineraryItem.icon,
+                                label: item.title,
+                                subtitle: 'Day ${day.dayNumber} · ${item.type.label}',
+                                onTap: () => widget.onPick(DocLinkedType.itineraryItem, item.id),
+                              ),
+                        ],
+                      ],
+                    ],
+                  ),
+          ),
         ],
+      ),
+    );
+  }
+
+  List<Widget> _buildSection<T>({
+    required String label,
+    required List<T> items,
+    required bool Function(T) linked,
+    required IconData Function(T) icon,
+    required String Function(T) title,
+    required String Function(T) subtitle,
+    required void Function(T) onTap,
+  }) {
+    final available = items.where((i) => !linked(i)).toList();
+    if (available.isEmpty) return [];
+    return [
+      _SectionHeader(label: label),
+      for (final item in available)
+        WabwayActionTile(
+          icon: icon(item),
+          label: title(item),
+          subtitle: subtitle(item),
+          onTap: () => onTap(item),
+        ),
+    ];
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(kSpace4, kSpace4, kSpace4, kSpace1),
+      child: Text(
+        label.toUpperCase(),
+        style: kStyleOverline.copyWith(color: kColorInkSoft, letterSpacing: 1),
       ),
     );
   }
@@ -1137,4 +1257,12 @@ String _fmtDateFull(DateTime d) {
     'July', 'August', 'September', 'October', 'November', 'December',
   ];
   return '${months[d.month - 1]} ${d.day}, ${d.year}';
+}
+
+String _fmtShortDate(DateTime d) {
+  const months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+  return '${months[d.month - 1]} ${d.day}';
 }

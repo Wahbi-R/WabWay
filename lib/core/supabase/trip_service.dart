@@ -49,13 +49,11 @@ abstract final class TripService {
 
   static Future<void> leaveTrip(String tripId) async {
     final userId = supabase.auth.currentUser!.id;
-    final rows = await supabase
+    await supabase
         .from('trip_members')
         .delete()
         .eq('trip_id', tripId)
-        .eq('user_id', userId)
-        .select();
-    if (rows.isEmpty) throw Exception('Could not leave trip');
+        .eq('user_id', userId);
   }
 
   static Future<void> updateTripName(String tripId, String name) async {
@@ -65,5 +63,47 @@ abstract final class TripService {
         .eq('id', tripId)
         .select();
     if (rows.isEmpty) throw Exception('Could not update trip name');
+  }
+
+  static Future<void> transferOwnership(
+      String tripId, String newOwnerId) async {
+    await supabase.rpc('transfer_trip_ownership', params: {
+      'p_trip_id':      tripId,
+      'p_new_owner_id': newOwnerId,
+    });
+  }
+
+  static Future<void> deleteTrip(String tripId) async {
+    await supabase.from('trips').delete().eq('id', tripId);
+  }
+
+  static Future<void> updateTrip(
+    String tripId, {
+    String? name,
+    String? destination,
+    DateTime? startDate,
+    DateTime? endDate,
+    String? defaultCurrency,
+    bool clearDestination = false,
+    bool clearStartDate   = false,
+    bool clearEndDate     = false,
+  }) async {
+    String _pad(int n, int w) => n.toString().padLeft(w, '0');
+    String _fmtDate(DateTime d) =>
+        '${_pad(d.year, 4)}-${_pad(d.month, 2)}-${_pad(d.day, 2)}';
+
+    final updates = <String, dynamic>{
+      if (name != null) 'name': name.trim(),
+      if (clearDestination) 'destination': null
+      else if (destination != null && destination.trim().isNotEmpty)
+        'destination': destination.trim(),
+      if (clearStartDate) 'start_date': null
+      else if (startDate != null) 'start_date': _fmtDate(startDate),
+      if (clearEndDate) 'end_date': null
+      else if (endDate != null) 'end_date': _fmtDate(endDate),
+      if (defaultCurrency != null) 'default_currency': defaultCurrency.toUpperCase(),
+    };
+    if (updates.isEmpty) return;
+    await supabase.from('trips').update(updates).eq('id', tripId);
   }
 }

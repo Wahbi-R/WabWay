@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/auth/profile_state.dart';
+import '../core/supabase/activity_service.dart';
 import '../core/supabase/doc_service.dart';
 import '../core/supabase/money_service.dart';
 import '../core/supabase/plan_service.dart';
@@ -8,12 +9,16 @@ import '../core/supabase/spot_service.dart';
 import '../core/supabase/travel_service.dart';
 import '../core/trip/app_trip.dart';
 import '../core/trip/trip_state.dart';
+import '../data/activity_data.dart';
 import '../data/money_data.dart';
 import '../data/plan_data.dart';
 import '../data/travel_data.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
+import 'import/import_sheet.dart';
+import 'notification_settings_screen.dart';
+import 'global_search_screen.dart';
 
 // ─── Loaded data ──────────────────────────────────────────────────────────────
 
@@ -27,6 +32,7 @@ class _HomeData {
     required this.balances,
     required this.memberMap,
     required this.currency,
+    required this.activityEvents,
   });
 
   final int spotCount;
@@ -37,6 +43,7 @@ class _HomeData {
   final List<MemberBalance> balances;
   final Map<String, String> memberMap; // userId → displayName
   final String currency;
+  final List<ActivityEvent> activityEvents;
 
   double get totalSpent => receipts.fold(0.0, (s, r) => s + r.amount);
 
@@ -93,19 +100,23 @@ class _HomeScreenState extends State<HomeScreen> {
     final myId = ProfileState.of(context).id;
 
     try {
-      final spotsFuture = SpotService.loadSpots(trip.id);
-      final docsFuture = DocService.loadDocuments(trip.id);
-      final planFuture = PlanService.loadAll(trip.id);
-      final travelFuture = TravelService.loadItems(trip.id);
-      final receiptsFuture = MoneyService.loadReceipts(trip.id);
-      final withdrawalsFuture = MoneyService.loadWithdrawals(trip.id);
+      final results = await Future.wait([
+        SpotService.loadSpots(trip.id),
+        DocService.loadDocuments(trip.id),
+        PlanService.loadAll(trip.id),
+        TravelService.loadItems(trip.id),
+        MoneyService.loadReceipts(trip.id),
+        MoneyService.loadWithdrawals(trip.id),
+        ActivityService.loadEvents(trip.id),
+      ]);
 
-      final spots = await spotsFuture;
-      final docs = await docsFuture;
-      final days = await planFuture;
-      final travelItems = await travelFuture;
-      final receipts = await receiptsFuture;
-      final withdrawals = await withdrawalsFuture;
+      final spots        = results[0] as List;
+      final docs         = results[1] as List;
+      final days         = results[2] as List<TripDay>;
+      final travelItems  = results[3] as List<TravelItem>;
+      final receipts     = results[4] as List<Receipt>;
+      final withdrawals  = results[5] as List;
+      final activities   = results[6] as List<ActivityEvent>;
 
       final memberMap = {for (final m in members) m.userId: m.profile.displayName};
       final tripMembers = members
@@ -114,7 +125,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       final balances = calculateBalances(
         receipts,
-        withdrawals,
+        withdrawals.cast(),
         myId: myId,
         members: tripMembers,
       );
@@ -131,6 +142,7 @@ class _HomeScreenState extends State<HomeScreen> {
           balances: balances,
           memberMap: memberMap,
           currency: trip.defaultCurrency,
+          activityEvents: activities,
         );
       });
     } catch (e) {
@@ -159,9 +171,29 @@ class _HomeScreenState extends State<HomeScreen> {
           title: Text('Home', style: kStyleTitle),
           actions: [
             IconButton(
+              icon: const Icon(Icons.download_rounded),
+              color: kColorInkSoft,
+              tooltip: 'Import',
+              onPressed: () => showImportSheet(context),
+            ),
+            IconButton(
+              icon: const Icon(Icons.search_rounded),
+              color: kColorInkSoft,
+              tooltip: 'Search',
+              onPressed: () => showGlobalSearch(
+                context,
+                tripId: TripState.tripOf(context).id,
+              ),
+            ),
+            IconButton(
               icon: const Icon(Icons.notifications_outlined),
               color: kColorInkSoft,
-              onPressed: () {},
+              onPressed: () => Navigator.push<void>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const NotificationSettingsScreen(),
+                ),
+              ),
             ),
             const SizedBox(width: kSpace2),
           ],
@@ -189,9 +221,29 @@ class _HomeScreenState extends State<HomeScreen> {
         title: Text('Home', style: kStyleTitle),
         actions: [
           IconButton(
+            icon: const Icon(Icons.download_rounded),
+            color: kColorInkSoft,
+            tooltip: 'Import',
+            onPressed: () => showImportSheet(context),
+          ),
+          IconButton(
+            icon: const Icon(Icons.search_rounded),
+            color: kColorInkSoft,
+            tooltip: 'Search',
+            onPressed: () => showGlobalSearch(
+              context,
+              tripId: TripState.tripOf(context).id,
+            ),
+          ),
+          IconButton(
             icon: const Icon(Icons.notifications_outlined),
             color: kColorInkSoft,
-            onPressed: () {},
+            onPressed: () => Navigator.push<void>(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const NotificationSettingsScreen(),
+              ),
+            ),
           ),
           const SizedBox(width: kSpace2),
         ],
@@ -583,9 +635,10 @@ class _ActivityFeed extends StatelessWidget {
       );
     }
 
-    final receipts = data!.receipts.take(4).toList();
+    final myId  = ProfileState.of(context).id;
+    final events = data!.activityEvents;
 
-    if (receipts.isEmpty) {
+    if (events.isEmpty) {
       return DecoratedBox(
         decoration: kCardDecoration(),
         child: Padding(
@@ -598,19 +651,16 @@ class _ActivityFeed extends StatelessWidget {
       );
     }
 
-    final myId = ProfileState.of(context).id;
-
     return DecoratedBox(
       decoration: kCardDecoration(),
       child: Column(
-        children: receipts.asMap().entries.map((entry) {
-          final i = entry.key;
-          final receipt = entry.value;
-          final isLast = i == receipts.length - 1;
+        children: events.asMap().entries.map((entry) {
+          final i    = entry.key;
+          final ev   = entry.value;
+          final isLast = i == events.length - 1;
 
-          final payerName = receipt.paidById == myId
-              ? 'You'
-              : (data!.memberMap[receipt.paidById] ?? receipt.paidById);
+          final actorLabel = ev.actorId == myId ? 'You' : ev.actorName;
+          final subtitle   = ev.entityTitle;
 
           return Column(
             children: [
@@ -622,24 +672,23 @@ class _ActivityFeed extends StatelessWidget {
                 leading: Container(
                   width: 36,
                   height: 36,
-                  decoration: const BoxDecoration(
-                    color: kColorSurfaceSunken,
+                  decoration: BoxDecoration(
+                    color: ev.type.softColor,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(receipt.category.icon, size: 18, color: kColorInkSoft),
+                  child: Icon(ev.type.icon, size: 18, color: ev.type.color),
                 ),
                 title: Text(
-                  '$payerName added a receipt',
+                  '$actorLabel ${ev.type.verb}',
                   style: kStyleBodyMedium,
                 ),
-                subtitle: Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Text(
-                    '${receipt.title} · ${fmtAmount(receipt.amount, data!.currency)}',
-                    style: kStyleCaption,
-                  ),
-                ),
-                trailing: Text(_relativeTime(receipt.date), style: kStyleOverline),
+                subtitle: subtitle != null && subtitle.isNotEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(subtitle, style: kStyleCaption),
+                      )
+                    : null,
+                trailing: Text(_relativeTime(ev.createdAt), style: kStyleOverline),
               ),
               if (!isLast) const Divider(height: 1, indent: kSpace4 + 36 + kSpace3),
             ],

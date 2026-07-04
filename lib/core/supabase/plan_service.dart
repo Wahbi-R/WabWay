@@ -199,6 +199,56 @@ abstract final class PlanService {
     await supabase.from('itinerary_days').delete().eq('id', dayId);
   }
 
+  static Future<void> updateDay(
+    String dayId, {
+    String? city,
+    DateTime? date,
+    String? notes,
+    bool clearNotes = false,
+  }) async {
+    final updates = <String, dynamic>{
+      if (city != null && city.trim().isNotEmpty) 'city': city.trim(),
+      if (date != null) 'date': _fmtDate(date),
+      if (clearNotes) 'notes': null
+      else if (notes != null) 'notes': notes.trim().isEmpty ? null : notes.trim(),
+    };
+    if (updates.isEmpty) return;
+    await supabase.from('itinerary_days').update(updates).eq('id', dayId);
+  }
+
+  static Future<void> moveItem(String itemId, String newDayId) async {
+    await supabase
+        .from('itinerary_items')
+        .update({'day_id': newDayId})
+        .eq('id', itemId);
+  }
+
+  static Future<ItineraryItem> duplicateItem(
+    ItineraryItem item, {
+    required String createdBy,
+  }) async {
+    final row = await supabase.from('itinerary_items').insert({
+      'trip_id':    (await supabase
+              .from('itinerary_items')
+              .select('trip_id')
+              .eq('id', item.id)
+              .single())['trip_id'],
+      'day_id':     item.dayId,
+      'title':      '${item.title} (copy)',
+      'type':       _typeToDb(item.type),
+      'created_by': createdBy,
+      'sort_order': 999,
+      if (item.time != null) 'time': item.time,
+      if (item.city != null) 'city': item.city,
+      if (item.location != null) 'location': item.location,
+      if (item.mapsUrl != null) 'maps_url': item.mapsUrl,
+      if (item.confirmationUrl != null) 'confirmation_url': item.confirmationUrl,
+      if (item.notes != null) 'notes': item.notes,
+      if (item.linkedSpotId != null) 'linked_spot_id': item.linkedSpotId,
+    }).select().single();
+    return _itemFromRow(row, []);
+  }
+
   // ── Helpers ───────────────────────────────────────────────────────────────────
 
   static String _fmtDate(DateTime d) =>

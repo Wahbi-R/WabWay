@@ -193,6 +193,35 @@ List<MemberBalance> calculateBalances(
       .toList();
 }
 
+// ─── Persisted settlement ─────────────────────────────────────────────────────
+
+class Settlement {
+  const Settlement({
+    required this.id,
+    required this.tripId,
+    required this.fromMemberId,
+    required this.toMemberId,
+    required this.amount,
+    required this.currency,
+    required this.settledAt,
+    required this.settledBy,
+    this.note,
+  });
+
+  final String id;
+  final String tripId;
+  final String fromMemberId;
+  final String toMemberId;
+  final double amount;
+  final String currency;
+  final DateTime settledAt;
+  final String settledBy;
+  final String? note;
+
+  bool matches(String fromId, String toId) =>
+      fromMemberId == fromId && toMemberId == toId;
+}
+
 // ─── Settlement suggestions ───────────────────────────────────────────────────
 
 class SettlementSuggestion {

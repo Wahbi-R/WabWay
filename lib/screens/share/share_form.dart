@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/place_search_service.dart';
 import '../../data/share_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
@@ -16,6 +17,10 @@ class ShareSaveData {
     this.travelType,
     this.amount,
     this.date,
+    this.mapsUrl,
+    this.latitude,
+    this.longitude,
+    this.placeSource,
   });
 
   final String title;
@@ -26,6 +31,10 @@ class ShareSaveData {
   final String? travelType;
   final double? amount;
   final DateTime? date;
+  final String? mapsUrl;
+  final double? latitude;
+  final double? longitude;
+  final String? placeSource;
 }
 
 class ShareForm extends StatefulWidget {
@@ -62,13 +71,28 @@ class _ShareFormState extends State<ShareForm> {
   bool _saving = false;
   String? _saveError;
 
+  // Maps URL handling
+  double? _parsedLat;
+  double? _parsedLng;
+
+  bool get _isMapsShare =>
+      widget.share.contentType == ShareContentType.googleMapsLink;
+
   @override
   void initState() {
     super.initState();
-    _titleCtrl = TextEditingController(text: widget.share.detectedTitle);
-    _notesCtrl = TextEditingController();
-    _amountCtrl = TextEditingController();
+    _titleCtrl    = TextEditingController(text: widget.share.detectedTitle);
+    _notesCtrl    = TextEditingController();
+    _amountCtrl   = TextEditingController();
     _locationCtrl = TextEditingController();
+
+    if (_isMapsShare) {
+      final coords = PlaceSearchService.parseLatLng(widget.share.rawContent);
+      if (coords != null) {
+        _parsedLat = coords.lat;
+        _parsedLng = coords.lng;
+      }
+    }
   }
 
   @override
@@ -95,14 +119,18 @@ class _ShareFormState extends State<ShareForm> {
     setState(() { _saving = true; _saveError = null; });
     try {
       await widget.onSave(ShareSaveData(
-        title: _titleCtrl.text.trim(),
-        notes: _notesCtrl.text.trim(),
-        location: _locationCtrl.text.trim().isEmpty ? null : _locationCtrl.text.trim(),
-        category: _category,
-        docType: _docType,
-        travelType: _travelType,
-        amount: double.tryParse(_amountCtrl.text.trim()),
-        date: _date,
+        title:       _titleCtrl.text.trim(),
+        notes:       _notesCtrl.text.trim(),
+        location:    _locationCtrl.text.trim().isEmpty ? null : _locationCtrl.text.trim(),
+        category:    _category,
+        docType:     _docType,
+        travelType:  _travelType,
+        amount:      double.tryParse(_amountCtrl.text.trim()),
+        date:        _date,
+        mapsUrl:     _isMapsShare ? widget.share.rawContent : null,
+        latitude:    _parsedLat,
+        longitude:   _parsedLng,
+        placeSource: _parsedLat != null ? 'shared_maps_link' : null,
       ));
     } catch (e) {
       if (mounted) setState(() { _saving = false; _saveError = e.toString(); });
@@ -184,13 +212,42 @@ class _ShareFormState extends State<ShareForm> {
       };
 
   List<Widget> _spotFields() => [
-        WabwayTextField(
-          label: 'Location or address',
-          hint: 'e.g. Shinjuku, Tokyo',
-          controller: _locationCtrl,
-          prefixIcon: Icons.place_rounded,
-          textInputAction: TextInputAction.next,
-        ),
+        if (_isMapsShare) ...[
+          _ReadOnlyField(
+            label: 'Google Maps URL',
+            value: widget.share.rawContent,
+            icon: Icons.map_rounded,
+          ),
+          if (_parsedLat != null) ...[
+            const SizedBox(height: kSpace2),
+            Row(
+              children: [
+                const Icon(Icons.my_location_rounded,
+                    size: 13, color: kColorSuccess),
+                const SizedBox(width: 4),
+                Text(
+                  'Map ready · ${_parsedLat!.toStringAsFixed(4)}, ${_parsedLng!.toStringAsFixed(4)}',
+                  style: kStyleCaption.copyWith(color: kColorSuccess),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: kSpace3),
+          WabwayTextField(
+            label: 'City (optional)',
+            hint: 'e.g. Tokyo',
+            controller: _locationCtrl,
+            prefixIcon: Icons.place_rounded,
+            textInputAction: TextInputAction.next,
+          ),
+        ] else
+          WabwayTextField(
+            label: 'Location or address',
+            hint: 'e.g. Shinjuku, Tokyo',
+            controller: _locationCtrl,
+            prefixIcon: Icons.place_rounded,
+            textInputAction: TextInputAction.next,
+          ),
         const SizedBox(height: kSpace3),
         WabwaySelectField<String>(
           label: 'Category',

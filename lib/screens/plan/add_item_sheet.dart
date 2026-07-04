@@ -465,7 +465,7 @@ class _TimePicker extends StatelessWidget {
 
 // ─── Document multi-picker ────────────────────────────────────────────────────
 
-class _DocsPicker extends StatelessWidget {
+class _DocsPicker extends StatefulWidget {
   const _DocsPicker({
     required this.docs,
     required this.selectedIds,
@@ -476,35 +476,92 @@ class _DocsPicker extends StatelessWidget {
   final void Function(String id, bool checked) onChanged;
 
   @override
+  State<_DocsPicker> createState() => _DocsPickerState();
+}
+
+class _DocsPickerState extends State<_DocsPicker> {
+  bool _expanded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Auto-expand if any docs are pre-selected (edit mode)
+    _expanded = widget.selectedIds.isNotEmpty;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (docs.isEmpty) return const SizedBox.shrink();
+    if (widget.docs.isEmpty) return const SizedBox.shrink();
+    final selectedCount = widget.selectedIds.length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Attach documents (optional)',
-            style: kStyleCaptionMedium.copyWith(color: kColorInk)),
-        const SizedBox(height: kSpace2),
-        ...docs.map((d) {
-          final checked = selectedIds.contains(d.id);
-          return CheckboxListTile(
-            value: checked,
-            onChanged: (v) => onChanged(d.id, v ?? false),
-            title: Text(d.title, style: kStyleBody),
-            subtitle: Text(d.type.label, style: kStyleCaption),
-            secondary: Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: d.type.softColor,
-                borderRadius: kRadiusMd,
+        GestureDetector(
+          onTap: () => setState(() => _expanded = !_expanded),
+          behavior: HitTestBehavior.opaque,
+          child: Row(
+            children: [
+              Text('Attach documents',
+                  style: kStyleCaptionMedium.copyWith(color: kColorInk)),
+              if (selectedCount > 0) ...[
+                const SizedBox(width: kSpace2),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: kColorPrimary,
+                    borderRadius: kRadiusPill,
+                  ),
+                  child: Text(
+                    '$selectedCount',
+                    style: kStyleCaption.copyWith(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+              const Spacer(),
+              Icon(
+                _expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                size: 18,
+                color: kColorInkSoft,
               ),
-              child: Icon(d.type.icon, size: 16, color: d.type.color),
-            ),
-            activeColor: kColorPrimary,
-            contentPadding: EdgeInsets.zero,
-            dense: true,
-          );
-        }),
+            ],
+          ),
+        ),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          child: _expanded
+              ? Column(
+                  children: [
+                    const SizedBox(height: kSpace2),
+                    ...widget.docs.map((d) {
+                      final checked = widget.selectedIds.contains(d.id);
+                      return CheckboxListTile(
+                        value: checked,
+                        onChanged: (v) => widget.onChanged(d.id, v ?? false),
+                        title: Text(d.title, style: kStyleBody),
+                        subtitle: Text(d.type.label, style: kStyleCaption),
+                        secondary: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: d.type.softColor,
+                            borderRadius: kRadiusMd,
+                          ),
+                          child: Icon(d.type.icon, size: 16, color: d.type.color),
+                        ),
+                        activeColor: kColorPrimary,
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                      );
+                    }),
+                  ],
+                )
+              : const SizedBox.shrink(),
+        ),
       ],
     );
   }

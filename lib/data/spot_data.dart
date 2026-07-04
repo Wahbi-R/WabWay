@@ -162,6 +162,10 @@ class Spot {
     this.sourceUrl,
     this.mapsUrl,
     this.notes,
+    this.address,
+    this.latitude,
+    this.longitude,
+    this.placeSource,
     this.votes = const SpotVotes(),
     this.comments = const [],
     required this.addedById,
@@ -176,28 +180,43 @@ class Spot {
   final String? sourceUrl;
   final String? mapsUrl;
   final String? notes;
+  final String? address;
+  final double? latitude;
+  final double? longitude;
+  final String? placeSource;
   final SpotVotes votes;
   final List<SpotComment> comments;
   final String addedById;
+
+  bool get isMapReady => latitude != null && longitude != null;
 
   Spot copyWith({
     SpotStatus? status,
     SpotVotes? votes,
     List<SpotComment>? comments,
     String? notes,
+    String? mapsUrl,
+    double? latitude,
+    double? longitude,
+    String? address,
+    String? placeSource,
   }) => Spot(
-        id: id,
-        name: name,
-        city: city,
-        area: area,
-        category: category,
-        status: status ?? this.status,
-        sourceUrl: sourceUrl,
-        mapsUrl: mapsUrl,
-        notes: notes ?? this.notes,
-        votes: votes ?? this.votes,
-        comments: comments ?? this.comments,
-        addedById: addedById,
+        id:          id,
+        name:        name,
+        city:        city,
+        area:        area,
+        category:    category,
+        status:      status ?? this.status,
+        sourceUrl:   sourceUrl,
+        mapsUrl:     mapsUrl ?? this.mapsUrl,
+        notes:       notes ?? this.notes,
+        address:     address ?? this.address,
+        latitude:    latitude ?? this.latitude,
+        longitude:   longitude ?? this.longitude,
+        placeSource: placeSource ?? this.placeSource,
+        votes:       votes ?? this.votes,
+        comments:    comments ?? this.comments,
+        addedById:   addedById,
       );
 }
 

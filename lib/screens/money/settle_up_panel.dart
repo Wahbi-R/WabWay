@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../core/supabase/settlement_service.dart';
 import '../../data/money_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
@@ -13,36 +14,93 @@ class SettleUpPanel extends StatefulWidget {
     required this.suggestions,
     required this.currency,
     required this.members,
+    required this.tripId,
+    required this.myId,
+    this.existingSettlements = const [],
     this.scrollController,
+    this.onSettled,
   });
 
   final List<MemberBalance> balances;
   final List<SettlementSuggestion> suggestions;
   final String currency;
   final List<TripMember> members;
+  final String tripId;
+  final String myId;
+  final List<Settlement> existingSettlements;
   final ScrollController? scrollController;
+  final VoidCallback? onSettled;
 
   @override
   State<SettleUpPanel> createState() => _SettleUpPanelState();
 }
 
 class _SettleUpPanelState extends State<SettleUpPanel> {
-  late final List<SettlementSuggestion> _suggestions;
+  late List<SettlementSuggestion> _suggestions;
+  bool _saving = false;
 
   @override
   void initState() {
     super.initState();
-    _suggestions = List.from(widget.suggestions);
+    _initSuggestions();
   }
 
-  void _markSettled(SettlementSuggestion s) {
-    setState(() => s.isSettled = true);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('Marked as settled', style: kStyleBody.copyWith(color: Colors.white)),
-      backgroundColor: kColorSuccess,
-      behavior: SnackBarBehavior.floating,
-      duration: const Duration(seconds: 2),
-    ));
+  @override
+  void didUpdateWidget(SettleUpPanel old) {
+    super.didUpdateWidget(old);
+    if (widget.existingSettlements != old.existingSettlements ||
+        widget.suggestions != old.suggestions) {
+      _initSuggestions();
+    }
+  }
+
+  void _initSuggestions() {
+    _suggestions = widget.suggestions.map((s) {
+      final alreadySettled = widget.existingSettlements
+          .any((e) => e.matches(s.fromMemberId, s.toMemberId));
+      return SettlementSuggestion(
+        fromMemberId: s.fromMemberId,
+        toMemberId:   s.toMemberId,
+        amount:       s.amount,
+        currency:     s.currency,
+        isSettled:    alreadySettled,
+      );
+    }).toList();
+  }
+
+  Future<void> _markSettled(SettlementSuggestion s) async {
+    if (_saving || s.isSettled) return;
+    setState(() { _saving = true; s.isSettled = true; });
+    try {
+      await SettlementService.createSettlement(
+        tripId:         widget.tripId,
+        fromMemberId:   s.fromMemberId,
+        toMemberId:     s.toMemberId,
+        amount:         s.amount,
+        currency:       s.currency,
+        settledBy:      widget.myId,
+      );
+      widget.onSettled?.call();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Settlement saved', style: kStyleBody.copyWith(color: Colors.white)),
+          backgroundColor: kColorSuccess,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ));
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => s.isSettled = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Could not save. Try again.', style: kStyleBody.copyWith(color: Colors.white)),
+          backgroundColor: kColorDanger,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   @override
@@ -142,6 +200,7 @@ class _SettleUpPanelState extends State<SettleUpPanel> {
                         s.fromMemberId == b.member.id && !s.isSettled).firstOrNull;
                     if (s != null) _markSettled(s);
                   },
+                  isSettled: _suggestions.where((s) => s.fromMemberId == b.member.id).any((s) => s.isSettled),
                 )),
             const SizedBox(height: kSpace4),
           ],
@@ -159,6 +218,7 @@ class _SettleUpPanelState extends State<SettleUpPanel> {
                         s.toMemberId == b.member.id && !s.isSettled).firstOrNull;
                     if (s != null) _markSettled(s);
                   },
+                  isSettled: _suggestions.where((s) => s.toMemberId == b.member.id).any((s) => s.isSettled),
                 )),
             const SizedBox(height: kSpace4),
           ],
@@ -235,12 +295,14 @@ class _BalanceRow extends StatelessWidget {
     required this.currency,
     this.isYouOwe = false,
     required this.onSettle,
+    this.isSettled = false,
   });
 
   final MemberBalance balance;
   final String currency;
   final bool isYouOwe;
   final VoidCallback onSettle;
+  final bool isSettled;
 
   @override
   Widget build(BuildContext context) {
@@ -278,12 +340,15 @@ class _BalanceRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: kSpace3),
-            WabwayButton(
-              label: 'Settled',
-              variant: WabwayButtonVariant.ghost,
-              size: WabwayButtonSize.sm,
-              onPressed: onSettle,
-            ),
+            if (isSettled)
+              const Icon(Icons.check_circle_rounded, size: 18, color: kColorSuccess)
+            else
+              WabwayButton(
+                label: 'Mark settled',
+                variant: WabwayButtonVariant.ghost,
+                size: WabwayButtonSize.sm,
+                onPressed: onSettle,
+              ),
           ],
         ),
       ),

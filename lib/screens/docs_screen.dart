@@ -32,6 +32,7 @@ class _DocsScreenState extends State<DocsScreen> {
 
   bool _loading = true;
   bool _error = false;
+  bool _offline = false;
 
   String? _activeTripId;
   RealtimeChannel? _realtimeChannel;
@@ -85,10 +86,10 @@ class _DocsScreenState extends State<DocsScreen> {
       final tripId = TripState.tripOf(context).id;
       final docs = await DocService.loadDocuments(tripId);
       if (!mounted) return;
-      setState(() { _docs = docs; _loading = false; });
+      setState(() { _docs = docs; _loading = false; _offline = false; });
     } catch (_) {
       if (!mounted) return;
-      if (silent) return;
+      if (silent) { setState(() => _offline = true); return; }
       setState(() { _loading = false; _error = true; });
     }
   }
@@ -246,7 +247,17 @@ class _DocsScreenState extends State<DocsScreen> {
     }
 
     final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
-    return isDesktop ? _buildDesktop(context) : _buildMobile(context);
+    final base = isDesktop ? _buildDesktop(context) : _buildMobile(context);
+    if (!_offline) return base;
+    return Stack(
+      children: [
+        base,
+        Positioned(
+          left: 0, right: 0, bottom: 0,
+          child: OfflineBanner(onRetry: _loadDocs),
+        ),
+      ],
+    );
   }
 
   // ── Desktop ───────────────────────────────────────────────────────────────────

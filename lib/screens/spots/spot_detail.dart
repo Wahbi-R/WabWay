@@ -225,8 +225,31 @@ class _SpotDetailContentState extends State<SpotDetailContent> {
                   ),
                   const SizedBox(width: kSpace2),
                   WabwayTag(label: widget.spot.category.label),
+                  if (widget.spot.isMapReady) ...[
+                    const SizedBox(width: kSpace2),
+                    const Icon(Icons.my_location_rounded,
+                        size: 13, color: kColorSuccess),
+                  ],
                 ],
               ),
+
+              // ── Address line (if from dataset)
+              if (widget.spot.address != null) ...[
+                const SizedBox(height: kSpace1),
+                Row(
+                  children: [
+                    const SizedBox(width: 18),
+                    Expanded(
+                      child: Text(
+                        widget.spot.address!,
+                        style: kStyleCaption.copyWith(color: kColorInkSoft),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: kSpace4),
               const Divider(height: 1),
               const SizedBox(height: kSpace4),

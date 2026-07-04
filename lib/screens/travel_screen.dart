@@ -97,6 +97,8 @@ class _TravelScreenState extends State<TravelScreen> {
     }
   }
 
+  bool _offline = false;
+
   Future<void> _silentReload() async {
     if (!mounted || _activeTripId.isEmpty) return;
     try {
@@ -117,8 +119,11 @@ class _TravelScreenState extends State<TravelScreen> {
         _days
           ..clear()
           ..addAll(days);
+        _offline = false;
       });
-    } catch (_) {}
+    } catch (_) {
+      if (mounted) setState(() => _offline = true);
+    }
   }
 
   // ─── Realtime ─────────────────────────────────────────────────────────────────
@@ -159,12 +164,18 @@ class _TravelScreenState extends State<TravelScreen> {
   }
 
   void _updateItem(TravelItem updated) {
+    final old = _items.where((i) => i.id == updated.id).firstOrNull;
     setState(() {
       final idx = _items.indexWhere((i) => i.id == updated.id);
       if (idx != -1) _items[idx] = updated;
       _selectedId = updated.id;
     });
     TravelService.updateItem(updated).catchError((_) => _silentReload());
+    if (old != null && _userId.isNotEmpty) {
+      TravelService.syncDocLinks(
+        updated.id, old.linkedDocIds, updated.linkedDocIds, _userId,
+      ).catchError((_) => _silentReload());
+    }
   }
 
   Future<void> _addItem(BuildContext context) async {
@@ -178,6 +189,7 @@ class _TravelScreenState extends State<TravelScreen> {
         tripId:             _activeTripId,
         title:              formItem.title,
         type:               formItem.type,
+        status:             formItem.status,
         createdBy:          _userId,
         date:               formItem.date,
         endDate:            formItem.endDate,
@@ -231,7 +243,17 @@ class _TravelScreenState extends State<TravelScreen> {
     }
 
     final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
-    return isDesktop ? _buildDesktop(context) : _buildMobile(context);
+    final base = isDesktop ? _buildDesktop(context) : _buildMobile(context);
+    if (!_offline) return base;
+    return Stack(
+      children: [
+        base,
+        Positioned(
+          left: 0, right: 0, bottom: 0,
+          child: OfflineBanner(onRetry: _silentReload),
+        ),
+      ],
+    );
   }
 
   // ─── Desktop ──────────────────────────────────────────────────────────────────

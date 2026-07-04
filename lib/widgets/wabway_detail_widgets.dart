@@ -135,11 +135,13 @@ class WabwayActionTile extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
+    this.subtitle,
     this.color,
   });
 
   final IconData icon;
   final String label;
+  final String? subtitle;
   final VoidCallback onTap;
   final Color? color;
 
@@ -149,6 +151,9 @@ class WabwayActionTile extends StatelessWidget {
     return ListTile(
       leading: Icon(icon, color: c, size: 20),
       title: Text(label, style: kStyleBodyMedium.copyWith(color: c)),
+      subtitle: subtitle != null
+          ? Text(subtitle!, style: kStyleCaption.copyWith(color: kColorInkSoft))
+          : null,
       onTap: onTap,
     );
   }

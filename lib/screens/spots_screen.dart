@@ -32,6 +32,7 @@ class _SpotsScreenState extends State<SpotsScreen> {
   Map<String, VoteType> _myVotes = {};
   bool _loading = true;
   bool _error = false;
+  bool _offline = false;
 
   String? _activeTripId;
   RealtimeChannel? _realtimeChannel;
@@ -39,9 +40,14 @@ class _SpotsScreenState extends State<SpotsScreen> {
 
   String? _selectedId;
   SpotCategory? _filterCategory;
+  Set<SpotStatus> _filterStatuses = {};
+  String? _filterCity;
   String _searchQuery = '';
   bool _showSearch = false;
   final _searchCtrl = TextEditingController();
+
+  int get _advancedFilterCount =>
+      _filterStatuses.length + (_filterCity != null ? 1 : 0);
 
   @override
   void didChangeDependencies() {
@@ -124,10 +130,10 @@ class _SpotsScreenState extends State<SpotsScreen> {
         }
       }
 
-      setState(() { _spots = spots; _docs = docs; _myVotes = myVotes; _loading = false; });
+      setState(() { _spots = spots; _docs = docs; _myVotes = myVotes; _loading = false; _offline = false; });
     } catch (_) {
       if (!mounted) return;
-      if (silent) return; // keep existing list visible, don't replace with error screen
+      if (silent) { setState(() => _offline = true); return; }
       setState(() { _loading = false; _error = true; });
     }
   }
@@ -139,10 +145,20 @@ class _SpotsScreenState extends State<SpotsScreen> {
           s.name.toLowerCase().contains(q) ||
           s.city.toLowerCase().contains(q) ||
           s.area.toLowerCase().contains(q);
-      final matchesCat =
-          _filterCategory == null || s.category == _filterCategory;
-      return matchesSearch && matchesCat;
+      final matchesCat    = _filterCategory == null || s.category == _filterCategory;
+      final matchesStatus = _filterStatuses.isEmpty || _filterStatuses.contains(s.status);
+      final matchesCity   = _filterCity == null ||
+          s.city.toLowerCase() == _filterCity!.toLowerCase();
+      return matchesSearch && matchesCat && matchesStatus && matchesCity;
     }).toList();
+  }
+
+  Set<String> get _availableCities {
+    final seen = <String>{};
+    for (final s in _spots) {
+      if (s.city.isNotEmpty) seen.add(s.city);
+    }
+    return seen;
   }
 
   Spot? get _selected =>
@@ -221,6 +237,28 @@ class _SpotsScreenState extends State<SpotsScreen> {
     }
   }
 
+  // ─── Advanced filter ─────────────────────────────────────────────────────────
+
+  Future<void> _openFilterSheet() async {
+    final result = await showModalBottomSheet<_SpotFilterResult>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _SpotFilterSheet(
+        statuses:       _filterStatuses,
+        city:           _filterCity,
+        availableCities: _availableCities,
+      ),
+    );
+    if (result != null && mounted) {
+      setState(() {
+        _filterStatuses = result.statuses;
+        _filterCity     = result.city;
+      });
+    }
+  }
+
   // ─── Mobile detail ────────────────────────────────────────────────────────────
 
   void _openDetailMobile(BuildContext context, Spot spot) {
@@ -281,7 +319,7 @@ class _SpotsScreenState extends State<SpotsScreen> {
 
     final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
 
-    return isDesktop
+    Widget body = isDesktop
         ? _DesktopLayout(
             spots: _filtered,
             allSpots: _spots,
@@ -311,6 +349,7 @@ class _SpotsScreenState extends State<SpotsScreen> {
             spots: _filtered,
             myVotes: _myVotes,
             filterCategory: _filterCategory,
+            advancedFilterCount: _advancedFilterCount,
             searchQuery: _searchQuery,
             searchCtrl: _searchCtrl,
             showSearch: _showSearch,
@@ -324,8 +363,19 @@ class _SpotsScreenState extends State<SpotsScreen> {
                 _searchCtrl.clear();
               }
             }),
+            onFilter: _openFilterSheet,
             onAdd: () => _addSpot(context),
           );
+    if (!_offline) return body;
+    return Stack(
+      children: [
+        body,
+        Positioned(
+          left: 0, right: 0, bottom: 0,
+          child: OfflineBanner(onRetry: _loadSpots),
+        ),
+      ],
+    );
   }
 }
 
@@ -336,6 +386,7 @@ class _MobileLayout extends StatelessWidget {
     required this.spots,
     required this.myVotes,
     required this.filterCategory,
+    required this.advancedFilterCount,
     required this.searchQuery,
     required this.searchCtrl,
     required this.showSearch,
@@ -343,12 +394,14 @@ class _MobileLayout extends StatelessWidget {
     required this.onFilterCategory,
     required this.onSearch,
     required this.onToggleSearch,
+    required this.onFilter,
     required this.onAdd,
   });
 
   final List<Spot> spots;
   final Map<String, VoteType> myVotes;
   final SpotCategory? filterCategory;
+  final int advancedFilterCount;
   final String searchQuery;
   final TextEditingController searchCtrl;
   final bool showSearch;
@@ -356,6 +409,7 @@ class _MobileLayout extends StatelessWidget {
   final ValueChanged<SpotCategory?> onFilterCategory;
   final ValueChanged<String> onSearch;
   final VoidCallback onToggleSearch;
+  final VoidCallback onFilter;
   final VoidCallback onAdd;
 
   @override
@@ -377,13 +431,38 @@ class _MobileLayout extends StatelessWidget {
                 color: kColorInkSoft,
                 onPressed: onToggleSearch,
               ),
-              IconButton(
-                icon: const Icon(Icons.tune_rounded),
-                color: kColorInkSoft,
-                // TODO: Spots filter panel — show bottom sheet with multi-select chips
-                // for category, city, and maybe tags. Replace _CategoryFilterStrip or
-                // augment it. State lives in _SpotsScreenState._filterCategory.
-                onPressed: () {},
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.tune_rounded),
+                    color: advancedFilterCount > 0 ? kColorPrimary : kColorInkSoft,
+                    onPressed: onFilter,
+                  ),
+                  if (advancedFilterCount > 0)
+                    Positioned(
+                      right: 6,
+                      top: 6,
+                      child: Container(
+                        width: 14,
+                        height: 14,
+                        decoration: const BoxDecoration(
+                          color: kColorPrimary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text(
+                            '$advancedFilterCount',
+                            style: kStyleCaption.copyWith(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(width: kSpace2),
             ],
@@ -751,6 +830,180 @@ class _CategoryFilterStripState extends State<_CategoryFilterStrip> {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Advanced filter sheet ────────────────────────────────────────────────────
+
+class _SpotFilterResult {
+  const _SpotFilterResult({required this.statuses, this.city});
+  final Set<SpotStatus> statuses;
+  final String? city;
+}
+
+class _SpotFilterSheet extends StatefulWidget {
+  const _SpotFilterSheet({
+    required this.statuses,
+    required this.availableCities,
+    this.city,
+  });
+
+  final Set<SpotStatus> statuses;
+  final String? city;
+  final Set<String> availableCities;
+
+  @override
+  State<_SpotFilterSheet> createState() => _SpotFilterSheetState();
+}
+
+class _SpotFilterSheetState extends State<_SpotFilterSheet> {
+  late Set<SpotStatus> _statuses;
+  String? _city;
+
+  @override
+  void initState() {
+    super.initState();
+    _statuses = Set.from(widget.statuses);
+    _city     = widget.city;
+  }
+
+  void _toggleStatus(SpotStatus s) {
+    setState(() {
+      if (_statuses.contains(s)) {
+        _statuses.remove(s);
+      } else {
+        _statuses.add(s);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasFilters = _statuses.isNotEmpty || _city != null;
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: kColorPaper,
+        borderRadius: kRadiusSheet,
+      ),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          kSpace4,
+          kSpace3,
+          kSpace4,
+          kSpace6 + MediaQuery.paddingOf(context).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const WabwayDragHandle(),
+            const SizedBox(height: kSpace3),
+            Row(
+              children: [
+                Text('Filter spots', style: kStyleTitle),
+                const Spacer(),
+                if (hasFilters)
+                  TextButton(
+                    onPressed: () => setState(() {
+                      _statuses = {};
+                      _city     = null;
+                    }),
+                    child: Text('Clear all',
+                        style: kStyleBodyMedium.copyWith(color: kColorDanger)),
+                  ),
+                WabwayIconButton(
+                  icon: Icons.close_rounded,
+                  label: 'Close',
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: kSpace4),
+
+            // Status
+            Text('Status', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
+            const SizedBox(height: kSpace2),
+            Wrap(
+              spacing: kSpace2,
+              runSpacing: kSpace2,
+              children: SpotStatus.values.map((s) {
+                final sel = _statuses.contains(s);
+                return GestureDetector(
+                  onTap: () => _toggleStatus(s),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 120),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: kSpace3, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: sel ? kColorPrimary : kColorSurfaceSunken,
+                      borderRadius: kRadiusPill,
+                      border: Border.all(
+                        color: sel ? kColorPrimary : kColorBorder,
+                      ),
+                    ),
+                    child: Text(
+                      s.label,
+                      style: kStyleCaption.copyWith(
+                        color: sel ? Colors.white : kColorInk,
+                        fontWeight: sel ? FontWeight.w600 : FontWeight.normal,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+
+            // City
+            if (widget.availableCities.isNotEmpty) ...[
+              const SizedBox(height: kSpace4),
+              Text('City', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
+              const SizedBox(height: kSpace2),
+              Wrap(
+                spacing: kSpace2,
+                runSpacing: kSpace2,
+                children: widget.availableCities.map((city) {
+                  final sel = _city == city;
+                  return GestureDetector(
+                    onTap: () => setState(() => _city = sel ? null : city),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 120),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: kSpace3, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: sel ? kColorAccent : kColorSurfaceSunken,
+                        borderRadius: kRadiusPill,
+                        border: Border.all(
+                          color: sel ? kColorAccent : kColorBorder,
+                        ),
+                      ),
+                      child: Text(
+                        city,
+                        style: kStyleCaption.copyWith(
+                          color: sel ? Colors.white : kColorInk,
+                          fontWeight: sel ? FontWeight.w600 : FontWeight.normal,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+
+            const SizedBox(height: kSpace5),
+            WabwayButton(
+              label: 'Apply filters',
+              icon: Icons.check_rounded,
+              fullWidth: true,
+              size: WabwayButtonSize.lg,
+              onPressed: () => Navigator.pop(
+                context,
+                _SpotFilterResult(statuses: _statuses, city: _city),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -109,6 +109,7 @@ class _AddTravelContentState extends State<_AddTravelContent> {
   final _notesCtrl = TextEditingController();
 
   TravelItemType _type = TravelItemType.flight;
+  TravelBookingStatus _status = TravelBookingStatus.booked;
   DateTime? _date;
   DateTime? _endDate;
   TimeOfDay? _time;
@@ -126,8 +127,9 @@ class _AddTravelContentState extends State<_AddTravelContent> {
       _addressCtrl.text = item.address ?? '';
       _confirmCtrl.text = item.confirmationNumber ?? '';
       _notesCtrl.text = item.notes ?? '';
-      _type = item.type;
-      _date = item.date;
+      _type   = item.type;
+      _status = item.status;
+      _date   = item.date;
       _endDate = item.endDate;
       _time = _parseTime(item.time);
       _endTime = _parseTime(item.endTime);
@@ -162,6 +164,7 @@ class _AddTravelContentState extends State<_AddTravelContent> {
       id: widget.initialItem?.id ?? 't_${DateTime.now().millisecondsSinceEpoch}',
       title: _titleCtrl.text.trim(),
       type: _type,
+      status: _status,
       date: _date,
       endDate: _endDate,
       time: _fmt(_time),
@@ -255,14 +258,32 @@ class _AddTravelContentState extends State<_AddTravelContent> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  WabwaySelectField<TravelItemType>(
-                    label: 'Type',
-                    value: _type,
-                    onChanged: (v) =>
-                        setState(() => _type = v ?? TravelItemType.flight),
-                    items: TravelItemType.values
-                        .map((t) => WabwaySelectItem(value: t, label: t.label))
-                        .toList(),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: WabwaySelectField<TravelItemType>(
+                          label: 'Type',
+                          value: _type,
+                          onChanged: (v) =>
+                              setState(() => _type = v ?? TravelItemType.flight),
+                          items: TravelItemType.values
+                              .map((t) => WabwaySelectItem(value: t, label: t.label))
+                              .toList(),
+                        ),
+                      ),
+                      const SizedBox(width: kSpace3),
+                      Expanded(
+                        child: WabwaySelectField<TravelBookingStatus>(
+                          label: 'Status',
+                          value: _status,
+                          onChanged: (v) =>
+                              setState(() => _status = v ?? TravelBookingStatus.booked),
+                          items: TravelBookingStatus.values
+                              .map((s) => WabwaySelectItem(value: s, label: s.label))
+                              .toList(),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: kSpace4),
 

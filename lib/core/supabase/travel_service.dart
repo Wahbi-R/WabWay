@@ -33,6 +33,7 @@ abstract final class TravelService {
       id:                     row['id'] as String,
       title:                  row['title'] as String,
       type:                   _typeFrom(row['type'] as String),
+      status:                 TravelBookingStatus.fromDb(row['status'] as String?),
       date:                   rawDate != null ? DateTime.parse(rawDate) : null,
       endDate:                rawEndDate != null ? DateTime.parse(rawEndDate) : null,
       time:                   rawTime?.substring(0, 5),
@@ -83,6 +84,7 @@ abstract final class TravelService {
     required String title,
     required TravelItemType type,
     required String createdBy,
+    TravelBookingStatus status = TravelBookingStatus.booked,
     DateTime? date,
     DateTime? endDate,
     String? time,
@@ -100,6 +102,7 @@ abstract final class TravelService {
       'trip_id':    tripId,
       'title':      title.trim(),
       'type':       _typeToDb(type),
+      'status':     status.toDb,
       'created_by': createdBy,
       if (date != null) 'date': _fmtDate(date),
       if (endDate != null) 'end_date': _fmtDate(endDate),
@@ -143,6 +146,7 @@ abstract final class TravelService {
     await supabase.from('travel_items').update({
       'title':               item.title,
       'type':                _typeToDb(item.type),
+      'status':              item.status.toDb,
       'date':                item.date != null ? _fmtDate(item.date!) : null,
       'end_date':            item.endDate != null ? _fmtDate(item.endDate!) : null,
       'time':                item.time,
@@ -153,6 +157,36 @@ abstract final class TravelService {
       'address':             item.address,
       'notes':               item.notes,
     }).eq('id', item.id);
+  }
+
+  /// Syncs document links for a travel item: deletes removed, inserts new.
+  static Future<void> syncDocLinks(
+    String itemId,
+    List<String> oldDocIds,
+    List<String> newDocIds,
+    String userId,
+  ) async {
+    final toRemove = oldDocIds.toSet().difference(newDocIds.toSet());
+    final toAdd    = newDocIds.toSet().difference(oldDocIds.toSet());
+
+    if (toRemove.isNotEmpty) {
+      await supabase
+          .from('document_links')
+          .delete()
+          .eq('linked_type', 'travel_item')
+          .eq('linked_id', itemId)
+          .inFilter('document_id', toRemove.toList());
+    }
+    if (toAdd.isNotEmpty) {
+      await supabase.from('document_links').insert(
+        toAdd.map((docId) => {
+          'document_id': docId,
+          'linked_type': 'travel_item',
+          'linked_id':   itemId,
+          'created_by':  userId,
+        }).toList(),
+      );
+    }
   }
 
   static Future<void> deleteItem(String itemId) async {

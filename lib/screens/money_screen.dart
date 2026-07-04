@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
 import '../core/supabase/client.dart';
 import '../core/supabase/money_service.dart';
+import '../core/supabase/settlement_service.dart';
 import '../core/trip/trip_state.dart';
 import '../data/money_data.dart';
 import '../theme/app_colors.dart';
@@ -33,6 +34,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
   List<CashWithdrawal> _withdrawals = [];
   bool _loading = true;
   bool _error = false;
+  bool _offline = false;
 
   _MoneyTab _tab = _MoneyTab.receipts;
   String? _selectedReceiptId;
@@ -45,6 +47,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
   // Captured in didChangeDependencies and passed to add sheets.
   List<TripMember> _members = [];
   String _userId = '';
+  List<Settlement> _persistedSettlements = [];
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────────
 
@@ -91,16 +94,19 @@ class _MoneyScreenState extends State<MoneyScreen> {
       final futures = await Future.wait([
         MoneyService.loadReceipts(tripId),
         MoneyService.loadWithdrawals(tripId),
+        SettlementService.loadSettlements(tripId),
       ]);
       if (!mounted) return;
       setState(() {
-        _receipts   = List<Receipt>.from(futures[0] as List);
-        _withdrawals = List<CashWithdrawal>.from(futures[1] as List);
+        _receipts              = List<Receipt>.from(futures[0] as List);
+        _withdrawals           = List<CashWithdrawal>.from(futures[1] as List);
+        _persistedSettlements  = List<Settlement>.from(futures[2] as List);
         _loading = false;
+        _offline = false;
       });
     } catch (_) {
       if (!mounted) return;
-      if (silent) return;
+      if (silent) { setState(() => _offline = true); return; }
       setState(() { _loading = false; _error = true; });
     }
   }
@@ -145,6 +151,17 @@ class _MoneyScreenState extends State<MoneyScreen> {
           table: 'cash_distributions',
           callback: (_) => _scheduleReload(),
         )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'settlements',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'trip_id',
+            value: tripId,
+          ),
+          callback: (_) => _scheduleReload(),
+        )
         .subscribe();
   }
 
@@ -165,7 +182,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
 
   List<MemberBalance> get _balances =>
       calculateBalances(_receipts, _withdrawals, myId: _userId, members: _members);
-  List<SettlementSuggestion> get _settlements =>
+  List<SettlementSuggestion> get _suggestions =>
       suggestSettlements(_balances, _currency, myId: _userId);
 
   Receipt? get _selectedReceipt => _selectedReceiptId == null
@@ -267,7 +284,17 @@ class _MoneyScreenState extends State<MoneyScreen> {
     }
 
     final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
-    return isDesktop ? _buildDesktop(context) : _buildMobile(context);
+    final base = isDesktop ? _buildDesktop(context) : _buildMobile(context);
+    if (!_offline) return base;
+    return Stack(
+      children: [
+        base,
+        Positioned(
+          left: 0, right: 0, bottom: 0,
+          child: OfflineBanner(onRetry: _loadAll),
+        ),
+      ],
+    );
   }
 
   // ─── Desktop ──────────────────────────────────────────────────────────────────
@@ -347,10 +374,14 @@ class _MoneyScreenState extends State<MoneyScreen> {
 
     // Settle up: full content in left panel
     return SettleUpPanel(
-      balances:    _balances,
-      suggestions: _settlements,
-      currency:    _currency,
-      members:     _members,
+      balances:            _balances,
+      suggestions:         _suggestions,
+      currency:            _currency,
+      members:             _members,
+      tripId:              _activeTripId ?? '',
+      myId:                _userId,
+      existingSettlements: _persistedSettlements,
+      onSettled:           () => _loadAll(silent: true),
     );
   }
 
@@ -402,6 +433,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
         withdrawal: withdrawal,
         myId:       _userId,
         members:    _members,
+        tripId:     _activeTripId ?? '',
         onDelete:   () => _deleteWithdrawal(withdrawal.id),
       ),
     );
@@ -507,6 +539,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
                               withdrawal: w,
                               myId:       _userId,
                               members:    _members,
+                              tripId:     _activeTripId ?? '',
                               onDelete:   () => _deleteWithdrawal(w.id),
                             ),
                           ),
@@ -517,10 +550,14 @@ class _MoneyScreenState extends State<MoneyScreen> {
 
             // Settle Up tab
             SettleUpPanel(
-              balances:    _balances,
-              suggestions: _settlements,
-              currency:    _currency,
-              members:     _members,
+              balances:            _balances,
+              suggestions:         _suggestions,
+              currency:            _currency,
+              members:             _members,
+              tripId:              _activeTripId ?? '',
+              myId:                _userId,
+              existingSettlements: _persistedSettlements,
+              onSettled:           () => _loadAll(silent: true),
             ),
           ],
         ),

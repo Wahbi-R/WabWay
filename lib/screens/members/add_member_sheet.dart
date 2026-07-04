@@ -67,7 +67,7 @@ class _AddMemberSheetState extends State<_AddMemberSheet> {
       if (profile == null) {
         setState(() {
           _loading = false;
-          _error = 'No Wabway account found for "$email". They need to sign up first.';
+          _error = 'No WabWay account found for "$email". They need to sign up first.';
         });
         return;
       }
@@ -161,7 +161,7 @@ class _AddMemberSheetState extends State<_AddMemberSheet> {
               ),
               const SizedBox(height: kSpace3),
               Text(
-                'They must already have a Wabway account. After being added, the trip will appear when they next log in.',
+                'They must already have a WabWay account. After being added, the trip will appear when they next log in.',
                 style: kStyleCaption,
                 textAlign: TextAlign.center,
               ),

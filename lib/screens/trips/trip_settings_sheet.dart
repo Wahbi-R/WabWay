@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../core/supabase/trip_service.dart';
 import '../../core/trip/app_trip.dart';
 import '../../core/trip/trip_state.dart';
@@ -63,6 +65,10 @@ class _TripSettingsSheetState extends State<_TripSettingsSheet> {
   bool _saving = false;
   String? _error;
 
+  String? _coverImageUrl;
+  bool _clearCover = false;
+  bool _uploadingCover = false;
+
   @override
   void initState() {
     super.initState();
@@ -71,6 +77,7 @@ class _TripSettingsSheetState extends State<_TripSettingsSheet> {
     _startDate       = widget.trip.startDate;
     _endDate         = widget.trip.endDate;
     _currency        = widget.trip.defaultCurrency;
+    _coverImageUrl   = widget.trip.coverImageUrl;
   }
 
   @override
@@ -108,6 +115,35 @@ class _TripSettingsSheetState extends State<_TripSettingsSheet> {
     });
   }
 
+  Future<void> _pickCoverPhoto() async {
+    if (kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Photo upload is not supported on web.'),
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
+    final picker = ImagePicker();
+    final file = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1600,
+      maxHeight: 900,
+      imageQuality: 85,
+    );
+    if (file == null || !mounted) return;
+    setState(() => _uploadingCover = true);
+    try {
+      final bytes = await file.readAsBytes();
+      final mime  = file.mimeType ?? 'image/jpeg';
+      final url   = await TripService.uploadCoverImage(widget.trip.id, mime, bytes);
+      if (mounted) setState(() { _coverImageUrl = url; _clearCover = false; });
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Failed to upload photo: $e');
+    } finally {
+      if (mounted) setState(() => _uploadingCover = false);
+    }
+  }
+
   Future<void> _save() async {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) {
@@ -119,14 +155,16 @@ class _TripSettingsSheetState extends State<_TripSettingsSheet> {
       final dest = _destinationCtrl.text.trim();
       await TripService.updateTrip(
         widget.trip.id,
-        name:            name,
-        destination:     dest.isEmpty ? null : dest,
+        name:             name,
+        destination:      dest.isEmpty ? null : dest,
         clearDestination: dest.isEmpty,
-        startDate:  _startDate,
-        clearStartDate: _startDate == null && widget.trip.startDate != null,
-        endDate:    _endDate,
-        clearEndDate: _endDate == null && widget.trip.endDate != null,
-        defaultCurrency: _currency,
+        startDate:        _startDate,
+        clearStartDate:   _startDate == null && widget.trip.startDate != null,
+        endDate:          _endDate,
+        clearEndDate:     _endDate == null && widget.trip.endDate != null,
+        defaultCurrency:  _currency,
+        coverImageUrl:    _clearCover ? null : _coverImageUrl,
+        clearCoverImage:  _clearCover,
       );
       if (!mounted) return;
       widget.onSaved();
@@ -258,6 +296,20 @@ class _TripSettingsSheetState extends State<_TripSettingsSheet> {
                       ),
                     ),
 
+                    const SizedBox(height: kSpace4),
+                    // Cover photo
+                    Text('Cover photo',
+                        style: kStyleCaptionMedium.copyWith(color: kColorInk)),
+                    const SizedBox(height: kSpace2),
+                    _CoverPhotoField(
+                      imageUrl: _clearCover ? null : _coverImageUrl,
+                      uploading: _uploadingCover,
+                      onPick: _pickCoverPhoto,
+                      onRemove: _coverImageUrl != null && !_clearCover
+                          ? () => setState(() { _clearCover = true; _coverImageUrl = null; })
+                          : null,
+                    ),
+
                     if (_error != null) ...[
                       const SizedBox(height: kSpace3),
                       Text(_error!,
@@ -278,6 +330,92 @@ class _TripSettingsSheetState extends State<_TripSettingsSheet> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ─── Cover photo field ────────────────────────────────────────────────────────
+
+class _CoverPhotoField extends StatelessWidget {
+  const _CoverPhotoField({
+    required this.imageUrl,
+    required this.uploading,
+    required this.onPick,
+    this.onRemove,
+  });
+
+  final String? imageUrl;
+  final bool uploading;
+  final VoidCallback onPick;
+  final VoidCallback? onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: uploading ? null : onPick,
+      child: Container(
+        height: 120,
+        decoration: BoxDecoration(
+          color: kColorSurfaceSunken,
+          borderRadius: kRadiusMd,
+          border: Border.all(color: kColorBorder),
+          image: imageUrl != null
+              ? DecorationImage(
+                  image: NetworkImage(imageUrl!),
+                  fit: BoxFit.cover,
+                )
+              : null,
+        ),
+        child: uploading
+            ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+            : imageUrl == null
+                ? Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.add_photo_alternate_rounded,
+                          size: 28, color: kColorInkSoft),
+                      const SizedBox(height: kSpace2),
+                      Text('Tap to add cover photo',
+                          style: kStyleCaption.copyWith(color: kColorInkSoft)),
+                    ],
+                  )
+                : Stack(
+                    children: [
+                      Positioned.fill(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: kRadiusMd,
+                            color: Colors.black26,
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        bottom: kSpace2,
+                        left: kSpace3,
+                        child: Text('Tap to change',
+                            style: kStyleCaption.copyWith(color: Colors.white)),
+                      ),
+                      if (onRemove != null)
+                        Positioned(
+                          top: kSpace2,
+                          right: kSpace2,
+                          child: GestureDetector(
+                            onTap: onRemove,
+                            child: Container(
+                              width: 28,
+                              height: 28,
+                              decoration: const BoxDecoration(
+                                color: Colors.black54,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.close_rounded,
+                                  size: 16, color: Colors.white),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
       ),
     );
   }

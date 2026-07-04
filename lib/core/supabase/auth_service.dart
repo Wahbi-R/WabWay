@@ -8,14 +8,10 @@ abstract final class AuthService {
     final trimmed = email.trim();
     AppLogger.instance.log('sendMagicLink → $trimmed', tag: 'AUTH');
     try {
-      final isMobile = !kIsWeb &&
-          (defaultTargetPlatform == TargetPlatform.android ||
-              defaultTargetPlatform == TargetPlatform.iOS);
       await supabase.auth.signInWithOtp(
         email: trimmed,
         shouldCreateUser: true,
-        emailRedirectTo:
-            isMobile ? 'com.example.wabway://login-callback' : null,
+        emailRedirectTo: 'https://wabway.wabble.ca/',
       );
       AppLogger.instance.log('sendMagicLink ✓ (OTP queued)', tag: 'AUTH');
     } catch (e) {

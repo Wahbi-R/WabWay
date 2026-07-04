@@ -1,4 +1,5 @@
 import '../../data/spot_data.dart';
+import '../offline_cache.dart';
 import 'client.dart';
 
 abstract final class SpotService {
@@ -27,6 +28,7 @@ abstract final class SpotService {
         'idea'       => SpotStatus.idea,
         'want_to_go' => SpotStatus.wantToGo,
         'must_do'    => SpotStatus.mustDo,
+        'confirmed'  => SpotStatus.confirmed,
         'planned'    => SpotStatus.planned,
         'booked'     => SpotStatus.booked,
         'skipped'    => SpotStatus.skipped,
@@ -34,12 +36,13 @@ abstract final class SpotService {
       };
 
   static String _statusToDb(SpotStatus s) => switch (s) {
-        SpotStatus.idea     => 'idea',
-        SpotStatus.wantToGo => 'want_to_go',
-        SpotStatus.mustDo   => 'must_do',
-        SpotStatus.planned  => 'planned',
-        SpotStatus.booked   => 'booked',
-        SpotStatus.skipped  => 'skipped',
+        SpotStatus.idea      => 'idea',
+        SpotStatus.wantToGo  => 'want_to_go',
+        SpotStatus.mustDo    => 'must_do',
+        SpotStatus.confirmed => 'confirmed',
+        SpotStatus.planned   => 'planned',
+        SpotStatus.booked    => 'booked',
+        SpotStatus.skipped   => 'skipped',
       };
 
   static VoteType _voteFrom(String s) => switch (s) {
@@ -126,10 +129,17 @@ abstract final class SpotService {
         .select('*, spot_votes(*), spot_comments(*)')
         .eq('trip_id', tripId)
         .order('created_at', ascending: false);
-    return data
-        .map((r) => _spotFromRow(r))
-        .toList();
+    OfflineCache.write(OfflineCache.spotsKey(tripId), data);
+    return data.map((r) => _spotFromRow(r)).toList();
   }
+
+  static Future<List<Spot>?> loadSpotsFromCache(String tripId) =>
+      OfflineCache.read(
+        OfflineCache.spotsKey(tripId),
+        (json) => (json as List)
+            .map((r) => _spotFromRow(r as Map<String, dynamic>))
+            .toList(),
+      );
 
   static Future<Spot> createSpot({
     required String tripId,
@@ -164,6 +174,43 @@ abstract final class SpotService {
       if (placeSource != null && placeSource.trim().isNotEmpty) 'place_source': placeSource.trim(),
     }).select('*, spot_votes(*), spot_comments(*)').single();
     return _spotFromRow(inserted);
+  }
+
+  static Future<Spot> updateSpot({
+    required String spotId,
+    required String name,
+    required String city,
+    required String area,
+    required SpotCategory category,
+    required SpotStatus status,
+    String? sourceUrl,
+    String? mapsUrl,
+    String? notes,
+    String? address,
+    double? latitude,
+    double? longitude,
+    String? placeSource,
+  }) async {
+    final updated = await supabase
+        .from('spots')
+        .update({
+          'name':     name.trim(),
+          'city':     city.trim().isEmpty ? 'Unknown' : city.trim(),
+          'area':     area.trim(),
+          'category': _catToDb(category),
+          'status':   _statusToDb(status),
+          'source_url':   sourceUrl?.trim().isEmpty == true ? null : sourceUrl?.trim(),
+          'maps_url':     mapsUrl?.trim().isEmpty == true ? null : mapsUrl?.trim(),
+          'notes':        notes?.trim().isEmpty == true ? null : notes?.trim(),
+          'address':      address?.trim().isEmpty == true ? null : address?.trim(),
+          'latitude':     latitude,
+          'longitude':    longitude,
+          'place_source': placeSource,
+        })
+        .eq('id', spotId)
+        .select('*, spot_votes(*), spot_comments(*)')
+        .single();
+    return _spotFromRow(updated);
   }
 
   static Future<void> deleteSpot(String spotId) async {

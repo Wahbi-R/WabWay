@@ -10,9 +10,8 @@ import '../../widgets/widgets.dart';
 class SettleUpPanel extends StatefulWidget {
   const SettleUpPanel({
     super.key,
-    required this.balances,
-    required this.suggestions,
-    required this.currency,
+    required this.balancesByCurrency,
+    required this.suggestionsByCurrency,
     required this.members,
     required this.tripId,
     required this.myId,
@@ -21,9 +20,8 @@ class SettleUpPanel extends StatefulWidget {
     this.onSettled,
   });
 
-  final List<MemberBalance> balances;
-  final List<SettlementSuggestion> suggestions;
-  final String currency;
+  final Map<String, List<MemberBalance>> balancesByCurrency;
+  final Map<String, List<SettlementSuggestion>> suggestionsByCurrency;
   final List<TripMember> members;
   final String tripId;
   final String myId;
@@ -36,7 +34,8 @@ class SettleUpPanel extends StatefulWidget {
 }
 
 class _SettleUpPanelState extends State<SettleUpPanel> {
-  late List<SettlementSuggestion> _suggestions;
+  // currency → suggestions (with isSettled state)
+  late Map<String, List<SettlementSuggestion>> _groupedSuggestions;
   bool _saving = false;
 
   @override
@@ -49,23 +48,26 @@ class _SettleUpPanelState extends State<SettleUpPanel> {
   void didUpdateWidget(SettleUpPanel old) {
     super.didUpdateWidget(old);
     if (widget.existingSettlements != old.existingSettlements ||
-        widget.suggestions != old.suggestions) {
+        widget.suggestionsByCurrency != old.suggestionsByCurrency) {
       _initSuggestions();
     }
   }
 
   void _initSuggestions() {
-    _suggestions = widget.suggestions.map((s) {
-      final alreadySettled = widget.existingSettlements
-          .any((e) => e.matches(s.fromMemberId, s.toMemberId));
-      return SettlementSuggestion(
-        fromMemberId: s.fromMemberId,
-        toMemberId:   s.toMemberId,
-        amount:       s.amount,
-        currency:     s.currency,
-        isSettled:    alreadySettled,
-      );
-    }).toList();
+    _groupedSuggestions = {};
+    for (final entry in widget.suggestionsByCurrency.entries) {
+      _groupedSuggestions[entry.key] = entry.value.map((s) {
+        final alreadySettled = widget.existingSettlements
+            .any((e) => e.matches(s.fromMemberId, s.toMemberId));
+        return SettlementSuggestion(
+          fromMemberId: s.fromMemberId,
+          toMemberId:   s.toMemberId,
+          amount:       s.amount,
+          currency:     s.currency,
+          isSettled:    alreadySettled,
+        );
+      }).toList();
+    }
   }
 
   Future<void> _markSettled(SettlementSuggestion s) async {
@@ -105,15 +107,15 @@ class _SettleUpPanelState extends State<SettleUpPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final totalOwedToYou = widget.balances
-        .where((b) => b.net > 0)
-        .fold(0.0, (a, b) => a + b.net);
-    final totalYouOwe = widget.balances
-        .where((b) => b.net < 0)
-        .fold(0.0, (a, b) => a + b.net.abs());
+    final currencies = widget.balancesByCurrency.keys.toList()..sort();
+    final allBalances = currencies
+        .expand((c) => widget.balancesByCurrency[c] ?? [])
+        .toList();
+    final allSuggestions = currencies
+        .expand((c) => _groupedSuggestions[c] ?? [])
+        .toList();
 
-    final owedToYou = widget.balances.where((b) => b.net > 0.5).toList();
-    final youOwe    = widget.balances.where((b) => b.net < -0.5).toList();
+    final anyBalance = allBalances.any((b) => b.net.abs() > 0.5);
 
     return SingleChildScrollView(
       controller: widget.scrollController,
@@ -121,109 +123,19 @@ class _SettleUpPanelState extends State<SettleUpPanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Balance overview card
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(kSpace4),
-            decoration: BoxDecoration(
-              color: kColorPaper,
-              borderRadius: kRadiusLg,
-              border: Border.all(color: kColorBorder),
-              boxShadow: kShadowSm,
+          // Per-currency balance sections (or single if one currency)
+          for (final currency in currencies) ...[
+            _CurrencyBalanceCard(
+              currency: currency,
+              balances: widget.balancesByCurrency[currency] ?? [],
+              suggestions: _groupedSuggestions[currency] ?? [],
+              onSettle: _markSettled,
+              showCurrencyLabel: currencies.length > 1,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Balance overview', style: kStyleBodySemibold),
-                const SizedBox(height: kSpace4),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _BalanceTile(
-                        label: 'Owed to you',
-                        amount: totalOwedToYou,
-                        currency: widget.currency,
-                        color: kColorSuccess,
-                        softColor: kColorSuccessSoft,
-                      ),
-                    ),
-                    const SizedBox(width: kSpace3),
-                    Expanded(
-                      child: _BalanceTile(
-                        label: 'You owe',
-                        amount: totalYouOwe,
-                        currency: widget.currency,
-                        color: kColorDanger,
-                        softColor: kColorDangerSoft,
-                      ),
-                    ),
-                  ],
-                ),
-                if (totalOwedToYou > 0 || totalYouOwe > 0) ...[
-                  const SizedBox(height: kSpace3),
-                  const Divider(height: 1),
-                  const SizedBox(height: kSpace3),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Net balance', style: kStyleCaptionMedium),
-                      Text(
-                        (totalOwedToYou - totalYouOwe) >= 0
-                            ? '+${fmtAmount(totalOwedToYou - totalYouOwe, widget.currency)}'
-                            : '-${fmtAmount((totalOwedToYou - totalYouOwe).abs(), widget.currency)}',
-                        style: GoogleFonts.ibmPlexMono(
-                          fontSize: kTextBase,
-                          fontWeight: FontWeight.w600,
-                          color: (totalOwedToYou - totalYouOwe) >= 0
-                              ? kColorSuccess
-                              : kColorDanger,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ],
-            ),
-          ),
-
-          const SizedBox(height: kSpace5),
-
-          // Who owes you
-          if (owedToYou.isNotEmpty) ...[
-            Text('Owed to you', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
-            const SizedBox(height: kSpace2),
-            ...owedToYou.map((b) => _BalanceRow(
-                  balance: b,
-                  currency: widget.currency,
-                  onSettle: () {
-                    final s = _suggestions.where((s) =>
-                        s.fromMemberId == b.member.id && !s.isSettled).firstOrNull;
-                    if (s != null) _markSettled(s);
-                  },
-                  isSettled: _suggestions.where((s) => s.fromMemberId == b.member.id).any((s) => s.isSettled),
-                )),
-            const SizedBox(height: kSpace4),
+            const SizedBox(height: kSpace3),
           ],
 
-          // You owe
-          if (youOwe.isNotEmpty) ...[
-            Text('You owe', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
-            const SizedBox(height: kSpace2),
-            ...youOwe.map((b) => _BalanceRow(
-                  balance: b,
-                  currency: widget.currency,
-                  isYouOwe: true,
-                  onSettle: () {
-                    final s = _suggestions.where((s) =>
-                        s.toMemberId == b.member.id && !s.isSettled).firstOrNull;
-                    if (s != null) _markSettled(s);
-                  },
-                  isSettled: _suggestions.where((s) => s.toMemberId == b.member.id).any((s) => s.isSettled),
-                )),
-            const SizedBox(height: kSpace4),
-          ],
-
-          if (owedToYou.isEmpty && youOwe.isEmpty)
+          if (!anyBalance)
             const WabwayEmptyState(
               icon: Icons.check_circle_rounded,
               title: 'All settled up',
@@ -231,14 +143,142 @@ class _SettleUpPanelState extends State<SettleUpPanel> {
             ),
 
           // Suggested settlements
-          if (_suggestions.isNotEmpty) ...[
+          if (allSuggestions.isNotEmpty) ...[
+            const SizedBox(height: kSpace2),
             Text('Suggested payments', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
             const SizedBox(height: kSpace2),
-            ..._suggestions.map((s) => _SettlementRow(
+            ...allSuggestions.map((s) => _SettlementRow(
                   suggestion: s,
-                  currency:   widget.currency,
+                  currency:   s.currency,
                   members:    widget.members,
                   onMark:     () => _markSettled(s),
+                )),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CurrencyBalanceCard extends StatelessWidget {
+  const _CurrencyBalanceCard({
+    required this.currency,
+    required this.balances,
+    required this.suggestions,
+    required this.onSettle,
+    required this.showCurrencyLabel,
+  });
+
+  final String currency;
+  final List<MemberBalance> balances;
+  final List<SettlementSuggestion> suggestions;
+  final ValueChanged<SettlementSuggestion> onSettle;
+  final bool showCurrencyLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final totalOwedToYou = balances.where((b) => b.net > 0)
+        .fold(0.0, (a, b) => a + b.net);
+    final totalYouOwe = balances.where((b) => b.net < 0)
+        .fold(0.0, (a, b) => a + b.net.abs());
+    final owedToYou = balances.where((b) => b.net > 0.5).toList();
+    final youOwe    = balances.where((b) => b.net < -0.5).toList();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(kSpace4),
+      decoration: BoxDecoration(
+        color: kColorPaper,
+        borderRadius: kRadiusLg,
+        border: Border.all(color: kColorBorder),
+        boxShadow: kShadowSm,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (showCurrencyLabel) ...[
+            WabwayBadge(label: currency, tone: WabwayBadgeTone.neutral),
+            const SizedBox(height: kSpace3),
+          ],
+          Text('Balance overview', style: kStyleBodySemibold),
+          const SizedBox(height: kSpace4),
+          Row(
+            children: [
+              Expanded(
+                child: _BalanceTile(
+                  label: 'Owed to you',
+                  amount: totalOwedToYou,
+                  currency: currency,
+                  color: kColorSuccess,
+                  softColor: kColorSuccessSoft,
+                ),
+              ),
+              const SizedBox(width: kSpace3),
+              Expanded(
+                child: _BalanceTile(
+                  label: 'You owe',
+                  amount: totalYouOwe,
+                  currency: currency,
+                  color: kColorDanger,
+                  softColor: kColorDangerSoft,
+                ),
+              ),
+            ],
+          ),
+          if (totalOwedToYou > 0 || totalYouOwe > 0) ...[
+            const SizedBox(height: kSpace3),
+            const Divider(height: 1),
+            const SizedBox(height: kSpace3),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Net balance', style: kStyleCaptionMedium),
+                Text(
+                  (totalOwedToYou - totalYouOwe) >= 0
+                      ? '+${fmtAmount(totalOwedToYou - totalYouOwe, currency)}'
+                      : '-${fmtAmount((totalOwedToYou - totalYouOwe).abs(), currency)}',
+                  style: GoogleFonts.ibmPlexMono(
+                    fontSize: kTextBase,
+                    fontWeight: FontWeight.w600,
+                    color: (totalOwedToYou - totalYouOwe) >= 0
+                        ? kColorSuccess
+                        : kColorDanger,
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (owedToYou.isNotEmpty) ...[
+            const SizedBox(height: kSpace4),
+            Text('Owed to you', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
+            const SizedBox(height: kSpace2),
+            ...owedToYou.map((b) => _BalanceRow(
+                  balance: b,
+                  currency: currency,
+                  onSettle: () {
+                    final s = suggestions.where((s) =>
+                        s.fromMemberId == b.member.id && !s.isSettled).firstOrNull;
+                    if (s != null) onSettle(s);
+                  },
+                  isSettled: suggestions.where((s) => s.fromMemberId == b.member.id)
+                      .any((s) => s.isSettled),
+                )),
+          ],
+          if (youOwe.isNotEmpty) ...[
+            const SizedBox(height: kSpace4),
+            Text('You owe', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
+            const SizedBox(height: kSpace2),
+            ...youOwe.map((b) => _BalanceRow(
+                  balance: b,
+                  currency: currency,
+                  isYouOwe: true,
+                  onSettle: () {
+                    final s = suggestions.where((s) =>
+                        s.toMemberId == b.member.id && !s.isSettled).firstOrNull;
+                    if (s != null) onSettle(s);
+                  },
+                  isSettled: suggestions.where((s) => s.toMemberId == b.member.id)
+                      .any((s) => s.isSettled),
                 )),
           ],
         ],

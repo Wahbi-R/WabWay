@@ -474,7 +474,7 @@ class _SidebarHeader extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    trip?.name ?? 'Wabway',
+                    trip?.name ?? 'WabWay',
                     style: kStyleBodyBold,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,

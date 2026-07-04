@@ -28,5 +28,8 @@ class ProfileState extends InheritedWidget {
       context.dependOnInheritedWidgetOfExactType<ProfileState>()?.onRefresh?.call();
 
   @override
-  bool updateShouldNotify(ProfileState old) => profile.id != old.profile.id;
+  bool updateShouldNotify(ProfileState old) =>
+      profile.id != old.profile.id ||
+      profile.displayName != old.profile.displayName ||
+      profile.avatarUrl != old.profile.avatarUrl;
 }

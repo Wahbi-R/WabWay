@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
@@ -41,10 +44,25 @@ class _PlanScreenState extends State<PlanScreen> {
 
   String? _selectedItemId;
   String? _selectedDayId;
+  bool _unplannedExpanded = true;
 
   ItineraryItem? get _selectedItem => itemById(_days, _selectedItemId ?? '');
   TripDay? get _selectedDay =>
       _selectedItem == null ? null : dayForItem(_days, _selectedItemId ?? '');
+
+  List<Spot> get _unplannedSpots {
+    final linkedIds = {
+      for (final day in _days)
+        for (final item in day.items)
+          if (item.linkedSpotId != null) item.linkedSpotId!,
+    };
+    return _spots
+        .where((s) =>
+            (s.status == SpotStatus.confirmed ||
+                s.status == SpotStatus.planned) &&
+            !linkedIds.contains(s.id))
+        .toList();
+  }
 
   @override
   void didChangeDependencies() {
@@ -244,6 +262,58 @@ class _PlanScreenState extends State<PlanScreen> {
     }
   }
 
+  Future<void> _addItemForSpot(BuildContext context, Spot spot) async {
+    if (_days.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Add a trip day first.', style: kStyleBody.copyWith(color: Colors.white)),
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
+    final result = await _showDayPickerSheet(context, days: _days);
+    if (result == null || !mounted) return;
+    final (dayId, timeOfDay) = result;
+    final day = _days.where((d) => d.id == dayId).firstOrNull;
+    if (day == null) return;
+    final itemType = _itemTypeForSpot(spot);
+    final timeStr = timeOfDay != null
+        ? '${timeOfDay.hour.toString().padLeft(2, '0')}:${timeOfDay.minute.toString().padLeft(2, '0')}'
+        : null;
+    try {
+      final item = await PlanService.createItem(
+        tripId:       _activeTripId,
+        dayId:        dayId,
+        title:        spot.name,
+        type:         itemType,
+        createdBy:    _userId,
+        time:         timeStr,
+        city:         spot.city.isNotEmpty ? spot.city : spot.area,
+        location:     (spot.address?.isNotEmpty == true) ? spot.address : spot.name,
+        mapsUrl:      spot.mapsUrl,
+        linkedSpotId: spot.id,
+        sortOrder:    day.items.length,
+      );
+      if (!mounted) return;
+      setState(() {
+        day.items.add(item);
+        _selectedItemId = item.id;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Failed to add item: $e', style: kStyleBody.copyWith(color: Colors.white)),
+        backgroundColor: kColorDanger,
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
+  }
+
+  ItineraryItemType _itemTypeForSpot(Spot spot) => switch (spot.category) {
+    SpotCategory.food      => ItineraryItemType.food,
+    SpotCategory.nightlife => ItineraryItemType.activity,
+    _                      => ItineraryItemType.spot,
+  };
+
   void _onEditDay(TripDay day) {
     _showEditDaySheet(context, day: day, onSaved: (city, date, notes, clearNotes) {
       setState(() {
@@ -282,6 +352,17 @@ class _PlanScreenState extends State<PlanScreen> {
       _selectedItemId = item.id;
     });
     PlanService.moveItem(item.id, newDayId).catchError((_) => _silentReload());
+  }
+
+  void _onReorderItems(String dayId, List<ItineraryItem> newOrder) {
+    final day = _days.where((d) => d.id == dayId).firstOrNull;
+    if (day == null) return;
+    setState(() {
+      day.items
+        ..clear()
+        ..addAll(newOrder);
+    });
+    PlanService.reorderItemsInDay(newOrder).catchError((_) => _silentReload());
   }
 
   Future<void> _onDuplicateItem(ItineraryItem item) async {
@@ -325,6 +406,123 @@ class _PlanScreenState extends State<PlanScreen> {
     }
   }
 
+  void _exportPlan() {
+    if (_days.isEmpty) return;
+    final buf = StringBuffer();
+    final tripState = TripState.maybeOf(context);
+    final tripName = tripState?.trip.name ?? 'Trip';
+    buf.writeln('$tripName — Itinerary');
+    buf.writeln('=' * 40);
+    for (final day in _days) {
+      buf.writeln('\nDay ${day.dayNumber} · ${day.city} · ${fmtDayDate(day.date)}');
+      if (day.notes != null && day.notes!.isNotEmpty) {
+        buf.writeln('  Note: ${day.notes}');
+      }
+      final items = day.sortedItems;
+      if (items.isEmpty) {
+        buf.writeln('  (no items)');
+      } else {
+        for (final item in items) {
+          final time = item.time != null ? '[${item.time}] ' : '';
+          buf.write('  • $time${item.title}');
+          if (item.location != null && item.location!.isNotEmpty) {
+            buf.write(' @ ${item.location}');
+          }
+          buf.writeln();
+          if (item.notes != null && item.notes!.isNotEmpty) {
+            buf.writeln('    ${item.notes}');
+          }
+        }
+      }
+    }
+    final text = buf.toString().trim();
+    if (kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Export is not supported on web.',
+            style: kStyleBody.copyWith(color: Colors.white)),
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
+    SharePlus.instance.share(ShareParams(
+      text: text,
+      subject: '$tripName — Itinerary',
+    ));
+  }
+
+  Future<void> _exportToCalendar() async {
+    if (kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Calendar export is not supported on web.',
+            style: kStyleBody.copyWith(color: Colors.white)),
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
+    if (_days.isEmpty) return;
+    final tripState = TripState.maybeOf(context);
+    final tripName = tripState?.trip.name ?? 'Trip';
+
+    final buf = StringBuffer();
+    buf.writeln('BEGIN:VCALENDAR');
+    buf.writeln('VERSION:2.0');
+    buf.writeln('PRODID:-//WabWay//EN');
+    buf.writeln('CALSCALE:GREGORIAN');
+    buf.writeln('METHOD:PUBLISH');
+
+    String _icsDate(DateTime d) =>
+        '${d.year.toString().padLeft(4, '0')}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}';
+
+    String _icsDateTime(DateTime d, String? timeStr) {
+      if (timeStr == null) return '${_icsDate(d)}';
+      final parts = timeStr.split(':');
+      if (parts.length < 2) return '${_icsDate(d)}';
+      return '${_icsDate(d)}T${parts[0].padLeft(2, '0')}${parts[1].padLeft(2, '0')}00';
+    }
+
+    for (final day in _days) {
+      for (final item in day.sortedItems) {
+        buf.writeln('BEGIN:VEVENT');
+        buf.writeln('UID:wabway-${item.id}@wabway.app');
+        buf.writeln('SUMMARY:${item.title.replaceAll(',', '\\,')}');
+        if (item.time != null) {
+          buf.writeln('DTSTART:${_icsDateTime(day.date, item.time)}');
+          buf.writeln('DTEND:${_icsDateTime(day.date, item.time)}');
+        } else {
+          buf.writeln('DTSTART;VALUE=DATE:${_icsDate(day.date)}');
+          buf.writeln('DTEND;VALUE=DATE:${_icsDate(day.date)}');
+        }
+        if (item.location != null && item.location!.isNotEmpty) {
+          buf.writeln('LOCATION:${item.location!.replaceAll(',', '\\,')}');
+        }
+        if (item.notes != null && item.notes!.isNotEmpty) {
+          buf.writeln('DESCRIPTION:${item.notes!.replaceAll('\n', '\\n').replaceAll(',', '\\,')}');
+        }
+        buf.writeln('END:VEVENT');
+      }
+    }
+    buf.writeln('END:VCALENDAR');
+
+    try {
+      final dir = Directory.systemTemp;
+      final file = File('${dir.path}/wabway_itinerary.ics');
+      await file.writeAsString(buf.toString());
+      if (!mounted) return;
+      await SharePlus.instance.share(ShareParams(
+        files: [XFile(file.path, mimeType: 'text/calendar')],
+        subject: '$tripName — Calendar',
+      ));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Could not export calendar.',
+              style: kStyleBody.copyWith(color: Colors.white)),
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    }
+  }
+
   // ─── Build ────────────────────────────────────────────────────────────────────
 
   @override
@@ -343,6 +541,8 @@ class _PlanScreenState extends State<PlanScreen> {
           _DesktopPlanBar(
             dayCount: _days.length,
             onAddDay: () => _addDay(context),
+            onExport: _days.isNotEmpty ? _exportPlan : null,
+            onExportCalendar: (_days.isNotEmpty && !kIsWeb) ? _exportToCalendar : null,
           ),
           Expanded(
             child: _loading
@@ -360,26 +560,45 @@ class _PlanScreenState extends State<PlanScreen> {
                         children: [
                           SizedBox(
                             width: 420,
-                            child: _days.isEmpty
+                            child: (_days.isEmpty && _unplannedSpots.isEmpty)
                                 ? _buildEmptyTimeline(context)
-                                : ListView.separated(
+                                : ListView.builder(
                                     padding: const EdgeInsets.all(kSpace4),
-                                    itemCount: _days.length,
-                                    separatorBuilder: (_, __) =>
-                                        const SizedBox(height: kSpace3),
-                                    itemBuilder: (ctx, i) => TripDayCard(
-                                      day: _days[i],
-                                      selectedItemId: _selectedItemId,
-                                      onItemTap: _selectItem,
-                                      onAddItem: () =>
-                                          _addItem(context, _days[i].id),
-                                      isDesktop: true,
-                                      onDayTap: () =>
-                                          _selectDay(_days[i].id),
-                                      daySelected:
-                                          _selectedDayId == _days[i].id,
-                                      onEditDay: () => _onEditDay(_days[i]),
-                                    ),
+                                    itemCount: _days.length +
+                                        (_unplannedSpots.isNotEmpty ? 1 : 0),
+                                    itemBuilder: (ctx, i) {
+                                      if (_unplannedSpots.isNotEmpty && i == 0) {
+                                        return Padding(
+                                          padding: const EdgeInsets.only(bottom: kSpace3),
+                                          child: _UnplannedSpotsSection(
+                                            spots: _unplannedSpots,
+                                            expanded: _unplannedExpanded,
+                                            onToggle: () => setState(() =>
+                                                _unplannedExpanded = !_unplannedExpanded),
+                                            onSpotTap: (spot) =>
+                                                _addItemForSpot(context, spot),
+                                          ),
+                                        );
+                                      }
+                                      final di = i - (_unplannedSpots.isNotEmpty ? 1 : 0);
+                                      return Padding(
+                                        padding: EdgeInsets.only(
+                                            bottom: di < _days.length - 1 ? kSpace3 : 0),
+                                        child: TripDayCard(
+                                          day: _days[di],
+                                          selectedItemId: _selectedItemId,
+                                          onItemTap: _selectItem,
+                                          onAddItem: () =>
+                                              _addItem(context, _days[di].id),
+                                          isDesktop: true,
+                                          onDayTap: () => _selectDay(_days[di].id),
+                                          daySelected: _selectedDayId == _days[di].id,
+                                          onEditDay: () => _onEditDay(_days[di]),
+                                          onReorder: (newOrder) =>
+                                              _onReorderItems(_days[di].id, newOrder),
+                                        ),
+                                      );
+                                    },
                                   ),
                           ),
                           const VerticalDivider(
@@ -467,6 +686,21 @@ class _PlanScreenState extends State<PlanScreen> {
       appBar: AppBar(
         title: Text('Plan', style: kStyleTitle),
         actions: [
+          if (_days.isNotEmpty) ...[
+            IconButton(
+              icon: const Icon(Icons.ios_share_rounded, size: 20),
+              tooltip: 'Export plan',
+              color: kColorInkSoft,
+              onPressed: _exportPlan,
+            ),
+            if (!kIsWeb)
+              IconButton(
+                icon: const Icon(Icons.calendar_month_rounded, size: 20),
+                tooltip: 'Export to calendar (.ics)',
+                color: kColorInkSoft,
+                onPressed: _exportToCalendar,
+              ),
+          ],
           TextButton.icon(
             onPressed: () => _addDay(context),
             icon: const Icon(Icons.add_rounded, size: 18),
@@ -486,7 +720,7 @@ class _PlanScreenState extends State<PlanScreen> {
                     description: _error!,
                   ),
                 )
-              : _days.isEmpty
+              : (_days.isEmpty && _unplannedSpots.isEmpty)
                   ? Center(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -506,41 +740,63 @@ class _PlanScreenState extends State<PlanScreen> {
                         ],
                       ),
                     )
-                  : ListView.separated(
+                  : ListView.builder(
                       padding: const EdgeInsets.all(kSpace4),
-                      itemCount: _days.length,
-                      separatorBuilder: (_, __) =>
-                          const SizedBox(height: kSpace3),
-                      itemBuilder: (ctx, i) => TripDayCard(
-                        day: _days[i],
-                        onItemTap: (id) {
-                          final item = itemById(_days, id);
-                          final day  = dayForItem(_days, id);
-                          if (item != null && day != null) {
-                            final spots = _spots;
-                            final docs  = _docs;
-                            final days  = List<TripDay>.from(_days);
-                            Navigator.push(
-                              ctx,
-                              MaterialPageRoute(
-                                builder: (_) => ItemDetailScreen(
-                                  item: item,
-                                  day: day,
-                                  spots: spots,
-                                  docs: docs,
-                                  days: days,
-                                  onDelete: () => _deleteItem(id),
-                                  onUpdated: _updateItem,
-                                  onMove: (newDayId) => _onMoveItem(item, newDayId),
-                                  onDuplicate: () => _onDuplicateItem(item),
-                                ),
-                              ),
-                            );
-                          }
-                        },
-                        onAddItem: () => _addItem(context, _days[i].id),
-                        onEditDay: () => _onEditDay(_days[i]),
-                      ),
+                      itemCount: _days.length +
+                          (_unplannedSpots.isNotEmpty ? 1 : 0),
+                      itemBuilder: (ctx, i) {
+                        if (_unplannedSpots.isNotEmpty && i == 0) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: kSpace3),
+                            child: _UnplannedSpotsSection(
+                              spots: _unplannedSpots,
+                              expanded: _unplannedExpanded,
+                              onToggle: () => setState(
+                                  () => _unplannedExpanded = !_unplannedExpanded),
+                              onSpotTap: (spot) =>
+                                  _addItemForSpot(context, spot),
+                            ),
+                          );
+                        }
+                        final di = i - (_unplannedSpots.isNotEmpty ? 1 : 0);
+                        return Padding(
+                          padding: EdgeInsets.only(
+                              bottom: di < _days.length - 1 ? kSpace3 : 0),
+                          child: TripDayCard(
+                            day: _days[di],
+                            onItemTap: (id) {
+                              final item = itemById(_days, id);
+                              final day  = dayForItem(_days, id);
+                              if (item != null && day != null) {
+                                final spots = _spots;
+                                final docs  = _docs;
+                                final days  = List<TripDay>.from(_days);
+                                Navigator.push(
+                                  ctx,
+                                  MaterialPageRoute(
+                                    builder: (_) => ItemDetailScreen(
+                                      item: item,
+                                      day: day,
+                                      spots: spots,
+                                      docs: docs,
+                                      days: days,
+                                      onDelete: () => _deleteItem(id),
+                                      onUpdated: _updateItem,
+                                      onMove: (newDayId) =>
+                                          _onMoveItem(item, newDayId),
+                                      onDuplicate: () => _onDuplicateItem(item),
+                                    ),
+                                  ),
+                                );
+                              }
+                            },
+                            onAddItem: () => _addItem(context, _days[di].id),
+                            onEditDay: () => _onEditDay(_days[di]),
+                            onReorder: (newOrder) =>
+                                _onReorderItems(_days[di].id, newOrder),
+                          ),
+                        );
+                      },
                     ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'plan_fab',
@@ -872,10 +1128,14 @@ class _DesktopPlanBar extends StatelessWidget {
   const _DesktopPlanBar({
     required this.dayCount,
     required this.onAddDay,
+    this.onExport,
+    this.onExportCalendar,
   });
 
   final int dayCount;
   final VoidCallback onAddDay;
+  final VoidCallback? onExport;
+  final VoidCallback? onExportCalendar;
 
   @override
   Widget build(BuildContext context) {
@@ -908,6 +1168,26 @@ class _DesktopPlanBar extends StatelessWidget {
               ),
             ),
           const Spacer(),
+          if (onExport != null) ...[
+            WabwayButton(
+              label: 'Export',
+              icon: Icons.ios_share_rounded,
+              size: WabwayButtonSize.sm,
+              variant: WabwayButtonVariant.ghost,
+              onPressed: onExport,
+            ),
+            const SizedBox(width: kSpace2),
+          ],
+          if (onExportCalendar != null) ...[
+            WabwayButton(
+              label: 'Calendar',
+              icon: Icons.calendar_month_rounded,
+              size: WabwayButtonSize.sm,
+              variant: WabwayButtonVariant.ghost,
+              onPressed: onExportCalendar,
+            ),
+            const SizedBox(width: kSpace2),
+          ],
           WabwayButton(
             label: 'Add Day',
             icon: Icons.calendar_today_rounded,
@@ -917,6 +1197,336 @@ class _DesktopPlanBar extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ─── Add day dialog ───────────────────────────────────────────────────────────
+
+// ─── Day picker sheet (for unplanned spots) ───────────────────────────────────
+
+Future<(String dayId, TimeOfDay? time)?> _showDayPickerSheet(
+  BuildContext context, {
+  required List<TripDay> days,
+}) {
+  return showModalBottomSheet<(String, TimeOfDay?)>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => _DayPickerSheet(days: days),
+  );
+}
+
+class _DayPickerSheet extends StatefulWidget {
+  const _DayPickerSheet({required this.days});
+  final List<TripDay> days;
+
+  @override
+  State<_DayPickerSheet> createState() => _DayPickerSheetState();
+}
+
+class _DayPickerSheetState extends State<_DayPickerSheet> {
+  String? _selectedDayId;
+  TimeOfDay? _time;
+
+  Future<void> _pickTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _time ?? const TimeOfDay(hour: 10, minute: 0),
+    );
+    if (picked != null) setState(() => _time = picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.55,
+      minChildSize: 0.4,
+      maxChildSize: 0.85,
+      expand: false,
+      builder: (_, ctrl) => DecoratedBox(
+        decoration: const BoxDecoration(
+          color: kColorPaper,
+          borderRadius: kRadiusSheet,
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(kSpace4, kSpace2, kSpace4, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const WabwayDragHandle(),
+                  const SizedBox(height: kSpace3),
+                  Text('Add to which day?', style: kStyleTitle),
+                  const SizedBox(height: kSpace2),
+                  Text('Pick a day for this spot.',
+                      style: kStyleBody.copyWith(color: kColorInkSoft)),
+                  const SizedBox(height: kSpace3),
+                  const Divider(height: 1, color: kColorBorder),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView.separated(
+                controller: ctrl,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: kSpace4, vertical: kSpace3),
+                itemCount: widget.days.length,
+                separatorBuilder: (_, __) => const SizedBox(height: kSpace2),
+                itemBuilder: (_, i) {
+                  final day = widget.days[i];
+                  final selected = _selectedDayId == day.id;
+                  return GestureDetector(
+                    onTap: () => setState(() => _selectedDayId = day.id),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      padding: const EdgeInsets.all(kSpace3),
+                      decoration: BoxDecoration(
+                        color: selected ? kColorPrimarySoft : kColorSurfaceSunken,
+                        borderRadius: kRadiusMd,
+                        border: Border.all(
+                          color: selected ? kColorPrimary : kColorBorder,
+                          width: selected ? 1.5 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: selected ? kColorPrimary : kColorBorder,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
+                              child: Text(
+                                '${day.dayNumber}',
+                                style: kStyleCaptionMedium.copyWith(
+                                  color: selected
+                                      ? kColorTextOnPrimary
+                                      : kColorInkSoft,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: kSpace3),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(day.city, style: kStyleBodyMedium),
+                                Text(fmtDayDate(day.date),
+                                    style: kStyleCaption.copyWith(
+                                        color: kColorInkSoft)),
+                              ],
+                            ),
+                          ),
+                          if (selected)
+                            const Icon(Icons.check_circle_rounded,
+                                size: 18, color: kColorPrimary),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                  kSpace4, 0, kSpace4,
+                  kSpace4 + MediaQuery.paddingOf(context).bottom),
+              child: Column(
+                children: [
+                  GestureDetector(
+                    onTap: _pickTime,
+                    child: Container(
+                      height: 44,
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: kSpace3),
+                      decoration: BoxDecoration(
+                        color: kColorSurfaceSunken,
+                        borderRadius: kRadiusMd,
+                        border: Border.all(color: kColorBorder),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.access_time_rounded,
+                              size: 16, color: kColorInkSoft),
+                          const SizedBox(width: kSpace2),
+                          Text(
+                            _time != null
+                                ? _time!.format(context)
+                                : 'Set time (optional)',
+                            style: kStyleBody.copyWith(
+                              color: _time != null
+                                  ? kColorInk
+                                  : kColorInkSoft,
+                            ),
+                          ),
+                          if (_time != null) ...[
+                            const Spacer(),
+                            GestureDetector(
+                              onTap: () => setState(() => _time = null),
+                              child: const Icon(Icons.close_rounded,
+                                  size: 16, color: kColorInkSoft),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: kSpace3),
+                  WabwayButton(
+                    label: 'Add to plan',
+                    icon: Icons.add_rounded,
+                    onPressed: _selectedDayId == null
+                        ? null
+                        : () => Navigator.pop(
+                            context, (_selectedDayId!, _time)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Unplanned spots section ──────────────────────────────────────────────────
+
+class _UnplannedSpotsSection extends StatelessWidget {
+  const _UnplannedSpotsSection({
+    required this.spots,
+    required this.expanded,
+    required this.onToggle,
+    required this.onSpotTap,
+  });
+
+  final List<Spot> spots;
+  final bool expanded;
+  final VoidCallback onToggle;
+  final ValueChanged<Spot> onSpotTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: kColorPaper,
+        borderRadius: kRadiusLg,
+        border: Border.all(color: kColorBorder),
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: onToggle,
+            borderRadius: expanded
+                ? const BorderRadius.vertical(top: Radius.circular(12))
+                : kRadiusLg,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: kSpace4, vertical: kSpace3),
+              child: Row(
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: const BoxDecoration(
+                      color: kColorSuccessSoft,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.place_rounded,
+                        size: 14, color: kColorSuccess),
+                  ),
+                  const SizedBox(width: kSpace3),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Unplanned Spots',
+                            style: kStyleBodyMedium),
+                        Text(
+                          '${spots.length} confirmed/planned spot${spots.length == 1 ? '' : 's'} not yet on a day',
+                          style: kStyleCaption.copyWith(color: kColorInkSoft),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    expanded
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
+                    color: kColorInkSoft,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (expanded) ...[
+            const Divider(height: 1, color: kColorBorder),
+            ...spots.map((spot) => _UnplannedSpotRow(
+                  spot: spot,
+                  onTap: () => onSpotTap(spot),
+                  isLast: spot == spots.last,
+                )),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _UnplannedSpotRow extends StatelessWidget {
+  const _UnplannedSpotRow({
+    required this.spot,
+    required this.onTap,
+    required this.isLast,
+  });
+
+  final Spot spot;
+  final VoidCallback onTap;
+  final bool isLast;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+                horizontal: kSpace4, vertical: kSpace3),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(spot.name, style: kStyleBodyMedium),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${spot.city}${spot.area.isNotEmpty ? ' · ${spot.area}' : ''}',
+                        style: kStyleCaption.copyWith(color: kColorInkSoft),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: kSpace2),
+                WabwayBadge(
+                  label: spot.status.label,
+                  tone: spot.status.tone,
+                ),
+                const SizedBox(width: kSpace2),
+                const Icon(Icons.add_circle_outline_rounded,
+                    size: 18, color: kColorPrimary),
+              ],
+            ),
+          ),
+        ),
+        if (!isLast) const Divider(height: 1, indent: kSpace4, color: kColorBorder),
+      ],
     );
   }
 }

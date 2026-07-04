@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
 import '../widgets/widgets.dart';
 
-// In-session store — push notification persistence comes later.
-class _NotifPrefs {
-  static bool activity  = true;
-  static bool money     = true;
-  static bool documents = true;
-  static bool itinerary = true;
-}
+const _kPrefActivity  = 'notif_activity';
+const _kPrefMoney     = 'notif_money';
+const _kPrefDocuments = 'notif_documents';
+const _kPrefItinerary = 'notif_itinerary';
 
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({super.key});
@@ -22,25 +20,36 @@ class NotificationSettingsScreen extends StatefulWidget {
 
 class _NotificationSettingsScreenState
     extends State<NotificationSettingsScreen> {
-  late bool _activity;
-  late bool _money;
-  late bool _documents;
-  late bool _itinerary;
+  bool _activity  = true;
+  bool _money     = true;
+  bool _documents = true;
+  bool _itinerary = true;
+  bool _loaded    = false;
 
   @override
   void initState() {
     super.initState();
-    _activity  = _NotifPrefs.activity;
-    _money     = _NotifPrefs.money;
-    _documents = _NotifPrefs.documents;
-    _itinerary = _NotifPrefs.itinerary;
+    _load();
   }
 
-  void _save() {
-    _NotifPrefs.activity  = _activity;
-    _NotifPrefs.money     = _money;
-    _NotifPrefs.documents = _documents;
-    _NotifPrefs.itinerary = _itinerary;
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _activity  = prefs.getBool(_kPrefActivity)  ?? true;
+      _money     = prefs.getBool(_kPrefMoney)     ?? true;
+      _documents = prefs.getBool(_kPrefDocuments) ?? true;
+      _itinerary = prefs.getBool(_kPrefItinerary) ?? true;
+      _loaded    = true;
+    });
+  }
+
+  Future<void> _save() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kPrefActivity,  _activity);
+    await prefs.setBool(_kPrefMoney,     _money);
+    await prefs.setBool(_kPrefDocuments, _documents);
+    await prefs.setBool(_kPrefItinerary, _itinerary);
   }
 
   @override
@@ -55,7 +64,9 @@ class _NotificationSettingsScreenState
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: SingleChildScrollView(
+      body: !_loaded
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
         padding: const EdgeInsets.all(kSpace4),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

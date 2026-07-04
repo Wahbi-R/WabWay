@@ -193,6 +193,62 @@ List<MemberBalance> calculateBalances(
       .toList();
 }
 
+/// Grouped version of [calculateBalances] — groups by currency.
+///
+/// Each entry in the returned map is `currency → List<MemberBalance>` using
+/// only the receipts/withdrawals denominated in that currency. This prevents
+/// cross-currency amounts from being summed as if they were equal.
+Map<String, List<MemberBalance>> calculateBalancesGrouped(
+  List<Receipt> receipts,
+  List<CashWithdrawal> withdrawals, {
+  String? myId,
+  List<TripMember>? members,
+}) {
+  final me = myId ?? kYouId;
+  final peers = members ?? kMockMembers;
+
+  // net[currency][memberId] = amount they owe you (positive) / you owe them (negative)
+  final Map<String, Map<String, double>> net = {};
+
+  void add(String currency, String memberId, double delta) {
+    net.putIfAbsent(currency, () => {})[memberId] =
+        (net[currency]![memberId] ?? 0) + delta;
+  }
+
+  for (final r in receipts) {
+    for (final split in r.splits) {
+      if (r.paidById == me && split.memberId != me) {
+        add(r.currency, split.memberId, split.amount);
+      } else if (r.paidById != me && split.memberId == me) {
+        add(r.currency, r.paidById, -split.amount);
+      }
+    }
+  }
+
+  for (final w in withdrawals) {
+    if (w.withdrawnById == me) {
+      for (final d in w.distributions) {
+        if (d.memberId != me) add(w.currency, d.memberId, d.amount);
+      }
+    } else {
+      for (final d in w.distributions) {
+        if (d.memberId == me) add(w.currency, w.withdrawnById, -d.amount);
+      }
+    }
+  }
+
+  final result = <String, List<MemberBalance>>{};
+  for (final entry in net.entries) {
+    final currency = entry.key;
+    final byMember = entry.value;
+    result[currency] = peers
+        .where((m) => m.id != me && (byMember[m.id] ?? 0).abs() > 0.01)
+        .map((m) => MemberBalance(member: m, net: byMember[m.id] ?? 0))
+        .toList();
+  }
+  return result;
+}
+
 // ─── Persisted settlement ─────────────────────────────────────────────────────
 
 class Settlement {

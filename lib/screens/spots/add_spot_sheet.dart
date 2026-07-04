@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/place_search_service.dart';
 import '../../core/supabase/spot_service.dart';
@@ -12,6 +13,20 @@ Future<Spot?> showAddSpotSheet(
   BuildContext context, {
   required String tripId,
   required String userId,
+}) => _showSpotSheet(context, tripId: tripId, userId: userId);
+
+Future<Spot?> showEditSpotSheet(
+  BuildContext context, {
+  required String tripId,
+  required String userId,
+  required Spot spot,
+}) => _showSpotSheet(context, tripId: tripId, userId: userId, initialSpot: spot);
+
+Future<Spot?> _showSpotSheet(
+  BuildContext context, {
+  required String tripId,
+  required String userId,
+  Spot? initialSpot,
 }) {
   final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
 
@@ -29,6 +44,7 @@ Future<Spot?> showAddSpotSheet(
           child: _AddSpotContent(
             tripId: tripId,
             userId: userId,
+            initialSpot: initialSpot,
             onSubmit: (spot) => Navigator.pop(dialogCtx, spot),
           ),
         ),
@@ -44,6 +60,7 @@ Future<Spot?> showAddSpotSheet(
     builder: (ctx) => _AddSpotSheet(
       tripId: tripId,
       userId: userId,
+      initialSpot: initialSpot,
       onSubmit: (spot) => Navigator.pop(ctx, spot),
     ),
   );
@@ -56,10 +73,12 @@ class _AddSpotSheet extends StatelessWidget {
     required this.tripId,
     required this.userId,
     required this.onSubmit,
+    this.initialSpot,
   });
   final String tripId;
   final String userId;
   final ValueChanged<Spot> onSubmit;
+  final Spot? initialSpot;
 
   @override
   Widget build(BuildContext context) {
@@ -75,6 +94,7 @@ class _AddSpotSheet extends StatelessWidget {
         child: _AddSpotContent(
           tripId: tripId,
           userId: userId,
+          initialSpot: initialSpot,
           scrollController: scrollCtrl,
           onSubmit: onSubmit,
           showDragHandle: true,
@@ -91,6 +111,7 @@ class _AddSpotContent extends StatefulWidget {
     required this.tripId,
     required this.userId,
     required this.onSubmit,
+    this.initialSpot,
     this.scrollController,
     this.showDragHandle = false,
   });
@@ -98,22 +119,26 @@ class _AddSpotContent extends StatefulWidget {
   final String tripId;
   final String userId;
   final ValueChanged<Spot> onSubmit;
+  final Spot? initialSpot;
   final ScrollController? scrollController;
   final bool showDragHandle;
+
+  bool get isEditing => initialSpot != null;
 
   @override
   State<_AddSpotContent> createState() => _AddSpotContentState();
 }
 
 class _AddSpotContentState extends State<_AddSpotContent> {
-  final _formKey    = GlobalKey<FormState>();
-  final _searchCtrl = TextEditingController();
-  final _nameCtrl   = TextEditingController();
-  final _cityCtrl   = TextEditingController();
-  final _areaCtrl   = TextEditingController();
-  final _mapsCtrl   = TextEditingController();
-  final _sourceCtrl = TextEditingController();
-  final _notesCtrl  = TextEditingController();
+  final _formKey     = GlobalKey<FormState>();
+  final _searchCtrl  = TextEditingController();
+  final _nameCtrl    = TextEditingController();
+  final _cityCtrl    = TextEditingController();
+  final _areaCtrl    = TextEditingController();
+  final _addressCtrl = TextEditingController();
+  final _mapsCtrl    = TextEditingController();
+  final _sourceCtrl  = TextEditingController();
+  final _notesCtrl   = TextEditingController();
 
   SpotCategory? _category;
   SpotStatus    _status    = SpotStatus.idea;
@@ -128,19 +153,39 @@ class _AddSpotContentState extends State<_AddSpotContent> {
 
   List<PlaceSuggestion> _suggestions = [];
   bool _showSuggestions = false;
+  bool _searchLoading = false;
+  Timer? _searchDebounce;
 
   @override
   void initState() {
     super.initState();
+    final s = widget.initialSpot;
+    if (s != null) {
+      _nameCtrl.text    = s.name;
+      _cityCtrl.text    = s.city;
+      _areaCtrl.text    = s.area;
+      _addressCtrl.text = s.address ?? '';
+      _mapsCtrl.text    = s.mapsUrl ?? '';
+      _sourceCtrl.text  = s.sourceUrl ?? '';
+      _notesCtrl.text   = s.notes ?? '';
+      _category         = s.category;
+      _status           = s.status;
+      _latitude         = s.latitude;
+      _longitude        = s.longitude;
+      _address          = s.address;
+      _placeSource      = s.placeSource;
+    }
     _mapsCtrl.addListener(_onMapsUrlChanged);
   }
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchCtrl.dispose();
     _nameCtrl.dispose();
     _cityCtrl.dispose();
     _areaCtrl.dispose();
+    _addressCtrl.dispose();
     _mapsCtrl.dispose();
     _sourceCtrl.dispose();
     _notesCtrl.dispose();
@@ -148,10 +193,22 @@ class _AddSpotContentState extends State<_AddSpotContent> {
   }
 
   void _onSearchChanged(String query) {
-    final results = PlaceSearchService.search(query);
-    setState(() {
-      _suggestions      = results;
-      _showSuggestions  = query.isNotEmpty;
+    _searchDebounce?.cancel();
+    if (query.trim().isEmpty) {
+      setState(() { _suggestions = []; _showSuggestions = false; _searchLoading = false; });
+      return;
+    }
+    // Show local results immediately for instant feedback
+    final local = PlaceSearchService.searchLocal(query);
+    setState(() { _suggestions = local; _showSuggestions = true; _searchLoading = true; });
+
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () async {
+      final results = await PlaceSearchService.searchPhoton(query);
+      if (!mounted) return;
+      setState(() {
+        _suggestions = results.isNotEmpty ? results : PlaceSearchService.searchLocal(query);
+        _searchLoading = false;
+      });
     });
   }
 
@@ -168,42 +225,66 @@ class _AddSpotContentState extends State<_AddSpotContent> {
   }
 
   void _applySuggestion(PlaceSuggestion place) {
-    _nameCtrl.text   = place.name;
-    _cityCtrl.text   = place.city;
-    _areaCtrl.text   = place.area;
-    _mapsCtrl.text   = place.mapsUrl;
+    _nameCtrl.text    = place.name;
+    _cityCtrl.text    = place.city;
+    _areaCtrl.text    = place.area;
+    _addressCtrl.text = place.address;
+    _mapsCtrl.text    = place.mapsUrl;
     _searchCtrl.clear();
     setState(() {
-      _category       = place.category;
-      _latitude       = place.latitude;
-      _longitude      = place.longitude;
-      _address        = place.address;
-      _placeSource    = 'local_suggestion';
-      _suggestions    = [];
+      _category        = place.category;
+      _latitude        = place.latitude;
+      _longitude       = place.longitude;
+      _address         = place.address;
+      _placeSource     = 'photon';
+      _suggestions     = [];
       _showSuggestions = false;
+      _searchLoading   = false;
     });
+    _searchDebounce?.cancel();
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() { _loading = true; _error = null; });
     try {
-      final spot = await SpotService.createSpot(
-        tripId:      widget.tripId,
-        name:        _nameCtrl.text.trim(),
-        city:        _cityCtrl.text.trim(),
-        area:        _areaCtrl.text.trim(),
-        category:    _category ?? SpotCategory.landmark,
-        status:      _status,
-        addedBy:     widget.userId,
-        sourceUrl:   _sourceCtrl.text.trim().isEmpty ? null : _sourceCtrl.text.trim(),
-        mapsUrl:     _mapsCtrl.text.trim().isEmpty   ? null : _mapsCtrl.text.trim(),
-        notes:       _notesCtrl.text.trim().isEmpty   ? null : _notesCtrl.text.trim(),
-        address:     _address,
-        latitude:    _latitude,
-        longitude:   _longitude,
-        placeSource: _placeSource,
-      );
+      final Spot spot;
+      if (widget.isEditing) {
+        final addrInput = _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim();
+        spot = await SpotService.updateSpot(
+          spotId:      widget.initialSpot!.id,
+          name:        _nameCtrl.text.trim(),
+          city:        _cityCtrl.text.trim(),
+          area:        _areaCtrl.text.trim(),
+          category:    _category ?? SpotCategory.landmark,
+          status:      _status,
+          sourceUrl:   _sourceCtrl.text.trim().isEmpty ? null : _sourceCtrl.text.trim(),
+          mapsUrl:     _mapsCtrl.text.trim().isEmpty   ? null : _mapsCtrl.text.trim(),
+          notes:       _notesCtrl.text.trim().isEmpty  ? null : _notesCtrl.text.trim(),
+          address:     addrInput,
+          latitude:    _latitude,
+          longitude:   _longitude,
+          placeSource: _placeSource,
+        );
+      } else {
+        final addrInput = _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim();
+        spot = await SpotService.createSpot(
+          tripId:      widget.tripId,
+          name:        _nameCtrl.text.trim(),
+          city:        _cityCtrl.text.trim(),
+          area:        _areaCtrl.text.trim(),
+          category:    _category ?? SpotCategory.landmark,
+          status:      _status,
+          addedBy:     widget.userId,
+          sourceUrl:   _sourceCtrl.text.trim().isEmpty ? null : _sourceCtrl.text.trim(),
+          mapsUrl:     _mapsCtrl.text.trim().isEmpty   ? null : _mapsCtrl.text.trim(),
+          notes:       _notesCtrl.text.trim().isEmpty  ? null : _notesCtrl.text.trim(),
+          address:     addrInput,
+          latitude:    _latitude,
+          longitude:   _longitude,
+          placeSource: _placeSource,
+        );
+      }
       widget.onSubmit(spot);
     } catch (e) {
       if (mounted) setState(() { _loading = false; _error = e.toString(); });
@@ -223,7 +304,7 @@ class _AddSpotContentState extends State<_AddSpotContent> {
           padding: const EdgeInsets.fromLTRB(kSpace4, kSpace3, kSpace4, 0),
           child: Row(
             children: [
-              Text('Add a spot', style: kStyleTitle),
+              Text(widget.isEditing ? 'Edit spot' : 'Add a spot', style: kStyleTitle),
               const Spacer(),
               WabwayIconButton(
                 icon: Icons.close_rounded,
@@ -273,7 +354,15 @@ class _AddSpotContentState extends State<_AddSpotContent> {
         // ── Suggestion list ──────────────────────────────────────────────
         if (_showSuggestions) ...[
           const SizedBox(height: kSpace2),
-          if (_suggestions.isEmpty)
+          if (_searchLoading && _suggestions.isEmpty)
+            const Padding(
+              padding: EdgeInsets.fromLTRB(kSpace4, 0, kSpace4, kSpace2),
+              child: Center(child: SizedBox(
+                width: 16, height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )),
+            )
+          else if (_suggestions.isEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(kSpace4, 0, kSpace4, kSpace2),
               child: Text(
@@ -377,6 +466,14 @@ class _AddSpotContentState extends State<_AddSpotContent> {
                   ),
                   const SizedBox(height: kSpace4),
 
+                  WabwayTextField(
+                    label: 'Address',
+                    hint: 'Street address (optional)',
+                    controller: _addressCtrl,
+                    textInputAction: TextInputAction.next,
+                  ),
+                  const SizedBox(height: kSpace4),
+
                   WabwaySelectField<SpotCategory>(
                     label: 'Category',
                     hint: 'Pick a category',
@@ -438,8 +535,8 @@ class _AddSpotContentState extends State<_AddSpotContent> {
                   const SizedBox(height: kSpace6),
 
                   WabwayButton(
-                    label: 'Add spot',
-                    icon: Icons.add_rounded,
+                    label: widget.isEditing ? 'Save changes' : 'Add spot',
+                    icon: widget.isEditing ? Icons.check_rounded : Icons.add_rounded,
                     fullWidth: true,
                     size: WabwayButtonSize.lg,
                     loading: _loading,

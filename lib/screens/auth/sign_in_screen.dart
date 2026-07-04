@@ -252,7 +252,7 @@ class _Logo extends StatelessWidget {
           ),
         ),
         const SizedBox(height: kSpace3),
-        Text('Wabway', style: kStyleHeadingMd),
+        Text('WabWay', style: kStyleHeadingMd),
         const SizedBox(height: 4),
         Text('Plan your trip together.', style: kStyleCaption),
       ],

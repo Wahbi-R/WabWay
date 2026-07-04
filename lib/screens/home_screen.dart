@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../core/auth/profile_state.dart';
 import '../core/supabase/activity_service.dart';
 import '../core/supabase/doc_service.dart';
@@ -9,6 +11,8 @@ import '../core/supabase/spot_service.dart';
 import '../core/supabase/travel_service.dart';
 import '../core/trip/app_trip.dart';
 import '../core/trip/trip_state.dart';
+import '../core/update_checker.dart';
+import 'onboarding_screen.dart';
 import '../data/activity_data.dart';
 import '../data/money_data.dart';
 import '../data/plan_data.dart';
@@ -84,6 +88,23 @@ class _HomeScreenState extends State<HomeScreen> {
   _HomeData? _data;
   Object? _error;
   bool _loaded = false;
+  UpdateInfo? _updateInfo;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!kIsWeb) _checkForUpdate();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) showOnboardingIfNeeded(context);
+    });
+  }
+
+  Future<void> _checkForUpdate() async {
+    final info = await UpdateChecker.check();
+    if (mounted && info != null && info.hasUpdate) {
+      setState(() => _updateInfo = info);
+    }
+  }
 
   @override
   void didChangeDependencies() {
@@ -253,6 +274,10 @@ class _HomeScreenState extends State<HomeScreen> {
         child: ListView(
           padding: const EdgeInsets.all(kSpace4),
           children: [
+            if (_updateInfo != null) ...[
+              _UpdateBanner(info: _updateInfo!, onDismiss: () => setState(() => _updateInfo = null)),
+              const SizedBox(height: kSpace3),
+            ],
             _TripHero(trip: trip, memberCount: members.length, data: data),
             const SizedBox(height: kSpace4),
             _QuickBalanceCard(data: data),
@@ -297,6 +322,74 @@ String _relativeTime(DateTime date) {
   if (diff.inHours >= 1) return '${diff.inHours}h ago';
   if (diff.inMinutes >= 1) return '${diff.inMinutes}m ago';
   return 'Just now';
+}
+
+// ─── Update banner ────────────────────────────────────────────────────────────
+
+class _UpdateBanner extends StatelessWidget {
+  const _UpdateBanner({required this.info, required this.onDismiss});
+  final UpdateInfo info;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: kColorPrimarySoft,
+        borderRadius: kRadiusMd,
+        border: Border.all(color: kColorPrimary.withValues(alpha: 0.3)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: kSpace3),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.system_update_rounded, size: 20, color: kColorPrimary),
+            const SizedBox(width: kSpace2),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Update available — ${info.latestTag}',
+                    style: kStyleBodyMedium.copyWith(color: kColorPrimaryDark),
+                  ),
+                  if (info.releaseNotes.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      info.releaseNotes.length > 120
+                          ? '${info.releaseNotes.substring(0, 120)}…'
+                          : info.releaseNotes,
+                      style: kStyleCaption.copyWith(color: kColorPrimaryDark),
+                    ),
+                  ],
+                  const SizedBox(height: kSpace2),
+                  GestureDetector(
+                    onTap: info.downloadUrl.isEmpty
+                        ? null
+                        : () => launchUrl(
+                              Uri.parse(info.downloadUrl),
+                              mode: LaunchMode.externalApplication,
+                            ),
+                    child: Text(
+                      'Download update →',
+                      style: kStyleCaptionMedium.copyWith(
+                          color: kColorPrimary,
+                          decoration: TextDecoration.underline),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            GestureDetector(
+              onTap: onDismiss,
+              child: const Icon(Icons.close_rounded, size: 16, color: kColorInkSoft),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 // ─── Trip hero ────────────────────────────────────────────────────────────────

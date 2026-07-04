@@ -90,7 +90,17 @@ class _DocsScreenState extends State<DocsScreen> {
     } catch (_) {
       if (!mounted) return;
       if (silent) { setState(() => _offline = true); return; }
-      setState(() { _loading = false; _error = true; });
+      // Try cached data on cold-start failure
+      final tripId = TripState.maybeOf(context)?.trip.id ?? '';
+      final cached = tripId.isNotEmpty
+          ? await DocService.loadDocumentsFromCache(tripId)
+          : null;
+      if (!mounted) return;
+      if (cached != null) {
+        setState(() { _docs = cached; _loading = false; _offline = true; });
+      } else {
+        setState(() { _loading = false; _error = true; });
+      }
     }
   }
 

@@ -10,12 +10,16 @@ import '../theme/app_decorations.dart';
 import '../widgets/wabway_button.dart';
 import '../widgets/wabway_text_field.dart';
 import 'docs_screen.dart';
+import 'map_screen.dart';
+import 'travel_screen.dart';
+import 'links_screen.dart';
 import 'import/import_sheet.dart';
 import 'members/add_member_sheet.dart';
 import 'members/invite_sheet.dart';
 import 'share/incoming_share_screen.dart';
 import 'trips/trip_settings_sheet.dart';
 import 'trips/trip_switcher_sheet.dart';
+import 'diagnostics_screen.dart';
 import 'notification_settings_screen.dart';
 
 class MoreScreen extends StatelessWidget {
@@ -84,6 +88,7 @@ class MoreScreen extends StatelessWidget {
                   final displayName = isMe
                       ? '${member.profile.displayName} (You)'
                       : member.profile.displayName;
+                  final canRemove = isOwner && !isMe && !member.isOwner;
                   return Column(
                     children: [
                       ListTile(
@@ -119,7 +124,15 @@ class MoreScreen extends StatelessWidget {
                                       color: kColorAccent),
                                 ),
                               )
-                            : null,
+                            : canRemove
+                                ? IconButton(
+                                    icon: const Icon(Icons.person_remove_outlined,
+                                        size: 18, color: kColorDanger),
+                                    tooltip: 'Remove member',
+                                    onPressed: () => _confirmRemoveMember(
+                                        context, trip.id, member),
+                                  )
+                                : null,
                       ),
                       if (!isLast)
                         const Divider(
@@ -158,7 +171,7 @@ class MoreScreen extends StatelessWidget {
                       title: Text('Add a member', style: kStyleBodySemibold),
                       subtitle: Padding(
                         padding: const EdgeInsets.only(top: kSpace1),
-                        child: Text('Add an existing Wabway user by email',
+                        child: Text('Add an existing WabWay user by email',
                             style: kStyleCaption),
                       ),
                       trailing: Icon(Icons.chevron_right_rounded,
@@ -201,36 +214,107 @@ class MoreScreen extends StatelessWidget {
 
           const SizedBox(height: kSpace4),
 
-          // Documents shortcut — visible on mobile only (docs tab removed from bottom nav)
-          const _SectionHeader(title: 'Documents'),
+          // Screens not in the mobile bottom nav
+          const _SectionHeader(title: 'Explore'),
           const SizedBox(height: kSpace3),
           DecoratedBox(
             decoration: kCardDecoration(),
             child: Material(
               color: Colors.transparent,
-              child: _SettingsRow(
-                icon: Icons.folder_rounded,
-                label: 'View documents',
-                onTap: () {
-                  // Capture providers before pushing — InheritedWidgets are not
-                  // available to new routes pushed on the root Navigator.
-                  final trip = TripState.tripOf(context);
-                  final members = TripState.membersOf(context);
-                  final profile = ProfileState.of(context);
-                  Navigator.push<void>(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ProfileState(
-                        profile: profile,
-                        child: TripState(
-                          trip: trip,
-                          members: members,
-                          child: const DocsScreen(),
+              child: Column(
+                children: [
+                  _SettingsRow(
+                    icon: Icons.map_rounded,
+                    label: 'Map',
+                    onTap: () {
+                      final trip = TripState.tripOf(context);
+                      final members = TripState.membersOf(context);
+                      final profile = ProfileState.of(context);
+                      Navigator.push<void>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ProfileState(
+                            profile: profile,
+                            child: TripState(
+                              trip: trip,
+                              members: members,
+                              child: const MapScreen(),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  );
-                },
+                      );
+                    },
+                  ),
+                  const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
+                  _SettingsRow(
+                    icon: Icons.flight_rounded,
+                    label: 'Travel',
+                    onTap: () {
+                      final trip = TripState.tripOf(context);
+                      final members = TripState.membersOf(context);
+                      final profile = ProfileState.of(context);
+                      Navigator.push<void>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ProfileState(
+                            profile: profile,
+                            child: TripState(
+                              trip: trip,
+                              members: members,
+                              child: const TravelScreen(),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
+                  _SettingsRow(
+                    icon: Icons.link_rounded,
+                    label: 'Links',
+                    onTap: () {
+                      final trip = TripState.tripOf(context);
+                      final members = TripState.membersOf(context);
+                      final profile = ProfileState.of(context);
+                      Navigator.push<void>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ProfileState(
+                            profile: profile,
+                            child: TripState(
+                              trip: trip,
+                              members: members,
+                              child: const LinksScreen(),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
+                  _SettingsRow(
+                    icon: Icons.folder_rounded,
+                    label: 'Documents',
+                    onTap: () {
+                      final trip = TripState.tripOf(context);
+                      final members = TripState.membersOf(context);
+                      final profile = ProfileState.of(context);
+                      Navigator.push<void>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ProfileState(
+                            profile: profile,
+                            child: TripState(
+                              trip: trip,
+                              members: members,
+                              child: const DocsScreen(),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
             ),
           ),
@@ -322,6 +406,35 @@ class MoreScreen extends StatelessWidget {
           const SizedBox(height: kSpace3),
           _AccountSection(),
 
+          const SizedBox(height: kSpace4),
+
+          // Diagnostics
+          const _SectionHeader(title: 'Debug'),
+          const SizedBox(height: kSpace3),
+          DecoratedBox(
+            decoration: kCardDecoration(),
+            child: Material(
+              color: Colors.transparent,
+              child: _SettingsRow(
+                icon: Icons.bug_report_rounded,
+                label: 'Diagnostics',
+                onTap: () {
+                  final profile = ProfileState.maybeOf(context);
+                  final activeTrip = TripState.maybeOf(context)?.trip;
+                  Navigator.push<void>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => DiagnosticsScreen(
+                        profile: profile,
+                        trip: activeTrip,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+
           const SizedBox(height: kSpace16),
         ],
       ),
@@ -407,6 +520,46 @@ void _showEditTripNameSheet(BuildContext context, trip) {
       onSaved: (_) => TripState.refresh(context),
     ),
   );
+}
+
+Future<void> _confirmRemoveMember(
+    BuildContext context, String tripId, member) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: kColorPaper,
+      shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
+      title: Text('Remove member?', style: kStyleBodySemibold),
+      content: Text(
+        'Remove ${member.profile.displayName} from the trip? They will lose access immediately.',
+        style: kStyleBody,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: Text('Cancel', style: kStyleBody.copyWith(color: kColorInkSoft)),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          child: Text('Remove', style: kStyleBodyMedium.copyWith(color: kColorDanger)),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true || !context.mounted) return;
+  try {
+    await TripService.removeMember(tripId, member.userId as String);
+    if (context.mounted) TripState.refresh(context);
+  } catch (_) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Could not remove member.',
+            style: kStyleBody.copyWith(color: Colors.white)),
+        backgroundColor: kColorDanger,
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
+  }
 }
 
 Future<void> _confirmLeaveTrip(BuildContext context, trip) async {

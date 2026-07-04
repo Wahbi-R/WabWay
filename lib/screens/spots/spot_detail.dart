@@ -12,6 +12,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
+import 'add_spot_sheet.dart';
 import 'spot_vote_chip.dart';
 
 // ─── Member name helper ────────────────────────────────────────────────────────
@@ -35,6 +36,7 @@ class SpotDetailScreen extends StatelessWidget {
     this.onVote,
     this.canDelete = false,
     this.onDelete,
+    this.onEdit,
     this.docs = const [],
   });
 
@@ -43,6 +45,7 @@ class SpotDetailScreen extends StatelessWidget {
   final ValueChanged<VoteType?>? onVote;
   final bool canDelete;
   final VoidCallback? onDelete;
+  final ValueChanged<Spot>? onEdit;
   final List<TripDocument> docs;
 
   @override
@@ -62,6 +65,22 @@ class SpotDetailScreen extends StatelessWidget {
             color: kColorInkSoft,
             onPressed: () => _openLink(context, spot.mapsUrl ?? spot.name),
           ),
+          if (onEdit != null)
+            IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              color: kColorInkSoft,
+              onPressed: () async {
+                final tripId = TripState.tripOf(context).id;
+                final userId = supabase.auth.currentUser?.id ?? '';
+                final updated = await showEditSpotSheet(
+                  context,
+                  tripId: tripId,
+                  userId: userId,
+                  spot: spot,
+                );
+                if (updated != null) onEdit!(updated);
+              },
+            ),
           if (canDelete && onDelete != null)
             IconButton(
               icon: const Icon(Icons.delete_outline_rounded),
@@ -95,6 +114,7 @@ class SpotDetailContent extends StatefulWidget {
     this.showHeader = false,
     this.canDelete = false,
     this.onDelete,
+    this.onEdit,
     this.docs = const [],
   });
 
@@ -104,6 +124,7 @@ class SpotDetailContent extends StatefulWidget {
   final bool showHeader;
   final bool canDelete;
   final VoidCallback? onDelete;
+  final ValueChanged<Spot>? onEdit;
   final List<TripDocument> docs;
 
   @override
@@ -198,6 +219,27 @@ class _SpotDetailContentState extends State<SpotDetailContent> {
                     label: widget.spot.status.label,
                     tone: widget.spot.status.tone,
                   ),
+                  if (widget.onEdit != null) ...[
+                    const SizedBox(width: kSpace2),
+                    GestureDetector(
+                      onTap: () async {
+                        final tripId = TripState.tripOf(context).id;
+                        final userId = supabase.auth.currentUser?.id ?? '';
+                        final updated = await showEditSpotSheet(
+                          context,
+                          tripId: tripId,
+                          userId: userId,
+                          spot: widget.spot,
+                        );
+                        if (updated != null) widget.onEdit!(updated);
+                      },
+                      child: const Icon(
+                        Icons.edit_outlined,
+                        size: 18,
+                        color: kColorInkSoft,
+                      ),
+                    ),
+                  ],
                   if (widget.canDelete && widget.onDelete != null) ...[
                     const SizedBox(width: kSpace2),
                     GestureDetector(

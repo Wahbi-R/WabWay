@@ -43,6 +43,7 @@ abstract final class PlanService {
       notes:           row['notes'] as String?,
       linkedSpotId:    row['linked_spot_id'] as String?,
       linkedDocIds:    docIds,
+      sortOrder:       (row['sort_order'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -247,6 +248,17 @@ abstract final class PlanService {
       if (item.linkedSpotId != null) 'linked_spot_id': item.linkedSpotId,
     }).select().single();
     return _itemFromRow(row, []);
+  }
+
+  static Future<void> reorderItemsInDay(List<ItineraryItem> items) async {
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].sortOrder != i) {
+        await supabase
+            .from('itinerary_items')
+            .update({'sort_order': i})
+            .eq('id', items[i].id);
+      }
+    }
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────────

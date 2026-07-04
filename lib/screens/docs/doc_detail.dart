@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/auth/profile_state.dart';
 import '../../core/supabase/client.dart';
@@ -864,6 +866,7 @@ class _ActionsSection extends StatefulWidget {
 
 class _ActionsSectionState extends State<_ActionsSection> {
   bool _openLoading = false;
+  bool _shareLoading = false;
 
   Future<void> _openFile() async {
     if (widget.doc.storagePath == null) return;
@@ -880,6 +883,35 @@ class _ActionsSectionState extends State<_ActionsSection> {
       if (mounted) _snack('Could not open file.');
     } finally {
       if (mounted) setState(() => _openLoading = false);
+    }
+  }
+
+  Future<void> _shareFile() async {
+    if (kIsWeb) {
+      _snack('Share is not available on web.');
+      return;
+    }
+    setState(() => _shareLoading = true);
+    try {
+      String? shareUrl;
+      if (widget.doc.storagePath != null) {
+        shareUrl = await DocService.getSignedUrl(widget.doc.storagePath!);
+      } else if (widget.doc.notes != null &&
+          Uri.tryParse(widget.doc.notes!)?.hasScheme == true) {
+        shareUrl = widget.doc.notes;
+      }
+      if (!mounted) return;
+      if (shareUrl == null) {
+        _snack('Nothing to share for this document.');
+        return;
+      }
+      await SharePlus.instance.share(
+        ShareParams(text: shareUrl, subject: widget.doc.title),
+      );
+    } catch (_) {
+      if (mounted) _snack('Could not share.');
+    } finally {
+      if (mounted) setState(() => _shareLoading = false);
     }
   }
 
@@ -1036,6 +1068,17 @@ class _ActionsSectionState extends State<_ActionsSection> {
               variant: WabwayButtonVariant.ghost,
               size: WabwayButtonSize.sm,
               onPressed: hasFile ? _openFile : null,
+            ),
+            WabwayButton(
+              label: 'Share',
+              icon: Icons.share_rounded,
+              variant: WabwayButtonVariant.ghost,
+              size: WabwayButtonSize.sm,
+              loading: _shareLoading,
+              onPressed: (hasFile || (widget.doc.notes != null &&
+                      Uri.tryParse(widget.doc.notes!)?.hasScheme == true))
+                  ? _shareFile
+                  : null,
             ),
             WabwayButton(
               label: 'Rename',

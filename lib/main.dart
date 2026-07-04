@@ -40,7 +40,7 @@ class WabwayApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Wabway',
+      title: 'WabWay',
       debugShowCheckedModeBanner: false,
       theme: buildWabwayTheme(),
       home: const AuthGate(),

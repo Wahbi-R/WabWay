@@ -68,6 +68,7 @@ class ItineraryItem {
     this.notes,
     this.linkedSpotId,
     this.linkedDocIds = const [],
+    this.sortOrder = 0,
   });
 
   final String id;
@@ -84,6 +85,7 @@ class ItineraryItem {
   final String? notes;
   final String? linkedSpotId;
   final List<String> linkedDocIds;
+  final int sortOrder;
 
   bool get hasTime => time != null;
   bool get hasLinks => linkedSpotId != null || linkedDocIds.isNotEmpty;
@@ -111,7 +113,8 @@ class TripDay {
   List<ItineraryItem> get sortedItems {
     final timed = items.where((i) => i.hasTime).toList()
       ..sort((a, b) => a.time!.compareTo(b.time!));
-    final flex = items.where((i) => !i.hasTime).toList();
+    final flex = items.where((i) => !i.hasTime).toList()
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
     return [...timed, ...flex];
   }
 }

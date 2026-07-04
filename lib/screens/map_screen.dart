@@ -2,6 +2,8 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'
+    show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
 import '../core/supabase/client.dart';
 import '../core/supabase/spot_service.dart';
 import '../core/trip/trip_state.dart';
@@ -25,6 +27,7 @@ class _MapScreenState extends State<MapScreen> {
   bool _error = false;
   bool _showMap = true;
   String? _activeTripId;
+  RealtimeChannel? _realtimeChannel;
 
   final _mapController = MapController();
 
@@ -35,13 +38,39 @@ class _MapScreenState extends State<MapScreen> {
     if (tripId != _activeTripId) {
       _activeTripId = tripId;
       _load(tripId);
+      _subscribeRealtime(tripId);
     }
   }
 
   @override
   void dispose() {
+    _realtimeChannel?.unsubscribe();
     _mapController.dispose();
     super.dispose();
+  }
+
+  void _subscribeRealtime(String tripId) {
+    _realtimeChannel?.unsubscribe();
+    _realtimeChannel = supabase
+        .channel('map-spots-$tripId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'spots',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'trip_id',
+            value: tripId,
+          ),
+          callback: (_) { if (mounted) _load(tripId); },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'spot_votes',
+          callback: (_) { if (mounted) _load(tripId); },
+        )
+        .subscribe();
   }
 
   Future<void> _load(String tripId) async {
@@ -65,6 +94,15 @@ class _MapScreenState extends State<MapScreen> {
     return LatLng(lat, lng);
   }
 
+  VoteType? _myVoteFor(Spot spot, String? userId) {
+    if (userId == null) return null;
+    if (spot.votes.mustDo.contains(userId)) return VoteType.mustDo;
+    if (spot.votes.want.contains(userId)) return VoteType.want;
+    if (spot.votes.maybe.contains(userId)) return VoteType.maybe;
+    if (spot.votes.skip.contains(userId)) return VoteType.skip;
+    return null;
+  }
+
   void _openDetail(Spot spot) {
     final userId = supabase.auth.currentUser?.id;
     showModalBottomSheet(
@@ -85,8 +123,12 @@ class _MapScreenState extends State<MapScreen> {
             controller: ctrl,
             child: SpotDetailContent(
               spot: spot,
-              myVote: null,
+              myVote: _myVoteFor(spot, userId),
               canDelete: spot.addedById == userId,
+              onEdit: (updated) => setState(() {
+                final idx = _spots.indexWhere((s) => s.id == updated.id);
+                if (idx != -1) _spots[idx] = updated;
+              }),
             ),
           ),
         ),
@@ -101,6 +143,11 @@ class _MapScreenState extends State<MapScreen> {
       appBar: AppBar(
         title: Text('Map', style: kStyleTitle),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Refresh',
+            onPressed: _activeTripId == null ? null : () => _load(_activeTripId!),
+          ),
           // Map / List toggle
           Padding(
             padding: const EdgeInsets.only(right: kSpace3),
@@ -175,7 +222,8 @@ class _MapScreenState extends State<MapScreen> {
           ),
           children: [
             TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+              subdomains: const ['a', 'b', 'c', 'd'],
               userAgentPackageName: 'com.example.wabway',
               maxZoom: 19,
             ),
@@ -310,12 +358,13 @@ class _SpotMarker extends StatelessWidget {
   final Spot spot;
 
   Color get _color => switch (spot.status) {
-        SpotStatus.idea     => const Color(0xFF9E9E9E),
-        SpotStatus.wantToGo => kColorPrimary,
-        SpotStatus.mustDo   => kColorAccent,
-        SpotStatus.planned  => const Color(0xFF7D9A75),
-        SpotStatus.booked   => kColorSuccess,
-        SpotStatus.skipped  => kColorDanger,
+        SpotStatus.idea      => const Color(0xFF9E9E9E),
+        SpotStatus.wantToGo  => kColorPrimary,
+        SpotStatus.mustDo    => kColorAccent,
+        SpotStatus.confirmed => kColorSuccess,
+        SpotStatus.planned   => const Color(0xFF7D9A75),
+        SpotStatus.booked    => kColorSuccess,
+        SpotStatus.skipped   => kColorDanger,
       };
 
   @override
@@ -384,12 +433,13 @@ class _SpotListRow extends StatelessWidget {
   final VoidCallback onDetailTap;
 
   Color get _statusColor => switch (spot.status) {
-        SpotStatus.idea     => const Color(0xFF9E9E9E),
-        SpotStatus.wantToGo => kColorPrimary,
-        SpotStatus.mustDo   => kColorAccent,
-        SpotStatus.planned  => const Color(0xFF7D9A75),
-        SpotStatus.booked   => kColorSuccess,
-        SpotStatus.skipped  => kColorDanger,
+        SpotStatus.idea      => const Color(0xFF9E9E9E),
+        SpotStatus.wantToGo  => kColorPrimary,
+        SpotStatus.mustDo    => kColorAccent,
+        SpotStatus.confirmed => kColorSuccess,
+        SpotStatus.planned   => const Color(0xFF7D9A75),
+        SpotStatus.booked    => kColorSuccess,
+        SpotStatus.skipped   => kColorDanger,
       };
 
   @override

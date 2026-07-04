@@ -2,6 +2,7 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/docs_data.dart';
+import '../offline_cache.dart';
 import 'client.dart';
 
 abstract final class DocService {
@@ -89,8 +90,17 @@ abstract final class DocService {
         .select('*, document_links(*)')
         .eq('trip_id', tripId)
         .order('created_at', ascending: false);
+    OfflineCache.write(OfflineCache.docsKey(tripId), data);
     return data.map<TripDocument>((r) => _docFromRow(r)).toList();
   }
+
+  static Future<List<TripDocument>?> loadDocumentsFromCache(String tripId) =>
+      OfflineCache.read(
+        OfflineCache.docsKey(tripId),
+        (json) => (json as List)
+            .map((r) => _docFromRow(r as Map<String, dynamic>))
+            .toList(),
+      );
 
   static Future<TripDocument> createDocument({
     required String tripId,

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
 import 'client.dart';
 import '../trip/app_trip.dart';
 import '../trip/app_trip_member.dart';
@@ -56,6 +58,14 @@ abstract final class TripService {
         .eq('user_id', userId);
   }
 
+  static Future<void> removeMember(String tripId, String userId) async {
+    await supabase
+        .from('trip_members')
+        .delete()
+        .eq('trip_id', tripId)
+        .eq('user_id', userId);
+  }
+
   static Future<void> updateTripName(String tripId, String name) async {
     final rows = await supabase
         .from('trips')
@@ -84,9 +94,11 @@ abstract final class TripService {
     DateTime? startDate,
     DateTime? endDate,
     String? defaultCurrency,
-    bool clearDestination = false,
-    bool clearStartDate   = false,
-    bool clearEndDate     = false,
+    String? coverImageUrl,
+    bool clearDestination  = false,
+    bool clearStartDate    = false,
+    bool clearEndDate      = false,
+    bool clearCoverImage   = false,
   }) async {
     String _pad(int n, int w) => n.toString().padLeft(w, '0');
     String _fmtDate(DateTime d) =>
@@ -102,8 +114,27 @@ abstract final class TripService {
       if (clearEndDate) 'end_date': null
       else if (endDate != null) 'end_date': _fmtDate(endDate),
       if (defaultCurrency != null) 'default_currency': defaultCurrency.toUpperCase(),
+      if (clearCoverImage) 'cover_image_url': null
+      else if (coverImageUrl != null) 'cover_image_url': coverImageUrl,
     };
     if (updates.isEmpty) return;
     await supabase.from('trips').update(updates).eq('id', tripId);
+  }
+
+  static Future<String> uploadCoverImage(
+    String tripId,
+    String mimeType,
+    List<int> bytes,
+  ) async {
+    final ext = mimeType.contains('png') ? 'png' : 'jpg';
+    final path = 'trips/$tripId/cover.$ext';
+    await supabase.storage
+        .from('trip-covers')
+        .uploadBinary(
+          path,
+          bytes is Uint8List ? bytes : Uint8List.fromList(bytes),
+          fileOptions: FileOptions(contentType: mimeType, upsert: true),
+        );
+    return supabase.storage.from('trip-covers').getPublicUrl(path);
   }
 }

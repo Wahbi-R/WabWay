@@ -7,26 +7,29 @@ enum SpotStatus {
   idea,
   wantToGo,
   mustDo,
+  confirmed,
   planned,
   booked,
   skipped;
 
   String get label => switch (this) {
-    SpotStatus.idea     => 'Idea',
-    SpotStatus.wantToGo => 'Want to go',
-    SpotStatus.mustDo   => 'Must-do',
-    SpotStatus.planned  => 'Planned',
-    SpotStatus.booked   => 'Booked',
-    SpotStatus.skipped  => 'Skipped',
+    SpotStatus.idea      => 'Idea',
+    SpotStatus.wantToGo  => 'Want to go',
+    SpotStatus.mustDo    => 'Must-do',
+    SpotStatus.confirmed => 'Confirmed',
+    SpotStatus.planned   => 'Planned',
+    SpotStatus.booked    => 'Booked',
+    SpotStatus.skipped   => 'Skipped',
   };
 
   WabwayBadgeTone get tone => switch (this) {
-    SpotStatus.idea     => WabwayBadgeTone.neutral,
-    SpotStatus.wantToGo => WabwayBadgeTone.primary,
-    SpotStatus.mustDo   => WabwayBadgeTone.accent,
-    SpotStatus.planned  => WabwayBadgeTone.secondary,
-    SpotStatus.booked   => WabwayBadgeTone.success,
-    SpotStatus.skipped  => WabwayBadgeTone.danger,
+    SpotStatus.idea      => WabwayBadgeTone.neutral,
+    SpotStatus.wantToGo  => WabwayBadgeTone.primary,
+    SpotStatus.mustDo    => WabwayBadgeTone.accent,
+    SpotStatus.confirmed => WabwayBadgeTone.success,
+    SpotStatus.planned   => WabwayBadgeTone.secondary,
+    SpotStatus.booked    => WabwayBadgeTone.success,
+    SpotStatus.skipped   => WabwayBadgeTone.danger,
   };
 }
 

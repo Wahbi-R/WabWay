@@ -134,7 +134,25 @@ class _SpotsScreenState extends State<SpotsScreen> {
     } catch (_) {
       if (!mounted) return;
       if (silent) { setState(() => _offline = true); return; }
-      setState(() { _loading = false; _error = true; });
+      // Try to show cached data on cold-start failure
+      final tripId = TripState.maybeOf(context)?.trip.id ?? '';
+      final cachedSpots = tripId.isNotEmpty
+          ? await SpotService.loadSpotsFromCache(tripId)
+          : null;
+      final cachedDocs = tripId.isNotEmpty
+          ? await DocService.loadDocumentsFromCache(tripId)
+          : null;
+      if (!mounted) return;
+      if (cachedSpots != null) {
+        setState(() {
+          _spots = cachedSpots;
+          _docs = cachedDocs ?? _docs;
+          _loading = false;
+          _offline = true;
+        });
+      } else {
+        setState(() { _loading = false; _error = true; });
+      }
     }
   }
 
@@ -216,6 +234,13 @@ class _SpotsScreenState extends State<SpotsScreen> {
     }
   }
 
+  void _onEditSpot(Spot updated) {
+    setState(() {
+      final idx = _spots.indexWhere((s) => s.id == updated.id);
+      if (idx != -1) _spots[idx] = updated;
+    });
+  }
+
   Future<void> _deleteSpot(String spotId) async {
     try {
       await SpotService.deleteSpot(spotId);
@@ -272,6 +297,7 @@ class _SpotsScreenState extends State<SpotsScreen> {
           onVote: (v) => _onVote(spot.id, v),
           canDelete: _canDelete(spot),
           docs: docs,
+          onEdit: _onEditSpot,
           onDelete: () {
             _deleteSpot(spot.id);
             Navigator.pop(context);
@@ -343,6 +369,7 @@ class _SpotsScreenState extends State<SpotsScreen> {
             }),
             onVote: _onVote,
             onDelete: _deleteSpot,
+            onEdit: _onEditSpot,
             onAdd: () => _addSpot(context),
           )
         : _MobileLayout(
@@ -542,6 +569,7 @@ class _DesktopLayout extends StatelessWidget {
     required this.onToggleSearch,
     required this.onVote,
     required this.onDelete,
+    required this.onEdit,
     required this.onAdd,
   });
 
@@ -561,6 +589,7 @@ class _DesktopLayout extends StatelessWidget {
   final VoidCallback onToggleSearch;
   final void Function(String, VoteType?) onVote;
   final Future<void> Function(String) onDelete;
+  final ValueChanged<Spot> onEdit;
   final VoidCallback onAdd;
 
   @override
@@ -635,6 +664,7 @@ class _DesktopLayout extends StatelessWidget {
                             onVote: (v) => onVote(selected!.id, v),
                             canDelete: canDelete(selected!),
                             docs: docs,
+                            onEdit: onEdit,
                             onDelete: () => onDelete(selected!.id),
                           ),
                         ),

@@ -180,10 +180,15 @@ class _MoneyScreenState extends State<MoneyScreen> {
     return 'JPY';
   }
 
-  List<MemberBalance> get _balances =>
-      calculateBalances(_receipts, _withdrawals, myId: _userId, members: _members);
-  List<SettlementSuggestion> get _suggestions =>
-      suggestSettlements(_balances, _currency, myId: _userId);
+  Map<String, List<MemberBalance>> get _balancesByCurrency =>
+      calculateBalancesGrouped(_receipts, _withdrawals, myId: _userId, members: _members);
+  Map<String, List<SettlementSuggestion>> get _suggestionsByCurrency {
+    final grouped = _balancesByCurrency;
+    return {
+      for (final entry in grouped.entries)
+        entry.key: suggestSettlements(entry.value, entry.key, myId: _userId),
+    };
+  }
 
   Receipt? get _selectedReceipt => _selectedReceiptId == null
       ? null
@@ -374,14 +379,13 @@ class _MoneyScreenState extends State<MoneyScreen> {
 
     // Settle up: full content in left panel
     return SettleUpPanel(
-      balances:            _balances,
-      suggestions:         _suggestions,
-      currency:            _currency,
-      members:             _members,
-      tripId:              _activeTripId ?? '',
-      myId:                _userId,
-      existingSettlements: _persistedSettlements,
-      onSettled:           () => _loadAll(silent: true),
+      balancesByCurrency:    _balancesByCurrency,
+      suggestionsByCurrency: _suggestionsByCurrency,
+      members:               _members,
+      tripId:                _activeTripId ?? '',
+      myId:                  _userId,
+      existingSettlements:   _persistedSettlements,
+      onSettled:             () => _loadAll(silent: true),
     );
   }
 
@@ -550,14 +554,13 @@ class _MoneyScreenState extends State<MoneyScreen> {
 
             // Settle Up tab
             SettleUpPanel(
-              balances:            _balances,
-              suggestions:         _suggestions,
-              currency:            _currency,
-              members:             _members,
-              tripId:              _activeTripId ?? '',
-              myId:                _userId,
-              existingSettlements: _persistedSettlements,
-              onSettled:           () => _loadAll(silent: true),
+              balancesByCurrency:    _balancesByCurrency,
+              suggestionsByCurrency: _suggestionsByCurrency,
+              members:               _members,
+              tripId:                _activeTripId ?? '',
+              myId:                  _userId,
+              existingSettlements:   _persistedSettlements,
+              onSettled:             () => _loadAll(silent: true),
             ),
           ],
         ),

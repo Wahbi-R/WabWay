@@ -20,6 +20,7 @@ class TripDayCard extends StatefulWidget {
     this.onDayTap,
     this.daySelected = false,
     this.onEditDay,
+    this.onReorder,
   });
 
   final TripDay day;
@@ -30,6 +31,7 @@ class TripDayCard extends StatefulWidget {
   final VoidCallback? onDayTap;
   final bool daySelected;
   final VoidCallback? onEditDay;
+  final ValueChanged<List<ItineraryItem>>? onReorder;
 
   @override
   State<TripDayCard> createState() => _TripDayCardState();
@@ -69,6 +71,14 @@ class _TripDayCardState extends State<TripDayCard> {
           const Divider(height: 1, color: kColorBorder),
           if (items.isEmpty)
             _EmptyDayBody(onAddItem: widget.onAddItem)
+          else if (widget.onReorder != null)
+            _ReorderableItemList(
+              items: items,
+              selectedItemId: widget.selectedItemId,
+              onItemTap: widget.onItemTap,
+              onAddItem: widget.onAddItem,
+              onReorder: widget.onReorder!,
+            )
           else
             Column(
               children: [
@@ -300,6 +310,109 @@ class _EmptyDayBody extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ─── Reorderable item list ────────────────────────────────────────────────────
+
+class _ReorderableItemList extends StatefulWidget {
+  const _ReorderableItemList({
+    required this.items,
+    required this.selectedItemId,
+    required this.onItemTap,
+    required this.onAddItem,
+    required this.onReorder,
+  });
+
+  final List<ItineraryItem> items;
+  final String? selectedItemId;
+  final ValueChanged<String> onItemTap;
+  final VoidCallback onAddItem;
+  final ValueChanged<List<ItineraryItem>> onReorder;
+
+  @override
+  State<_ReorderableItemList> createState() => _ReorderableItemListState();
+}
+
+class _ReorderableItemListState extends State<_ReorderableItemList> {
+  late List<ItineraryItem> _items;
+
+  @override
+  void initState() {
+    super.initState();
+    _items = List.of(widget.items);
+  }
+
+  @override
+  void didUpdateWidget(_ReorderableItemList old) {
+    super.didUpdateWidget(old);
+    if (widget.items != old.items) _items = List.of(widget.items);
+  }
+
+  void _handleReorder(int oldIndex, int newIndex) {
+    if (newIndex > oldIndex) newIndex--;
+    setState(() {
+      final item = _items.removeAt(oldIndex);
+      _items.insert(newIndex, item);
+    });
+    widget.onReorder(_items);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        ReorderableListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: _items.length,
+          onReorder: _handleReorder,
+          proxyDecorator: (child, index, animation) => Material(
+            elevation: 3,
+            color: Colors.transparent,
+            child: child,
+          ),
+          itemBuilder: (_, i) {
+            final item = _items[i];
+            final isLast = i == _items.length - 1;
+            return Column(
+              key: ValueKey(item.id),
+              children: [
+                Row(
+                  children: [
+                    ReorderableDragStartListener(
+                      index: i,
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(
+                            horizontal: kSpace2, vertical: kSpace3),
+                        child: Icon(Icons.drag_handle_rounded,
+                            size: 18, color: kColorBorder),
+                      ),
+                    ),
+                    Expanded(
+                      child: ItineraryItemTile(
+                        item: item,
+                        isLast: isLast,
+                        selected: item.id == widget.selectedItemId,
+                        onTap: () => widget.onItemTap(item.id),
+                      ),
+                    ),
+                  ],
+                ),
+                if (!isLast)
+                  const Divider(
+                    height: 1,
+                    indent: kSpace2 + 18 + kSpace2 + kSpace4 + 50 + kSpace3 + 10 + kSpace3,
+                    color: kColorBorder,
+                  ),
+              ],
+            );
+          },
+        ),
+        const Divider(height: 1, color: kColorBorder),
+        _AddItemRow(onTap: widget.onAddItem),
+      ],
     );
   }
 }

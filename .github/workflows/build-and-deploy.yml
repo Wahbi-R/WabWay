@@ -3,6 +3,16 @@ name: Build & Deploy
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      build_apk:
+        description: "Build Android APK and release?"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
 
 permissions:
   contents: write   # create GitHub releases
@@ -32,7 +42,7 @@ jobs:
       # Write secrets to .env so --dart-define-from-file=.env works in CI
       - name: Create .env
         run: |
-          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" > .env
+          echo "SUPABASE_URL=${{ vars.SUPABASE_URL }}" > .env
           echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
 
       - name: Flutter pub get
@@ -50,14 +60,17 @@ jobs:
       # ── Android APK ──────────────────────────────────────────────────────────
 
       - name: Build APK
+        if: github.event_name == 'push' || github.event.inputs.build_apk == 'true'
         run: flutter build apk --debug --dart-define-from-file=.env
 
       - name: Rename APK
+        if: github.event_name == 'push' || github.event.inputs.build_apk == 'true'
         run: |
           cp build/app/outputs/flutter-apk/app-debug.apk \
              build/app/outputs/flutter-apk/wabway-${{ steps.version.outputs.tag }}.apk
 
       - name: Create / update GitHub Release
+        if: github.event_name == 'push' || github.event.inputs.build_apk == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}

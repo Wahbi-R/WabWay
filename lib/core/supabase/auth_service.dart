@@ -8,8 +8,9 @@ abstract final class AuthService {
     final trimmed = email.trim();
     AppLogger.instance.log('sendMagicLink → $trimmed', tag: 'AUTH');
     try {
-      final isMobile = defaultTargetPlatform == TargetPlatform.android ||
-          defaultTargetPlatform == TargetPlatform.iOS;
+      final isMobile = !kIsWeb &&
+          (defaultTargetPlatform == TargetPlatform.android ||
+              defaultTargetPlatform == TargetPlatform.iOS);
       await supabase.auth.signInWithOtp(
         email: trimmed,
         shouldCreateUser: true,

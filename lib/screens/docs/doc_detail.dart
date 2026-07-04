@@ -905,9 +905,7 @@ class _ActionsSectionState extends State<_ActionsSection> {
         _snack('Nothing to share for this document.');
         return;
       }
-      await SharePlus.instance.share(
-        ShareParams(text: shareUrl, subject: widget.doc.title),
-      );
+      await Share.share(shareUrl, subject: widget.doc.title);
     } catch (_) {
       if (mounted) _snack('Could not share.');
     } finally {

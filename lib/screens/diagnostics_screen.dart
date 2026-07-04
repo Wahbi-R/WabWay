@@ -49,7 +49,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
   Widget build(BuildContext context) {
     final profile = widget.profile;
     final trip    = widget.trip;
-    final url     = supabase.supabaseUrl;
+    const url = String.fromEnvironment('SUPABASE_URL', defaultValue: '—');
 
     final rows = <_DiagRow>[
       _DiagRow('App version', _appVersion),

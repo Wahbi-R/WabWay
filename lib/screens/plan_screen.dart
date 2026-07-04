@@ -444,10 +444,7 @@ class _PlanScreenState extends State<PlanScreen> {
       ));
       return;
     }
-    SharePlus.instance.share(ShareParams(
-      text: text,
-      subject: '$tripName — Itinerary',
-    ));
+    unawaited(Share.share(text, subject: '$tripName — Itinerary'));
   }
 
   Future<void> _exportToCalendar() async {
@@ -470,14 +467,14 @@ class _PlanScreenState extends State<PlanScreen> {
     buf.writeln('CALSCALE:GREGORIAN');
     buf.writeln('METHOD:PUBLISH');
 
-    String _icsDate(DateTime d) =>
+    String icsDate(DateTime d) =>
         '${d.year.toString().padLeft(4, '0')}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}';
 
-    String _icsDateTime(DateTime d, String? timeStr) {
-      if (timeStr == null) return '${_icsDate(d)}';
+    String icsDateTime(DateTime d, String? timeStr) {
+      if (timeStr == null) return icsDate(d);
       final parts = timeStr.split(':');
-      if (parts.length < 2) return '${_icsDate(d)}';
-      return '${_icsDate(d)}T${parts[0].padLeft(2, '0')}${parts[1].padLeft(2, '0')}00';
+      if (parts.length < 2) return icsDate(d);
+      return '${icsDate(d)}T${parts[0].padLeft(2, '0')}${parts[1].padLeft(2, '0')}00';
     }
 
     for (final day in _days) {
@@ -486,11 +483,11 @@ class _PlanScreenState extends State<PlanScreen> {
         buf.writeln('UID:wabway-${item.id}@wabway.app');
         buf.writeln('SUMMARY:${item.title.replaceAll(',', '\\,')}');
         if (item.time != null) {
-          buf.writeln('DTSTART:${_icsDateTime(day.date, item.time)}');
-          buf.writeln('DTEND:${_icsDateTime(day.date, item.time)}');
+          buf.writeln('DTSTART:${icsDateTime(day.date, item.time)}');
+          buf.writeln('DTEND:${icsDateTime(day.date, item.time)}');
         } else {
-          buf.writeln('DTSTART;VALUE=DATE:${_icsDate(day.date)}');
-          buf.writeln('DTEND;VALUE=DATE:${_icsDate(day.date)}');
+          buf.writeln('DTSTART;VALUE=DATE:${icsDate(day.date)}');
+          buf.writeln('DTEND;VALUE=DATE:${icsDate(day.date)}');
         }
         if (item.location != null && item.location!.isNotEmpty) {
           buf.writeln('LOCATION:${item.location!.replaceAll(',', '\\,')}');
@@ -508,10 +505,10 @@ class _PlanScreenState extends State<PlanScreen> {
       final file = File('${dir.path}/wabway_itinerary.ics');
       await file.writeAsString(buf.toString());
       if (!mounted) return;
-      await SharePlus.instance.share(ShareParams(
-        files: [XFile(file.path, mimeType: 'text/calendar')],
+      await Share.shareXFiles(
+        [XFile(file.path, mimeType: 'text/calendar')],
         subject: '$tripName — Calendar',
-      ));
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(

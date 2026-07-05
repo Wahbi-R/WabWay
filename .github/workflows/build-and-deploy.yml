@@ -61,12 +61,12 @@ jobs:
 
       - name: Build APK
         if: github.event_name == 'push' || github.event.inputs.build_apk == 'true'
-        run: flutter build apk --debug --dart-define-from-file=.env
+        run: flutter build apk --release --dart-define-from-file=.env
 
       - name: Rename APK
         if: github.event_name == 'push' || github.event.inputs.build_apk == 'true'
         run: |
-          cp build/app/outputs/flutter-apk/app-debug.apk \
+          cp build/app/outputs/flutter-apk/app-release.apk \
              build/app/outputs/flutter-apk/wabway-${{ steps.version.outputs.tag }}.apk
 
       - name: Create / update GitHub Release

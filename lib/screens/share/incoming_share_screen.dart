@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../../core/ocr/gemini_parser.dart';
 import '../../core/ocr/itinerary_scanner.dart';
 import '../../core/platform/platform_file.dart';
 import '../../core/auth/profile_state.dart';
@@ -68,9 +69,15 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
       final result = await ItineraryScanner.scan(bytes, ext);
       if (!mounted) return;
       if (result.bookings.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('No booking data detected — fill in manually'),
+        final msg = result.source == 'gemini'
+            ? 'AI couldn\'t find bookings in this image — try a clearer screenshot'
+            : GeminiParser.isAvailable
+                ? 'AI found no bookings; OCR also found none — fill in manually'
+                : 'No AI key configured — OCR found no booking patterns';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(msg),
           behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 4),
         ));
         return;
       }
@@ -482,10 +489,12 @@ class _ParseItineraryBanner extends StatelessWidget {
                         color: Color(0xFF4A7AB5),
                       ),
                     )
-                  : const Icon(
-                      Icons.document_scanner_rounded,
+                  : Icon(
+                      GeminiParser.isAvailable
+                          ? Icons.auto_awesome_rounded
+                          : Icons.document_scanner_rounded,
                       size: 18,
-                      color: Color(0xFF4A7AB5),
+                      color: const Color(0xFF4A7AB5),
                     ),
             ),
             const SizedBox(width: kSpace3),
@@ -500,8 +509,10 @@ class _ParseItineraryBanner extends StatelessWidget {
                   ),
                   Text(
                     scanning
-                        ? 'Sending to AI parser…'
-                        : 'AI reads flights, hotels, trains & more. Falls back to on-device OCR.',
+                        ? (GeminiParser.isAvailable ? 'Sending to AI…' : 'Reading with on-device OCR…')
+                        : GeminiParser.isAvailable
+                            ? 'AI · reads flights, hotels, trains & more'
+                            : 'OCR only — add GEMINI_API_KEY for AI parsing',
                     style: kStyleCaption.copyWith(color: kColorInkSoft),
                   ),
                 ],

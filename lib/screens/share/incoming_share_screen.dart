@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import '../../core/platform/platform_file.dart';
 import '../../core/auth/profile_state.dart';
 import '../../core/supabase/doc_service.dart';
+import '../../core/supabase/links_service.dart';
 import '../../core/supabase/money_service.dart';
 import '../../core/supabase/spot_service.dart';
 import '../../core/supabase/travel_service.dart';
 import '../../core/trip/trip_state.dart';
 import '../../data/docs_data.dart';
+import '../../data/links_data.dart';
 import '../../data/money_data.dart';
 import '../../data/share_data.dart';
 import '../../data/spot_data.dart';
@@ -167,6 +169,18 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
           );
         }
 
+      case ShareDestination.link:
+        final url = widget.share.rawContent ?? '';
+        if (url.isEmpty) return;
+        await LinksService.createLink(
+          tripId:   tripId,
+          addedBy:  userId,
+          title:    data.title,
+          url:      url,
+          category: _linkCategory(widget.share.contentType),
+          notes:    data.notes.isEmpty ? null : data.notes,
+        );
+
       default:
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -234,6 +248,15 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
         'activity'      => ReceiptCategory.activity,
         'shopping'      => ReceiptCategory.shopping,
         _               => ReceiptCategory.other,
+      };
+
+  static LinkCategory _linkCategory(ShareContentType contentType) =>
+      switch (contentType) {
+        ShareContentType.instagramLink => LinkCategory.social,
+        ShareContentType.tiktokLink    => LinkCategory.social,
+        ShareContentType.youtubeLink   => LinkCategory.article,
+        ShareContentType.blogArticle   => LinkCategory.article,
+        _                              => LinkCategory.general,
       };
 
   @override

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../core/ocr/itinerary_parser.dart';
+import '../../core/ocr/parse_counter.dart';
+import '../../core/ocr/parsed_booking.dart';
 import '../../core/supabase/travel_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
@@ -9,13 +10,13 @@ import '../../widgets/widgets.dart';
 class ParsedItineraryScreen extends StatefulWidget {
   const ParsedItineraryScreen({
     super.key,
-    required this.flights,
+    required this.bookings,
     required this.tripId,
     required this.userId,
     this.onDone,
   });
 
-  final List<ParsedFlight> flights;
+  final List<ParsedBooking> bookings;
   final String tripId;
   final String userId;
   final VoidCallback? onDone;
@@ -28,47 +29,49 @@ class _ParsedItineraryScreenState extends State<ParsedItineraryScreen> {
   late final List<bool> _selected;
   late final List<TextEditingController> _titleCtrls;
   bool _saving = false;
+  int _remaining = ParseCounter.dailyLimit;
 
   @override
   void initState() {
     super.initState();
-    _selected = List.filled(widget.flights.length, true);
-    _titleCtrls = widget.flights
-        .map((f) => TextEditingController(text: f.title))
+    _selected  = List.filled(widget.bookings.length, true);
+    _titleCtrls = widget.bookings
+        .map((b) => TextEditingController(text: b.title))
         .toList();
+    _loadRemaining();
+  }
+
+  Future<void> _loadRemaining() async {
+    final r = await ParseCounter.remaining();
+    if (mounted) setState(() => _remaining = r);
   }
 
   @override
   void dispose() {
-    for (final c in _titleCtrls) {
-      c.dispose();
-    }
+    for (final c in _titleCtrls) c.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
-      for (int i = 0; i < widget.flights.length; i++) {
+      for (int i = 0; i < widget.bookings.length; i++) {
         if (!_selected[i]) continue;
-        final f = widget.flights[i];
+        final b = widget.bookings[i];
         await TravelService.createItem(
           tripId:    widget.tripId,
-          title:     _titleCtrls[i].text.trim().isEmpty
-              ? f.title
-              : _titleCtrls[i].text.trim(),
-          type:      f.itemType,
+          title:     _titleCtrls[i].text.trim().isEmpty ? b.title : _titleCtrls[i].text.trim(),
+          type:      b.itemType,
           createdBy: widget.userId,
-          date:      f.date,
-          notes:     f.notes,
+          date:      b.date,
+          notes:     b.notes.isEmpty ? null : b.notes,
         );
       }
       if (!mounted) return;
+      final count = _selected.where((s) => s).length;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(
-          'Saved ${_selected.where((s) => s).length} flight(s)',
-          style: kStyleBodyMedium.copyWith(color: kColorTextOnPrimary),
-        ),
+        content: Text('Saved $count booking${count == 1 ? '' : 's'} to Travel',
+            style: kStyleBodyMedium.copyWith(color: kColorTextOnPrimary)),
         backgroundColor: kColorPrimary,
         behavior: SnackBarBehavior.floating,
         shape: const RoundedRectangleBorder(borderRadius: kRadiusMd),
@@ -77,10 +80,9 @@ class _ParsedItineraryScreenState extends State<ParsedItineraryScreen> {
       widget.onDone?.call();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Error: $e'),
-        backgroundColor: Colors.red,
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -89,10 +91,12 @@ class _ParsedItineraryScreenState extends State<ParsedItineraryScreen> {
   @override
   Widget build(BuildContext context) {
     final selectedCount = _selected.where((s) => s).length;
+    final isAi = widget.bookings.any((b) => b.isAi);
+
     return Scaffold(
       backgroundColor: kColorCream,
       appBar: AppBar(
-        title: Text('Parsed flights', style: kStyleTitle),
+        title: Text('Parsed bookings', style: kStyleTitle),
         leading: IconButton(
           icon: const Icon(Icons.close_rounded),
           onPressed: () => Navigator.pop(context),
@@ -100,32 +104,39 @@ class _ParsedItineraryScreenState extends State<ParsedItineraryScreen> {
       ),
       body: Column(
         children: [
+          // ── Source banner ──────────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(kSpace4, kSpace4, kSpace4, 0),
+            child: _SourceBanner(isAi: isAi, remaining: _remaining),
+          ),
+          const SizedBox(height: kSpace3),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: kSpace4),
             child: Text(
-              'Found ${widget.flights.length} flight leg(s). '
+              'Found ${widget.bookings.length} booking${widget.bookings.length == 1 ? '' : 's'}. '
               'Deselect any you don\'t want to save.',
               style: kStyleCaption.copyWith(color: kColorInkSoft),
             ),
           ),
           const SizedBox(height: kSpace3),
+
+          // ── Booking cards ──────────────────────────────────────────────────
           Expanded(
             child: ListView.separated(
               padding: const EdgeInsets.symmetric(
                   horizontal: kSpace4, vertical: kSpace2),
-              itemCount: widget.flights.length,
-              separatorBuilder: (_, __) =>
-                  const SizedBox(height: kSpace3),
-              itemBuilder: (context, i) =>
-                  _FlightCard(
-                    flight: widget.flights[i],
-                    selected: _selected[i],
-                    titleCtrl: _titleCtrls[i],
-                    onToggle: (v) =>
-                        setState(() => _selected[i] = v),
-                  ),
+              itemCount: widget.bookings.length,
+              separatorBuilder: (_, __) => const SizedBox(height: kSpace3),
+              itemBuilder: (_, i) => _BookingCard(
+                booking:   widget.bookings[i],
+                selected:  _selected[i],
+                titleCtrl: _titleCtrls[i],
+                onToggle:  (v) => setState(() => _selected[i] = v),
+              ),
             ),
           ),
+
+          // ── Save button ───────────────────────────────────────────────────
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(kSpace4),
@@ -134,19 +145,16 @@ class _ParsedItineraryScreenState extends State<ParsedItineraryScreen> {
                 style: FilledButton.styleFrom(
                   backgroundColor: kColorPrimary,
                   minimumSize: const Size.fromHeight(48),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: kRadiusMd),
+                  shape: const RoundedRectangleBorder(borderRadius: kRadiusMd),
                 ),
                 child: _saving
                     ? const SizedBox(
-                        width: 20,
-                        height: 20,
+                        width: 20, height: 20,
                         child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white),
+                            strokeWidth: 2, color: Colors.white),
                       )
                     : Text(
-                        'Save $selectedCount flight${selectedCount == 1 ? '' : 's'} to Travel',
+                        'Save $selectedCount item${selectedCount == 1 ? '' : 's'} to Travel',
                         style: kStyleBodyMedium.copyWith(
                             color: kColorTextOnPrimary),
                       ),
@@ -159,58 +167,125 @@ class _ParsedItineraryScreenState extends State<ParsedItineraryScreen> {
   }
 }
 
-class _FlightCard extends StatelessWidget {
-  const _FlightCard({
-    required this.flight,
+// ─── Source banner ─────────────────────────────────────────────────────────────
+
+class _SourceBanner extends StatelessWidget {
+  const _SourceBanner({required this.isAi, required this.remaining});
+  final bool isAi;
+  final int remaining;
+
+  @override
+  Widget build(BuildContext context) {
+    if (isAi) {
+      final pct = (remaining / ParseCounter.dailyLimit * 100).round();
+      final low = remaining < 100;
+      return Container(
+        padding: const EdgeInsets.symmetric(
+            horizontal: kSpace3, vertical: kSpace2),
+        decoration: BoxDecoration(
+          color: low
+              ? const Color(0xFFFFF3E0)
+              : const Color(0xFFE8F5EE),
+          borderRadius: kRadiusMd,
+          border: Border.all(
+            color: low
+                ? const Color(0xFFE65100).withValues(alpha: 0.3)
+                : kColorSuccess.withValues(alpha: 0.3),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              low ? Icons.warning_amber_rounded : Icons.auto_awesome_rounded,
+              size: 16,
+              color: low ? const Color(0xFFE65100) : kColorSuccess,
+            ),
+            const SizedBox(width: kSpace2),
+            Expanded(
+              child: Text(
+                low
+                    ? 'Only $remaining AI parses left today ($pct% remaining)'
+                    : 'AI-parsed · $remaining free parses left today',
+                style: kStyleCaption.copyWith(
+                  color: low ? const Color(0xFFE65100) : kColorSuccess,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // OCR fallback
+    return Container(
+      padding: const EdgeInsets.symmetric(
+          horizontal: kSpace3, vertical: kSpace2),
+      decoration: BoxDecoration(
+        color: kColorSurfaceSunken,
+        borderRadius: kRadiusMd,
+        border: Border.all(color: kColorBorder),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.document_scanner_rounded,
+              size: 16, color: kColorInkSoft),
+          const SizedBox(width: kSpace2),
+          Expanded(
+            child: Text(
+              'Parsed on-device (no AI key set — flights only)',
+              style: kStyleCaption.copyWith(color: kColorInkSoft),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Booking card ──────────────────────────────────────────────────────────────
+
+class _BookingCard extends StatelessWidget {
+  const _BookingCard({
+    required this.booking,
     required this.selected,
     required this.titleCtrl,
     required this.onToggle,
   });
 
-  final ParsedFlight flight;
+  final ParsedBooking booking;
   final bool selected;
   final TextEditingController titleCtrl;
   final ValueChanged<bool> onToggle;
 
   @override
   Widget build(BuildContext context) {
+    final b = booking;
     return WabwayCard(
       child: Padding(
         padding: const EdgeInsets.all(kSpace4),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header row: icon + checkbox
+            // Header
             Row(
               children: [
                 Container(
-                  width: 36,
-                  height: 36,
+                  width: 36, height: 36,
                   decoration: BoxDecoration(
-                    color: flight.itemType.softColor,
+                    color: b.itemType.softColor,
                     borderRadius: kRadiusSm,
                   ),
-                  child: Icon(
-                    flight.itemType.icon,
-                    size: 18,
-                    color: flight.itemType.color,
-                  ),
+                  child: Icon(b.itemType.icon, size: 18, color: b.itemType.color),
                 ),
                 const SizedBox(width: kSpace3),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        flight.flightNumber,
-                        style: kStyleBodySemibold,
-                      ),
-                      if (flight.airline != null)
-                        Text(
-                          flight.airline!,
-                          style: kStyleCaption.copyWith(
-                              color: kColorInkSoft),
-                        ),
+                      Text(b.itemType.label, style: kStyleBodySemibold),
+                      if (b.airline != null)
+                        Text(b.airline!,
+                            style: kStyleCaption.copyWith(color: kColorInkSoft)),
                     ],
                   ),
                 ),
@@ -224,66 +299,70 @@ class _FlightCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: kSpace3),
-            // Route + times
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(flight.departureTime,
-                          style: kStyleBodySemibold),
-                      Text(flight.departureCity,
-                          style: kStyleCaption,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis),
-                    ],
+
+            // Route / detail row
+            if (b.departureCity != null && b.arrivalCity != null)
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(b.departureTime ?? '', style: kStyleBodySemibold),
+                        Text(b.departureCity!,
+                            style: kStyleCaption,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis),
+                      ],
+                    ),
                   ),
-                ),
-                Icon(Icons.arrow_forward_rounded,
-                    size: 16, color: kColorInkSoft),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        '${flight.arrivalTime}${flight.nextDay ? ' +1' : ''}',
-                        style: kStyleBodySemibold,
-                      ),
-                      Text(flight.arrivalCity,
-                          style: kStyleCaption,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.right),
-                    ],
+                  const Icon(Icons.arrow_forward_rounded,
+                      size: 16, color: kColorInkSoft),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '${b.arrivalTime ?? ''}${b.nextDay ? ' +1' : ''}',
+                          style: kStyleBodySemibold,
+                        ),
+                        Text(b.arrivalCity!,
+                            style: kStyleCaption,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.right),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              )
+            else
+              Text(b.notes,
+                  style: kStyleCaption.copyWith(color: kColorInkSoft),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis),
+
             const SizedBox(height: kSpace3),
+
             // Date + cabin
             Row(
               children: [
-                Icon(Icons.calendar_today_rounded,
+                const Icon(Icons.calendar_today_rounded,
                     size: 12, color: kColorInkSoft),
                 const SizedBox(width: kSpace1),
-                Text(
-                  _formatDate(flight.date),
-                  style: kStyleCaption.copyWith(color: kColorInkSoft),
-                ),
-                if (flight.cabinClass != null) ...[
+                Text(_fmtDate(b.date),
+                    style: kStyleCaption.copyWith(color: kColorInkSoft)),
+                if (b.cabinClass != null) ...[
                   const SizedBox(width: kSpace3),
-                  Icon(Icons.airline_seat_recline_normal_rounded,
+                  const Icon(Icons.airline_seat_recline_normal_rounded,
                       size: 12, color: kColorInkSoft),
                   const SizedBox(width: kSpace1),
-                  Text(
-                    flight.cabinClass!,
-                    style:
-                        kStyleCaption.copyWith(color: kColorInkSoft),
-                  ),
+                  Text(b.cabinClass!,
+                      style: kStyleCaption.copyWith(color: kColorInkSoft)),
                 ],
               ],
             ),
+
             // Editable title
             const SizedBox(height: kSpace3),
             TextField(
@@ -291,7 +370,8 @@ class _FlightCard extends StatelessWidget {
               style: kStyleCaption,
               decoration: InputDecoration(
                 labelText: 'Travel item title',
-                labelStyle: kStyleCaption.copyWith(color: kColorInkSoft),
+                labelStyle:
+                    kStyleCaption.copyWith(color: kColorInkSoft),
                 isDense: true,
                 contentPadding: const EdgeInsets.symmetric(
                     horizontal: kSpace3, vertical: kSpace2),
@@ -311,11 +391,9 @@ class _FlightCard extends StatelessWidget {
     );
   }
 
-  String _formatDate(DateTime d) {
-    const months = [
-      '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-    ];
-    return '${months[d.month]} ${d.day}, ${d.year}';
+  String _fmtDate(DateTime d) {
+    const m = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${m[d.month]} ${d.day}, ${d.year}';
   }
 }

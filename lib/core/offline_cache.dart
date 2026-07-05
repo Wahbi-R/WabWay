@@ -33,7 +33,13 @@ abstract final class OfflineCache {
     } catch (_) {}
   }
 
-  static String spotsKey(String tripId) => 'cache_spots_$tripId';
-  static String docsKey(String tripId) => 'cache_docs_$tripId';
-  static String planKey(String tripId) => 'cache_plan_$tripId';
+  static String spotsKey(String tripId)             => 'cache_spots_$tripId';
+  static String docsKey(String tripId)              => 'cache_docs_$tripId';
+  static String planKey(String tripId)              => 'cache_plan_$tripId';
+  static String travelKey(String tripId)            => 'cache_travel_$tripId';
+  static String linksKey(String tripId)             => 'cache_links_$tripId';
+  static String moneyReceiptsKey(String tripId)     => 'cache_money_receipts_$tripId';
+  static String moneyWithdrawalsKey(String tripId)  => 'cache_money_withdrawals_$tripId';
+  static String tripShellKey(String tripId)         => 'cache_trip_shell_$tripId';
+  static String userTripsKey                        => 'cache_user_trips';
 }

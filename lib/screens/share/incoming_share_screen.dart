@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import '../../core/ocr/itinerary_parser.dart';
-import '../../core/ocr/ocr_service.dart';
+import '../../core/ocr/itinerary_scanner.dart';
 import '../../core/platform/platform_file.dart';
 import '../../core/auth/profile_state.dart';
 import '../../core/supabase/doc_service.dart';
@@ -64,20 +63,13 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
     if (filePath == null) return;
     setState(() => _scanning = true);
     try {
-      final text = await OcrService.extractText(filePath);
-      if (text == null || text.trim().isEmpty) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('No text found in image'),
-          behavior: SnackBarBehavior.floating,
-        ));
-        return;
-      }
-      final flights = ItineraryParser.parse(text);
+      final bytes  = await readFileAsBytes(filePath);
+      final ext    = filePath.split('.').last.toLowerCase();
+      final result = await ItineraryScanner.scan(bytes, ext);
       if (!mounted) return;
-      if (flights.isEmpty) {
+      if (result.bookings.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('No flight data detected — fill in manually'),
+          content: Text('No booking data detected — fill in manually'),
           behavior: SnackBarBehavior.floating,
         ));
         return;
@@ -86,12 +78,12 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
         context,
         MaterialPageRoute(
           builder: (_) => ParsedItineraryScreen(
-            flights: flights,
-            tripId: widget.tripId,
-            userId: widget.userId,
+            bookings: result.bookings,
+            tripId:   widget.tripId,
+            userId:   widget.userId,
             onDone: () {
-              Navigator.pop(context); // close parsed screen
-              widget.onDone?.call();  // close share screen
+              Navigator.pop(context);
+              widget.onDone?.call();
             },
           ),
         ),
@@ -508,8 +500,8 @@ class _ParseItineraryBanner extends StatelessWidget {
                   ),
                   Text(
                     scanning
-                        ? 'Extracting flights from image'
-                        : 'Reads flight numbers, times, and routes from the image',
+                        ? 'Sending to AI parser…'
+                        : 'AI reads flights, hotels, trains & more. Falls back to on-device OCR.',
                     style: kStyleCaption.copyWith(color: kColorInkSoft),
                   ),
                 ],

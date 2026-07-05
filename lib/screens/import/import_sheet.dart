@@ -5,8 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../core/ocr/itinerary_parser.dart';
-import '../../core/ocr/ocr_service.dart';
+import '../../core/ocr/itinerary_scanner.dart';
+import '../../core/ocr/parsed_booking.dart';
 import '../../core/supabase/client.dart';
 import '../../core/supabase/doc_service.dart';
 import '../../core/supabase/money_service.dart';
@@ -148,8 +148,9 @@ class _ImportContentState extends State<_ImportContent> {
   ReceiptCategory _receiptCat = ReceiptCategory.other;
 
   // ── OCR / itinerary parsing ───────────────────────────────────────────────
-  bool               _ocrLoading = false;
-  List<ParsedFlight> _ocrFlights = [];
+  bool                _ocrLoading  = false;
+  List<ParsedBooking> _ocrBookings = [];
+  String              _ocrSource   = '';
 
   // ── Submit ────────────────────────────────────────────────────────────────
   bool    _submitting = false;
@@ -213,7 +214,8 @@ class _ImportContentState extends State<_ImportContent> {
       _fileExt      = ext;
       _fileSizeKb   = sizeKb;
       _sourceIsLink = false;
-      _ocrFlights   = [];
+      _ocrBookings  = [];
+      _ocrSource    = '';
       if (_titleCtrl.text.isEmpty) _titleCtrl.text = nameWithoutExt;
       _docType = _docTypeFromExt(ext);
       _onDetailsStep = true;
@@ -233,13 +235,14 @@ class _ImportContentState extends State<_ImportContent> {
   Future<void> _runOcr(Uint8List bytes, String ext) async {
     setState(() => _ocrLoading = true);
     try {
-      final text = await OcrService.extractTextFromBytes(bytes, ext);
+      final result = await ItineraryScanner.scan(bytes, ext);
       if (!mounted) return;
-      final flights = text != null ? ItineraryParser.parse(text) : <ParsedFlight>[];
-      setState(() { _ocrFlights = flights; _ocrLoading = false; });
-
-      // Auto-switch destination to Travel when flights detected
-      if (flights.isNotEmpty && _dest != _Dest.travel) {
+      setState(() {
+        _ocrBookings = result.bookings;
+        _ocrSource   = result.source;
+        _ocrLoading  = false;
+      });
+      if (result.bookings.isNotEmpty && _dest != _Dest.travel) {
         setState(() => _dest = _Dest.travel);
       }
     } catch (_) {
@@ -248,17 +251,17 @@ class _ImportContentState extends State<_ImportContent> {
   }
 
   Future<void> _openParsedItinerary() async {
-    final flights = _ocrFlights;
-    if (flights.isEmpty) return;
+    final bookings = _ocrBookings;
+    if (bookings.isEmpty) return;
     await Navigator.of(context, rootNavigator: true).push<void>(
       MaterialPageRoute(
         builder: (_) => ParsedItineraryScreen(
-          flights: flights,
-          tripId:  widget.tripId,
-          userId:  widget.userId,
-          onDone:  () {
-            Navigator.pop(context); // close parsed screen
-            Navigator.pop(context); // close import sheet
+          bookings: bookings,
+          tripId:   widget.tripId,
+          userId:   widget.userId,
+          onDone:   () {
+            Navigator.pop(context);
+            Navigator.pop(context);
           },
         ),
       ),
@@ -660,14 +663,15 @@ class _ImportContentState extends State<_ImportContent> {
 
         // OCR itinerary banner
         if (_ocrLoading)
-          _OcrBanner(loading: true, flightCount: 0, onTap: null)
-        else if (_ocrFlights.isNotEmpty)
+          _OcrBanner(loading: true, bookingCount: 0, source: '', onTap: null)
+        else if (_ocrBookings.isNotEmpty)
           _OcrBanner(
-            loading:     false,
-            flightCount: _ocrFlights.length,
-            onTap:       _openParsedItinerary,
+            loading:      false,
+            bookingCount: _ocrBookings.length,
+            source:       _ocrSource,
+            onTap:        _openParsedItinerary,
           ),
-        if (_ocrLoading || _ocrFlights.isNotEmpty)
+        if (_ocrLoading || _ocrBookings.isNotEmpty)
           const SizedBox(height: kSpace4),
 
         // Destination type
@@ -1036,18 +1040,21 @@ class _SourcePreview extends StatelessWidget {
 class _OcrBanner extends StatelessWidget {
   const _OcrBanner({
     required this.loading,
-    required this.flightCount,
+    required this.bookingCount,
+    required this.source,
     required this.onTap,
   });
 
   final bool loading;
-  final int  flightCount;
+  final int  bookingCount;
+  final String source;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     const blue     = Color(0xFF4A7AB5);
     const blueSoft = Color(0xFFE8EEF6);
+    final isAi = source == 'gemini';
 
     return GestureDetector(
       onTap: onTap,
@@ -1071,7 +1078,13 @@ class _OcrBanner extends StatelessWidget {
                       padding: EdgeInsets.all(8),
                       child: CircularProgressIndicator(strokeWidth: 2, color: blue),
                     )
-                  : const Icon(Icons.document_scanner_rounded, size: 18, color: blue),
+                  : Icon(
+                      isAi
+                          ? Icons.auto_awesome_rounded
+                          : Icons.document_scanner_rounded,
+                      size: 18,
+                      color: blue,
+                    ),
             ),
             const SizedBox(width: kSpace3),
             Expanded(
@@ -1080,14 +1093,16 @@ class _OcrBanner extends StatelessWidget {
                 children: [
                   Text(
                     loading
-                        ? 'Scanning for flights…'
-                        : '$flightCount flight leg${flightCount == 1 ? '' : 's'} detected',
+                        ? 'Scanning for bookings…'
+                        : '$bookingCount booking${bookingCount == 1 ? '' : 's'} detected',
                     style: kStyleBodyMedium.copyWith(color: blue),
                   ),
                   Text(
                     loading
-                        ? 'Reading text from image'
-                        : 'Tap to review and save to Travel',
+                        ? 'Trying AI parser, then on-device OCR'
+                        : isAi
+                            ? 'AI-parsed · tap to review and save to Travel'
+                            : 'On-device OCR · tap to review and save to Travel',
                     style: kStyleCaption.copyWith(color: kColorInkSoft),
                   ),
                 ],

@@ -1,3 +1,5 @@
+import 'dart:convert';
+import '../offline_cache.dart';
 import '../../data/money_data.dart';
 import 'client.dart';
 
@@ -77,7 +79,21 @@ abstract final class MoneyService {
         .select('*, receipt_splits(*)')
         .eq('trip_id', tripId)
         .order('date', ascending: false);
-    return data.map<Receipt>((r) => _receiptFromRow(r)).toList();
+    final receipts = data.map<Receipt>((r) => _receiptFromRow(r)).toList();
+    await OfflineCache.write(
+      OfflineCache.moneyReceiptsKey(tripId),
+      data,
+    );
+    return receipts;
+  }
+
+  static Future<List<Receipt>?> loadReceiptsFromCache(String tripId) {
+    return OfflineCache.read<List<Receipt>>(
+      OfflineCache.moneyReceiptsKey(tripId),
+      (json) => (json as List)
+          .map<Receipt>((r) => _receiptFromRow(Map<String, dynamic>.from(r as Map)))
+          .toList(),
+    );
   }
 
   static Future<List<CashWithdrawal>> loadWithdrawals(String tripId) async {
@@ -86,7 +102,21 @@ abstract final class MoneyService {
         .select('*, cash_distributions(*)')
         .eq('trip_id', tripId)
         .order('date', ascending: false);
-    return data.map<CashWithdrawal>((r) => _withdrawalFromRow(r)).toList();
+    final withdrawals = data.map<CashWithdrawal>((r) => _withdrawalFromRow(r)).toList();
+    await OfflineCache.write(
+      OfflineCache.moneyWithdrawalsKey(tripId),
+      data,
+    );
+    return withdrawals;
+  }
+
+  static Future<List<CashWithdrawal>?> loadWithdrawalsFromCache(String tripId) {
+    return OfflineCache.read<List<CashWithdrawal>>(
+      OfflineCache.moneyWithdrawalsKey(tripId),
+      (json) => (json as List)
+          .map<CashWithdrawal>((r) => _withdrawalFromRow(Map<String, dynamic>.from(r as Map)))
+          .toList(),
+    );
   }
 
   // ── Mutations ─────────────────────────────────────────────────────────────────

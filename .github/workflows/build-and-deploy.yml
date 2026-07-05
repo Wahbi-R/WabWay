@@ -59,6 +59,17 @@ jobs:
 
       # ── Android APK ──────────────────────────────────────────────────────────
 
+      - name: Set up signing
+        if: github.event_name == 'push' || github.event.inputs.build_apk == 'true'
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/wabway-release.jks
+          cat > android/key.properties <<EOF
+          storeFile=wabway-release.jks
+          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          EOF
+
       - name: Build APK
         if: github.event_name == 'push' || github.event.inputs.build_apk == 'true'
         run: flutter build apk --release --dart-define-from-file=.env

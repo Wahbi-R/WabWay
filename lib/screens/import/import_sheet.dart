@@ -221,15 +221,15 @@ class _ImportContentState extends State<_ImportContent> {
       _onDetailsStep = true;
     });
 
-    // Auto-run OCR on images (not web, not PDF for now)
-    if (!kIsWeb && _isImageExt(ext)) {
+    // Auto-run scanner on images and PDFs (PDFs go to Gemini only; ML Kit can't read them)
+    if (!kIsWeb && _isScannable(ext)) {
       _runOcr(bytes, ext ?? 'jpg');
     }
   }
 
-  static bool _isImageExt(String? ext) {
-    const imageExts = {'jpg', 'jpeg', 'png', 'webp', 'heic', 'bmp'};
-    return imageExts.contains(ext?.toLowerCase());
+  static bool _isScannable(String? ext) {
+    const exts = {'jpg', 'jpeg', 'png', 'webp', 'heic', 'bmp', 'pdf'};
+    return exts.contains(ext?.toLowerCase());
   }
 
   Future<void> _runOcr(Uint8List bytes, String ext) async {

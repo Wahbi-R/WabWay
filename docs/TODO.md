@@ -8,7 +8,7 @@ Checked items are done. Log the date and a one-liner when completing something.
 
 - [x] **W1. Fix web build** — conditional export pattern for `share_handler` (native vs web stub) and `platform_file` helper replacing `dart:io` File usage; `flutter build web` compiles cleanly (2026-07-04, see `docs/features/web-build.md`).
 - [x] **W2. GitHub Actions CI/CD** — on push to `main`: builds debug APK → creates/updates GitHub Release with APK attached; builds web → deploys to GitHub Pages; secrets-based `.env` creation (2026-07-04, see `docs/features/ci-cd.md`).
-- [ ] **W3. Custom domain** — add `CNAME wabway Wahbi-R.github.io` in DNS; set `wabway.wabble.ca` as custom domain in repo Pages settings; GitHub provisions SSL automatically. See `docs/features/ci-cd.md` for full steps.
+- [x] **W3. Custom domain** — CNAME configured in Porkbun DNS; custom domain set in GitHub Pages; SSL certificate approved and enforced by GitHub (2026-07-04, live at https://wabway.wabble.ca).
 - [x] **W4. In-app update checker** — implemented as item #28; `UpdateChecker.check()` hits GitHub Releases API; `_UpdateBanner` shown in Home screen (Android only) (2026-07-04).
 
 ---

@@ -73,11 +73,13 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
       if (!mounted) return;
       if (result.bookings.isEmpty) {
         final String msg;
+        final aiStatus = GeminiParser.lastHttpStatus;
         if (result.source == 'gemini') {
           msg = 'AI read the file but found no bookings — fill in manually';
-        } else if (result.source.startsWith('gemini_error_')) {
-          final code = result.source.replaceFirst('gemini_error_', '');
-          msg = 'AI request failed (HTTP $code) — check API key or quota';
+        } else if (GeminiParser.isAvailable && aiStatus != 0 && aiStatus != 200) {
+          msg = aiStatus == 429
+              ? 'AI quota exceeded (HTTP 429); OCR also found none — fix API key billing'
+              : 'AI failed (HTTP $aiStatus); OCR found no bookings — fill in manually';
         } else if (GeminiParser.isAvailable) {
           msg = 'AI found no bookings; OCR also found none — fill in manually';
         } else {

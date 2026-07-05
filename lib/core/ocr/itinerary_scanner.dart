@@ -12,24 +12,15 @@ abstract final class ItineraryScanner {
     String ext,
   ) async {
     // ── Try Gemini AI ────────────────────────────────────────────────────────
-    // ignore: avoid_print
-    print('[Scanner] isAvailable=${GeminiParser.isAvailable} bytes=${bytes.length} ext=$ext');
     if (GeminiParser.isAvailable) {
       try {
         final results = await GeminiParser.parse(bytes, ext);
-        // ignore: avoid_print
-        print('[Scanner] Gemini returned ${results.length} bookings');
         if (results.isNotEmpty) return (bookings: results, source: 'gemini');
-        // Gemini returned 0 → fall through to OCR (useful for image inputs)
-      } on GeminiApiException catch (e) {
-        // ignore: avoid_print
-        print('[Scanner] Gemini API error ${e.statusCode}: ${e.body}');
-        // Surface the HTTP error (quota, auth, etc.) — OCR won't fix these
-        return (bookings: <ParsedBooking>[], source: 'gemini_error_${e.statusCode}');
-      } catch (e) {
-        // ignore: avoid_print
-        print('[Scanner] Gemini error: $e');
-        // Network/timeout errors → fall through to OCR
+        // Gemini returned 0 → fall through to OCR
+      } on GeminiApiException {
+        // Quota / auth / model error → fall through to OCR
+      } catch (_) {
+        // Network / parse error → fall through to OCR
       }
     }
 

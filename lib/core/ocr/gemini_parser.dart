@@ -60,8 +60,6 @@ If nothing is found return an empty array [].
       'generationConfig': {'responseMimeType': 'application/json'},
     });
 
-    // ignore: avoid_print
-    print('[Gemini] sending ${bytes.length} bytes as $mimeType');
     final response = await http
         .post(
           Uri.parse('$_url?key=$_apiKey'),
@@ -73,8 +71,6 @@ If nothing is found return an empty array [].
     lastHttpStatus = response.statusCode;
     lastResponseSnippet = response.body.substring(
         0, response.body.length.clamp(0, 400));
-    // ignore: avoid_print
-    print('[Gemini] status=${response.statusCode} body=$lastResponseSnippet');
 
     if (response.statusCode != 200) {
       throw GeminiApiException(response.statusCode, lastResponseSnippet);

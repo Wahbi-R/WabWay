@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/place_search_service.dart';
 import '../../core/supabase/spot_service.dart';
-import '../../data/japan_places.dart';
 import '../../data/spot_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
@@ -148,7 +147,6 @@ class _AddSpotContentState extends State<_AddSpotContent> {
   // Location from suggestion or Maps URL
   double? _latitude;
   double? _longitude;
-  String? _address;
   String? _placeSource;
 
   List<PlaceSuggestion> _suggestions = [];
@@ -172,7 +170,7 @@ class _AddSpotContentState extends State<_AddSpotContent> {
       _status           = s.status;
       _latitude         = s.latitude;
       _longitude        = s.longitude;
-      _address          = s.address;
+
       _placeSource      = s.placeSource;
     }
     _mapsCtrl.addListener(_onMapsUrlChanged);
@@ -198,17 +196,12 @@ class _AddSpotContentState extends State<_AddSpotContent> {
       setState(() { _suggestions = []; _showSuggestions = false; _searchLoading = false; });
       return;
     }
-    // Show local results immediately for instant feedback
-    final local = PlaceSearchService.searchLocal(query);
-    setState(() { _suggestions = local; _showSuggestions = true; _searchLoading = true; });
+    setState(() { _suggestions = []; _showSuggestions = true; _searchLoading = true; });
 
     _searchDebounce = Timer(const Duration(milliseconds: 350), () async {
       final results = await PlaceSearchService.searchPhoton(query);
       if (!mounted) return;
-      setState(() {
-        _suggestions = results.isNotEmpty ? results : PlaceSearchService.searchLocal(query);
-        _searchLoading = false;
-      });
+      setState(() { _suggestions = results; _searchLoading = false; });
     });
   }
 
@@ -235,7 +228,7 @@ class _AddSpotContentState extends State<_AddSpotContent> {
       _category        = place.category;
       _latitude        = place.latitude;
       _longitude       = place.longitude;
-      _address         = place.address;
+
       _placeSource     = 'photon';
       _suggestions     = [];
       _showSuggestions = false;
@@ -391,7 +384,9 @@ class _AddSpotContentState extends State<_AddSpotContent> {
                     ),
                     title: Text(place.name, style: kStyleBody),
                     subtitle: Text(
-                      '${place.area}, ${place.city}',
+                      [place.area, place.city]
+                          .where((s) => s.isNotEmpty)
+                          .join(', '),
                       style: kStyleCaption.copyWith(color: kColorInkSoft),
                     ),
                     onTap: () => _applySuggestion(place),

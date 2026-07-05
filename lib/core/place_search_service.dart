@@ -1,19 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../data/japan_places.dart';
 import '../data/spot_data.dart';
 
 abstract final class PlaceSearchService {
-  // ─── Local fallback ──────────────────────────────────────────────────────────
-
-  static List<PlaceSuggestion> searchLocal(String query, {int limit = 8}) {
-    if (query.trim().isEmpty) return [];
-    return kJapanPlaces.where((p) => p.matches(query)).take(limit).toList();
-  }
-
-  // ─── Photon live search ───────────────────────────────────────────────────────
-
   static Future<List<PlaceSuggestion>> searchPhoton(
     String query, {
     int limit = 6,
@@ -47,24 +37,34 @@ abstract final class PlaceSearchService {
       final name = (props['name'] as String?)?.trim() ?? '';
       if (name.isEmpty) return null;
 
-      final lng  = coords[0].toDouble();
-      final lat  = coords[1].toDouble();
-      final city = (props['city'] ?? props['county'] ?? props['state'] ?? '') as String;
-      final area = (props['district'] ?? props['suburb'] ?? props['neighbourhood'] ?? '') as String;
-      final street = [
-        props['housenumber'],
-        props['street'],
-      ].whereType<String>().join(' ').trim();
+      final lng = coords[0].toDouble();
+      final lat = coords[1].toDouble();
 
-      final category = _categoryFromProps(props);
-      final mapsUrl  = 'https://www.google.com/maps/search/?api=1&query=$lat,$lng';
+      final city = _str(props['city'] ?? props['county'] ?? props['state']);
+      final area = _str(props['district'] ?? props['suburb'] ?? props['neighbourhood']);
+
+      // Build address from whatever Photon provides — Japanese addresses
+      // rarely have housenumber+street in OSM, so fall back through levels.
+      final addrParts = <String>[];
+      final housenumber = _str(props['housenumber']);
+      final street      = _str(props['street']);
+      final postcode    = _str(props['postcode']);
+
+      if (housenumber.isNotEmpty) addrParts.add(housenumber);
+      if (street.isNotEmpty)      addrParts.add(street);
+      // If no street data, use neighbourhood/suburb as the address hint
+      if (addrParts.isEmpty && area.isNotEmpty) addrParts.add(area);
+      if (postcode.isNotEmpty) addrParts.add(postcode);
+
+      final address = addrParts.join(' ');
+      final mapsUrl = 'https://www.google.com/maps/search/?api=1&query=$lat,$lng';
 
       return PlaceSuggestion(
         name:      name,
-        address:   street,
+        address:   address,
         city:      city,
         area:      area,
-        category:  category,
+        category:  _categoryFromProps(props),
         latitude:  lat,
         longitude: lng,
         mapsUrl:   mapsUrl,
@@ -74,9 +74,11 @@ abstract final class PlaceSearchService {
     }
   }
 
+  static String _str(dynamic v) => (v as String?)?.trim() ?? '';
+
   static SpotCategory _categoryFromProps(Map<String, dynamic> props) {
-    final type = ((props['type'] as String?) ?? '').toLowerCase();
-    final osm  = ((props['osm_value'] as String?) ?? '').toLowerCase();
+    final type = _str(props['type']).toLowerCase();
+    final osm  = _str(props['osm_value']).toLowerCase();
     final combined = '$type $osm';
     if (combined.contains('restaurant') ||
         combined.contains('cafe') ||
@@ -95,7 +97,6 @@ abstract final class PlaceSearchService {
         combined.contains('mountain') ||
         combined.contains('beach')) return SpotCategory.nature;
     if (combined.contains('nightclub') ||
-        combined.contains('bar') ||
         combined.contains('pub') ||
         combined.contains('club')) return SpotCategory.nightlife;
     if (combined.contains('attraction') ||
@@ -109,7 +110,7 @@ abstract final class PlaceSearchService {
     return SpotCategory.landmark;
   }
 
-  // ─── Maps URL helpers ─────────────────────────────────────────────────────────
+  // ─── Maps URL helpers ──────────────────────────────────────────────────────
 
   static ({double lat, double lng})? parseLatLng(String url) {
     final match = RegExp(r'@(-?\d+\.?\d*),(-?\d+\.?\d*)').firstMatch(url);

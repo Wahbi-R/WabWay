@@ -154,6 +154,32 @@ class SpotComment {
   final DateTime createdAt;
 }
 
+// ─── Place suggestion (from Photon search) ────────────────────────────────────
+
+class PlaceSuggestion {
+  const PlaceSuggestion({
+    required this.name,
+    required this.address,
+    required this.city,
+    required this.area,
+    required this.category,
+    required this.latitude,
+    required this.longitude,
+    required this.mapsUrl,
+  });
+
+  final String name;
+  final String address;
+  final String city;
+  final String area;
+  final SpotCategory category;
+  final double latitude;
+  final double longitude;
+  final String mapsUrl;
+}
+
+// ─── Spot ─────────────────────────────────────────────────────────────────────
+
 class Spot {
   const Spot({
     required this.id,

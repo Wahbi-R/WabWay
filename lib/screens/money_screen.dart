@@ -1,11 +1,11 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
 import '../core/supabase/client.dart';
 import '../core/supabase/money_service.dart';
 import '../core/supabase/settlement_service.dart';
+import '../core/sync_queue.dart';
 import '../core/trip/trip_state.dart';
 import '../data/money_data.dart';
 import '../theme/app_colors.dart';
@@ -35,6 +35,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
   bool _loading = true;
   bool _error = false;
   bool _offline = false;
+  int _pendingSyncCount = 0;
 
   _MoneyTab _tab = _MoneyTab.receipts;
   String? _selectedReceiptId;
@@ -97,17 +98,36 @@ class _MoneyScreenState extends State<MoneyScreen> {
         SettlementService.loadSettlements(tripId),
       ]);
       if (!mounted) return;
+      final pending = await SyncQueue.pendingCountFor(tripId);
+      if (!mounted) return;
       setState(() {
         _receipts              = List<Receipt>.from(futures[0] as List);
         _withdrawals           = List<CashWithdrawal>.from(futures[1] as List);
         _persistedSettlements  = List<Settlement>.from(futures[2] as List);
         _loading = false;
         _offline = false;
+        _pendingSyncCount = pending;
       });
     } catch (_) {
       if (!mounted) return;
       if (silent) { setState(() => _offline = true); return; }
-      setState(() { _loading = false; _error = true; });
+      // Try cached data on cold-start failure.
+      final cachedReceipts     = await MoneyService.loadReceiptsFromCache(tripId);
+      final cachedWithdrawals  = await MoneyService.loadWithdrawalsFromCache(tripId);
+      final pending            = await SyncQueue.pendingCountFor(tripId);
+      if (!mounted) return;
+      if (cachedReceipts != null) {
+        setState(() {
+          _receipts             = cachedReceipts;
+          _withdrawals          = cachedWithdrawals ?? [];
+          _persistedSettlements = [];
+          _loading = false;
+          _offline = true;
+          _pendingSyncCount = pending;
+        });
+      } else {
+        setState(() { _loading = false; _error = true; });
+      }
     }
   }
 
@@ -173,12 +193,6 @@ class _MoneyScreenState extends State<MoneyScreen> {
   }
 
   // ── Derived state ─────────────────────────────────────────────────────────────
-
-  String get _currency {
-    if (_receipts.isNotEmpty)    return _receipts.first.currency;
-    if (_withdrawals.isNotEmpty) return _withdrawals.first.currency;
-    return 'JPY';
-  }
 
   Map<String, List<MemberBalance>> get _balancesByCurrency =>
       calculateBalancesGrouped(_receipts, _withdrawals, myId: _userId, members: _members);
@@ -316,6 +330,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
                 ? _addWithdrawal(context)
                 : _addReceipt(context),
             showAdd: _tab != _MoneyTab.settleUp,
+            pendingSyncCount: _pendingSyncCount,
           ),
           Expanded(
             child: Row(
@@ -452,7 +467,30 @@ class _MoneyScreenState extends State<MoneyScreen> {
       child: Scaffold(
         backgroundColor: kColorCream,
         appBar: AppBar(
-          title: Text('Money', style: kStyleTitle),
+          title: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Money', style: kStyleTitle),
+              if (_pendingSyncCount > 0) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: kColorWarning,
+                    borderRadius: kRadiusPill,
+                  ),
+                  child: Text(
+                    '$_pendingSyncCount pending',
+                    style: kStyleCaption.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 10,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
           actions: [
             if (_tab != _MoneyTab.settleUp)
               IconButton(
@@ -592,12 +630,14 @@ class _DesktopMoneyBar extends StatelessWidget {
     required this.onTabChange,
     required this.onAdd,
     required this.showAdd,
+    this.pendingSyncCount = 0,
   });
 
   final _MoneyTab activeTab;
   final ValueChanged<_MoneyTab> onTabChange;
   final VoidCallback onAdd;
   final bool showAdd;
+  final int pendingSyncCount;
 
   @override
   Widget build(BuildContext context) {
@@ -611,6 +651,24 @@ class _DesktopMoneyBar extends StatelessWidget {
       child: Row(
         children: [
           Text('Money', style: kStyleTitle),
+          if (pendingSyncCount > 0) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: kColorWarning,
+                borderRadius: kRadiusPill,
+              ),
+              child: Text(
+                '$pendingSyncCount pending',
+                style: kStyleCaption.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 10,
+                ),
+              ),
+            ),
+          ],
           const SizedBox(width: kSpace6),
 
           // Tab chips

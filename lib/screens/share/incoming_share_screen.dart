@@ -65,19 +65,28 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
     setState(() => _scanning = true);
     try {
       final bytes  = await readFileAsBytes(filePath);
-      final ext    = filePath.split('.').last.toLowerCase();
+      // Use contentType as authoritative source; filename-based ext is
+      // unreliable on Android because shared file paths include package-name
+      // dots (e.g. com.google.android.gm/cache/OJLNKI).
+      final ext = _extFromShare(filePath, widget.share.contentType);
       final result = await ItineraryScanner.scan(bytes, ext);
       if (!mounted) return;
       if (result.bookings.isEmpty) {
-        final msg = result.source == 'gemini'
-            ? 'AI couldn\'t find bookings in this image — try a clearer screenshot'
-            : GeminiParser.isAvailable
-                ? 'AI found no bookings; OCR also found none — fill in manually'
-                : 'No AI key configured — OCR found no booking patterns';
+        final String msg;
+        if (result.source == 'gemini') {
+          msg = 'AI read the file but found no bookings — fill in manually';
+        } else if (result.source.startsWith('gemini_error_')) {
+          final code = result.source.replaceFirst('gemini_error_', '');
+          msg = 'AI request failed (HTTP $code) — check API key or quota';
+        } else if (GeminiParser.isAvailable) {
+          msg = 'AI found no bookings; OCR also found none — fill in manually';
+        } else {
+          msg = 'No AI key configured — OCR found no booking patterns';
+        }
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(msg),
           behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 4),
+          duration: const Duration(seconds: 5),
         ));
         return;
       }
@@ -267,6 +276,20 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
 
   void _handleDiscard() {
     widget.onDone?.call();
+  }
+
+  /// Derives the file extension for [ItineraryScanner].
+  /// Prefers the [contentType] enum (reliable) over splitting the file path
+  /// (unreliable on Android — package-name dots pollute the result).
+  static String _extFromShare(String filePath, ShareContentType contentType) {
+    if (contentType == ShareContentType.pdfFile) return 'pdf';
+    // For images, pull just the filename part before splitting on '.'.
+    final filename = filePath.split('/').last;
+    final dotIdx = filename.lastIndexOf('.');
+    if (dotIdx >= 0 && dotIdx < filename.length - 1) {
+      return filename.substring(dotIdx + 1).toLowerCase();
+    }
+    return contentType == ShareContentType.screenshot ? 'png' : '';
   }
 
   static SpotCategory _spotCategory(String? raw) => switch (raw) {

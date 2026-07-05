@@ -7,14 +7,19 @@ import 'parse_counter.dart';
 
 abstract final class GeminiParser {
   static const _apiKey = String.fromEnvironment('GEMINI_API_KEY', defaultValue: '');
-  static const _model  = 'gemini-1.5-flash';
+  static const _model  = 'gemini-2.0-flash';
   static const _url    =
       'https://generativelanguage.googleapis.com/v1beta/models/$_model:generateContent';
 
   static bool get isAvailable => _apiKey.isNotEmpty;
 
+  /// Last HTTP status from the Gemini API (0 if never called).
+  static int lastHttpStatus = 0;
+  /// First 400 chars of the last Gemini response body, for debug display.
+  static String lastResponseSnippet = '';
+
   static const _prompt = '''
-You are a travel itinerary parser. Extract every booking visible in this image.
+You are a travel itinerary parser. Extract every booking from the provided document or image.
 
 Return a JSON array (no markdown, no explanation). Each element must have:
   "type"  : "flight" | "hotel" | "train" | "reservation"
@@ -55,6 +60,8 @@ If nothing is found return an empty array [].
       'generationConfig': {'responseMimeType': 'application/json'},
     });
 
+    // ignore: avoid_print
+    print('[Gemini] sending ${bytes.length} bytes as $mimeType');
     final response = await http
         .post(
           Uri.parse('$_url?key=$_apiKey'),
@@ -63,7 +70,15 @@ If nothing is found return an empty array [].
         )
         .timeout(const Duration(seconds: 30));
 
-    if (response.statusCode != 200) return [];
+    lastHttpStatus = response.statusCode;
+    lastResponseSnippet = response.body.substring(
+        0, response.body.length.clamp(0, 400));
+    // ignore: avoid_print
+    print('[Gemini] status=${response.statusCode} body=$lastResponseSnippet');
+
+    if (response.statusCode != 200) {
+      throw GeminiApiException(response.statusCode, lastResponseSnippet);
+    }
 
     await ParseCounter.increment();
 
@@ -117,6 +132,15 @@ If nothing is found return an empty array [].
         'png'           => 'image/png',
         'webp'          => 'image/webp',
         'heic'          => 'image/heic',
+        'pdf'           => 'application/pdf',
         _               => 'image/jpeg',
       };
+}
+
+class GeminiApiException implements Exception {
+  final int statusCode;
+  final String body;
+  const GeminiApiException(this.statusCode, this.body);
+  @override
+  String toString() => 'GeminiApiException($statusCode): $body';
 }

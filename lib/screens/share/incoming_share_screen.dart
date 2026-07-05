@@ -1,4 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../../core/ocr/itinerary_parser.dart';
+import '../../core/ocr/ocr_service.dart';
 import '../../core/platform/platform_file.dart';
 import '../../core/auth/profile_state.dart';
 import '../../core/supabase/doc_service.dart';
@@ -19,6 +22,7 @@ import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 import 'content_preview_card.dart';
 import 'destination_selector.dart';
+import 'parsed_itinerary_screen.dart';
 import 'share_form.dart';
 
 class IncomingShareScreen extends StatefulWidget {
@@ -41,9 +45,60 @@ class IncomingShareScreen extends StatefulWidget {
 
 class _IncomingShareScreenState extends State<IncomingShareScreen> {
   ShareDestination? _destination;
+  bool _scanning = false;
 
   void _selectDestination(ShareDestination dest) {
     setState(() => _destination = dest);
+  }
+
+  bool get _canParseItinerary =>
+      !kIsWeb &&
+      _destination == ShareDestination.travelItem &&
+      widget.share.filePath != null &&
+      (widget.share.contentType == ShareContentType.screenshot ||
+          widget.share.contentType == ShareContentType.pdfFile ||
+          widget.share.contentType == ShareContentType.receiptPhoto);
+
+  Future<void> _parseItinerary() async {
+    final filePath = widget.share.filePath;
+    if (filePath == null) return;
+    setState(() => _scanning = true);
+    try {
+      final text = await OcrService.extractText(filePath);
+      if (text == null || text.trim().isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('No text found in image'),
+          behavior: SnackBarBehavior.floating,
+        ));
+        return;
+      }
+      final flights = ItineraryParser.parse(text);
+      if (!mounted) return;
+      if (flights.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('No flight data detected — fill in manually'),
+          behavior: SnackBarBehavior.floating,
+        ));
+        return;
+      }
+      await Navigator.push<void>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ParsedItineraryScreen(
+            flights: flights,
+            tripId: widget.tripId,
+            userId: widget.userId,
+            onDone: () {
+              Navigator.pop(context); // close parsed screen
+              widget.onDone?.call();  // close share screen
+            },
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _scanning = false);
+    }
   }
 
   Future<void> _handleSave(ShareSaveData data) async {
@@ -170,7 +225,7 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
         }
 
       case ShareDestination.link:
-        final url = widget.share.rawContent ?? '';
+        final url = widget.share.rawContent;
         if (url.isEmpty) return;
         await LinksService.createLink(
           tripId:   tripId,
@@ -322,6 +377,13 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
                   const SizedBox(height: kSpace5),
                   const Divider(color: kColorBorder),
                   const SizedBox(height: kSpace4),
+                  if (_canParseItinerary) ...[
+                    _ParseItineraryBanner(
+                      scanning: _scanning,
+                      onTap: _parseItinerary,
+                    ),
+                    const SizedBox(height: kSpace4),
+                  ],
                   Text(
                     'Details',
                     style: kStyleCaptionMedium.copyWith(color: kColorInkSoft),
@@ -362,6 +424,13 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
             const SizedBox(height: kSpace5),
             Container(width: double.infinity, height: 1, color: kColorBorder),
             const SizedBox(height: kSpace4),
+            if (_canParseItinerary) ...[
+              _ParseItineraryBanner(
+                scanning: _scanning,
+                onTap: _parseItinerary,
+              ),
+              const SizedBox(height: kSpace4),
+            ],
             Text(
               'Details',
               style: kStyleCaptionMedium.copyWith(color: kColorInkSoft),
@@ -377,6 +446,80 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
             const SizedBox(height: kSpace12),
           ],
         ],
+      ),
+    );
+  }
+}
+
+// ─── Parse itinerary banner ────────────────────────────────────────────────────
+
+class _ParseItineraryBanner extends StatelessWidget {
+  const _ParseItineraryBanner({
+    required this.scanning,
+    required this.onTap,
+  });
+
+  final bool scanning;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: scanning ? null : onTap,
+      child: Container(
+        padding: const EdgeInsets.all(kSpace3),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE8EEF6),
+          borderRadius: kRadiusMd,
+          border: Border.all(color: const Color(0xFF4A7AB5).withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: const Color(0xFF4A7AB5).withValues(alpha: 0.15),
+                borderRadius: kRadiusSm,
+              ),
+              child: scanning
+                  ? const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Color(0xFF4A7AB5),
+                      ),
+                    )
+                  : const Icon(
+                      Icons.document_scanner_rounded,
+                      size: 18,
+                      color: Color(0xFF4A7AB5),
+                    ),
+            ),
+            const SizedBox(width: kSpace3),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    scanning ? 'Scanning…' : 'Parse itinerary automatically',
+                    style: kStyleBodyMedium.copyWith(
+                        color: const Color(0xFF4A7AB5)),
+                  ),
+                  Text(
+                    scanning
+                        ? 'Extracting flights from image'
+                        : 'Reads flight numbers, times, and routes from the image',
+                    style: kStyleCaption.copyWith(color: kColorInkSoft),
+                  ),
+                ],
+              ),
+            ),
+            if (!scanning)
+              const Icon(Icons.arrow_forward_ios_rounded,
+                  size: 14, color: Color(0xFF4A7AB5)),
+          ],
+        ),
       ),
     );
   }

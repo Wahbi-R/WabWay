@@ -11,7 +11,9 @@ abstract final class AuthService {
       await supabase.auth.signInWithOtp(
         email: trimmed,
         shouldCreateUser: true,
-        emailRedirectTo: 'https://wabway.wabble.ca/',
+        emailRedirectTo: kIsWeb
+            ? 'https://wabway.wabble.ca/'
+            : 'com.example.wabway://login-callback',
       );
       AppLogger.instance.log('sendMagicLink ✓ (OTP queued)', tag: 'AUTH');
     } catch (e) {

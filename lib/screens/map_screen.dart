@@ -1,3 +1,4 @@
+import 'dart:math' show min, max;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -30,6 +31,7 @@ class _MapScreenState extends State<MapScreen> {
   RealtimeChannel? _realtimeChannel;
 
   final _mapController = MapController();
+  bool _needsFit = true;   // fit-to-bounds on first successful load only
 
   @override
   void didChangeDependencies() {
@@ -77,10 +79,42 @@ class _MapScreenState extends State<MapScreen> {
     setState(() { _loading = true; _error = false; });
     try {
       final spots = await SpotService.loadSpots(tripId);
-      if (mounted) setState(() { _spots = spots; _loading = false; });
+      if (!mounted) return;
+      setState(() { _spots = spots; _loading = false; });
+      _fitIfNeeded();
     } catch (_) {
       if (mounted) setState(() { _loading = false; _error = true; });
     }
+  }
+
+  void _fitIfNeeded() {
+    if (!_needsFit) return;
+    final mapped = _mappedSpots;
+    if (mapped.isEmpty) return;
+    _needsFit = false;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (mapped.length == 1) {
+        _mapController.move(
+            LatLng(mapped.first.latitude!, mapped.first.longitude!), 14);
+      } else {
+        _mapController.fitCamera(
+          CameraFit.bounds(
+            bounds: _spotBounds(mapped),
+            padding: const EdgeInsets.all(56),
+          ),
+        );
+      }
+    });
+  }
+
+  LatLngBounds _spotBounds(List<Spot> spots) {
+    final lats = spots.map((s) => s.latitude!);
+    final lngs = spots.map((s) => s.longitude!);
+    return LatLngBounds(
+      LatLng(lats.reduce(min), lngs.reduce(min)),
+      LatLng(lats.reduce(max), lngs.reduce(max)),
+    );
   }
 
   List<Spot> get _mappedSpots =>
@@ -222,10 +256,13 @@ class _MapScreenState extends State<MapScreen> {
           ),
           children: [
             TileLayer(
-              urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+              // Carto Voyager — English/Latin labels worldwide
+              urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
               subdomains: const ['a', 'b', 'c', 'd'],
               userAgentPackageName: 'com.example.wabway',
-              maxZoom: 19,
+              maxNativeZoom: 19,
+              maxZoom: 22,
+              additionalOptions: const {'lang': 'en'},
             ),
             MarkerLayer(
               markers: mapped.map((spot) {

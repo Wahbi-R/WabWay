@@ -1,9 +1,12 @@
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/ocr/itinerary_parser.dart';
+import '../../core/ocr/ocr_service.dart';
 import '../../core/supabase/client.dart';
 import '../../core/supabase/doc_service.dart';
 import '../../core/supabase/money_service.dart';
@@ -20,6 +23,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
+import '../share/parsed_itinerary_screen.dart';
 
 // ─── Entry point ──────────────────────────────────────────────────────────────
 
@@ -143,6 +147,10 @@ class _ImportContentState extends State<_ImportContent> {
   final _currencyCtrl = TextEditingController(text: 'USD');
   ReceiptCategory _receiptCat = ReceiptCategory.other;
 
+  // ── OCR / itinerary parsing ───────────────────────────────────────────────
+  bool               _ocrLoading = false;
+  List<ParsedFlight> _ocrFlights = [];
+
   // ── Submit ────────────────────────────────────────────────────────────────
   bool    _submitting = false;
   String? _error;
@@ -205,11 +213,56 @@ class _ImportContentState extends State<_ImportContent> {
       _fileExt      = ext;
       _fileSizeKb   = sizeKb;
       _sourceIsLink = false;
+      _ocrFlights   = [];
       if (_titleCtrl.text.isEmpty) _titleCtrl.text = nameWithoutExt;
-      // Auto-pick doc type from extension
       _docType = _docTypeFromExt(ext);
       _onDetailsStep = true;
     });
+
+    // Auto-run OCR on images (not web, not PDF for now)
+    if (!kIsWeb && _isImageExt(ext)) {
+      _runOcr(bytes, ext ?? 'jpg');
+    }
+  }
+
+  static bool _isImageExt(String? ext) {
+    const imageExts = {'jpg', 'jpeg', 'png', 'webp', 'heic', 'bmp'};
+    return imageExts.contains(ext?.toLowerCase());
+  }
+
+  Future<void> _runOcr(Uint8List bytes, String ext) async {
+    setState(() => _ocrLoading = true);
+    try {
+      final text = await OcrService.extractTextFromBytes(bytes, ext);
+      if (!mounted) return;
+      final flights = text != null ? ItineraryParser.parse(text) : <ParsedFlight>[];
+      setState(() { _ocrFlights = flights; _ocrLoading = false; });
+
+      // Auto-switch destination to Travel when flights detected
+      if (flights.isNotEmpty && _dest != _Dest.travel) {
+        setState(() => _dest = _Dest.travel);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _ocrLoading = false);
+    }
+  }
+
+  Future<void> _openParsedItinerary() async {
+    final flights = _ocrFlights;
+    if (flights.isEmpty) return;
+    await Navigator.of(context, rootNavigator: true).push<void>(
+      MaterialPageRoute(
+        builder: (_) => ParsedItineraryScreen(
+          flights: flights,
+          tripId:  widget.tripId,
+          userId:  widget.userId,
+          onDone:  () {
+            Navigator.pop(context); // close parsed screen
+            Navigator.pop(context); // close import sheet
+          },
+        ),
+      ),
+    );
   }
 
   void _applyLinkSource() {
@@ -603,7 +656,19 @@ class _ImportContentState extends State<_ImportContent> {
           fileSizeKb: _fileSizeKb,
           link:       _sourceIsLink ? _linkCtrl.text.trim() : null,
         ),
-        const SizedBox(height: kSpace5),
+        const SizedBox(height: kSpace3),
+
+        // OCR itinerary banner
+        if (_ocrLoading)
+          _OcrBanner(loading: true, flightCount: 0, onTap: null)
+        else if (_ocrFlights.isNotEmpty)
+          _OcrBanner(
+            loading:     false,
+            flightCount: _ocrFlights.length,
+            onTap:       _openParsedItinerary,
+          ),
+        if (_ocrLoading || _ocrFlights.isNotEmpty)
+          const SizedBox(height: kSpace4),
 
         // Destination type
         Text('Save as', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
@@ -961,6 +1026,77 @@ class _SourcePreview extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── OCR banner ───────────────────────────────────────────────────────────────
+
+class _OcrBanner extends StatelessWidget {
+  const _OcrBanner({
+    required this.loading,
+    required this.flightCount,
+    required this.onTap,
+  });
+
+  final bool loading;
+  final int  flightCount;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    const blue     = Color(0xFF4A7AB5);
+    const blueSoft = Color(0xFFE8EEF6);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(kSpace3),
+        decoration: BoxDecoration(
+          color:  blueSoft,
+          borderRadius: kRadiusMd,
+          border: Border.all(color: blue.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36, height: 36,
+              decoration: BoxDecoration(
+                color: blue.withValues(alpha: 0.15),
+                borderRadius: kRadiusSm,
+              ),
+              child: loading
+                  ? const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: CircularProgressIndicator(strokeWidth: 2, color: blue),
+                    )
+                  : const Icon(Icons.document_scanner_rounded, size: 18, color: blue),
+            ),
+            const SizedBox(width: kSpace3),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    loading
+                        ? 'Scanning for flights…'
+                        : '$flightCount flight leg${flightCount == 1 ? '' : 's'} detected',
+                    style: kStyleBodyMedium.copyWith(color: blue),
+                  ),
+                  Text(
+                    loading
+                        ? 'Reading text from image'
+                        : 'Tap to review and save to Travel',
+                    style: kStyleCaption.copyWith(color: kColorInkSoft),
+                  ),
+                ],
+              ),
+            ),
+            if (!loading)
+              const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: blue),
+          ],
+        ),
       ),
     );
   }

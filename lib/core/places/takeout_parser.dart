@@ -84,6 +84,16 @@ abstract final class TakeoutParser {
             city:     h.city,
             mapsUrl:  url.isNotEmpty ? url : null,
           ));
+        } else {
+          // Geocoding failed — still include the place with the Maps URL
+          // so it's not silently dropped. lat/lon left as 0 (handled in save).
+          places.add(MapsPlace(
+            name:    title,
+            lat:     0,
+            lon:     0,
+            mapsUrl: url.isNotEmpty ? url : null,
+            category: SpotCategory.landmark,
+          ));
         }
       }
       return places.isEmpty ? null : places;

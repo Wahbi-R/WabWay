@@ -145,8 +145,8 @@ class _MapsImportScreenState extends State<MapsImportScreen> {
           addedBy:     widget.userId,
           mapsUrl:     p.mapsUrl ?? widget.result.finalUrl,
           address:     p.address,
-          latitude:    p.lat,
-          longitude:   p.lon,
+          latitude:    (p.lat != 0 || p.lon != 0) ? p.lat : null,
+          longitude:   (p.lat != 0 || p.lon != 0) ? p.lon : null,
           placeSource: _listName,
           imageUrl:    imageUrl,
         );

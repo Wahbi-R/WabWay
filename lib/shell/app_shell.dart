@@ -15,6 +15,7 @@ import '../screens/members_screen.dart';
 import '../screens/travel_screen.dart';
 import '../screens/map_screen.dart';
 import '../screens/links_screen.dart';
+import '../screens/accommodations/accommodations_screen.dart';
 import '../screens/placeholder_screen.dart';
 import '../screens/trips/trip_switcher_sheet.dart';
 import '../core/trip/trip_state.dart';
@@ -123,6 +124,13 @@ const _desktopDestinations = [
     builder: _buildTravel,
   ),
   _NavDest(
+    key: 'stays',
+    label: 'Stays',
+    icon: Icons.hotel_outlined,
+    selectedIcon: Icons.hotel_rounded,
+    builder: _buildStays,
+  ),
+  _NavDest(
     key: 'money',
     label: 'Money',
     icon: Icons.account_balance_wallet_outlined,
@@ -160,6 +168,7 @@ Widget _buildLinks(BuildContext _)   => const LinksScreen();
 Widget _buildMap(BuildContext _)     => const MapScreen();
 Widget _buildPlan(BuildContext _)    => const PlanScreen();
 Widget _buildTravel(BuildContext _)  => const TravelScreen();
+Widget _buildStays(BuildContext _)   => const AccommodationsScreen();
 Widget _buildMoney(BuildContext _)   => const MoneyScreen();
 Widget _buildDocs(BuildContext _)    => const DocsScreen();
 Widget _buildMembers(BuildContext _) => const MembersScreen();

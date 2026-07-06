@@ -11,7 +11,8 @@ enum ShareContentType {
   blogArticle,
   pdfFile,
   receiptPhoto,
-  screenshot;
+  screenshot,
+  accommodationLink;
 
   String get label => switch (this) {
         ShareContentType.googleMapsLink => 'Google Maps link',
@@ -22,7 +23,8 @@ enum ShareContentType {
         ShareContentType.blogArticle => 'Article or blog',
         ShareContentType.pdfFile => 'PDF file',
         ShareContentType.receiptPhoto => 'Receipt photo',
-        ShareContentType.screenshot => 'Screenshot',
+        ShareContentType.screenshot        => 'Screenshot',
+        ShareContentType.accommodationLink => 'Accommodation listing',
       };
 
   String get sourceName => switch (this) {
@@ -34,7 +36,8 @@ enum ShareContentType {
         ShareContentType.blogArticle => 'Web',
         ShareContentType.pdfFile => 'Files',
         ShareContentType.receiptPhoto => 'Photos',
-        ShareContentType.screenshot => 'Photos',
+        ShareContentType.screenshot        => 'Photos',
+        ShareContentType.accommodationLink => 'Web',
       };
 
   IconData get icon => switch (this) {
@@ -46,7 +49,8 @@ enum ShareContentType {
         ShareContentType.blogArticle => Icons.article_rounded,
         ShareContentType.pdfFile => Icons.picture_as_pdf_rounded,
         ShareContentType.receiptPhoto => Icons.receipt_long_rounded,
-        ShareContentType.screenshot => Icons.screenshot_monitor_rounded,
+        ShareContentType.screenshot        => Icons.screenshot_monitor_rounded,
+        ShareContentType.accommodationLink => Icons.hotel_rounded,
       };
 
   Color get color => switch (this) {
@@ -58,7 +62,8 @@ enum ShareContentType {
         ShareContentType.blogArticle => const Color(0xFF4A9B8A),
         ShareContentType.pdfFile => const Color(0xFFB94A48),
         ShareContentType.receiptPhoto => const Color(0xFF7D9A75),
-        ShareContentType.screenshot => const Color(0xFF6F665D),
+        ShareContentType.screenshot        => const Color(0xFF6F665D),
+        ShareContentType.accommodationLink => const Color(0xFF4A9B8A),
       };
 
   Color get softColor => switch (this) {
@@ -70,7 +75,8 @@ enum ShareContentType {
         ShareContentType.blogArticle => const Color(0xFFE8F3F1),
         ShareContentType.pdfFile => const Color(0xFFF5E8E8),
         ShareContentType.receiptPhoto => const Color(0xFFEEF4EC),
-        ShareContentType.screenshot => const Color(0xFFEEEAE3),
+        ShareContentType.screenshot        => const Color(0xFFEEEAE3),
+        ShareContentType.accommodationLink => const Color(0xFFE8F3F1),
       };
 
   List<ShareDestination> get suggestedDestinations => switch (this) {
@@ -97,7 +103,8 @@ enum ShareContentType {
             ShareDestination.receipt,
             ShareDestination.document
           ],
-        ShareContentType.screenshot => [ShareDestination.document],
+        ShareContentType.screenshot        => [ShareDestination.document],
+        ShareContentType.accommodationLink => [ShareDestination.travelItem],
       };
 }
 
@@ -188,6 +195,15 @@ ShareContentType detectContentType(String rawContent) {
       lower.contains('goo.gl/maps') ||
       lower.contains('maps.app.goo.gl')) {
     return ShareContentType.googleMapsLink;
+  }
+  if (lower.contains('airbnb.com') ||
+      lower.contains('booking.com') ||
+      lower.contains('expedia.com') ||
+      lower.contains('vrbo.com') ||
+      lower.contains('hotels.com') ||
+      lower.contains('avion.com') ||
+      lower.contains('avion.travel')) {
+    return ShareContentType.accommodationLink;
   }
   if (lower.contains('instagram.com')) return ShareContentType.instagramLink;
   if (lower.contains('tiktok.com') || lower.contains('vm.tiktok.com')) {

@@ -5,8 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/ocr/gemini_parser.dart';
 import '../../core/ocr/itinerary_scanner.dart';
-import '../../core/ocr/parsed_booking.dart';
 import '../../core/supabase/client.dart';
 import '../../core/supabase/doc_service.dart';
 import '../../core/supabase/money_service.dart';
@@ -148,9 +148,10 @@ class _ImportContentState extends State<_ImportContent> {
   ReceiptCategory _receiptCat = ReceiptCategory.other;
 
   // ── OCR / itinerary parsing ───────────────────────────────────────────────
-  bool                _ocrLoading  = false;
-  List<ParsedBooking> _ocrBookings = [];
-  String              _ocrSource   = '';
+  bool _scanningAi  = false;
+  bool _scanningOcr = false;
+
+  bool get _anyScan => _scanningAi || _scanningOcr;
 
   // ── Submit ────────────────────────────────────────────────────────────────
   bool    _submitting = false;
@@ -214,17 +215,11 @@ class _ImportContentState extends State<_ImportContent> {
       _fileExt      = ext;
       _fileSizeKb   = sizeKb;
       _sourceIsLink = false;
-      _ocrBookings  = [];
-      _ocrSource    = '';
       if (_titleCtrl.text.isEmpty) _titleCtrl.text = nameWithoutExt;
       _docType = _docTypeFromExt(ext);
       _onDetailsStep = true;
     });
 
-    // Auto-run scanner on images and PDFs (PDFs go to Gemini only; ML Kit can't read them)
-    if (!kIsWeb && _isScannable(ext)) {
-      _runOcr(bytes, ext ?? 'jpg');
-    }
   }
 
   static bool _isScannable(String? ext) {
@@ -232,33 +227,67 @@ class _ImportContentState extends State<_ImportContent> {
     return exts.contains(ext?.toLowerCase());
   }
 
-  Future<void> _runOcr(Uint8List bytes, String ext) async {
-    setState(() => _ocrLoading = true);
+  Future<void> _parseWithAi() async {
+    final bytes = _fileBytes;
+    final ext   = _fileExt ?? 'jpg';
+    if (bytes == null || _anyScan) return;
+    setState(() => _scanningAi = true);
     try {
-      final result = await ItineraryScanner.scan(bytes, ext);
+      final result = await ItineraryScanner.scanWithAi(bytes, ext);
       if (!mounted) return;
-      setState(() {
-        _ocrBookings = result.bookings;
-        _ocrSource   = result.source;
-        _ocrLoading  = false;
-      });
-      if (result.bookings.isNotEmpty && _dest != _Dest.travel) {
-        setState(() => _dest = _Dest.travel);
+      if (result.bookings.isEmpty) {
+        final aiStatus = GeminiParser.lastHttpStatus;
+        final msg = switch (aiStatus) {
+          429  => 'AI quota exceeded — try "Read text / PDF" instead',
+          0    => 'No AI key configured',
+          200  => 'AI read the file but found no bookings — try OCR',
+          _    => 'AI failed (HTTP $aiStatus) — try OCR instead',
+        };
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(msg),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 5),
+        ));
+        return;
       }
-    } catch (_) {
-      if (mounted) setState(() => _ocrLoading = false);
+      await _pushResults(result);
+    } finally {
+      if (mounted) setState(() => _scanningAi = false);
     }
   }
 
-  Future<void> _openParsedItinerary() async {
-    final bookings = _ocrBookings;
-    if (bookings.isEmpty) return;
+  Future<void> _parseWithOcr() async {
+    final bytes = _fileBytes;
+    final ext   = _fileExt ?? 'jpg';
+    if (bytes == null || _anyScan) return;
+    setState(() => _scanningOcr = true);
+    try {
+      final result = await ItineraryScanner.scanWithOcr(bytes, ext);
+      if (!mounted) return;
+      if (result.bookings.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('No booking patterns found — fill in manually'),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 4),
+        ));
+        return;
+      }
+      await _pushResults(result);
+    } finally {
+      if (mounted) setState(() => _scanningOcr = false);
+    }
+  }
+
+  Future<void> _pushResults(ScanResult result) async {
     await Navigator.of(context, rootNavigator: true).push<void>(
       MaterialPageRoute(
         builder: (_) => ParsedItineraryScreen(
-          bookings: bookings,
-          tripId:   widget.tripId,
-          userId:   widget.userId,
+          bookings:       result.bookings,
+          tripId:         widget.tripId,
+          userId:         widget.userId,
+          sourceBytes:    _fileBytes,
+          sourceExt:      _fileExt,
+          sourceFileName: _fileName,
           onDone:   () {
             Navigator.pop(context);
             Navigator.pop(context);
@@ -661,18 +690,28 @@ class _ImportContentState extends State<_ImportContent> {
         ),
         const SizedBox(height: kSpace3),
 
-        // OCR itinerary banner
-        if (_ocrLoading)
-          _OcrBanner(loading: true, bookingCount: 0, source: '', onTap: null)
-        else if (_ocrBookings.isNotEmpty)
+        // Itinerary parse buttons (only for scannable files)
+        if (!kIsWeb && _isScannable(_fileExt)) ...[
+          if (GeminiParser.isAvailable)
+            _OcrBanner(
+              icon:     Icons.auto_awesome_rounded,
+              label:    'Parse with AI',
+              subtitle: 'Reads flights, hotels & trains via Gemini',
+              loading:  _scanningAi,
+              disabled: _anyScan,
+              onTap:    _parseWithAi,
+            ),
+          if (GeminiParser.isAvailable) const SizedBox(height: kSpace2),
           _OcrBanner(
-            loading:      false,
-            bookingCount: _ocrBookings.length,
-            source:       _ocrSource,
-            onTap:        _openParsedItinerary,
+            icon:     Icons.document_scanner_rounded,
+            label:    'Read text / PDF',
+            subtitle: 'On-device OCR · no AI required',
+            loading:  _scanningOcr,
+            disabled: _anyScan,
+            onTap:    _parseWithOcr,
           ),
-        if (_ocrLoading || _ocrBookings.isNotEmpty)
           const SizedBox(height: kSpace4),
+        ],
 
         // Destination type
         Text('Save as', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
@@ -1039,78 +1078,70 @@ class _SourcePreview extends StatelessWidget {
 
 class _OcrBanner extends StatelessWidget {
   const _OcrBanner({
+    required this.icon,
+    required this.label,
+    required this.subtitle,
     required this.loading,
-    required this.bookingCount,
-    required this.source,
+    required this.disabled,
     required this.onTap,
   });
 
-  final bool loading;
-  final int  bookingCount;
-  final String source;
-  final VoidCallback? onTap;
+  final IconData     icon;
+  final String       label;
+  final String       subtitle;
+  final bool         loading;
+  final bool         disabled;
+  final VoidCallback onTap;
+
+  static const _blue = Color(0xFF4A7AB5);
 
   @override
   Widget build(BuildContext context) {
-    const blue     = Color(0xFF4A7AB5);
-    const blueSoft = Color(0xFFE8EEF6);
-    final isAi = source == 'gemini';
-
     return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(kSpace3),
-        decoration: BoxDecoration(
-          color:  blueSoft,
-          borderRadius: kRadiusMd,
-          border: Border.all(color: blue.withValues(alpha: 0.3)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 36, height: 36,
-              decoration: BoxDecoration(
-                color: blue.withValues(alpha: 0.15),
-                borderRadius: kRadiusSm,
+      onTap: disabled ? null : onTap,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 150),
+        opacity: disabled && !loading ? 0.45 : 1.0,
+        child: Container(
+          padding: const EdgeInsets.all(kSpace3),
+          decoration: BoxDecoration(
+            color: const Color(0xFFE8EEF6),
+            borderRadius: kRadiusMd,
+            border: Border.all(color: _blue.withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 36, height: 36,
+                decoration: BoxDecoration(
+                  color: _blue.withValues(alpha: 0.15),
+                  borderRadius: kRadiusSm,
+                ),
+                child: loading
+                    ? const Padding(
+                        padding: EdgeInsets.all(8),
+                        child: CircularProgressIndicator(strokeWidth: 2, color: _blue),
+                      )
+                    : Icon(icon, size: 18, color: _blue),
               ),
-              child: loading
-                  ? const Padding(
-                      padding: EdgeInsets.all(8),
-                      child: CircularProgressIndicator(strokeWidth: 2, color: blue),
-                    )
-                  : Icon(
-                      isAi
-                          ? Icons.auto_awesome_rounded
-                          : Icons.document_scanner_rounded,
-                      size: 18,
-                      color: blue,
+              const SizedBox(width: kSpace3),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      loading ? 'Scanning…' : label,
+                      style: kStyleBodyMedium.copyWith(color: _blue),
                     ),
-            ),
-            const SizedBox(width: kSpace3),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    loading
-                        ? 'Scanning for bookings…'
-                        : '$bookingCount booking${bookingCount == 1 ? '' : 's'} detected',
-                    style: kStyleBodyMedium.copyWith(color: blue),
-                  ),
-                  Text(
-                    loading
-                        ? 'Trying AI parser, then on-device OCR'
-                        : isAi
-                            ? 'AI-parsed · tap to review and save to Travel'
-                            : 'On-device OCR · tap to review and save to Travel',
-                    style: kStyleCaption.copyWith(color: kColorInkSoft),
-                  ),
-                ],
+                    Text(subtitle,
+                        style: kStyleCaption.copyWith(color: kColorInkSoft)),
+                  ],
+                ),
               ),
-            ),
-            if (!loading)
-              const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: blue),
-          ],
+              if (!loading)
+                const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: _blue),
+            ],
+          ),
         ),
       ),
     );

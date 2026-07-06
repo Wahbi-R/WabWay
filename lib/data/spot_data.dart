@@ -195,6 +195,7 @@ class Spot {
     this.latitude,
     this.longitude,
     this.placeSource,
+    this.imageUrl,
     this.votes = const SpotVotes(),
     this.comments = const [],
     required this.addedById,
@@ -213,6 +214,9 @@ class Spot {
   final double? latitude;
   final double? longitude;
   final String? placeSource;
+  /// Wikipedia (or other) thumbnail URL. Stored as a URL string only —
+  /// images are loaded lazily over the network and never saved locally.
+  final String? imageUrl;
   final SpotVotes votes;
   final List<SpotComment> comments;
   final String addedById;
@@ -229,6 +233,7 @@ class Spot {
     double? longitude,
     String? address,
     String? placeSource,
+    String? imageUrl,
   }) => Spot(
         id:          id,
         name:        name,
@@ -243,6 +248,7 @@ class Spot {
         latitude:    latitude ?? this.latitude,
         longitude:   longitude ?? this.longitude,
         placeSource: placeSource ?? this.placeSource,
+        imageUrl:    imageUrl ?? this.imageUrl,
         votes:       votes ?? this.votes,
         comments:    comments ?? this.comments,
         addedById:   addedById,

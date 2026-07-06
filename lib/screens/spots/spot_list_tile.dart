@@ -31,7 +31,7 @@ class SpotListTile extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _PhotoSlot(category: spot.category),
+            _PhotoSlot(category: spot.category, imageUrl: spot.imageUrl),
             const SizedBox(width: kSpace4),
             Expanded(
               child: Column(
@@ -102,28 +102,46 @@ class SpotListTile extends StatelessWidget {
 }
 
 class _PhotoSlot extends StatelessWidget {
-  const _PhotoSlot({required this.category});
+  const _PhotoSlot({required this.category, this.imageUrl});
   final SpotCategory category;
+  final String?      imageUrl;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 76,
-      height: 76,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [kColorPrimarySoft, kColorAccentSoft],
+    return ClipRRect(
+      borderRadius: kRadiusMd,
+      child: Container(
+        width: 76,
+        height: 76,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [kColorPrimarySoft, kColorAccentSoft],
+          ),
+          border: Border.all(color: kColorBorder),
         ),
-        borderRadius: kRadiusMd,
-        border: Border.all(color: kColorBorder),
-      ),
-      child: Icon(
-        category.icon,
-        size: 28,
-        color: kColorPrimaryDark.withValues(alpha: 0.35),
+        child: imageUrl != null
+            ? Image.network(
+                imageUrl!,
+                fit: BoxFit.cover,
+                width: 76,
+                height: 76,
+                cacheWidth: 152, // 2× for density, kept small in memory
+                errorBuilder: (_, __, ___) => _icon,
+                loadingBuilder: (_, child, progress) =>
+                    progress == null ? child : _icon,
+              )
+            : _icon,
       ),
     );
   }
+
+  Widget get _icon => Center(
+        child: Icon(
+          category.icon,
+          size: 28,
+          color: kColorPrimaryDark.withValues(alpha: 0.35),
+        ),
+      );
 }

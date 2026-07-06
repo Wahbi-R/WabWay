@@ -107,6 +107,7 @@ abstract final class SpotService {
       latitude:    (row['latitude'] as num?)?.toDouble(),
       longitude:   (row['longitude'] as num?)?.toDouble(),
       placeSource: row['place_source'] as String?,
+      imageUrl:    row['image_url'] as String?,
       addedById:   row['added_by'] as String,
       votes:       SpotVotes(mustDo: mustDo, want: want, maybe: maybe, skip: skip),
       comments:    comments,
@@ -156,6 +157,7 @@ abstract final class SpotService {
     double? latitude,
     double? longitude,
     String? placeSource,
+    String? imageUrl,
   }) async {
     final inserted = await supabase.from('spots').insert({
       'trip_id':  tripId,
@@ -172,6 +174,7 @@ abstract final class SpotService {
       if (latitude    != null)                                  'latitude':     latitude,
       if (longitude   != null)                                  'longitude':    longitude,
       if (placeSource != null && placeSource.trim().isNotEmpty) 'place_source': placeSource.trim(),
+      if (imageUrl    != null && imageUrl.trim().isNotEmpty)    'image_url':    imageUrl.trim(),
     }).select('*, spot_votes(*), spot_comments(*)').single();
     return _spotFromRow(inserted);
   }

@@ -24,6 +24,8 @@ dependencies:
   share_plus: ^10.0.0
   shared_preferences: ^2.3.0
   google_mlkit_text_recognition: ^0.13.0
+  syncfusion_flutter_pdf: ^27.1.48
+  webview_flutter: ^4.10.0
 
 dev_dependencies:
   flutter_test:
@@ -37,7 +39,12 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: false
-  image_path: "assets/icon/wabway_icon.png"
+  image_path: "assets/icon/wabway_app_icon_1024.png"
   adaptive_icon_background: "#F8F3EA"
-  adaptive_icon_foreground: "assets/icon/wabway_icon.png"
+  adaptive_icon_foreground: "assets/icon/wabway_adaptive_foreground_432.png"
   min_sdk_android: 23
+  web:
+    generate: true
+    image_path: "assets/icon/wabway_app_icon_1024.png"
+    background_color: "#F8F3EA"
+    theme_color: "#C96F4A"

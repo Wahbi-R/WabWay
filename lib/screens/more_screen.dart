@@ -9,6 +9,7 @@ import '../theme/app_text_theme.dart';
 import '../theme/app_decorations.dart';
 import '../widgets/wabway_button.dart';
 import '../widgets/wabway_text_field.dart';
+import 'accommodations/accommodations_screen.dart';
 import 'docs_screen.dart';
 import 'map_screen.dart';
 import 'travel_screen.dart';
@@ -285,6 +286,29 @@ class MoreScreen extends StatelessWidget {
                               trip: trip,
                               members: members,
                               child: const LinksScreen(),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
+                  _SettingsRow(
+                    icon: Icons.hotel_rounded,
+                    label: 'Stays',
+                    onTap: () {
+                      final trip = TripState.tripOf(context);
+                      final members = TripState.membersOf(context);
+                      final profile = ProfileState.of(context);
+                      Navigator.push<void>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ProfileState(
+                            profile: profile,
+                            child: TripState(
+                              trip: trip,
+                              members: members,
+                              child: const AccommodationsScreen(),
                             ),
                           ),
                         ),

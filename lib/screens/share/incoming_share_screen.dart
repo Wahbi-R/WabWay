@@ -1,7 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../core/ocr/gemini_parser.dart';
+import '../../core/places/google_maps_parser.dart';
+import '../../core/places/listing_parser.dart';
+import '../../screens/accommodations/add_accommodation_sheet.dart';
 import '../../core/ocr/itinerary_scanner.dart';
+import '../../core/places/social_place_extractor.dart';
 import '../../core/platform/platform_file.dart';
 import '../../core/auth/profile_state.dart';
 import '../../core/supabase/doc_service.dart';
@@ -22,6 +26,8 @@ import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 import 'content_preview_card.dart';
 import 'destination_selector.dart';
+import 'extracted_spots_screen.dart';
+import 'maps_import_screen.dart';
 import 'parsed_itinerary_screen.dart';
 import 'share_form.dart';
 
@@ -45,7 +51,14 @@ class IncomingShareScreen extends StatefulWidget {
 
 class _IncomingShareScreenState extends State<IncomingShareScreen> {
   ShareDestination? _destination;
-  bool _scanning = false;
+  bool _scanningAi     = false;
+  bool _scanningOcr    = false;
+  bool _scanningPlaces = false;
+  bool _scanningStay   = false;
+  bool _scanningMaps   = false;
+
+  bool get _anyScan =>
+      _scanningAi || _scanningOcr || _scanningPlaces || _scanningStay || _scanningMaps;
 
   void _selectDestination(ShareDestination dest) {
     setState(() => _destination = dest);
@@ -59,46 +72,76 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
           widget.share.contentType == ShareContentType.pdfFile ||
           widget.share.contentType == ShareContentType.receiptPhoto);
 
-  Future<void> _parseItinerary() async {
-    final filePath = widget.share.filePath;
-    if (filePath == null) return;
-    setState(() => _scanning = true);
+  bool get _canFindPlaces =>
+      widget.share.contentType == ShareContentType.tiktokLink ||
+      widget.share.contentType == ShareContentType.instagramLink;
+
+  bool get _canImportMaps =>
+      widget.share.contentType == ShareContentType.googleMapsLink;
+
+  bool get _canSaveAsStay =>
+      widget.share.contentType == ShareContentType.accommodationLink;
+
+  Future<void> _saveAsStay() async {
+    if (_anyScan) return;
+    setState(() => _scanningStay = true);
     try {
-      final bytes  = await readFileAsBytes(filePath);
-      // Use contentType as authoritative source; filename-based ext is
-      // unreliable on Android because shared file paths include package-name
-      // dots (e.g. com.google.android.gm/cache/OJLNKI).
-      final ext = _extFromShare(filePath, widget.share.contentType);
-      final result = await ItineraryScanner.scan(bytes, ext);
+      final url    = widget.share.rawContent;
+      final result = await ListingParser.parse(url);
       if (!mounted) return;
-      if (result.bookings.isEmpty) {
-        final String msg;
-        final aiStatus = GeminiParser.lastHttpStatus;
-        if (result.source == 'gemini') {
-          msg = 'AI read the file but found no bookings — fill in manually';
-        } else if (GeminiParser.isAvailable && aiStatus != 0 && aiStatus != 200) {
-          msg = aiStatus == 429
-              ? 'AI quota exceeded (HTTP 429); OCR also found none — fix API key billing'
-              : 'AI failed (HTTP $aiStatus); OCR found no bookings — fill in manually';
-        } else if (GeminiParser.isAvailable) {
-          msg = 'AI found no bookings; OCR also found none — fill in manually';
-        } else {
-          msg = 'No AI key configured — OCR found no booking patterns';
-        }
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(msg),
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => AddAccommodationSheet(
+          tripId:     widget.tripId,
+          userId:     widget.userId,
+          prefilled:  result,
+          initialUrl: url,
+        ),
+      );
+      if (mounted) widget.onDone?.call();
+    } finally {
+      if (mounted) setState(() => _scanningStay = false);
+    }
+  }
+
+  Future<void> _findPlaces() async {
+    if (_anyScan) return;
+    setState(() => _scanningPlaces = true);
+    try {
+      final result = await SocialPlaceExtractor.extract(widget.share.rawContent);
+      if (!mounted) return;
+      if (result == null) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Could not load the post — it may be private'),
           behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 5),
+          duration: Duration(seconds: 4),
+        ));
+        return;
+      }
+      if (result.places.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+            result.caption.isEmpty
+                ? 'No caption found in this post'
+                : 'No recognisable places found in caption',
+          ),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 4),
         ));
         return;
       }
       await Navigator.push<void>(
         context,
         MaterialPageRoute(
-          builder: (_) => ParsedItineraryScreen(
-            bookings: result.bookings,
-            tripId:   widget.tripId,
-            userId:   widget.userId,
+          builder: (_) => ExtractedSpotsScreen(
+            places:    result.places,
+            caption:   result.caption,
+            sourceUrl: widget.share.rawContent,
+            tripId:    widget.tripId,
+            userId:    widget.userId,
             onDone: () {
               Navigator.pop(context);
               widget.onDone?.call();
@@ -107,8 +150,120 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
         ),
       );
     } finally {
-      if (mounted) setState(() => _scanning = false);
+      if (mounted) setState(() => _scanningPlaces = false);
     }
+  }
+
+  Future<void> _importFromMaps() async {
+    if (_anyScan) return;
+    setState(() => _scanningMaps = true);
+    try {
+      final result = await GoogleMapsParser.parse(widget.share.rawContent);
+      if (!mounted) return;
+      if (result == null) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Could not reach Google Maps — check your connection'),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 4),
+        ));
+        return;
+      }
+      await Navigator.push<void>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MapsImportScreen(
+            result: result,
+            tripId: widget.tripId,
+            userId: widget.userId,
+            onDone: () {
+              Navigator.pop(context);
+              widget.onDone?.call();
+            },
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _scanningMaps = false);
+    }
+  }
+
+  Future<void> _parseWithAi() async {
+    final filePath = widget.share.filePath;
+    if (filePath == null || _anyScan) return;
+    setState(() => _scanningAi = true);
+    try {
+      final bytes  = await readFileAsBytes(filePath);
+      final ext    = _extFromShare(filePath, widget.share.contentType);
+      final result = await ItineraryScanner.scanWithAi(bytes, ext);
+      if (!mounted) return;
+      if (result.bookings.isEmpty) {
+        final aiStatus = GeminiParser.lastHttpStatus;
+        final msg = switch (aiStatus) {
+          429  => 'AI quota exceeded — try OCR instead',
+          0    => 'No AI key configured',
+          200  => 'AI read the file but found no bookings — try OCR',
+          _    => 'AI failed (HTTP $aiStatus) — try OCR instead',
+        };
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(msg),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 5),
+        ));
+        return;
+      }
+      await _pushResults(result, bytes, ext, filePath);
+    } finally {
+      if (mounted) setState(() => _scanningAi = false);
+    }
+  }
+
+  Future<void> _parseWithOcr() async {
+    final filePath = widget.share.filePath;
+    if (filePath == null || _anyScan) return;
+    setState(() => _scanningOcr = true);
+    try {
+      final bytes  = await readFileAsBytes(filePath);
+      final ext    = _extFromShare(filePath, widget.share.contentType);
+      final result = await ItineraryScanner.scanWithOcr(bytes, ext);
+      if (!mounted) return;
+      if (result.bookings.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('No booking patterns found — fill in manually'),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 4),
+        ));
+        return;
+      }
+      await _pushResults(result, bytes, ext, filePath);
+    } finally {
+      if (mounted) setState(() => _scanningOcr = false);
+    }
+  }
+
+  Future<void> _pushResults(
+    ScanResult result,
+    Uint8List bytes,
+    String ext,
+    String filePath,
+  ) async {
+    final fileName = filePath.split('/').last;
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ParsedItineraryScreen(
+          bookings:       result.bookings,
+          tripId:         widget.tripId,
+          userId:         widget.userId,
+          sourceBytes:    bytes,
+          sourceExt:      ext,
+          sourceFileName: fileName,
+          onDone: () {
+            Navigator.pop(context);
+            widget.onDone?.call();
+          },
+        ),
+      ),
+    );
   }
 
   Future<void> _handleSave(ShareSaveData data) async {
@@ -402,9 +557,56 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
                   const Divider(color: kColorBorder),
                   const SizedBox(height: kSpace4),
                   if (_canParseItinerary) ...[
+                    if (GeminiParser.isAvailable)
+                      _ParseItineraryBanner(
+                        icon: Icons.auto_awesome_rounded,
+                        label: 'Parse with AI',
+                        subtitle: 'Reads flights, hotels & trains via Gemini',
+                        scanning: _scanningAi,
+                        disabled: _anyScan,
+                        onTap: _parseWithAi,
+                      ),
+                    if (GeminiParser.isAvailable) const SizedBox(height: kSpace2),
                     _ParseItineraryBanner(
-                      scanning: _scanning,
-                      onTap: _parseItinerary,
+                      icon: Icons.document_scanner_rounded,
+                      label: 'Read text / PDF',
+                      subtitle: 'On-device OCR · no AI required',
+                      scanning: _scanningOcr,
+                      disabled: _anyScan,
+                      onTap: _parseWithOcr,
+                    ),
+                    const SizedBox(height: kSpace4),
+                  ],
+                  if (_canImportMaps) ...[
+                    _ParseItineraryBanner(
+                      icon: Icons.pin_drop_rounded,
+                      label: 'Import from Google Maps',
+                      subtitle: 'Add all pins as spots · works with lists & My Maps',
+                      scanning: _scanningMaps,
+                      disabled: _anyScan,
+                      onTap: _importFromMaps,
+                    ),
+                    const SizedBox(height: kSpace4),
+                  ],
+                  if (_canFindPlaces) ...[
+                    _ParseItineraryBanner(
+                      icon: Icons.place_rounded,
+                      label: 'Find places',
+                      subtitle: 'Extract locations from caption · no AI',
+                      scanning: _scanningPlaces,
+                      disabled: _anyScan,
+                      onTap: _findPlaces,
+                    ),
+                    const SizedBox(height: kSpace4),
+                  ],
+                  if (_canSaveAsStay) ...[
+                    _ParseItineraryBanner(
+                      icon: Icons.hotel_rounded,
+                      label: 'Save as stay',
+                      subtitle: 'Parse listing details automatically',
+                      scanning: _scanningStay,
+                      disabled: _anyScan,
+                      onTap: _saveAsStay,
                     ),
                     const SizedBox(height: kSpace4),
                   ],
@@ -449,9 +651,56 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
             Container(width: double.infinity, height: 1, color: kColorBorder),
             const SizedBox(height: kSpace4),
             if (_canParseItinerary) ...[
+              if (GeminiParser.isAvailable)
+                _ParseItineraryBanner(
+                  icon: Icons.auto_awesome_rounded,
+                  label: 'Parse with AI',
+                  subtitle: 'Reads flights, hotels & trains via Gemini',
+                  scanning: _scanningAi,
+                  disabled: _anyScan,
+                  onTap: _parseWithAi,
+                ),
+              if (GeminiParser.isAvailable) const SizedBox(height: kSpace2),
               _ParseItineraryBanner(
-                scanning: _scanning,
-                onTap: _parseItinerary,
+                icon: Icons.document_scanner_rounded,
+                label: 'Read text / PDF',
+                subtitle: 'On-device OCR · no AI required',
+                scanning: _scanningOcr,
+                disabled: _anyScan,
+                onTap: _parseWithOcr,
+              ),
+              const SizedBox(height: kSpace4),
+            ],
+            if (_canImportMaps) ...[
+              _ParseItineraryBanner(
+                icon: Icons.pin_drop_rounded,
+                label: 'Import from Google Maps',
+                subtitle: 'Add all pins as spots · works with lists & My Maps',
+                scanning: _scanningMaps,
+                disabled: _anyScan,
+                onTap: _importFromMaps,
+              ),
+              const SizedBox(height: kSpace4),
+            ],
+            if (_canFindPlaces) ...[
+              _ParseItineraryBanner(
+                icon: Icons.place_rounded,
+                label: 'Find places',
+                subtitle: 'Extract locations from caption · no AI',
+                scanning: _scanningPlaces,
+                disabled: _anyScan,
+                onTap: _findPlaces,
+              ),
+              const SizedBox(height: kSpace4),
+            ],
+            if (_canSaveAsStay) ...[
+              _ParseItineraryBanner(
+                icon: Icons.hotel_rounded,
+                label: 'Save as stay',
+                subtitle: 'Parse listing details automatically',
+                scanning: _scanningStay,
+                disabled: _anyScan,
+                onTap: _saveAsStay,
               ),
               const SizedBox(height: kSpace4),
             ],
@@ -479,74 +728,77 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
 
 class _ParseItineraryBanner extends StatelessWidget {
   const _ParseItineraryBanner({
+    required this.icon,
+    required this.label,
+    required this.subtitle,
     required this.scanning,
+    required this.disabled,
     required this.onTap,
   });
 
-  final bool scanning;
+  final IconData icon;
+  final String   label;
+  final String   subtitle;
+  final bool     scanning;
+  final bool     disabled;
   final VoidCallback onTap;
+
+  static const _blue = Color(0xFF4A7AB5);
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: scanning ? null : onTap,
-      child: Container(
-        padding: const EdgeInsets.all(kSpace3),
-        decoration: BoxDecoration(
-          color: const Color(0xFFE8EEF6),
-          borderRadius: kRadiusMd,
-          border: Border.all(color: const Color(0xFF4A7AB5).withValues(alpha: 0.3)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: const Color(0xFF4A7AB5).withValues(alpha: 0.15),
-                borderRadius: kRadiusSm,
+      onTap: disabled ? null : onTap,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 150),
+        opacity: disabled && !scanning ? 0.45 : 1.0,
+        child: Container(
+          padding: const EdgeInsets.all(kSpace3),
+          decoration: BoxDecoration(
+            color: const Color(0xFFE8EEF6),
+            borderRadius: kRadiusMd,
+            border: Border.all(color: _blue.withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: _blue.withValues(alpha: 0.15),
+                  borderRadius: kRadiusSm,
+                ),
+                child: scanning
+                    ? const Padding(
+                        padding: EdgeInsets.all(8),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: _blue,
+                        ),
+                      )
+                    : Icon(icon, size: 18, color: _blue),
               ),
-              child: scanning
-                  ? const Padding(
-                      padding: EdgeInsets.all(8),
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Color(0xFF4A7AB5),
-                      ),
-                    )
-                  : Icon(
-                      GeminiParser.isAvailable
-                          ? Icons.auto_awesome_rounded
-                          : Icons.document_scanner_rounded,
-                      size: 18,
-                      color: const Color(0xFF4A7AB5),
+              const SizedBox(width: kSpace3),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      scanning ? 'Scanning…' : label,
+                      style: kStyleBodyMedium.copyWith(color: _blue),
                     ),
-            ),
-            const SizedBox(width: kSpace3),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    scanning ? 'Scanning…' : 'Parse itinerary automatically',
-                    style: kStyleBodyMedium.copyWith(
-                        color: const Color(0xFF4A7AB5)),
-                  ),
-                  Text(
-                    scanning
-                        ? (GeminiParser.isAvailable ? 'Sending to AI…' : 'Reading with on-device OCR…')
-                        : GeminiParser.isAvailable
-                            ? 'AI · reads flights, hotels, trains & more'
-                            : 'OCR only — add GEMINI_API_KEY for AI parsing',
-                    style: kStyleCaption.copyWith(color: kColorInkSoft),
-                  ),
-                ],
+                    Text(
+                      subtitle,
+                      style: kStyleCaption.copyWith(color: kColorInkSoft),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            if (!scanning)
-              const Icon(Icons.arrow_forward_ios_rounded,
-                  size: 14, color: Color(0xFF4A7AB5)),
-          ],
+              if (!scanning)
+                const Icon(Icons.arrow_forward_ios_rounded,
+                    size: 14, color: _blue),
+            ],
+          ),
         ),
       ),
     );
@@ -691,5 +943,7 @@ class _ContentTypeInfoCard extends StatelessWidget {
           'Receipt photos can be logged as group expenses so you can settle up later.',
         ShareContentType.screenshot =>
           'Screenshots are usually confirmations or reference images — save as a document.',
+        ShareContentType.accommodationLink =>
+          'Accommodation links can be saved as stays — tap "Save as stay" to parse the listing details automatically.',
       };
 }

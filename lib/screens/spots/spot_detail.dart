@@ -201,7 +201,7 @@ class _SpotDetailContentState extends State<SpotDetailContent> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _PhotoHeader(category: widget.spot.category),
+        _PhotoHeader(category: widget.spot.category, imageUrl: widget.spot.imageUrl),
         Padding(
           padding: const EdgeInsets.fromLTRB(kSpace4, kSpace4, kSpace4, 0),
           child: Column(
@@ -553,29 +553,62 @@ class _LinkedDocTileState extends State<_LinkedDocTile> {
 // ─── Sub-widgets ──────────────────────────────────────────────────────────────
 
 class _PhotoHeader extends StatelessWidget {
-  const _PhotoHeader({required this.category});
+  const _PhotoHeader({required this.category, this.imageUrl});
   final SpotCategory category;
+  final String?      imageUrl;
 
   @override
   Widget build(BuildContext context) {
+    final height = imageUrl != null ? 200.0 : 96.0;
     return SizedBox(
-      height: 96,
+      height: height,
       width: double.infinity,
-      child: DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [kColorPrimarySoft, kColorAccentSoft],
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Background gradient (always present as fallback)
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [kColorPrimarySoft, kColorAccentSoft],
+              ),
+            ),
           ),
-        ),
-        child: Center(
-          child: Icon(
-            category.icon,
-            size: 40,
-            color: kColorPrimaryDark.withValues(alpha: 0.22),
-          ),
-        ),
+          if (imageUrl != null)
+            Image.network(
+              imageUrl!,
+              fit: BoxFit.cover,
+              cacheWidth: 800,
+              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              loadingBuilder: (_, child, progress) =>
+                  progress == null ? child : const SizedBox.shrink(),
+            )
+          else
+            Center(
+              child: Icon(
+                category.icon,
+                size: 40,
+                color: kColorPrimaryDark.withValues(alpha: 0.22),
+              ),
+            ),
+          // Subtle scrim at bottom so text below stays readable
+          if (imageUrl != null)
+            Positioned(
+              left: 0, right: 0, bottom: 0,
+              child: Container(
+                height: 60,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.transparent, Color(0x55000000)],
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

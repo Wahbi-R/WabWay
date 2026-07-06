@@ -13,7 +13,7 @@ val keystoreProperties = Properties().apply {
 
 android {
     namespace = "com.example.wabway"
-    compileSdk = 37
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

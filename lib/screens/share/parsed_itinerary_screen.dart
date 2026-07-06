@@ -1,7 +1,14 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import '../../core/ocr/parse_counter.dart';
 import '../../core/ocr/parsed_booking.dart';
+import '../../core/supabase/doc_service.dart';
+import '../../core/supabase/plan_service.dart';
 import '../../core/supabase/travel_service.dart';
+import '../../data/docs_data.dart';
+import '../../data/plan_data.dart';
+import '../../data/travel_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
@@ -13,12 +20,18 @@ class ParsedItineraryScreen extends StatefulWidget {
     required this.bookings,
     required this.tripId,
     required this.userId,
+    this.sourceBytes,
+    this.sourceExt,
+    this.sourceFileName,
     this.onDone,
   });
 
   final List<ParsedBooking> bookings;
   final String tripId;
   final String userId;
+  final Uint8List? sourceBytes;
+  final String?    sourceExt;
+  final String?    sourceFileName;
   final VoidCallback? onDone;
 
   @override
@@ -27,23 +40,54 @@ class ParsedItineraryScreen extends StatefulWidget {
 
 class _ParsedItineraryScreenState extends State<ParsedItineraryScreen> {
   late final List<bool> _selected;
+  late final List<bool> _addToPlan;
   late final List<TextEditingController> _titleCtrls;
-  bool _saving = false;
-  int _remaining = ParseCounter.dailyLimit;
+  bool   _saving      = false;
+  int    _remaining   = ParseCounter.dailyLimit;
+  List<TripDay> _days = [];
+  bool   _daysLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _selected  = List.filled(widget.bookings.length, true);
+    _selected   = List.filled(widget.bookings.length, true);
+    // Default add-to-plan to true for all confirmed booking types
+    _addToPlan  = widget.bookings.map(_defaultAddToPlan).toList();
     _titleCtrls = widget.bookings
         .map((b) => TextEditingController(text: b.title))
         .toList();
     _loadRemaining();
+    _loadDays();
   }
+
+  static bool _defaultAddToPlan(ParsedBooking b) =>
+      b.itemType == TravelItemType.flight ||
+      b.itemType == TravelItemType.train  ||
+      b.itemType == TravelItemType.hotel  ||
+      b.itemType == TravelItemType.reservation;
 
   Future<void> _loadRemaining() async {
     final r = await ParseCounter.remaining();
     if (mounted) setState(() => _remaining = r);
+  }
+
+  Future<void> _loadDays() async {
+    setState(() => _daysLoading = true);
+    try {
+      final days = await PlanService.loadAll(widget.tripId);
+      if (mounted) setState(() => _days = days);
+    } finally {
+      if (mounted) setState(() => _daysLoading = false);
+    }
+  }
+
+  TripDay? _matchingDay(DateTime bookingDate) {
+    for (final d in _days) {
+      if (d.date.year  == bookingDate.year  &&
+          d.date.month == bookingDate.month &&
+          d.date.day   == bookingDate.day) return d;
+    }
+    return null;
   }
 
   @override
@@ -55,22 +99,94 @@ class _ParsedItineraryScreenState extends State<ParsedItineraryScreen> {
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
+      // 1. Upload source file once if provided
+      String? docId;
+      if (widget.sourceBytes != null && widget.sourceExt != null) {
+        final ext = widget.sourceExt!;
+        final doc = await DocService.uploadAndCreate(
+          tripId:  widget.tripId,
+          userId:  widget.userId,
+          title:   widget.sourceFileName?.replaceAll(RegExp(r'\.[^.]+$'), '') ?? 'Booking document',
+          type:    ext == 'pdf' ? DocType.other : DocType.flight,
+          ext:     ext,
+          bytes:   widget.sourceBytes!,
+        );
+        docId = doc.id;
+      }
+
+      // 2. Save each selected booking
+      int count = 0;
       for (int i = 0; i < widget.bookings.length; i++) {
         if (!_selected[i]) continue;
-        final b = widget.bookings[i];
-        await TravelService.createItem(
-          tripId:    widget.tripId,
-          title:     _titleCtrls[i].text.trim().isEmpty ? b.title : _titleCtrls[i].text.trim(),
-          type:      b.itemType,
-          createdBy: widget.userId,
-          date:      b.date,
-          notes:     b.notes.isEmpty ? null : b.notes,
+        final b     = widget.bookings[i];
+        final title = _titleCtrls[i].text.trim().isEmpty ? b.title : _titleCtrls[i].text.trim();
+
+        // 2a. Create plan item first (if requested) so we get its ID for linking
+        String? planItemId;
+        if (_addToPlan[i]) {
+          final day = _matchingDay(b.date);
+          if (day != null) {
+            final planItem = await PlanService.createItem(
+              tripId:      widget.tripId,
+              dayId:       day.id,
+              title:       title,
+              type:        _planType(b.itemType),
+              createdBy:   widget.userId,
+              time:        b.departureTime,
+              notes:       b.notes.isEmpty ? null : b.notes,
+              linkedDocIds: docId != null ? [docId] : [],
+            );
+            planItemId = planItem.id;
+          }
+        }
+
+        // 2b. Create travel item
+        final travelItem = await TravelService.createItem(
+          tripId:                widget.tripId,
+          title:                 title,
+          type:                  b.itemType,
+          createdBy:             widget.userId,
+          date:                  b.date,
+          time:                  b.departureTime,
+          notes:                 b.notes.isEmpty ? null : b.notes,
+          linkedItineraryItemId: planItemId,
+          linkedDocIds:          docId != null ? [docId] : [],
         );
+
+        // 2c. Link doc → travel item
+        if (docId != null) {
+          await DocService.addLink(
+            documentId: docId,
+            linkedType: DocLinkedType.travelItem,
+            linkedId:   travelItem.id,
+            createdBy:  widget.userId,
+          );
+        }
+
+        // 2d. Link doc → plan item
+        if (docId != null && planItemId != null) {
+          await DocService.addLink(
+            documentId: docId,
+            linkedType: DocLinkedType.itineraryItem,
+            linkedId:   planItemId,
+            createdBy:  widget.userId,
+          );
+        }
+
+        count++;
       }
+
       if (!mounted) return;
-      final count = _selected.where((s) => s).length;
+      final planCount = _selected
+          .asMap()
+          .entries
+          .where((e) => e.value && _addToPlan[e.key] && _matchingDay(widget.bookings[e.key].date) != null)
+          .length;
+      final msg = planCount > 0
+          ? 'Saved $count booking${count == 1 ? '' : 's'} to Travel and $planCount to Plan'
+          : 'Saved $count booking${count == 1 ? '' : 's'} to Travel';
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Saved $count booking${count == 1 ? '' : 's'} to Travel',
+        content: Text(msg,
             style: kStyleBodyMedium.copyWith(color: kColorTextOnPrimary)),
         backgroundColor: kColorPrimary,
         behavior: SnackBarBehavior.floating,
@@ -87,6 +203,15 @@ class _ParsedItineraryScreenState extends State<ParsedItineraryScreen> {
       if (mounted) setState(() => _saving = false);
     }
   }
+
+  static ItineraryItemType _planType(TravelItemType t) => switch (t) {
+        TravelItemType.flight      => ItineraryItemType.travel,
+        TravelItemType.train       => ItineraryItemType.travel,
+        TravelItemType.hotel       => ItineraryItemType.other,
+        TravelItemType.reservation => ItineraryItemType.activity,
+        TravelItemType.ticket      => ItineraryItemType.activity,
+        _                          => ItineraryItemType.other,
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -107,7 +232,11 @@ class _ParsedItineraryScreenState extends State<ParsedItineraryScreen> {
           // ── Source banner ──────────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(kSpace4, kSpace4, kSpace4, 0),
-            child: _SourceBanner(isAi: isAi, remaining: _remaining),
+            child: _SourceBanner(
+              isAi: isAi,
+              remaining: _remaining,
+              hasFile: widget.sourceBytes != null,
+            ),
           ),
           const SizedBox(height: kSpace3),
           Padding(
@@ -128,10 +257,14 @@ class _ParsedItineraryScreenState extends State<ParsedItineraryScreen> {
               itemCount: widget.bookings.length,
               separatorBuilder: (_, __) => const SizedBox(height: kSpace3),
               itemBuilder: (_, i) => _BookingCard(
-                booking:   widget.bookings[i],
-                selected:  _selected[i],
-                titleCtrl: _titleCtrls[i],
-                onToggle:  (v) => setState(() => _selected[i] = v),
+                booking:    widget.bookings[i],
+                selected:   _selected[i],
+                addToPlan:  _addToPlan[i],
+                titleCtrl:  _titleCtrls[i],
+                matchingDay: _matchingDay(widget.bookings[i].date),
+                daysLoading: _daysLoading,
+                onToggle:    (v) => setState(() => _selected[i] = v),
+                onPlanToggle: (v) => setState(() => _addToPlan[i] = v),
               ),
             ),
           ),
@@ -170,9 +303,14 @@ class _ParsedItineraryScreenState extends State<ParsedItineraryScreen> {
 // ─── Source banner ─────────────────────────────────────────────────────────────
 
 class _SourceBanner extends StatelessWidget {
-  const _SourceBanner({required this.isAi, required this.remaining});
+  const _SourceBanner({
+    required this.isAi,
+    required this.remaining,
+    required this.hasFile,
+  });
   final bool isAi;
-  final int remaining;
+  final int  remaining;
+  final bool hasFile;
 
   @override
   Widget build(BuildContext context) {
@@ -183,9 +321,7 @@ class _SourceBanner extends StatelessWidget {
         padding: const EdgeInsets.symmetric(
             horizontal: kSpace3, vertical: kSpace2),
         decoration: BoxDecoration(
-          color: low
-              ? const Color(0xFFFFF3E0)
-              : const Color(0xFFE8F5EE),
+          color: low ? const Color(0xFFFFF3E0) : const Color(0xFFE8F5EE),
           borderRadius: kRadiusMd,
           border: Border.all(
             color: low
@@ -211,12 +347,17 @@ class _SourceBanner extends StatelessWidget {
                 ),
               ),
             ),
+            if (hasFile) ...[
+              const SizedBox(width: kSpace2),
+              const Icon(Icons.attach_file_rounded, size: 14, color: kColorInkSoft),
+              const SizedBox(width: kSpace1),
+              Text('File linked', style: kStyleCaption.copyWith(color: kColorInkSoft)),
+            ],
           ],
         ),
       );
     }
 
-    // OCR fallback
     return Container(
       padding: const EdgeInsets.symmetric(
           horizontal: kSpace3, vertical: kSpace2),
@@ -232,10 +373,16 @@ class _SourceBanner extends StatelessWidget {
           const SizedBox(width: kSpace2),
           Expanded(
             child: Text(
-              'Parsed on-device (no AI key set — flights only)',
+              'Parsed on-device (OCR)',
               style: kStyleCaption.copyWith(color: kColorInkSoft),
             ),
           ),
+          if (hasFile) ...[
+            const SizedBox(width: kSpace2),
+            const Icon(Icons.attach_file_rounded, size: 14, color: kColorInkSoft),
+            const SizedBox(width: kSpace1),
+            Text('File linked', style: kStyleCaption.copyWith(color: kColorInkSoft)),
+          ],
         ],
       ),
     );
@@ -248,14 +395,22 @@ class _BookingCard extends StatelessWidget {
   const _BookingCard({
     required this.booking,
     required this.selected,
+    required this.addToPlan,
     required this.titleCtrl,
+    required this.matchingDay,
+    required this.daysLoading,
     required this.onToggle,
+    required this.onPlanToggle,
   });
 
-  final ParsedBooking booking;
-  final bool selected;
+  final ParsedBooking   booking;
+  final bool            selected;
+  final bool            addToPlan;
   final TextEditingController titleCtrl;
+  final TripDay?        matchingDay;
+  final bool            daysLoading;
   final ValueChanged<bool> onToggle;
+  final ValueChanged<bool> onPlanToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -266,7 +421,7 @@ class _BookingCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
+            // Header row
             Row(
               children: [
                 Container(
@@ -300,7 +455,7 @@ class _BookingCard extends StatelessWidget {
             ),
             const SizedBox(height: kSpace3),
 
-            // Route / detail row
+            // Route row
             if (b.departureCity != null && b.arrivalCity != null)
               Row(
                 children: [
@@ -370,8 +525,7 @@ class _BookingCard extends StatelessWidget {
               style: kStyleCaption,
               decoration: InputDecoration(
                 labelText: 'Travel item title',
-                labelStyle:
-                    kStyleCaption.copyWith(color: kColorInkSoft),
+                labelStyle: kStyleCaption.copyWith(color: kColorInkSoft),
                 isDense: true,
                 contentPadding: const EdgeInsets.symmetric(
                     horizontal: kSpace3, vertical: kSpace2),
@@ -385,6 +539,17 @@ class _BookingCard extends StatelessWidget {
                 ),
               ),
             ),
+
+            // ── Add to plan toggle ─────────────────────────────────────────
+            const SizedBox(height: kSpace3),
+            const Divider(color: kColorBorder, height: 1),
+            const SizedBox(height: kSpace2),
+            _PlanToggle(
+              addToPlan:   addToPlan,
+              matchingDay: matchingDay,
+              daysLoading: daysLoading,
+              onToggle:    onPlanToggle,
+            ),
           ],
         ),
       ),
@@ -395,5 +560,79 @@ class _BookingCard extends StatelessWidget {
     const m = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return '${m[d.month]} ${d.day}, ${d.year}';
+  }
+}
+
+// ─── Plan toggle row ───────────────────────────────────────────────────────────
+
+class _PlanToggle extends StatelessWidget {
+  const _PlanToggle({
+    required this.addToPlan,
+    required this.matchingDay,
+    required this.daysLoading,
+    required this.onToggle,
+  });
+
+  final bool     addToPlan;
+  final TripDay? matchingDay;
+  final bool     daysLoading;
+  final ValueChanged<bool> onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    if (daysLoading) {
+      return Row(
+        children: [
+          const SizedBox(
+            width: 14, height: 14,
+            child: CircularProgressIndicator(strokeWidth: 1.5, color: kColorInkSoft),
+          ),
+          const SizedBox(width: kSpace2),
+          Text('Checking plan days…',
+              style: kStyleCaption.copyWith(color: kColorInkSoft)),
+        ],
+      );
+    }
+
+    final canAdd = matchingDay != null;
+    final sub = canAdd
+        ? 'Day ${matchingDay!.dayNumber} – ${matchingDay!.city}'
+        : 'No matching plan day for this date';
+
+    return Row(
+      children: [
+        SizedBox(
+          width: 20, height: 20,
+          child: Checkbox(
+            value: canAdd && addToPlan,
+            onChanged: canAdd ? (v) => onToggle(v ?? false) : null,
+            activeColor: kColorPrimary,
+            visualDensity: VisualDensity.compact,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+          ),
+        ),
+        const SizedBox(width: kSpace2),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Also add to itinerary',
+                style: kStyleCaption.copyWith(
+                  color: canAdd ? kColorInk : kColorInkSoft,
+                ),
+              ),
+              Text(
+                sub,
+                style: kStyleCaption.copyWith(
+                  color: canAdd ? kColorInkSoft : kColorInkSoft.withValues(alpha: 0.6),
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }

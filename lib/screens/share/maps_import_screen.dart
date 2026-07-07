@@ -35,7 +35,10 @@ class _MapsImportScreenState extends State<MapsImportScreen> {
   late List<MapsPlace>     _places;
   bool _saving          = false;
   bool _loadingTakeout  = false;
-  bool _scrapedWebView  = false; // true once a WebView scrape has been attempted
+  bool _scrapedWebView  = false;
+  bool _geocoding       = false;
+  int  _geocodingDone   = 0;
+  int  _geocodingTotal  = 0;
 
   @override
   void initState() {
@@ -95,32 +98,70 @@ class _MapsImportScreenState extends State<MapsImportScreen> {
       final bytes = file.bytes;
       if (bytes == null) return;
 
-      List<MapsPlace>? places;
       final isCsv = (file.extension ?? '').toLowerCase() == 'csv';
-      if (isCsv) {
-        // geocoding in progress — spinner already shown via _loadingTakeout
-        places = await TakeoutParser.parseCsv(bytes);
-      } else {
-        places = TakeoutParser.parseJson(bytes);
-      }
 
-      if (!mounted) return;
-      if (places == null || places.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(isCsv
-              ? "Couldn't read any places — make sure you picked a CSV "
-                "from Takeout/Saved/"
-              : "Couldn't find any places — make sure you picked "
-                "Saved Places.json from Takeout/Maps (your places)/"),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 5),
-        ));
+      if (isCsv) {
+        // Fast sync parse — show list immediately, geocode in background
+        final fast = TakeoutParser.parseCsvFast(bytes);
+        if (!mounted) return;
+        if (fast.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text("Couldn't read any places — make sure you picked "
+                "a CSV from Takeout/Saved/"),
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 5),
+          ));
+          return;
+        }
+        _setPlaces(fast);
+        setState(() => _loadingTakeout = false);
+        // Background geocoding — updates cards live as results come in
+        _startBackgroundGeocoding();
         return;
+      } else {
+        final places = TakeoutParser.parseJson(bytes);
+        if (!mounted) return;
+        if (places == null || places.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text("Couldn't find any places — make sure you picked "
+                "Saved Places.json from Takeout/Maps (your places)/"),
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 5),
+          ));
+          return;
+        }
+        _setPlaces(places);
       }
-      _setPlaces(places);
     } finally {
       if (mounted) setState(() => _loadingTakeout = false);
     }
+  }
+
+  Future<void> _startBackgroundGeocoding() async {
+    final total = _places.where((p) => !p.hasCoords).length;
+    if (total == 0) return;
+    setState(() {
+      _geocoding     = true;
+      _geocodingDone = 0;
+      _geocodingTotal = total;
+    });
+
+    for (int i = 0; i < _places.length; i++) {
+      if (_places[i].hasCoords) continue;
+      final updated = await TakeoutParser.geocodePlace(_places[i]);
+      if (!mounted) return;
+      setState(() {
+        _places[i]   = updated;
+        _geocodingDone++;
+        // keep category in sync if geocoding returned a better one
+        if (_categories[i] == SpotCategory.landmark &&
+            updated.category != SpotCategory.landmark) {
+          _categories[i] = updated.category;
+        }
+      });
+    }
+
+    if (mounted) setState(() => _geocoding = false);
   }
 
 
@@ -144,9 +185,10 @@ class _MapsImportScreenState extends State<MapsImportScreen> {
           status:      SpotStatus.wantToGo,
           addedBy:     widget.userId,
           mapsUrl:     p.mapsUrl ?? widget.result.finalUrl,
+          notes:       p.notes,
           address:     p.address,
-          latitude:    (p.lat != 0 || p.lon != 0) ? p.lat : null,
-          longitude:   (p.lat != 0 || p.lon != 0) ? p.lon : null,
+          latitude:    p.hasCoords ? p.lat : null,
+          longitude:   p.hasCoords ? p.lon : null,
           placeSource: _listName,
           imageUrl:    imageUrl,
         );
@@ -358,6 +400,62 @@ class _MapsImportScreenState extends State<MapsImportScreen> {
             ),
           ] else ...[
             const SizedBox(height: kSpace3),
+            // Geocoding progress banner
+            if (_geocoding || _geocodingTotal > 0)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(kSpace4, 0, kSpace4, kSpace3),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: kSpace3, vertical: kSpace2),
+                  decoration: BoxDecoration(
+                    color: _geocoding
+                        ? const Color(0xFFE8EEF6)
+                        : const Color(0xFFF0F4EE),
+                    borderRadius: kRadiusMd,
+                  ),
+                  child: Row(
+                    children: [
+                      if (_geocoding) ...[
+                        const SizedBox(
+                          width: 13, height: 13,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Color(0xFF4A7AB5)),
+                        ),
+                        const SizedBox(width: kSpace2),
+                        Text(
+                          'Finding locations… $_geocodingDone of $_geocodingTotal',
+                          style: kStyleCaption.copyWith(
+                              color: const Color(0xFF4A7AB5)),
+                        ),
+                      ] else ...[
+                        Icon(
+                          _places.where((p) => !p.hasCoords).isEmpty
+                              ? Icons.check_circle_rounded
+                              : Icons.info_outline_rounded,
+                          size: 14,
+                          color: _places.where((p) => !p.hasCoords).isEmpty
+                              ? const Color(0xFF5A9A6F)
+                              : kColorInkSoft,
+                        ),
+                        const SizedBox(width: kSpace2),
+                        Expanded(
+                          child: Text(
+                            _places.where((p) => !p.hasCoords).isEmpty
+                                ? 'All $_geocodingTotal places located'
+                                : '${_places.where((p) => !p.hasCoords).length} places '
+                                  "couldn't be located — saved without a map pin",
+                            style: kStyleCaption.copyWith(
+                              color: _places.where((p) => !p.hasCoords).isEmpty
+                                  ? const Color(0xFF5A9A6F)
+                                  : kColorInkSoft,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: kSpace4),
               child: Text(
@@ -538,17 +636,33 @@ class _MapsPlaceCard extends StatelessWidget {
                       if (place.address != null && place.address!.isNotEmpty)
                         Text(
                           place.address!,
-                          style:
-                              kStyleCaption.copyWith(color: kColorInkSoft),
+                          style: kStyleCaption.copyWith(color: kColorInkSoft),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        )
+                      else if (place.hasCoords)
+                        Text(
+                          '${place.lat.toStringAsFixed(4)}, '
+                          '${place.lon.toStringAsFixed(4)}',
+                          style: kStyleCaption.copyWith(color: kColorInkSoft),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         )
                       else
+                        Row(children: [
+                          Icon(Icons.location_off_rounded,
+                              size: 11, color: kColorInkSoft),
+                          const SizedBox(width: 3),
+                          Text('No location found',
+                              style: kStyleCaption.copyWith(
+                                  color: kColorInkSoft)),
+                        ]),
+                      if (place.notes != null && place.notes!.isNotEmpty)
                         Text(
-                          '${place.lat.toStringAsFixed(5)}, '
-                          '${place.lon.toStringAsFixed(5)}',
-                          style:
-                              kStyleCaption.copyWith(color: kColorInkSoft),
+                          place.notes!,
+                          style: kStyleCaption.copyWith(
+                              color: kColorPrimary,
+                              fontStyle: FontStyle.italic),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),

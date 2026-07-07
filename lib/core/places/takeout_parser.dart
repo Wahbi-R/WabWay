@@ -36,22 +36,24 @@ abstract final class TakeoutParser {
     }
   }
 
-  /// Async parse a CSV custom-list file (geocodes each place via Nominatim).
-  /// Returns null if the file doesn't look like a Takeout Saved CSV.
-  static Future<List<MapsPlace>?> parseCsv(Uint8List bytes) async {
+  /// Fast synchronous CSV parse — extracts names, notes, and URLs immediately
+  /// with no network calls. All places have lat=lon=0 until geocoded.
+  /// Deduplicates by URL. Returns empty list if not a valid Takeout CSV.
+  static List<MapsPlace> parseCsvFast(Uint8List bytes) {
     try {
-      final text  = utf8.decode(bytes);
-      final lines = text.split('\n');
-      if (lines.isEmpty) return null;
+      final text    = utf8.decode(bytes);
+      final lines   = text.split('\n');
+      if (lines.isEmpty) return [];
 
-      final headers = _splitCsvRow(lines.first);
-      final titleIdx = headers.indexWhere(
-          (h) => h.trim().toLowerCase() == 'title');
-      final urlIdx   = headers.indexWhere(
-          (h) => h.trim().toLowerCase() == 'url');
-      if (titleIdx < 0) return null; // not the expected format
+      final headers  = _splitCsvRow(lines.first);
+      final titleIdx = headers.indexWhere((h) => h.trim().toLowerCase() == 'title');
+      final noteIdx  = headers.indexWhere((h) => h.trim().toLowerCase() == 'note');
+      final urlIdx   = headers.indexWhere((h) => h.trim().toLowerCase() == 'url');
+      if (titleIdx < 0) return [];
 
-      final places = <MapsPlace>[];
+      final places   = <MapsPlace>[];
+      final seenUrls = <String>{};
+
       for (final raw in lines.skip(1)) {
         final line = raw.trim();
         if (line.isEmpty) continue;
@@ -59,47 +61,82 @@ abstract final class TakeoutParser {
         final title = titleIdx < cols.length ? cols[titleIdx].trim() : '';
         if (title.isEmpty) continue;
 
-        final url = urlIdx >= 0 && urlIdx < cols.length
-            ? cols[urlIdx].trim()
-            : '';
+        final url  = urlIdx >= 0 && urlIdx < cols.length
+            ? cols[urlIdx].trim() : '';
+        final note = noteIdx >= 0 && noteIdx < cols.length
+            ? cols[noteIdx].trim() : '';
 
-        // Try geocoding via the Maps URL (extracts name from path → Nominatim)
-        if (url.isNotEmpty && url.contains('/maps/place/')) {
-          final result = await GoogleMapsParser.parse(url);
-          if (result != null && result.places.isNotEmpty) {
-            places.add(result.places.first.copyWith(name: title));
-            continue;
+        // Deduplicate by Maps URL
+        if (url.isNotEmpty) {
+          if (seenUrls.contains(url)) continue;
+          seenUrls.add(url);
+        }
+
+        places.add(MapsPlace(
+          name:     title,
+          lat:      0,
+          lon:      0,
+          mapsUrl:  url.isNotEmpty ? url : null,
+          notes:    note.isNotEmpty ? note : null,
+          category: SpotCategory.landmark,
+        ));
+      }
+      return places;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Geocode a single place that came from [parseCsvFast] (lat=lon=0).
+  /// Returns an updated [MapsPlace] with coords, or the original if nothing
+  /// was found. Callers should update their list and setState after each call.
+  static Future<MapsPlace> geocodePlace(MapsPlace place) async {
+    if (place.hasCoords) return place; // already resolved
+
+    // Try Nominatim directly with the place name — faster than going through
+    // GoogleMapsParser which also fetches the (JS-rendered) Maps page.
+    final hits = await NominatimService.search(place.name);
+    if (hits.isNotEmpty) {
+      final h = hits.first;
+      return place.copyWith(
+        lat:      h.lat,
+        lon:      h.lon,
+        city:     h.city,
+        category: h.category,
+      );
+    }
+
+    // Fallback: extract name from URL path and retry (handles URL-encoded names
+    // that differ from the display title)
+    if (place.mapsUrl != null && place.mapsUrl!.contains('/maps/place/')) {
+      final m = RegExp(r'/maps/place/([^/?]+)').firstMatch(place.mapsUrl!);
+      if (m != null) {
+        final slug = Uri.decodeComponent(
+            m.group(1)!.replaceAll('+', ' ')).trim();
+        if (slug.isNotEmpty && slug != place.name) {
+          final hits2 = await NominatimService.search(slug);
+          if (hits2.isNotEmpty) {
+            final h = hits2.first;
+            return place.copyWith(lat: h.lat, lon: h.lon, city: h.city,
+                category: h.category);
           }
         }
-
-        // Fallback: geocode by title text directly
-        final hits = await NominatimService.search(title);
-        if (hits.isNotEmpty) {
-          final h = hits.first;
-          places.add(MapsPlace(
-            name:     title,
-            lat:      h.lat,
-            lon:      h.lon,
-            category: h.category,
-            city:     h.city,
-            mapsUrl:  url.isNotEmpty ? url : null,
-          ));
-        } else {
-          // Geocoding failed — still include the place with the Maps URL
-          // so it's not silently dropped. lat/lon left as 0 (handled in save).
-          places.add(MapsPlace(
-            name:    title,
-            lat:     0,
-            lon:     0,
-            mapsUrl: url.isNotEmpty ? url : null,
-            category: SpotCategory.landmark,
-          ));
-        }
       }
-      return places.isEmpty ? null : places;
-    } catch (_) {
-      return null;
     }
+
+    return place; // stays at 0,0 — flagged in UI
+  }
+
+  /// Legacy async parse that blocks until all geocoding is done.
+  /// Prefer [parseCsvFast] + [geocodePlace] for large lists.
+  static Future<List<MapsPlace>?> parseCsv(Uint8List bytes) async {
+    final fast = parseCsvFast(bytes);
+    if (fast.isEmpty) return null;
+    final out = <MapsPlace>[];
+    for (final p in fast) {
+      out.add(await geocodePlace(p));
+    }
+    return out;
   }
 
   /// Legacy alias kept for callers that passed .json bytes.

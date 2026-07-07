@@ -16,6 +16,7 @@ class MapsPlace {
     this.mapsUrl,
     required this.category,
     this.city = '',
+    this.notes,
   });
 
   final String       name;
@@ -25,6 +26,9 @@ class MapsPlace {
   final String?      mapsUrl;
   final SpotCategory category;
   final String       city;
+  final String?      notes;
+
+  bool get hasCoords => lat != 0 || lon != 0;
 
   MapsPlace copyWith({
     String? name,
@@ -34,6 +38,7 @@ class MapsPlace {
     String? mapsUrl,
     SpotCategory? category,
     String? city,
+    String? notes,
   }) =>
       MapsPlace(
         name:     name     ?? this.name,
@@ -43,6 +48,7 @@ class MapsPlace {
         mapsUrl:  mapsUrl  ?? this.mapsUrl,
         category: category ?? this.category,
         city:     city     ?? this.city,
+        notes:    notes    ?? this.notes,
       );
 }
 

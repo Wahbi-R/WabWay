@@ -309,6 +309,31 @@ abstract final class GoogleMapsParser {
     );
   }
 
+  // ── Public coord-only lookup (used as last-resort fallback) ───────────────
+
+  /// Fetches a Google Maps URL and tries to extract coordinates from the
+  /// redirect chain or the page HTML — no Nominatim involved.
+  ///
+  /// Used when Nominatim has no result for a place but we still have the
+  /// original Maps URL (e.g. from a Takeout CSV). Returns null on failure.
+  static Future<(double, double)?> fetchCoordsFromUrl(String url) async {
+    try {
+      final fetched = await _fetch(url);
+      if (fetched == null) return null;
+      final (html, finalUrl) = fetched;
+
+      // Check the final redirect URL first (often has @lat,lon)
+      if (finalUrl != null) {
+        final c = _extractCoords(finalUrl);
+        if (c != null) return c;
+      }
+      // Then try the page HTML
+      return _extractCoords(html);
+    } catch (_) {
+      return null;
+    }
+  }
+
   // ── Helpers ────────────────────────────────────────────────────────────────
 
   /// Extracts (lat, lon) trying several patterns in priority order.

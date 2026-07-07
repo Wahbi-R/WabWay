@@ -106,8 +106,8 @@ abstract final class TakeoutParser {
       );
     }
 
-    // Fallback: extract name from URL path and retry (handles URL-encoded names
-    // that differ from the display title)
+    // Fallback 2: extract name from URL path and retry with Nominatim
+    // (handles URL-encoded names that differ from the display title)
     if (place.mapsUrl != null && place.mapsUrl!.contains('/maps/place/')) {
       final m = RegExp(r'/maps/place/([^/?]+)').firstMatch(place.mapsUrl!);
       if (m != null) {
@@ -121,6 +121,15 @@ abstract final class TakeoutParser {
                 category: h.category);
           }
         }
+      }
+
+      // Fallback 3: fetch the actual Google Maps page and extract coordinates
+      // from the redirect URL or HTML. Works for many places Nominatim doesn't
+      // know (local shops, restaurants, etc.) since Google's server often
+      // redirects to a URL containing @lat,lon.
+      final coords = await GoogleMapsParser.fetchCoordsFromUrl(place.mapsUrl!);
+      if (coords != null) {
+        return place.copyWith(lat: coords.$1, lon: coords.$2);
       }
     }
 

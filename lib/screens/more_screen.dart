@@ -22,6 +22,7 @@ import 'trips/trip_settings_sheet.dart';
 import 'trips/trip_switcher_sheet.dart';
 import 'diagnostics_screen.dart';
 import 'notification_settings_screen.dart';
+import '../core/changelog.dart';
 
 class MoreScreen extends StatelessWidget {
   const MoreScreen({super.key});
@@ -432,7 +433,22 @@ class MoreScreen extends StatelessWidget {
 
           const SizedBox(height: kSpace4),
 
+          // What's new
+          const SizedBox(height: kSpace5),
+          DecoratedBox(
+            decoration: kCardDecoration(),
+            child: Material(
+              color: Colors.transparent,
+              child: _SettingsRow(
+                icon: Icons.new_releases_rounded,
+                label: "What's new",
+                onTap: () => ChangelogService.show(context, forceShow: true),
+              ),
+            ),
+          ),
+
           // Diagnostics
+          const SizedBox(height: kSpace5),
           const _SectionHeader(title: 'Debug'),
           const SizedBox(height: kSpace3),
           DecoratedBox(

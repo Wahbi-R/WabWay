@@ -19,6 +19,7 @@ import '../screens/accommodations/accommodations_screen.dart';
 import '../screens/placeholder_screen.dart';
 import '../screens/trips/trip_switcher_sheet.dart';
 import '../core/trip/trip_state.dart';
+import '../core/changelog.dart';
 
 // ─── Navigation destination models ───────────────────────────────────────────
 
@@ -192,8 +193,10 @@ class _AppShellState extends State<AppShell> {
   void initState() {
     super.initState();
     ShareHandler.instance.addListener(_onSharePending);
-    // Process a share that arrived before this widget was mounted.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _onSharePending());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _onSharePending();
+      ChangelogService.maybeShowOnLaunch(context);
+    });
   }
 
   @override

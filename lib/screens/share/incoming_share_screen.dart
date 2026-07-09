@@ -54,11 +54,12 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
   bool _scanningAi     = false;
   bool _scanningOcr    = false;
   bool _scanningPlaces = false;
+  bool _scanningAudio  = false;
   bool _scanningStay   = false;
   bool _scanningMaps   = false;
 
   bool get _anyScan =>
-      _scanningAi || _scanningOcr || _scanningPlaces || _scanningStay || _scanningMaps;
+      _scanningAi || _scanningOcr || _scanningPlaces || _scanningAudio || _scanningStay || _scanningMaps;
 
   void _selectDestination(ShareDestination dest) {
     setState(() => _destination = dest);
@@ -151,6 +152,41 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
       );
     } finally {
       if (mounted) setState(() => _scanningPlaces = false);
+    }
+  }
+
+  Future<void> _transcribeAudio() async {
+    if (_anyScan) return;
+    setState(() => _scanningAudio = true);
+    try {
+      final result = await SocialPlaceExtractor.extractFromAudio(widget.share.rawContent);
+      if (!mounted) return;
+      if (result == null) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Could not transcribe audio — check server or try the caption method'),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 5),
+        ));
+        return;
+      }
+      await Navigator.push<void>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ExtractedSpotsScreen(
+            places:    result.places,
+            caption:   result.caption,
+            sourceUrl: widget.share.rawContent,
+            tripId:    widget.tripId,
+            userId:    widget.userId,
+            onDone: () {
+              Navigator.pop(context);
+              widget.onDone?.call();
+            },
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _scanningAudio = false);
     }
   }
 
@@ -598,6 +634,17 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
                       onTap: _findPlaces,
                     ),
                     const SizedBox(height: kSpace4),
+                    if (SocialPlaceExtractor.audioServerAvailable) ...[
+                      _ParseItineraryBanner(
+                        icon: Icons.graphic_eq_rounded,
+                        label: 'Extract from audio',
+                        subtitle: 'Transcribes spoken place names from the video',
+                        scanning: _scanningAudio,
+                        disabled: _anyScan,
+                        onTap: _transcribeAudio,
+                      ),
+                      const SizedBox(height: kSpace4),
+                    ],
                   ],
                   if (_canSaveAsStay) ...[
                     _ParseItineraryBanner(

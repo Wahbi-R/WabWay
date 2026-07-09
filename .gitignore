@@ -2,6 +2,9 @@
 .env
 .env.*
 
+# Audio transcription server (separate git repo)
+wabway-server/
+
 # Miscellaneous
 *.class
 *.lock

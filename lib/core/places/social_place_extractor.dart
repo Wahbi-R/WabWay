@@ -1,5 +1,11 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'nominatim_service.dart';
 import 'oembed_service.dart';
+
+// URL of the WabWay audio server (wabway-server/ project running on G8 via Termux).
+// Set via --dart-define-from-file=.env. Empty string disables the audio banner.
+const _kAudioServerUrl = String.fromEnvironment('AUDIO_SERVER_URL', defaultValue: '');
 
 class SocialPlaceResult {
   const SocialPlaceResult({
@@ -11,6 +17,52 @@ class SocialPlaceResult {
 }
 
 abstract final class SocialPlaceExtractor {
+  /// Whether the audio server is configured (controls banner visibility).
+  static bool get audioServerAvailable => _kAudioServerUrl.isNotEmpty;
+
+  /// Downloads the video audio, transcribes it on the G8 server, and geocodes
+  /// any place names extracted by spaCy NER. Returns null if the server is
+  /// unreachable or the video can't be downloaded.
+  static Future<SocialPlaceResult?> extractFromAudio(String url) async {
+    if (_kAudioServerUrl.isEmpty) return null;
+    try {
+      final resp = await http
+          .post(
+            Uri.parse('$_kAudioServerUrl/transcribe'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'url': url}),
+          )
+          .timeout(const Duration(minutes: 3)); // transcription can take ~60s
+
+      if (resp.statusCode != 200) return null;
+
+      final body      = jsonDecode(resp.body) as Map<String, dynamic>;
+      final transcript = (body['transcript'] as String? ?? '').trim();
+      final rawPlaces  = (body['places'] as List?)?.cast<String>() ?? [];
+
+      if (transcript.isEmpty) return null;
+
+      // Geocode each server-extracted place name via Nominatim
+      final places = <NominatimPlace>[];
+      for (final name in rawPlaces.take(8)) {
+        final results = await NominatimService.search(name);
+        if (results.isNotEmpty) {
+          final best = results.first;
+          if (!places.any((p) => p.name.toLowerCase() == best.name.toLowerCase())) {
+            places.add(best);
+          }
+        }
+        if (rawPlaces.indexOf(name) < rawPlaces.length - 1) {
+          await Future<void>.delayed(const Duration(milliseconds: 1100));
+        }
+      }
+
+      return SocialPlaceResult(caption: transcript, places: places);
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Fetches a TikTok/Instagram post caption and geocodes any place
   /// candidates found within it. Returns null if the post is unreachable.
   static Future<SocialPlaceResult?> extract(String url) async {

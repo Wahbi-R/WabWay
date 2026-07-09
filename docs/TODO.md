@@ -91,6 +91,21 @@ Checked items are done. Log the date and a one-liner when completing something.
 
 ---
 
+---
+
+## Phase 3 — Maps Import & Media
+
+### Completed
+
+- [x] **49. Google Maps import** — share any Maps URL → WabWay; resolves short links via redirect tracking; Nominatim geocoding fallback; WebView scraper for JS-rendered list pages (5 regex patterns); KML import for My Maps (2026-07-07, see `docs/features/phase 3/google-maps-import.md`).
+- [x] **50. Google Takeout CSV import** — fast sync parse + instant list display; three-step background geocoding per place (Nominatim name → URL slug → Google Maps page fetch); deduplication by URL; Notes column preserved; unfound places flagged "No location found" instead of dropped; progress counter "Finding locations… X of Y" (2026-07-07, see `docs/features/phase 3/google-takeout-import.md`).
+- [x] **51. Spot images (Wikipedia thumbnails)** — `WikipediaImageService` fetches thumbnail URL from Wikipedia REST API (fallback: MediaWiki pageimages API); URL stored in `spots.image_url`; shown in list tile and detail header; no local storage (2026-07-07, see `docs/features/phase 3/spot-images.md`).
+- [x] **52. OCR itinerary scanner** — two-pass OCR with `google_mlkit_text_recognition`; Gemini AI fallback for multi-column booking formats; PDF text-layer extraction before image OCR; parse mode shown in banner (2026-07-07, see `docs/features/phase 3/ocr-itinerary-scanner.md`).
+- [x] **53. Changelog sheet** — auto-shows once on upgrade (compares `PackageInfo.buildNumber` to `SharedPrefs last_seen_build`); accessible from More → What's new; `DraggableScrollableSheet` with release list; const `_kChangelog` list in `changelog.dart` (2026-07-09, see `docs/features/phase 3/changelog-sheet.md`).
+- [x] **54. Photo albums** — Photos screen under More; members add links to Google Photos / iCloud / Dropbox albums; service auto-detected from URL; step-by-step guide for Google Photos collaborative albums; Realtime sync; migration `006_trip_photo_albums.sql` applied via `supabase db push` (2026-07-09, see `docs/features/phase 3/photo-albums.md`).
+
+---
+
 ## Dead buttons / stubs to wire up
 
 | Location | Button | What it needs |

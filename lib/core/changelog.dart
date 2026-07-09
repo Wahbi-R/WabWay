@@ -11,6 +11,48 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 23,
+    label: 'Document thumbnails',
+    changes: [
+      'Image documents now show a real preview thumbnail in the docs grid and list',
+      'Thumbnails are served from Supabase\'s CDN — fast after the first load, no extra uploads',
+      'Non-image files (PDFs, etc.) are unchanged',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 22,
+    label: 'Caption extraction & paste fallback',
+    changes: [
+      'Instagram and TikTok captions are now fetched server-side, fixing CORS errors on web builds',
+      'Audio transcription automatically pulls the post caption too and combines place candidates from both',
+      'Paste fallback: copy-paste a caption manually if auto-fetch isn\'t available — tap "Find places" to scan it',
+      'Place extraction is smarter — fewer false positives from sentence-starting words',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 21,
+    label: 'Unified import & share screen',
+    changes: [
+      'Import and share intake are now one screen — same flow whether you\'re sharing from another app or importing manually',
+      'Import mode lets you pick a file, take a photo, or paste a URL before continuing',
+      'Plan item destination fully wired — pick day and item type in one step',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 20,
+    label: 'Audio transcription for social shares',
+    changes: [
+      'Share a TikTok or Instagram video to WabWay and it extracts place names from the audio narration',
+      'Transcription runs on-device via whisper.cpp (requires the WabWay server on your phone)',
+      'Found places are geocoded and dropped straight into the spot picker',
+      'Banner is hidden automatically when the server isn\'t configured',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 19,
     label: 'Shared photo albums',
     changes: [

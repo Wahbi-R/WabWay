@@ -196,8 +196,7 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
   Future<void> _fetchRate() async {
     if (!_needsConversion) return;
     setState(() => _fetchingRate = true);
-    final rate = await ExchangeRateService.fetch(
-      _currency, widget.homeCurrency, DateTime.now());
+    final rate = await ExchangeRateService.fetch(_currency, widget.homeCurrency);
     if (!mounted) return;
     setState(() {
       _fetchingRate = false;

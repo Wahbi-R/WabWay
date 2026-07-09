@@ -7,17 +7,25 @@ abstract final class ExchangeRateService {
   ///
   /// When [from] == [to] returns 1.0 immediately.
   /// Weekends and public holidays return the nearest prior ECB rate.
+  /// Fetches the rate for [from] → [to].
+  /// Pass [date] for historical lookups (editing old receipts); omit or pass
+  /// today to get the latest published ECB rate via the /latest endpoint.
   static Future<double?> fetch(
     String from,
-    String to,
-    DateTime date,
-  ) async {
+    String to, {
+    DateTime? date,
+  }) async {
     if (from == to) return 1.0;
-    final d = '${date.year.toString().padLeft(4, '0')}-'
-        '${date.month.toString().padLeft(2, '0')}-'
-        '${date.day.toString().padLeft(2, '0')}';
+    final now   = DateTime.now();
+    final isToday = date == null ||
+        (date.year == now.year && date.month == now.month && date.day == now.day);
+    final segment = isToday
+        ? 'latest'
+        : '${date.year.toString().padLeft(4, '0')}-'
+            '${date.month.toString().padLeft(2, '0')}-'
+            '${date.day.toString().padLeft(2, '0')}';
     try {
-      final uri = Uri.parse('https://api.frankfurter.app/$d?from=$from&to=$to');
+      final uri = Uri.parse('https://api.frankfurter.app/$segment?from=$from&to=$to');
       final res = await http.get(uri).timeout(const Duration(seconds: 5));
       if (res.statusCode != 200) return null;
       final j = jsonDecode(res.body) as Map<String, dynamic>;

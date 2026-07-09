@@ -49,14 +49,17 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
-      # Parse version from pubspec.yaml → e.g. "1.0.0+1" → tag "v1.0.0+1"
+      # Build number comes from the CI run number (auto-increments on every push).
+      # The base semver is still read from pubspec.yaml; only the +build part is overridden.
       - name: Extract version
         id: version
         run: |
-          VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}')
-          echo "full=$VERSION" >> $GITHUB_OUTPUT
-          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
-          echo "name=WabWay v$(echo $VERSION | cut -d'+' -f1)" >> $GITHUB_OUTPUT
+          BASE=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d'+' -f1)
+          BUILD=${{ github.run_number }}
+          echo "full=${BASE}+${BUILD}" >> $GITHUB_OUTPUT
+          echo "tag=v${BASE}+${BUILD}" >> $GITHUB_OUTPUT
+          echo "name=WabWay v${BASE}" >> $GITHUB_OUTPUT
+          echo "build=${BUILD}" >> $GITHUB_OUTPUT
 
       # ── Android APK ──────────────────────────────────────────────────────────
 
@@ -73,7 +76,7 @@ jobs:
 
       - name: Build APK
         if: github.event_name == 'push' || github.event.inputs.build_apk == 'true'
-        run: flutter build apk --release --dart-define-from-file=.env
+        run: flutter build apk --release --build-number=${{ steps.version.outputs.build }} --dart-define-from-file=.env
 
       - name: Rename APK
         if: github.event_name == 'push' || github.event.inputs.build_apk == 'true'
@@ -96,7 +99,7 @@ jobs:
       # ── Web → GitHub Pages ───────────────────────────────────────────────────
 
       - name: Build web
-        run: flutter build web --dart-define-from-file=.env
+        run: flutter build web --build-number=${{ steps.version.outputs.build }} --dart-define-from-file=.env
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

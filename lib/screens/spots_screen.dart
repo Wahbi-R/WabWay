@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
 import '../core/auth/profile_state.dart';
+import '../core/images/wikipedia_image_service.dart';
 import '../core/supabase/client.dart';
 import '../core/supabase/doc_service.dart';
 import '../core/supabase/spot_service.dart';
@@ -37,6 +38,7 @@ class _SpotsScreenState extends State<SpotsScreen> {
   String? _activeTripId;
   RealtimeChannel? _realtimeChannel;
   Timer? _debounce;
+  final _thumbnailAttempted = <String>{};
 
   String? _selectedId;
   SpotCategory? _filterCategory;
@@ -131,6 +133,7 @@ class _SpotsScreenState extends State<SpotsScreen> {
       }
 
       setState(() { _spots = spots; _docs = docs; _myVotes = myVotes; _loading = false; _offline = false; });
+      _fetchMissingThumbnails(spots);
     } catch (_) {
       if (!mounted) return;
       if (silent) { setState(() => _offline = true); return; }
@@ -153,6 +156,27 @@ class _SpotsScreenState extends State<SpotsScreen> {
       } else {
         setState(() { _loading = false; _error = true; });
       }
+    }
+  }
+
+  void _fetchMissingThumbnails(List<Spot> spots) {
+    final missing = spots
+        .where((s) => s.imageUrl == null && !_thumbnailAttempted.contains(s.id))
+        .toList();
+    if (missing.isEmpty) return;
+    for (final s in missing) {
+      _thumbnailAttempted.add(s.id);
+      WikipediaImageService.fetchThumbnailUrl(s.name).then((url) async {
+        if (url == null || !mounted) return;
+        try {
+          await SpotService.updateSpotImageUrl(s.id, url);
+          if (!mounted) return;
+          setState(() {
+            final idx = _spots.indexWhere((sp) => sp.id == s.id);
+            if (idx != -1) _spots[idx] = _spots[idx].copyWith(imageUrl: url);
+          });
+        } catch (_) {}
+      });
     }
   }
 

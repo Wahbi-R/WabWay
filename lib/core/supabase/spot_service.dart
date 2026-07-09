@@ -220,6 +220,10 @@ abstract final class SpotService {
     await supabase.from('spots').delete().eq('id', spotId);
   }
 
+  static Future<void> updateSpotImageUrl(String spotId, String imageUrl) async {
+    await supabase.from('spots').update({'image_url': imageUrl}).eq('id', spotId);
+  }
+
   // ─── Votes ──────────────────────────────────────────────────────────────────
 
   static Future<void> upsertVote({

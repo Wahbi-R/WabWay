@@ -109,6 +109,9 @@ Checked items are done. Log the date and a one-liner when completing something.
 ### Pending
 
 - [ ] **56. Termux:Boot auto-start** — `pkg install termux-boot`; add `~/.termux/boot/start-server.sh` that runs `cd ~/wabway-server && bash start.sh`; keeps audio server running after phone reboot without manual intervention.
+- [x] **57. Paste-caption fallback + server caption proxy** — `_PasteCaptionCard` in `IncomingShareScreen` lets users paste an Instagram/TikTok caption manually; `/caption` endpoint on `wabway-server` fetches captions server-side (yt-dlp primary, HTML scrape fallback) to bypass CORS; proxy URL registered via `OembedService.setProxyUrl`; auto-combined with audio transcript on `/transcribe` (2026-07-09, see `docs/features/phase 3/caption-extraction.md`).
+- [x] **58. Photos create-album buttons** — empty state on Photos screen shows `_CreateAlbumCard` with Google Photos and iCloud launch buttons; note that photos don't auto-sync added to guide card subtitle (2026-07-09).
+- [x] **59. Document image thumbnails** — `DocService.getThumbnailUrl` generates a 400×280 signed URL with Supabase Storage image transform (CDN-cached after first access); `DocGridCard` header and `DocListRow` leading box show `Image.network` with fade-in for image docs; non-image docs unchanged (2026-07-09, see `docs/features/phase 3/doc-thumbnails.md`).
 
 ---
 

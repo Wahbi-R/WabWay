@@ -261,6 +261,29 @@ abstract final class DocService {
     return supabase.storage.from(_bucket).createSignedUrl(path, expiresIn);
   }
 
+  static final Map<String, Future<String?>> _thumbCache = {};
+
+  static const _imageExts = {'jpg', 'jpeg', 'png', 'webp'};
+
+  static Future<String?> getThumbnailUrl(String storagePath, String ext) {
+    if (!_imageExts.contains(ext.toLowerCase())) return Future.value(null);
+    return _thumbCache.putIfAbsent(storagePath, () async {
+      try {
+        return await supabase.storage.from(_bucket).createSignedUrl(
+          storagePath,
+          3600,
+          transform: const TransformOptions(
+            width: 400,
+            height: 280,
+            resize: ResizeMode.cover,
+          ),
+        );
+      } catch (_) {
+        return null;
+      }
+    });
+  }
+
   static Future<void> deleteStorageFile(String path) async {
     await supabase.storage.from(_bucket).remove([path]);
   }

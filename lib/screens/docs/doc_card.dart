@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/auth/profile_state.dart';
 import '../../core/supabase/client.dart';
+import '../../core/supabase/doc_service.dart';
 import '../../core/trip/trip_state.dart';
 import '../../data/docs_data.dart';
 import '../../theme/app_colors.dart';
@@ -41,28 +42,41 @@ class DocGridCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Icon area
-          Container(
-            height: 80,
-            decoration: BoxDecoration(
-              color: doc.type.softColor,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-            ),
-            child: Stack(
-              children: [
-                Center(
-                  child: Icon(
-                    doc.type.icon,
-                    size: 44,
-                    color: doc.type.color.withValues(alpha: 0.75),
-                  ),
-                ),
-                Positioned(
-                  top: kSpace2,
-                  right: kSpace2,
-                  child: _ExtBadge(ext: doc.ext, color: doc.extColor, softColor: doc.extSoftColor),
-                ),
-              ],
+          // Icon / thumbnail area
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+            child: SizedBox(
+              height: 80,
+              child: doc.isImage && doc.storagePath != null
+                  ? FutureBuilder<String?>(
+                      future: DocService.getThumbnailUrl(doc.storagePath!, doc.ext),
+                      builder: (context, snap) {
+                        if (snap.hasData && snap.data != null) {
+                          return Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              Image.network(
+                                snap.data!,
+                                fit: BoxFit.cover,
+                                frameBuilder: (ctx, child, frame, _) => AnimatedOpacity(
+                                  opacity: frame == null ? 0 : 1,
+                                  duration: const Duration(milliseconds: 200),
+                                  child: child,
+                                ),
+                                errorBuilder: (_, __, ___) => _IconArea(doc: doc),
+                              ),
+                              Positioned(
+                                top: kSpace2,
+                                right: kSpace2,
+                                child: _ExtBadge(ext: doc.ext, color: doc.extColor, softColor: doc.extSoftColor),
+                              ),
+                            ],
+                          );
+                        }
+                        return _IconArea(doc: doc, showBadge: true);
+                      },
+                    )
+                  : _IconArea(doc: doc, showBadge: true),
             ),
           ),
 
@@ -136,15 +150,33 @@ class DocListRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: kSpace3),
       child: Row(
         children: [
-          // Type icon box
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: doc.type.softColor,
-              borderRadius: kRadiusMd,
+          // Type icon / thumbnail box
+          ClipRRect(
+            borderRadius: kRadiusMd,
+            child: SizedBox(
+              width: 44,
+              height: 44,
+              child: doc.isImage && doc.storagePath != null
+                  ? FutureBuilder<String?>(
+                      future: DocService.getThumbnailUrl(doc.storagePath!, doc.ext),
+                      builder: (context, snap) {
+                        if (snap.hasData && snap.data != null) {
+                          return Image.network(
+                            snap.data!,
+                            fit: BoxFit.cover,
+                            frameBuilder: (ctx, child, frame, _) => AnimatedOpacity(
+                              opacity: frame == null ? 0 : 1,
+                              duration: const Duration(milliseconds: 200),
+                              child: child,
+                            ),
+                            errorBuilder: (_, __, ___) => _SmallIconBox(doc: doc),
+                          );
+                        }
+                        return _SmallIconBox(doc: doc);
+                      },
+                    )
+                  : _SmallIconBox(doc: doc),
             ),
-            child: Icon(doc.type.icon, size: 22, color: doc.type.color),
           ),
           const SizedBox(width: kSpace3),
 
@@ -199,6 +231,51 @@ class DocListRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ─── Icon area helpers ────────────────────────────────────────────────────────
+
+class _IconArea extends StatelessWidget {
+  const _IconArea({required this.doc, this.showBadge = false});
+  final TripDocument doc;
+  final bool showBadge;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: doc.type.softColor,
+      child: Stack(
+        children: [
+          Center(
+            child: Icon(
+              doc.type.icon,
+              size: 44,
+              color: doc.type.color.withValues(alpha: 0.75),
+            ),
+          ),
+          if (showBadge)
+            Positioned(
+              top: kSpace2,
+              right: kSpace2,
+              child: _ExtBadge(ext: doc.ext, color: doc.extColor, softColor: doc.extSoftColor),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SmallIconBox extends StatelessWidget {
+  const _SmallIconBox({required this.doc});
+  final TripDocument doc;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: doc.type.softColor,
+      child: Icon(doc.type.icon, size: 22, color: doc.type.color),
     );
   }
 }

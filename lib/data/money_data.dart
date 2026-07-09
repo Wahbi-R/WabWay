@@ -61,6 +61,9 @@ class Receipt {
     required this.title,
     required this.amount,
     required this.currency,
+    required this.homeAmount,
+    required this.exchangeRate,
+    required this.transactionFeePct,
     required this.paidById,
     required this.splits,
     required this.category,
@@ -71,14 +74,25 @@ class Receipt {
 
   final String id;
   final String title;
+  /// Original amount in [currency] (the foreign/local currency paid).
   final double amount;
   final String currency;
+  /// Locked equivalent in the trip's home currency. Set at creation time.
+  final double homeAmount;
+  /// 1 unit of [currency] expressed in home currency (stored for auditability).
+  final double exchangeRate;
+  /// Card foreign transaction fee % applied on top of the exchange rate.
+  final double transactionFeePct;
   final String paidById;
+  /// Split amounts are in home currency.
   final List<ReceiptSplit> splits;
   final ReceiptCategory category;
   final DateTime date;
   final String? notes;
   final String? storagePath;
+
+  /// True when the receipt was entered in a foreign currency and a real rate was applied.
+  bool get isForeignCurrency => exchangeRate != 1.0;
 
   double get myShare => myShareFor(kYouId);
   double get myNet   => myNetFor(kYouId);
@@ -326,12 +340,23 @@ List<SettlementSuggestion> suggestSettlements(
 
 String fmtAmount(double amount, String currency) {
   return switch (currency) {
-    'JPY' => '¥${amount.toStringAsFixed(0)}',
+    'JPY' || 'KRW' || 'IDR' || 'VND' => '${_currencySymbol(currency)}${amount.toStringAsFixed(0)}',
     'USD' => '\$${amount.toStringAsFixed(2)}',
     'EUR' => '€${amount.toStringAsFixed(2)}',
+    'GBP' => '£${amount.toStringAsFixed(2)}',
+    'CAD' => 'C\$${amount.toStringAsFixed(2)}',
+    'AUD' => 'A\$${amount.toStringAsFixed(2)}',
     _     => '$currency ${amount.toStringAsFixed(2)}',
   };
 }
+
+String _currencySymbol(String code) => switch (code) {
+  'JPY' => '¥',
+  'KRW' => '₩',
+  'IDR' => 'Rp',
+  'VND' => '₫',
+  _     => code,
+};
 
 String fmtDate(DateTime d) {
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -352,15 +377,18 @@ Receipt _split4(
 }) {
   final share = (amount / 4 * 100).roundToDouble() / 100;
   return Receipt(
-    id: id,
-    title: title,
-    amount: amount,
-    currency: currency,
-    paidById: paidById,
-    category: category,
-    date: date,
-    notes: notes,
-    splits: kMockMembers
+    id:                  id,
+    title:               title,
+    amount:              amount,
+    currency:            currency,
+    homeAmount:          amount,
+    exchangeRate:        1,
+    transactionFeePct:   0,
+    paidById:            paidById,
+    category:            category,
+    date:                date,
+    notes:               notes,
+    splits:              kMockMembers
         .map((m) => ReceiptSplit(memberId: m.id, amount: share))
         .toList(),
   );
@@ -370,14 +398,17 @@ final kMockReceipts = <Receipt>[
   _split4('r1', 'Ramen Ichiran', 4800, 'JPY', 'alex',
       ReceiptCategory.food, DateTime(2024, 11, 12)),
   Receipt(
-    id: 'r2',
-    title: 'Shinkansen Tokyo → Kyoto',
-    amount: 27400,
-    currency: 'JPY',
-    paidById: 'you',
-    category: ReceiptCategory.transport,
-    date: DateTime(2024, 11, 15),
-    notes: 'Reserved seats, non-reserved section.',
+    id:                'r2',
+    title:             'Shinkansen Tokyo → Kyoto',
+    amount:            27400,
+    currency:          'JPY',
+    homeAmount:        27400,
+    exchangeRate:      1,
+    transactionFeePct: 0,
+    paidById:          'you',
+    category:          ReceiptCategory.transport,
+    date:              DateTime(2024, 11, 15),
+    notes:             'Reserved seats, non-reserved section.',
     splits: const [
       ReceiptSplit(memberId: 'you',    amount: 6850),
       ReceiptSplit(memberId: 'jordan', amount: 6850),
@@ -386,13 +417,16 @@ final kMockReceipts = <Receipt>[
     ],
   ),
   Receipt(
-    id: 'r3',
-    title: 'Hotel Shinjuku (2 nights)',
-    amount: 36000,
-    currency: 'JPY',
-    paidById: 'jordan',
-    category: ReceiptCategory.accommodation,
-    date: DateTime(2024, 11, 12),
+    id:                'r3',
+    title:             'Hotel Shinjuku (2 nights)',
+    amount:            36000,
+    currency:          'JPY',
+    homeAmount:        36000,
+    exchangeRate:      1,
+    transactionFeePct: 0,
+    paidById:          'jordan',
+    category:          ReceiptCategory.accommodation,
+    date:              DateTime(2024, 11, 12),
     splits: const [
       ReceiptSplit(memberId: 'you',    amount: 9000),
       ReceiptSplit(memberId: 'alex',   amount: 9000),
@@ -408,13 +442,16 @@ final kMockReceipts = <Receipt>[
       ReceiptCategory.activity, DateTime(2024, 11, 14),
       notes: '4 × ¥3,500. Book in advance next time.'),
   Receipt(
-    id: 'r7',
-    title: 'Kyoto Ryokan (1 night)',
-    amount: 52000,
-    currency: 'JPY',
-    paidById: 'you',
-    category: ReceiptCategory.accommodation,
-    date: DateTime(2024, 11, 16),
+    id:                'r7',
+    title:             'Kyoto Ryokan (1 night)',
+    amount:            52000,
+    currency:          'JPY',
+    homeAmount:        52000,
+    exchangeRate:      1,
+    transactionFeePct: 0,
+    paidById:          'you',
+    category:          ReceiptCategory.accommodation,
+    date:              DateTime(2024, 11, 16),
     splits: const [
       ReceiptSplit(memberId: 'you',    amount: 13000),
       ReceiptSplit(memberId: 'alex',   amount: 13000),

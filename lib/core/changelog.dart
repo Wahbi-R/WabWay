@@ -11,6 +11,18 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 24,
+    label: 'Multi-currency receipts',
+    changes: [
+      'Receipts in foreign currencies now show the home-currency equivalent (e.g. ≈ C\$89.43)',
+      'Exchange rate is locked at the time of purchase — balances stay accurate even if rates shift',
+      'Optional transaction fee field to capture card surcharges',
+      'Set your settlement currency (e.g. CAD) in Trip Settings → Settlement currency',
+      'Old receipts backfilled with exchange rate 1 — update them manually if needed',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 23,
     label: 'Document thumbnails',
     changes: [

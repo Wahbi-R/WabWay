@@ -45,15 +45,19 @@ abstract final class SyncQueue {
     final failed = <Map<String, dynamic>>[];
     for (final item in list) {
       try {
+        final amt = (item['amount'] as num).toDouble();
         await MoneyService.createReceipt(
-          tripId:   tripId,
-          paidBy:   userId,
-          title:    item['title'] as String,
-          amount:   (item['amount'] as num).toDouble(),
-          currency: item['currency'] as String? ?? 'USD',
-          category: ReceiptCategory.other,
-          date:     DateTime.tryParse(item['date'] as String? ?? '') ?? DateTime.now(),
-          splits:   [ReceiptSplit(memberId: userId, amount: (item['amount'] as num).toDouble())],
+          tripId:            tripId,
+          paidBy:            userId,
+          title:             item['title'] as String,
+          amount:            amt,
+          currency:          item['currency'] as String? ?? 'USD',
+          homeAmount:        amt,
+          exchangeRate:      1.0,
+          transactionFeePct: 0.0,
+          category:          ReceiptCategory.other,
+          date:              DateTime.tryParse(item['date'] as String? ?? '') ?? DateTime.now(),
+          splits:            [ReceiptSplit(memberId: userId, amount: amt)],
         );
       } catch (_) {
         failed.add(item);

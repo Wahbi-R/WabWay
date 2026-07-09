@@ -62,6 +62,7 @@ class _TripSettingsSheetState extends State<_TripSettingsSheet> {
   DateTime? _startDate;
   DateTime? _endDate;
   late String _currency;
+  late String _homeCurrency;
   bool _saving = false;
   String? _error;
 
@@ -77,6 +78,7 @@ class _TripSettingsSheetState extends State<_TripSettingsSheet> {
     _startDate       = widget.trip.startDate;
     _endDate         = widget.trip.endDate;
     _currency        = widget.trip.defaultCurrency;
+    _homeCurrency    = widget.trip.homeCurrency;
     _coverImageUrl   = widget.trip.coverImageUrl;
   }
 
@@ -163,6 +165,7 @@ class _TripSettingsSheetState extends State<_TripSettingsSheet> {
         endDate:          _endDate,
         clearEndDate:     _endDate == null && widget.trip.endDate != null,
         defaultCurrency:  _currency,
+        homeCurrency:     _homeCurrency,
         coverImageUrl:    _clearCover ? null : _coverImageUrl,
         clearCoverImage:  _clearCover,
       );
@@ -265,35 +268,29 @@ class _TripSettingsSheetState extends State<_TripSettingsSheet> {
                     ),
                     const SizedBox(height: kSpace4),
 
-                    // Currency
+                    // Default currency (trip's local currency)
                     Text('Default currency',
                         style: kStyleCaptionMedium.copyWith(color: kColorInk)),
+                    const SizedBox(height: kSpace1),
+                    Text('Pre-filled when adding receipts.',
+                        style: kStyleCaption.copyWith(color: kColorInkSoft)),
                     const SizedBox(height: kSpace2),
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: kColorSurfaceSunken,
-                        borderRadius: kRadiusMd,
-                        border: Border.all(color: kColorBorder),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _currency,
-                          isExpanded: true,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: kSpace3, vertical: 2),
-                          borderRadius: kRadiusMd,
-                          items: _kCurrencies.map((c) {
-                            final (code, label) = c;
-                            return DropdownMenuItem(
-                              value: code,
-                              child: Text(label, style: kStyleBodyMedium),
-                            );
-                          }).toList(),
-                          onChanged: (v) {
-                            if (v != null) setState(() => _currency = v);
-                          },
-                        ),
-                      ),
+                    _CurrencyDropdown(
+                      value: _currency,
+                      onChanged: (v) => setState(() => _currency = v),
+                    ),
+                    const SizedBox(height: kSpace4),
+
+                    // Home / settlement currency
+                    Text('Settlement currency',
+                        style: kStyleCaptionMedium.copyWith(color: kColorInk)),
+                    const SizedBox(height: kSpace1),
+                    Text('Everyone gets paid back in this currency.',
+                        style: kStyleCaption.copyWith(color: kColorInkSoft)),
+                    const SizedBox(height: kSpace2),
+                    _CurrencyDropdown(
+                      value: _homeCurrency,
+                      onChanged: (v) => setState(() => _homeCurrency = v),
                     ),
 
                     const SizedBox(height: kSpace4),
@@ -416,6 +413,41 @@ class _CoverPhotoField extends StatelessWidget {
                         ),
                     ],
                   ),
+      ),
+    );
+  }
+}
+
+// ─── Currency dropdown (shared by default + home currency pickers) ────────────
+
+class _CurrencyDropdown extends StatelessWidget {
+  const _CurrencyDropdown({required this.value, required this.onChanged});
+  final String value;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: kColorSurfaceSunken,
+        borderRadius: kRadiusMd,
+        border: Border.all(color: kColorBorder),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value,
+          isExpanded: true,
+          padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: 2),
+          borderRadius: kRadiusMd,
+          items: _kCurrencies.map((c) {
+            final (code, label) = c;
+            return DropdownMenuItem(
+              value: code,
+              child: Text(label, style: kStyleBodyMedium),
+            );
+          }).toList(),
+          onChanged: (v) { if (v != null) onChanged(v); },
+        ),
       ),
     );
   }

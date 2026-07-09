@@ -94,6 +94,7 @@ abstract final class TripService {
     DateTime? startDate,
     DateTime? endDate,
     String? defaultCurrency,
+    String? homeCurrency,
     String? coverImageUrl,
     bool clearDestination  = false,
     bool clearStartDate    = false,
@@ -114,6 +115,7 @@ abstract final class TripService {
       if (clearEndDate) 'end_date': null
       else if (endDate != null) 'end_date': _fmtDate(endDate),
       if (defaultCurrency != null) 'default_currency': defaultCurrency.toUpperCase(),
+      if (homeCurrency != null) 'home_currency': homeCurrency.toUpperCase(),
       if (clearCoverImage) 'cover_image_url': null
       else if (coverImageUrl != null) 'cover_image_url': coverImageUrl,
     };

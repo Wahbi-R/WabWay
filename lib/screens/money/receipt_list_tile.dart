@@ -12,6 +12,7 @@ class ReceiptListTile extends StatelessWidget {
     required this.receipt,
     required this.myId,
     required this.members,
+    required this.homeCurrency,
     this.selected = false,
     this.onTap,
   });
@@ -19,6 +20,7 @@ class ReceiptListTile extends StatelessWidget {
   final Receipt receipt;
   final String myId;
   final List<TripMember> members;
+  final String homeCurrency;
   final bool selected;
   final VoidCallback? onTap;
 
@@ -92,10 +94,22 @@ class ReceiptListTile extends StatelessWidget {
                     color: kColorInk,
                   ),
                 ),
+                // Show home-currency equivalent when it differs from receipt currency
+                if (receipt.isForeignCurrency) ...[
+                  const SizedBox(height: 1),
+                  Text(
+                    '≈ ${fmtAmount(receipt.homeAmount, homeCurrency)}',
+                    style: GoogleFonts.ibmPlexMono(
+                      fontSize: kTextXs,
+                      fontWeight: FontWeight.w400,
+                      color: kColorInkSoft,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 2),
                 if (net.abs() > 0.01)
                   Text(
-                    '${isPositive ? '+' : ''}${fmtAmount(net, receipt.currency)}',
+                    '${isPositive ? '+' : ''}${fmtAmount(net, homeCurrency)}',
                     style: GoogleFonts.ibmPlexMono(
                       fontSize: kTextXs,
                       fontWeight: FontWeight.w500,

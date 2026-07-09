@@ -1,4 +1,3 @@
-import 'dart:convert';
 import '../offline_cache.dart';
 import '../../data/money_data.dart';
 import 'client.dart';
@@ -31,22 +30,26 @@ abstract final class MoneyService {
     final splits = splitsRaw.map((s) {
       final split = s as Map<String, dynamic>;
       return ReceiptSplit(
-        memberId:   split['user_id'] as String,
-        amount:     (split['amount'] as num).toDouble(),
-        isSettled:  split['is_settled'] as bool? ?? false,
+        memberId:  split['user_id'] as String,
+        amount:    (split['amount'] as num).toDouble(),
+        isSettled: split['is_settled'] as bool? ?? false,
       );
     }).toList();
+    final rawAmount = (row['amount'] as num).toDouble();
     return Receipt(
-      id:          row['id'] as String,
-      title:       row['title'] as String,
-      amount:      (row['amount'] as num).toDouble(),
-      currency:    row['currency'] as String,
-      paidById:    row['paid_by'] as String,
-      category:    _catFrom(row['category'] as String),
-      date:        DateTime.parse(row['date'] as String),
-      notes:       row['notes'] as String?,
-      storagePath: row['storage_path'] as String?,
-      splits:      splits,
+      id:                row['id'] as String,
+      title:             row['title'] as String,
+      amount:            rawAmount,
+      currency:          row['currency'] as String,
+      homeAmount:        (row['home_amount'] as num?)?.toDouble() ?? rawAmount,
+      exchangeRate:      (row['exchange_rate'] as num?)?.toDouble() ?? 1.0,
+      transactionFeePct: (row['transaction_fee_pct'] as num?)?.toDouble() ?? 0.0,
+      paidById:          row['paid_by'] as String,
+      category:          _catFrom(row['category'] as String),
+      date:              DateTime.parse(row['date'] as String),
+      notes:             row['notes'] as String?,
+      storagePath:       row['storage_path'] as String?,
+      splits:            splits,
     );
   }
 
@@ -127,19 +130,25 @@ abstract final class MoneyService {
     required String title,
     required double amount,
     required String currency,
+    required double homeAmount,
+    required double exchangeRate,
+    required double transactionFeePct,
     required ReceiptCategory category,
     required DateTime date,
     required List<ReceiptSplit> splits,
     String? notes,
   }) async {
     final receipt = await supabase.from('receipts').insert({
-      'trip_id':  tripId,
-      'title':    title.trim(),
-      'amount':   amount,
-      'currency': currency,
-      'paid_by':  paidBy,
-      'category': _catToDb(category),
-      'date':     _fmtDate(date),
+      'trip_id':              tripId,
+      'title':                title.trim(),
+      'amount':               amount,
+      'currency':             currency,
+      'home_amount':          homeAmount,
+      'exchange_rate':        exchangeRate,
+      'transaction_fee_pct':  transactionFeePct,
+      'paid_by':              paidBy,
+      'category':             _catToDb(category),
+      'date':                 _fmtDate(date),
       if (notes != null && notes.isNotEmpty) 'notes': notes,
     }).select().single();
 
@@ -208,6 +217,9 @@ abstract final class MoneyService {
     required String title,
     required double amount,
     required String currency,
+    required double homeAmount,
+    required double exchangeRate,
+    required double transactionFeePct,
     required ReceiptCategory category,
     required String paidBy,
     required DateTime date,
@@ -215,13 +227,16 @@ abstract final class MoneyService {
     String? notes,
   }) async {
     await supabase.from('receipts').update({
-      'title':    title.trim(),
-      'amount':   amount,
-      'currency': currency,
-      'paid_by':  paidBy,
-      'category': _catToDb(category),
-      'date':     _fmtDate(date),
-      'notes':    (notes != null && notes.isNotEmpty) ? notes : null,
+      'title':               title.trim(),
+      'amount':              amount,
+      'currency':            currency,
+      'home_amount':         homeAmount,
+      'exchange_rate':       exchangeRate,
+      'transaction_fee_pct': transactionFeePct,
+      'paid_by':             paidBy,
+      'category':            _catToDb(category),
+      'date':                _fmtDate(date),
+      'notes':               (notes != null && notes.isNotEmpty) ? notes : null,
     }).eq('id', receiptId);
 
     for (final split in splits) {

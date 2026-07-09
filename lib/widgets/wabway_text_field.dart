@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
@@ -24,6 +25,7 @@ class WabwayTextField extends StatelessWidget {
     this.enabled = true,
     this.readOnly = false,
     this.focusNode,
+    this.inputFormatters,
   });
 
   final String? label;
@@ -44,6 +46,7 @@ class WabwayTextField extends StatelessWidget {
   final bool enabled;
   final bool readOnly;
   final FocusNode? focusNode;
+  final List<TextInputFormatter>? inputFormatters;
 
   @override
   Widget build(BuildContext context) {
@@ -68,6 +71,7 @@ class WabwayTextField extends StatelessWidget {
           enabled: enabled,
           readOnly: readOnly,
           focusNode: focusNode,
+          inputFormatters: inputFormatters,
           style: kStyleBody,
           decoration: kInputDecoration(
             hint: hint,

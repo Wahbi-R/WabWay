@@ -688,15 +688,18 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
         }
         final amount = data.amount ?? 0.0;
         final receipt = await MoneyService.createReceipt(
-          tripId: tripId,
-          paidBy: userId,
-          title: data.title,
-          amount: amount,
-          currency: 'JPY',
-          category: _receiptCategory(data.category),
-          date: data.date ?? DateTime.now(),
-          notes: data.notes.isEmpty ? null : data.notes,
-          splits: [ReceiptSplit(memberId: userId, amount: amount)],
+          tripId:            tripId,
+          paidBy:            userId,
+          title:             data.title,
+          amount:            amount,
+          currency:          'JPY',
+          homeAmount:        amount,
+          exchangeRate:      1.0,
+          transactionFeePct: 0.0,
+          category:          _receiptCategory(data.category),
+          date:              data.date ?? DateTime.now(),
+          notes:             data.notes.isEmpty ? null : data.notes,
+          splits:            [ReceiptSplit(memberId: userId, amount: amount)],
         );
         if (receiptDoc != null) {
           await DocService.addLink(

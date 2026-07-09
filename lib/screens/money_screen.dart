@@ -214,13 +214,16 @@ class _MoneyScreenState extends State<MoneyScreen> {
 
   // ── Mutations ─────────────────────────────────────────────────────────────────
 
+  String get _homeCurrency => TripState.tripOf(context).homeCurrency;
+
   Future<void> _addReceipt(BuildContext context) async {
     if (_activeTripId == null) return;
     final receipt = await showAddReceiptSheet(
       context,
-      tripId:  _activeTripId!,
-      userId:  _userId,
-      members: _members,
+      tripId:       _activeTripId!,
+      userId:       _userId,
+      members:      _members,
+      homeCurrency: _homeCurrency,
     );
     if (receipt != null && mounted) {
       setState(() {
@@ -361,10 +364,11 @@ class _MoneyScreenState extends State<MoneyScreen> {
         itemCount: _receipts.length,
         separatorBuilder: (_, __) => const SizedBox(height: kSpace2),
         itemBuilder: (_, i) => ReceiptListTile(
-          receipt:  _receipts[i],
-          myId:     _userId,
-          members:  _members,
-          selected: _selectedReceiptId == _receipts[i].id,
+          receipt:      _receipts[i],
+          myId:         _userId,
+          members:      _members,
+          homeCurrency: _homeCurrency,
+          selected:     _selectedReceiptId == _receipts[i].id,
           onTap: () => setState(() => _selectedReceiptId = _receipts[i].id),
         ),
       );
@@ -529,9 +533,10 @@ class _MoneyScreenState extends State<MoneyScreen> {
                     itemBuilder: (ctx, i) {
                       final r = _receipts[i];
                       return ReceiptListTile(
-                        receipt: r,
-                        myId:    _userId,
-                        members: _members,
+                        receipt:      r,
+                        myId:         _userId,
+                        members:      _members,
+                        homeCurrency: _homeCurrency,
                         onTap: () => Navigator.push(
                           ctx,
                           MaterialPageRoute(

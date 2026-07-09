@@ -1,8 +1,10 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/supabase/client.dart';
 import '../../core/supabase/doc_service.dart';
+import '../../core/supabase/exchange_rate_service.dart';
 import '../../core/supabase/money_service.dart';
 import '../../data/docs_data.dart';
 import '../../data/money_data.dart';
@@ -22,6 +24,7 @@ Future<Receipt?> showAddReceiptSheet(
   String? userId,
   List<TripMember>? members,
   Receipt? existingReceipt,
+  String homeCurrency = 'CAD',
 }) {
   final effectiveUserId = userId ?? supabase.auth.currentUser?.id ?? kYouId;
   final effectiveMembers = (members != null && members.isNotEmpty)
@@ -48,6 +51,7 @@ Future<Receipt?> showAddReceiptSheet(
             userId:          effectiveUserId,
             members:         effectiveMembers,
             existingReceipt: existingReceipt,
+            homeCurrency:    homeCurrency,
             onSubmit: (r) => Navigator.pop(dialogCtx, r),
           ),
         ),
@@ -65,6 +69,7 @@ Future<Receipt?> showAddReceiptSheet(
       userId:          effectiveUserId,
       members:         effectiveMembers,
       existingReceipt: existingReceipt,
+      homeCurrency:    homeCurrency,
       onSubmit: (r) => Navigator.pop(ctx, r),
     ),
   );
@@ -76,6 +81,7 @@ class _AddReceiptSheet extends StatelessWidget {
     required this.tripId,
     required this.userId,
     required this.members,
+    required this.homeCurrency,
     this.existingReceipt,
   });
 
@@ -83,6 +89,7 @@ class _AddReceiptSheet extends StatelessWidget {
   final String? tripId;
   final String userId;
   final List<TripMember> members;
+  final String homeCurrency;
   final Receipt? existingReceipt;
 
   @override
@@ -101,6 +108,7 @@ class _AddReceiptSheet extends StatelessWidget {
           userId:           userId,
           members:          members,
           existingReceipt:  existingReceipt,
+          homeCurrency:     homeCurrency,
           scrollController: ctrl,
           onSubmit:         onSubmit,
           showDragHandle:   true,
@@ -118,6 +126,7 @@ class _AddReceiptContent extends StatefulWidget {
     required this.tripId,
     required this.userId,
     required this.members,
+    required this.homeCurrency,
     this.existingReceipt,
     this.scrollController,
     this.showDragHandle = false,
@@ -128,6 +137,7 @@ class _AddReceiptContent extends StatefulWidget {
   final String? tripId;
   final String userId;
   final List<TripMember> members;
+  final String homeCurrency;
   /// When set, the form pre-fills with this receipt and updates rather than creates.
   final Receipt? existingReceipt;
   final ScrollController? scrollController;
@@ -138,10 +148,13 @@ class _AddReceiptContent extends StatefulWidget {
 }
 
 class _AddReceiptContentState extends State<_AddReceiptContent> {
-  final _formKey   = GlobalKey<FormState>();
-  final _titleCtrl = TextEditingController();
+  final _formKey    = GlobalKey<FormState>();
+  final _titleCtrl  = TextEditingController();
   final _amountCtrl = TextEditingController();
   final _notesCtrl  = TextEditingController();
+  final _rateCtrl   = TextEditingController();
+  final _feePctCtrl = TextEditingController(text: '0');
+  final _homeAmountCtrl = TextEditingController();
 
   late String _paidById;
   late Set<String> _splitWith;
@@ -150,8 +163,50 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
   ReceiptCategory _category  = ReceiptCategory.food;
   String          _currency  = 'JPY';
   _SplitMode      _splitMode = _SplitMode.equal;
-  bool            _loading   = false;
+  bool            _loading      = false;
+  bool            _fetchingRate = false;
+  bool            _showFee      = false;
+  bool            _homeOverride = false; // user typed home amount directly
   String?         _error;
+
+  bool get _needsConversion => _currency != widget.homeCurrency;
+
+  // Derived home amount from rate + fee; null if inputs are invalid.
+  double? get _derivedHomeAmount {
+    final amount = double.tryParse(_amountCtrl.text.trim());
+    if (amount == null) return null;
+    if (!_needsConversion) return amount;
+    final rate = double.tryParse(_rateCtrl.text.trim());
+    if (rate == null || rate <= 0) return null;
+    final feePct = double.tryParse(_feePctCtrl.text.trim()) ?? 0;
+    return amount * rate * (1 + feePct / 100);
+  }
+
+  // The home amount to use when building splits.
+  double get _effectiveHomeAmount {
+    if (!_needsConversion) return double.tryParse(_amountCtrl.text.trim()) ?? 0;
+    if (_homeOverride) return double.tryParse(_homeAmountCtrl.text.trim()) ?? 0;
+    return _derivedHomeAmount ?? 0;
+  }
+
+  void _recomputeHome() {
+    if (!_homeOverride) setState(() {});
+  }
+
+  Future<void> _fetchRate() async {
+    if (!_needsConversion) return;
+    setState(() => _fetchingRate = true);
+    final rate = await ExchangeRateService.fetch(
+      _currency, widget.homeCurrency, DateTime.now());
+    if (!mounted) return;
+    setState(() {
+      _fetchingRate = false;
+      if (rate != null) {
+        _rateCtrl.text = rate.toStringAsFixed(6);
+        _homeOverride  = false;
+      }
+    });
+  }
 
   Uint8List? _photoBytes;
   String?    _photoExt;
@@ -186,6 +241,11 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
         ),
       };
       _splitMode = _SplitMode.custom;
+      // Pre-fill conversion fields
+      if (ex.exchangeRate != 1.0) {
+        _rateCtrl.text    = ex.exchangeRate.toStringAsFixed(6);
+        _feePctCtrl.text  = ex.transactionFeePct.toStringAsFixed(2);
+      }
 
       // Pre-load existing linked documents so the user can see and remove them.
       DocService.loadLinkedDocuments(
@@ -205,6 +265,8 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
       _customCtrls = {
         for (final m in widget.members) m.id: TextEditingController(),
       };
+      // Fetch the rate for the default currency on first open.
+      WidgetsBinding.instance.addPostFrameCallback((_) => _fetchRate());
     }
   }
 
@@ -213,6 +275,9 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
     _titleCtrl.dispose();
     _amountCtrl.dispose();
     _notesCtrl.dispose();
+    _rateCtrl.dispose();
+    _feePctCtrl.dispose();
+    _homeAmountCtrl.dispose();
     for (final c in _customCtrls.values) {
       c.dispose();
     }
@@ -227,9 +292,19 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
     final notes =
         _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim();
 
+    // Compute home-currency amounts for splits.
+    final homeTotal    = _effectiveHomeAmount;
+    final exchangeRate = _needsConversion
+        ? (double.tryParse(_rateCtrl.text.trim()) ?? 1.0)
+        : 1.0;
+    final feePct = _needsConversion
+        ? (double.tryParse(_feePctCtrl.text.trim()) ?? 0.0)
+        : 0.0;
+
     List<ReceiptSplit> splits;
     if (_splitMode == _SplitMode.equal) {
-      final share = _splitWith.isEmpty ? 0.0 : total / _splitWith.length;
+      // Splits are stored in home currency.
+      final share = _splitWith.isEmpty ? 0.0 : homeTotal / _splitWith.length;
       splits = _splitWith
           .map((id) => ReceiptSplit(memberId: id, amount: share))
           .toList();
@@ -243,15 +318,18 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
     // Local-only mode when tripId was not provided.
     if (widget.tripId == null) {
       widget.onSubmit(Receipt(
-        id:       DateTime.now().millisecondsSinceEpoch.toString(),
-        title:    title,
-        amount:   total,
-        currency: _currency,
-        paidById: _paidById,
-        splits:   splits,
-        category: _category,
-        date:     DateTime.now(),
-        notes:    notes,
+        id:                DateTime.now().millisecondsSinceEpoch.toString(),
+        title:             title,
+        amount:            total,
+        currency:          _currency,
+        homeAmount:        homeTotal,
+        exchangeRate:      exchangeRate,
+        transactionFeePct: feePct,
+        paidById:          _paidById,
+        splits:            splits,
+        category:          _category,
+        date:              DateTime.now(),
+        notes:             notes,
       ));
       return;
     }
@@ -261,27 +339,33 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
       Receipt receipt;
       if (_isEditing) {
         receipt = await MoneyService.updateReceipt(
-          receiptId: widget.existingReceipt!.id,
-          paidBy:    _paidById,
-          title:     title,
-          amount:    total,
-          currency:  _currency,
-          category:  _category,
-          date:      widget.existingReceipt!.date,
-          splits:    splits,
-          notes:     notes,
+          receiptId:         widget.existingReceipt!.id,
+          paidBy:            _paidById,
+          title:             title,
+          amount:            total,
+          currency:          _currency,
+          homeAmount:        homeTotal,
+          exchangeRate:      exchangeRate,
+          transactionFeePct: feePct,
+          category:          _category,
+          date:              widget.existingReceipt!.date,
+          splits:            splits,
+          notes:             notes,
         );
       } else {
         receipt = await MoneyService.createReceipt(
-          tripId:   widget.tripId!,
-          paidBy:   _paidById,
-          title:    title,
-          amount:   total,
-          currency: _currency,
-          category: _category,
-          date:     DateTime.now(),
-          splits:   splits,
-          notes:    notes,
+          tripId:            widget.tripId!,
+          paidBy:            _paidById,
+          title:             title,
+          amount:            total,
+          currency:          _currency,
+          homeAmount:        homeTotal,
+          exchangeRate:      exchangeRate,
+          transactionFeePct: feePct,
+          category:          _category,
+          date:              DateTime.now(),
+          splits:            splits,
+          notes:             notes,
         );
       }
       // Upload photo as a linked document (non-fatal — receipt already saved).
@@ -396,6 +480,7 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
                           keyboardType: const TextInputType.numberWithOptions(
                               decimal: true),
                           textInputAction: TextInputAction.next,
+                          onChanged: (_) => _recomputeHome(),
                           validator: (v) {
                             if (v == null || v.trim().isEmpty) return 'Required';
                             if (double.tryParse(v.trim()) == null) {
@@ -411,17 +496,55 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
                         child: WabwaySelectField<String>(
                           label: 'Currency',
                           value: _currency,
-                          onChanged: (v) =>
-                              setState(() => _currency = v ?? 'JPY'),
+                          onChanged: (v) {
+                            setState(() {
+                              _currency     = v ?? 'JPY';
+                              _homeOverride = false;
+                              _rateCtrl.clear();
+                            });
+                            _fetchRate();
+                          },
                           items: const [
                             WabwaySelectItem(value: 'JPY', label: 'JPY ¥'),
                             WabwaySelectItem(value: 'USD', label: 'USD \$'),
                             WabwaySelectItem(value: 'EUR', label: 'EUR €'),
+                            WabwaySelectItem(value: 'GBP', label: 'GBP £'),
+                            WabwaySelectItem(value: 'CAD', label: 'CAD C\$'),
+                            WabwaySelectItem(value: 'AUD', label: 'AUD A\$'),
+                            WabwaySelectItem(value: 'KRW', label: 'KRW ₩'),
+                            WabwaySelectItem(value: 'THB', label: 'THB ฿'),
                           ],
                         ),
                       ),
                     ],
                   ),
+
+                  // ── Conversion section (only when currency ≠ home currency) ──
+                  if (_needsConversion) ...[
+                    const SizedBox(height: kSpace4),
+                    _ConversionSection(
+                      homeCurrency:     widget.homeCurrency,
+                      rateCtrl:         _rateCtrl,
+                      feePctCtrl:       _feePctCtrl,
+                      homeAmountCtrl:   _homeAmountCtrl,
+                      fetchingRate:     _fetchingRate,
+                      showFee:          _showFee,
+                      homeOverride:     _homeOverride,
+                      derivedHomeAmount: _derivedHomeAmount,
+                      onRefetchRate:    _fetchRate,
+                      onRateChanged:    (_) => setState(() => _homeOverride = false),
+                      onFeeToggle:      () => setState(() => _showFee = !_showFee),
+                      onFeeChanged:     (_) => setState(() {}),
+                      onHomeOverride:   (v) => setState(() {
+                        _homeOverride = true;
+                        _homeAmountCtrl.text = v;
+                      }),
+                      onHomeOverrideClear: () => setState(() {
+                        _homeOverride = false;
+                        _homeAmountCtrl.clear();
+                      }),
+                    ),
+                  ],
                   const SizedBox(height: kSpace4),
 
                   WabwaySelectField<ReceiptCategory>(
@@ -451,8 +574,12 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
                   const SizedBox(height: kSpace4),
 
                   // Split method
-                  Text('Split method',
-                      style: kStyleCaptionMedium.copyWith(color: kColorInk)),
+                  Text(
+                    _needsConversion
+                        ? 'Split method  ·  amounts in ${widget.homeCurrency}'
+                        : 'Split method',
+                    style: kStyleCaptionMedium.copyWith(color: kColorInk),
+                  ),
                   const SizedBox(height: kSpace2),
                   _SplitToggle(
                     mode: _splitMode,
@@ -534,6 +661,187 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ─── Conversion section ───────────────────────────────────────────────────────
+
+class _ConversionSection extends StatelessWidget {
+  const _ConversionSection({
+    required this.homeCurrency,
+    required this.rateCtrl,
+    required this.feePctCtrl,
+    required this.homeAmountCtrl,
+    required this.fetchingRate,
+    required this.showFee,
+    required this.homeOverride,
+    required this.derivedHomeAmount,
+    required this.onRefetchRate,
+    required this.onRateChanged,
+    required this.onFeeToggle,
+    required this.onFeeChanged,
+    required this.onHomeOverride,
+    required this.onHomeOverrideClear,
+  });
+
+  final String homeCurrency;
+  final TextEditingController rateCtrl;
+  final TextEditingController feePctCtrl;
+  final TextEditingController homeAmountCtrl;
+  final bool fetchingRate;
+  final bool showFee;
+  final bool homeOverride;
+  final double? derivedHomeAmount;
+  final VoidCallback onRefetchRate;
+  final ValueChanged<String> onRateChanged;
+  final VoidCallback onFeeToggle;
+  final ValueChanged<String> onFeeChanged;
+  final ValueChanged<String> onHomeOverride;
+  final VoidCallback onHomeOverrideClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(kSpace3),
+      decoration: BoxDecoration(
+        color: kColorPrimarySoft,
+        borderRadius: kRadiusMd,
+        border: Border.all(color: kColorPrimary.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.currency_exchange_rounded, size: 14, color: kColorPrimary),
+              const SizedBox(width: kSpace2),
+              Text('Exchange to $homeCurrency',
+                  style: kStyleCaptionMedium.copyWith(color: kColorPrimary)),
+            ],
+          ),
+          const SizedBox(height: kSpace3),
+
+          // Exchange rate row
+          Row(
+            children: [
+              Expanded(
+                child: WabwayTextField(
+                  label: 'Exchange rate',
+                  hint: '0.000000',
+                  controller: rateCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  textInputAction: TextInputAction.next,
+                  onChanged: onRateChanged,
+                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
+                ),
+              ),
+              const SizedBox(width: kSpace2),
+              Padding(
+                padding: const EdgeInsets.only(top: 18),
+                child: fetchingRate
+                    ? const SizedBox(
+                        width: 36, height: 36,
+                        child: Center(child: SizedBox(
+                          width: 16, height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: kColorPrimary),
+                        )),
+                      )
+                    : IconButton(
+                        icon: const Icon(Icons.refresh_rounded, size: 18),
+                        color: kColorPrimary,
+                        tooltip: 'Refresh rate',
+                        onPressed: onRefetchRate,
+                      ),
+              ),
+            ],
+          ),
+
+          // Transaction fee toggle
+          const SizedBox(height: kSpace2),
+          GestureDetector(
+            onTap: onFeeToggle,
+            child: Row(
+              children: [
+                Icon(
+                  showFee
+                      ? Icons.keyboard_arrow_up_rounded
+                      : Icons.keyboard_arrow_down_rounded,
+                  size: 16, color: kColorInkSoft,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  showFee ? 'Hide card fee' : 'Add card fee',
+                  style: kStyleCaption.copyWith(color: kColorInkSoft),
+                ),
+              ],
+            ),
+          ),
+
+          if (showFee) ...[
+            const SizedBox(height: kSpace3),
+            WabwayTextField(
+              label: 'Transaction fee %',
+              hint: '0',
+              controller: feePctCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              textInputAction: TextInputAction.next,
+              onChanged: onFeeChanged,
+              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
+            ),
+          ],
+
+          const SizedBox(height: kSpace3),
+          const Divider(height: 1),
+          const SizedBox(height: kSpace3),
+
+          // Home amount display / override
+          if (!homeOverride) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('$homeCurrency equivalent',
+                          style: kStyleCaption.copyWith(color: kColorInkSoft)),
+                      const SizedBox(height: 2),
+                      Text(
+                        derivedHomeAmount != null
+                            ? fmtAmount(derivedHomeAmount!, homeCurrency)
+                            : '—',
+                        style: kStyleBodySemibold.copyWith(color: kColorPrimary),
+                      ),
+                    ],
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    final v = derivedHomeAmount?.toStringAsFixed(2) ?? '';
+                    onHomeOverride(v);
+                  },
+                  child: Text('Override', style: kStyleCaption.copyWith(color: kColorInkSoft)),
+                ),
+              ],
+            ),
+          ] else ...[
+            WabwayTextField(
+              label: '$homeCurrency equivalent (overridden)',
+              hint: '0.00',
+              controller: homeAmountCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              textInputAction: TextInputAction.next,
+              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
+            ),
+            const SizedBox(height: kSpace2),
+            GestureDetector(
+              onTap: onHomeOverrideClear,
+              child: Text('← Use calculated amount',
+                  style: kStyleCaption.copyWith(color: kColorInkSoft)),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

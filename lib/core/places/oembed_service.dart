@@ -9,11 +9,11 @@ class OembedResult {
 
 abstract final class OembedService {
   static const _ua = 'WabWay/1.1 (wahbi@portalprints.com)';
+  static const _browserUa =
+      'Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
 
-  /// Fetches the post title/caption for a TikTok or Instagram URL.
-  /// Returns null if the URL is unreachable or the content is private.
   static Future<OembedResult?> fetch(String url) async {
-    if (url.contains('tiktok.com')) return _tiktok(url);
+    if (url.contains('tiktok.com'))    return _tiktok(url);
     if (url.contains('instagram.com')) return _instagram(url);
     return null;
   }
@@ -41,15 +41,89 @@ abstract final class OembedService {
     }
   }
 
-  // ── Instagram — scrape public OG tags ────────────────────────────────────
+  // ── Instagram ─────────────────────────────────────────────────────────────
+  // Strategy:
+  //   1. Fetch /p/CODE/embed/captioned/ — public embed page has the full caption
+  //   2. Fall back to og:description from the main page (usually truncated)
 
   static Future<OembedResult?> _instagram(String url) async {
+    final shortcode = RegExp(
+      r'instagram\.com/(?:p|reel|tv)/([A-Za-z0-9_-]+)',
+    ).firstMatch(url)?.group(1);
+
+    // 1. Embed page
+    if (shortcode != null) {
+      final result = await _instagramEmbed(shortcode);
+      if (result != null) return result;
+    }
+
+    // 2. Main page OG fallback
+    return _instagramOg(url);
+  }
+
+  static Future<OembedResult?> _instagramEmbed(String shortcode) async {
     try {
-      final res = await http
-          .get(Uri.parse(url), headers: {
-            'User-Agent': 'facebookexternalhit/1.1',
-          })
-          .timeout(const Duration(seconds: 10));
+      final embedUrl = 'https://www.instagram.com/p/$shortcode/embed/captioned/';
+      final res = await http.get(Uri.parse(embedUrl), headers: {
+        'User-Agent': _browserUa,
+        'Accept': 'text/html,application/xhtml+xml',
+        'Accept-Language': 'en-US,en;q=0.9',
+      }).timeout(const Duration(seconds: 12));
+
+      if (res.statusCode != 200) return null;
+      final html = res.body;
+
+      // Try to pull caption from the Caption div
+      final caption = _captionFromEmbedHtml(html);
+
+      // Thumbnail from og:image in embed page
+      final thumb = _ogTag(html, 'og:image');
+
+      if (caption == null || caption.isEmpty) return null;
+      return OembedResult(title: caption, thumbnailUrl: thumb);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Parses the caption text out of Instagram's embed page HTML.
+  static String? _captionFromEmbedHtml(String html) {
+    // The embed page wraps the caption in class="Caption"
+    final captionBlock = RegExp(
+      r'''class=["']Caption["'][^>]*>([\s\S]*?)(?:<div\s+class=["']CaptionComments|<\/div>\s*<\/div>\s*<div\s+class=["']EmbedFooter)''',
+    ).firstMatch(html)?.group(1);
+
+    if (captionBlock != null) {
+      // Strip the leading username div
+      var text = captionBlock.replaceFirst(
+        RegExp(r'^[\s\S]*?<\/div>\s*', dotAll: true),
+        '',
+      );
+      text = _stripTags(text);
+      text = _decodeEntities(text).replaceAll(RegExp(r' +'), ' ').trim();
+      if (text.length > 10) return text;
+    }
+
+    // Fallback: look for caption in JSON blob embedded in the page
+    final jsonCaption = RegExp(
+      r'"caption"\s*:\s*"((?:[^"\\]|\\.)*)"',
+    ).firstMatch(html)?.group(1);
+    if (jsonCaption != null && jsonCaption.length > 5) {
+      return _decodeEntities(
+        jsonCaption
+            .replaceAll(r'\n', '\n')
+            .replaceAll(r'\"', '"'),
+      ).trim();
+    }
+
+    return null;
+  }
+
+  static Future<OembedResult?> _instagramOg(String url) async {
+    try {
+      final res = await http.get(Uri.parse(url), headers: {
+        'User-Agent': 'facebookexternalhit/1.1',
+      }).timeout(const Duration(seconds: 10));
       if (res.statusCode != 200) return null;
       final html = res.body;
 
@@ -68,8 +142,9 @@ abstract final class OembedService {
     }
   }
 
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
   static String? _ogTag(String html, String property) {
-    // Matches both content="..." and content='...' variants
     final re = RegExp(
       '<meta[^>]+property=["\']$property["\'][^>]+content=["\']([^"\']*)["\']',
       caseSensitive: false,
@@ -81,6 +156,10 @@ abstract final class OembedService {
         ).firstMatch(html);
     return m?.group(1);
   }
+
+  static String _stripTags(String html) =>
+      html.replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
+          .replaceAll(RegExp(r'<[^>]+>'), '');
 
   static String _decodeEntities(String s) => s
       .replaceAll('&amp;',  '&')

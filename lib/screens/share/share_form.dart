@@ -21,6 +21,8 @@ class ShareSaveData {
     this.latitude,
     this.longitude,
     this.placeSource,
+    this.planDayId,
+    this.planItemType,
   });
 
   final String title;
@@ -35,6 +37,8 @@ class ShareSaveData {
   final double? latitude;
   final double? longitude;
   final String? placeSource;
+  final String? planDayId;
+  final String? planItemType;
 }
 
 class ShareForm extends StatefulWidget {
@@ -46,7 +50,7 @@ class ShareForm extends StatefulWidget {
     required this.onDiscard,
   });
 
-  final IncomingShare share;
+  final IncomingShare? share;
   final ShareDestination destination;
   /// Called with the collected form data when the user taps Save.
   /// Throw to show an inline error; complete normally to dismiss.
@@ -76,18 +80,19 @@ class _ShareFormState extends State<ShareForm> {
   double? _parsedLng;
 
   bool get _isMapsShare =>
-      widget.share.contentType == ShareContentType.googleMapsLink;
+      widget.share?.contentType == ShareContentType.googleMapsLink;
 
   @override
   void initState() {
     super.initState();
-    _titleCtrl    = TextEditingController(text: widget.share.detectedTitle);
+    _titleCtrl    = TextEditingController(text: widget.share?.detectedTitle ?? '');
     _notesCtrl    = TextEditingController();
     _amountCtrl   = TextEditingController();
     _locationCtrl = TextEditingController();
 
     if (_isMapsShare) {
-      final coords = PlaceSearchService.parseLatLng(widget.share.rawContent);
+      final rawContent = widget.share?.rawContent ?? '';
+      final coords = PlaceSearchService.parseLatLng(rawContent);
       if (coords != null) {
         _parsedLat = coords.lat;
         _parsedLng = coords.lng;
@@ -107,7 +112,7 @@ class _ShareFormState extends State<ShareForm> {
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: widget.share.sharedAt ?? DateTime.now(),
+      initialDate: widget.share?.sharedAt ?? DateTime.now(),
       firstDate: DateTime(2020),
       lastDate: DateTime(2030),
     );
@@ -127,7 +132,7 @@ class _ShareFormState extends State<ShareForm> {
         travelType:  _travelType,
         amount:      double.tryParse(_amountCtrl.text.trim()),
         date:        _date,
-        mapsUrl:     _isMapsShare ? widget.share.rawContent : null,
+        mapsUrl:     _isMapsShare ? widget.share?.rawContent : null,
         latitude:    _parsedLat,
         longitude:   _parsedLng,
         placeSource: _parsedLat != null ? 'shared_maps_link' : null,
@@ -143,7 +148,7 @@ class _ShareFormState extends State<ShareForm> {
         ShareDestination.travelItem => 'Save travel item',
         ShareDestination.document => 'Save document',
         ShareDestination.receipt => 'Save receipt',
-        ShareDestination.itineraryNote => 'Save note',
+        ShareDestination.planItem => 'Save plan item',
       };
 
   @override
@@ -208,14 +213,14 @@ class _ShareFormState extends State<ShareForm> {
         ShareDestination.travelItem => _travelItemFields(),
         ShareDestination.document => _documentFields(),
         ShareDestination.receipt => _receiptFields(),
-        ShareDestination.itineraryNote => [],
+        ShareDestination.planItem => [],
       };
 
   List<Widget> _spotFields() => [
         if (_isMapsShare) ...[
           _ReadOnlyField(
             label: 'Google Maps URL',
-            value: widget.share.rawContent,
+            value: widget.share?.rawContent ?? '',
             icon: Icons.map_rounded,
           ),
           if (_parsedLat != null) ...[
@@ -268,7 +273,7 @@ class _ShareFormState extends State<ShareForm> {
   List<Widget> _linkFields() => [
         _ReadOnlyField(
           label: 'URL',
-          value: widget.share.rawContent,
+          value: widget.share?.rawContent ?? '',
           icon: Icons.link_rounded,
         ),
       ];

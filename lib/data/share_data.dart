@@ -116,7 +116,7 @@ enum ShareDestination {
   travelItem,
   document,
   receipt,
-  itineraryNote;
+  planItem;
 
   String get label => switch (this) {
         ShareDestination.spot => 'Spot',
@@ -124,7 +124,7 @@ enum ShareDestination {
         ShareDestination.travelItem => 'Travel item',
         ShareDestination.document => 'Document',
         ShareDestination.receipt => 'Receipt',
-        ShareDestination.itineraryNote => 'Itinerary note',
+        ShareDestination.planItem => 'Plan item',
       };
 
   String get description => switch (this) {
@@ -133,7 +133,7 @@ enum ShareDestination {
         ShareDestination.travelItem => 'Add to flights, hotels, or bookings',
         ShareDestination.document => 'Store as a trip document',
         ShareDestination.receipt => 'Log as a group expense',
-        ShareDestination.itineraryNote => 'Add a note to a day',
+        ShareDestination.planItem => 'Add to an itinerary day',
       };
 
   IconData get icon => switch (this) {
@@ -142,7 +142,7 @@ enum ShareDestination {
         ShareDestination.travelItem => Icons.flight_rounded,
         ShareDestination.document => Icons.description_rounded,
         ShareDestination.receipt => Icons.receipt_long_rounded,
-        ShareDestination.itineraryNote => Icons.event_note_rounded,
+        ShareDestination.planItem => Icons.event_note_rounded,
       };
 
   Color get color => switch (this) {
@@ -151,7 +151,7 @@ enum ShareDestination {
         ShareDestination.travelItem => const Color(0xFF7D9A75),
         ShareDestination.document => const Color(0xFF5B6E8A),
         ShareDestination.receipt => const Color(0xFFD6A84F),
-        ShareDestination.itineraryNote => const Color(0xFF4A9B8A),
+        ShareDestination.planItem => const Color(0xFF4A9B8A),
       };
 
   Color get softColor => switch (this) {
@@ -160,7 +160,7 @@ enum ShareDestination {
         ShareDestination.travelItem => const Color(0xFFEEF4EC),
         ShareDestination.document => const Color(0xFFECEEF2),
         ShareDestination.receipt => const Color(0xFFF8F0E2),
-        ShareDestination.itineraryNote => const Color(0xFFE8F3F1),
+        ShareDestination.planItem => const Color(0xFFE8F3F1),
       };
 }
 

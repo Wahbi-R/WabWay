@@ -20,7 +20,7 @@ import '../data/travel_data.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
-import 'import/import_sheet.dart';
+import 'share/incoming_share_screen.dart';
 import 'notification_settings_screen.dart';
 import 'global_search_screen.dart';
 
@@ -195,7 +195,7 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: const Icon(Icons.download_rounded),
               color: kColorInkSoft,
               tooltip: 'Import',
-              onPressed: () => showImportSheet(context),
+              onPressed: () => showImportScreen(context),
             ),
             IconButton(
               icon: const Icon(Icons.search_rounded),
@@ -245,7 +245,7 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: const Icon(Icons.download_rounded),
             color: kColorInkSoft,
             tooltip: 'Import',
-            onPressed: () => showImportSheet(context),
+            onPressed: () => showImportScreen(context),
           ),
           IconButton(
             icon: const Icon(Icons.search_rounded),

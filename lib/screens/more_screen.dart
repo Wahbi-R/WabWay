@@ -15,7 +15,6 @@ import 'map_screen.dart';
 import 'travel_screen.dart';
 import 'links_screen.dart';
 import 'photos_screen.dart';
-import 'import/import_sheet.dart';
 import 'members/add_member_sheet.dart';
 import 'members/invite_sheet.dart';
 import 'share/incoming_share_screen.dart';
@@ -380,7 +379,7 @@ class MoreScreen extends StatelessWidget {
               child: _SettingsRow(
                 icon: Icons.download_rounded,
                 label: 'Import file or link',
-                onTap: () => showImportSheet(context),
+                onTap: () => showImportScreen(context),
               ),
             ),
           ),

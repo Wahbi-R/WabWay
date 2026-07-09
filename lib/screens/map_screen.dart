@@ -2,6 +2,7 @@ import 'dart:math' show min, max;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_map_cancellable_tile_provider/flutter_map_cancellable_tile_provider.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
@@ -263,6 +264,7 @@ class _MapScreenState extends State<MapScreen> {
               maxNativeZoom: 19,
               maxZoom: 22,
               additionalOptions: const {'lang': 'en'},
+              tileProvider: CancellableNetworkTileProvider(),
             ),
             MarkerLayer(
               markers: mapped.map((spot) {

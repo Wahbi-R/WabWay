@@ -14,6 +14,7 @@ import 'docs_screen.dart';
 import 'map_screen.dart';
 import 'travel_screen.dart';
 import 'links_screen.dart';
+import 'photos_screen.dart';
 import 'import/import_sheet.dart';
 import 'members/add_member_sheet.dart';
 import 'members/invite_sheet.dart';
@@ -264,6 +265,29 @@ class MoreScreen extends StatelessWidget {
                               trip: trip,
                               members: members,
                               child: const TravelScreen(),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
+                  _SettingsRow(
+                    icon: Icons.photo_library_rounded,
+                    label: 'Photos',
+                    onTap: () {
+                      final trip = TripState.tripOf(context);
+                      final members = TripState.membersOf(context);
+                      final profile = ProfileState.of(context);
+                      Navigator.push<void>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ProfileState(
+                            profile: profile,
+                            child: TripState(
+                              trip: trip,
+                              members: members,
+                              child: const PhotosScreen(),
                             ),
                           ),
                         ),

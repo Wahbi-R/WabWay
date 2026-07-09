@@ -11,6 +11,17 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 19,
+    label: 'Shared photo albums',
+    changes: [
+      'New Photos section — drop links to everyone\'s photo albums in one place',
+      'Supports Google Photos, iCloud, Dropbox, and any album link',
+      'Step-by-step guide for setting up a collaborative Google Photos album the whole group can upload to',
+      'Auto-detects the album service from the URL',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 18,
     label: 'Google Maps import & spot photos',
     changes: [

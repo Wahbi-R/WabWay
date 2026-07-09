@@ -167,7 +167,9 @@ abstract final class ChangelogService {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
+      constraints: const BoxConstraints(maxWidth: 560),
       builder: (_) => const _ChangelogSheet(),
     );
   }

@@ -113,6 +113,8 @@ Checked items are done. Log the date and a one-liner when completing something.
 - [x] **58. Photos create-album buttons** — empty state on Photos screen shows `_CreateAlbumCard` with Google Photos and iCloud launch buttons; note that photos don't auto-sync added to guide card subtitle (2026-07-09).
 - [x] **59. Document image thumbnails** — `DocService.getThumbnailUrl` generates a 400×280 signed URL with Supabase Storage image transform (CDN-cached after first access); `DocGridCard` header and `DocListRow` leading box show `Image.network` with fade-in for image docs; non-image docs unchanged (2026-07-09, see `docs/features/phase 3/doc-thumbnails.md`).
 - [x] **60. Multi-currency receipts** — `home_currency` on trips (default CAD, settable in Trip Settings); exchange rate auto-fetched from Frankfurter API at time of receipt creation and locked in; optional transaction fee field; `home_amount` stored once and never recalculated; ReceiptListTile shows original and home-currency amounts; migration `007_multi_currency_receipts.sql` applied via `supabase db push` (2026-07-09, see `docs/features/phase 3/multi-currency-receipts.md`).
+- [x] **61. Auto-fetch spot thumbnails** — on spots load, spots with `imageUrl == null` are queued for Wikipedia thumbnail lookup in background; `_thumbnailAttempted` set prevents re-fetching; results streamed into list and written back to DB (2026-07-09).
+- [x] **62. Plan item improvements** — spot picker at top of add-item sheet autofills title/address/city/country/mapsUrl and links the spot; location field now autocompletes via Photon; country field added to `ItineraryItem`; migration `008_itinerary_country.sql` (2026-07-09, see `docs/features/phase 3/plan-item-improvements.md`).
 
 ---
 

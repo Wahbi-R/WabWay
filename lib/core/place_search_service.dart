@@ -59,6 +59,8 @@ abstract final class PlaceSearchService {
       final address = addrParts.join(' ');
       final mapsUrl = 'https://www.google.com/maps/search/?api=1&query=$lat,$lng';
 
+      final country = _str(props['country']);
+
       return PlaceSuggestion(
         name:      name,
         address:   address,
@@ -68,6 +70,7 @@ abstract final class PlaceSearchService {
         latitude:  lat,
         longitude: lng,
         mapsUrl:   mapsUrl,
+        country:   country,
       );
     } catch (_) {
       return null;

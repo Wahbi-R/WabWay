@@ -62,6 +62,7 @@ class ItineraryItem {
     required this.type,
     this.time,
     this.city,
+    this.country,
     this.location,
     this.mapsUrl,
     this.confirmationUrl,
@@ -79,6 +80,7 @@ class ItineraryItem {
   // "09:00" 24h format, null = flexible / no set time
   final String? time;
   final String? city;
+  final String? country;
   final String? location;
   final String? mapsUrl;
   final String? confirmationUrl;

@@ -11,6 +11,37 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 27,
+    label: 'Plan item improvements',
+    changes: [
+      'Pick a spot to auto-fill the plan item title, address, city, country, and Google Maps link',
+      'Location / Address field now autocompletes as you type — powered by Photon',
+      'New Country field on plan items, auto-filled from address search',
+      'Spot picker sits above the title so you can pre-fill before editing',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 26,
+    label: 'Bug fixes',
+    changes: [
+      'Exchange rate no longer shows 0.00 — now uses the /latest Frankfurter endpoint which is always available',
+      'What\'s new shows as a centred dialog on desktop instead of a cropped bottom sheet',
+      '"What\'s new" button added to the desktop sidebar so it\'s reachable without going through More',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 25,
+    label: 'Auto-fetch spot thumbnails',
+    changes: [
+      'Spots added before thumbnails were introduced now get Wikipedia images automatically',
+      'Images stream in as they load — no need to re-add spots',
+      'Already-found images are saved to the database so they load instantly next time',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 24,
     label: 'Multi-currency receipts',
     changes: [

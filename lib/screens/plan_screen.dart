@@ -236,6 +236,7 @@ class _PlanScreenState extends State<PlanScreen> {
         createdBy:       _userId,
         time:            draft.time,
         city:            draft.city,
+        country:         draft.country,
         location:        draft.location,
         mapsUrl:         draft.mapsUrl,
         confirmationUrl: draft.confirmationUrl,

@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import '../../core/place_search_service.dart';
 import '../../data/plan_data.dart';
 import '../../data/docs_data.dart';
 import '../../data/spot_data.dart';
@@ -6,6 +9,13 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+ItineraryItemType _typeFromCategory(SpotCategory cat) => switch (cat) {
+  SpotCategory.food => ItineraryItemType.food,
+  _                 => ItineraryItemType.spot,
+};
 
 // ─── Show add item sheet / dialog ─────────────────────────────────────────────
 
@@ -121,19 +131,19 @@ class _AddItemContent extends StatefulWidget {
 }
 
 class _AddItemContentState extends State<_AddItemContent> {
-  final _formKey = GlobalKey<FormState>();
-  final _titleCtrl = TextEditingController();
-  final _cityCtrl = TextEditingController();
-  final _locationCtrl = TextEditingController();
-  final _mapsCtrl = TextEditingController();
-  final _confirmCtrl = TextEditingController();
-  final _notesCtrl = TextEditingController();
+  final _formKey       = GlobalKey<FormState>();
+  final _titleCtrl     = TextEditingController();
+  final _locationCtrl  = TextEditingController();
+  final _cityCtrl      = TextEditingController();
+  final _countryCtrl   = TextEditingController();
+  final _mapsCtrl      = TextEditingController();
+  final _confirmCtrl   = TextEditingController();
+  final _notesCtrl     = TextEditingController();
 
   ItineraryItemType _type = ItineraryItemType.activity;
   TimeOfDay? _time;
   String? _linkedSpotId;
   final Set<String> _linkedDocIds = {};
-
   bool _showAdvanced = false;
 
   @override
@@ -141,20 +151,21 @@ class _AddItemContentState extends State<_AddItemContent> {
     super.initState();
     final item = widget.initialItem;
     if (item != null) {
-      _titleCtrl.text = item.title;
-      _cityCtrl.text = item.city ?? '';
+      _titleCtrl.text    = item.title;
       _locationCtrl.text = item.location ?? '';
-      _mapsCtrl.text = item.mapsUrl ?? '';
-      _confirmCtrl.text = item.confirmationUrl ?? '';
-      _notesCtrl.text = item.notes ?? '';
-      _type = item.type;
-      _linkedSpotId = item.linkedSpotId;
+      _cityCtrl.text     = item.city ?? '';
+      _countryCtrl.text  = item.country ?? '';
+      _mapsCtrl.text     = item.mapsUrl ?? '';
+      _confirmCtrl.text  = item.confirmationUrl ?? '';
+      _notesCtrl.text    = item.notes ?? '';
+      _type              = item.type;
+      _linkedSpotId      = item.linkedSpotId;
       _linkedDocIds.addAll(item.linkedDocIds);
       if (item.time != null) {
         final parts = item.time!.split(':');
         if (parts.length == 2) {
           _time = TimeOfDay(
-            hour: int.tryParse(parts[0]) ?? 0,
+            hour:   int.tryParse(parts[0]) ?? 0,
             minute: int.tryParse(parts[1]) ?? 0,
           );
         }
@@ -168,12 +179,31 @@ class _AddItemContentState extends State<_AddItemContent> {
   @override
   void dispose() {
     _titleCtrl.dispose();
-    _cityCtrl.dispose();
     _locationCtrl.dispose();
+    _cityCtrl.dispose();
+    _countryCtrl.dispose();
     _mapsCtrl.dispose();
     _confirmCtrl.dispose();
     _notesCtrl.dispose();
     super.dispose();
+  }
+
+  void _applySpot(Spot spot) {
+    setState(() {
+      _titleCtrl.text   = spot.name;
+      _cityCtrl.text    = spot.city.isNotEmpty ? spot.city : spot.area;
+      _locationCtrl.text = spot.address?.isNotEmpty == true ? spot.address! : '';
+      if (spot.mapsUrl != null) {
+        _mapsCtrl.text  = spot.mapsUrl!;
+        _showAdvanced   = true;
+      }
+      _linkedSpotId     = spot.id;
+      _type             = _typeFromCategory(spot.category);
+    });
+  }
+
+  void _clearSpot() {
+    setState(() => _linkedSpotId = null);
   }
 
   void _submit() {
@@ -182,18 +212,19 @@ class _AddItemContentState extends State<_AddItemContent> {
         ? null
         : '${_time!.hour.toString().padLeft(2, '0')}:${_time!.minute.toString().padLeft(2, '0')}';
     widget.onSubmit(ItineraryItem(
-      id: widget.initialItem?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-      dayId: widget.initialItem?.dayId ?? widget.dayId,
-      title: _titleCtrl.text.trim(),
-      type: _type,
-      time: timeStr,
-      city: _cityCtrl.text.trim().isEmpty ? null : _cityCtrl.text.trim(),
-      location: _locationCtrl.text.trim().isEmpty ? null : _locationCtrl.text.trim(),
-      mapsUrl: _mapsCtrl.text.trim().isEmpty ? null : _mapsCtrl.text.trim(),
+      id:              widget.initialItem?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      dayId:           widget.initialItem?.dayId ?? widget.dayId,
+      title:           _titleCtrl.text.trim(),
+      type:            _type,
+      time:            timeStr,
+      location:        _locationCtrl.text.trim().isEmpty ? null : _locationCtrl.text.trim(),
+      city:            _cityCtrl.text.trim().isEmpty ? null : _cityCtrl.text.trim(),
+      country:         _countryCtrl.text.trim().isEmpty ? null : _countryCtrl.text.trim(),
+      mapsUrl:         _mapsCtrl.text.trim().isEmpty ? null : _mapsCtrl.text.trim(),
       confirmationUrl: _confirmCtrl.text.trim().isEmpty ? null : _confirmCtrl.text.trim(),
-      notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
-      linkedSpotId: _linkedSpotId,
-      linkedDocIds: _linkedDocIds.toList(),
+      notes:           _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
+      linkedSpotId:    _linkedSpotId,
+      linkedDocIds:    _linkedDocIds.toList(),
     ));
   }
 
@@ -222,7 +253,8 @@ class _AddItemContentState extends State<_AddItemContent> {
           padding: const EdgeInsets.fromLTRB(kSpace4, kSpace3, kSpace4, 0),
           child: Row(
             children: [
-              Text(widget.initialItem != null ? 'Edit item' : 'Add itinerary item', style: kStyleTitle),
+              Text(widget.initialItem != null ? 'Edit item' : 'Add itinerary item',
+                  style: kStyleTitle),
               const Spacer(),
               WabwayIconButton(
                 icon: Icons.close_rounded,
@@ -237,25 +269,36 @@ class _AddItemContentState extends State<_AddItemContent> {
         Flexible(
           child: SingleChildScrollView(
             controller: widget.scrollController,
-            padding: EdgeInsets.fromLTRB(
-                kSpace4, 0, kSpace4, kSpace6 + bottomPad),
+            padding: EdgeInsets.fromLTRB(kSpace4, 0, kSpace4, kSpace6 + bottomPad),
             child: Form(
               key: _formKey,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+
+                  // ── Spot quick-pick ───────────────────────────────────────
+                  if (widget.spots.isNotEmpty) ...[
+                    _SpotPicker(
+                      spots: widget.spots,
+                      linkedSpotId: _linkedSpotId,
+                      onSelected: _applySpot,
+                      onClear: _clearSpot,
+                    ),
+                    const SizedBox(height: kSpace4),
+                  ],
+
+                  // ── Title ─────────────────────────────────────────────────
                   WabwayTextField(
                     label: 'Title',
                     hint: 'e.g. Senso-ji Temple',
                     controller: _titleCtrl,
                     textInputAction: TextInputAction.next,
                     validator: (v) =>
-                        (v == null || v.trim().isEmpty)
-                            ? 'Title is required'
-                            : null,
+                        (v == null || v.trim().isEmpty) ? 'Title is required' : null,
                   ),
                   const SizedBox(height: kSpace4),
 
+                  // ── Type ──────────────────────────────────────────────────
                   WabwaySelectField<ItineraryItemType>(
                     label: 'Type',
                     value: _type,
@@ -267,7 +310,7 @@ class _AddItemContentState extends State<_AddItemContent> {
                   ),
                   const SizedBox(height: kSpace4),
 
-                  // Time picker
+                  // ── Time ──────────────────────────────────────────────────
                   _TimePicker(
                     selected: _time,
                     onTap: _pickTime,
@@ -275,57 +318,59 @@ class _AddItemContentState extends State<_AddItemContent> {
                   ),
                   const SizedBox(height: kSpace4),
 
-                  Row(
-                    children: [
-                      Expanded(
-                        child: WabwayTextField(
-                          label: 'City',
-                          hint: 'e.g. Tokyo',
-                          controller: _cityCtrl,
-                          textInputAction: TextInputAction.next,
-                        ),
-                      ),
-                    ],
+                  // ── Location / Address (with autocomplete) ────────────────
+                  _LocationField(
+                    controller: _locationCtrl,
+                    onPlaceSelected: (p) {
+                      setState(() {
+                        _locationCtrl.text = p.address.isNotEmpty
+                            ? '${p.name}, ${p.address}'
+                            : p.name;
+                        if (p.city.isNotEmpty && _cityCtrl.text.isEmpty) {
+                          _cityCtrl.text = p.city;
+                        }
+                        if (p.country.isNotEmpty && _countryCtrl.text.isEmpty) {
+                          _countryCtrl.text = p.country;
+                        }
+                        if (_mapsCtrl.text.isEmpty) {
+                          _mapsCtrl.text = p.mapsUrl;
+                          _showAdvanced  = true;
+                        }
+                      });
+                    },
                   ),
                   const SizedBox(height: kSpace4),
 
+                  // ── City ──────────────────────────────────────────────────
                   WabwayTextField(
-                    label: 'Location / Address',
-                    hint: 'e.g. 2-3-1 Asakusa, Taito City',
-                    controller: _locationCtrl,
+                    label: 'City',
+                    hint: 'e.g. Tokyo',
+                    controller: _cityCtrl,
                     textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: kSpace4),
 
-                  // Linked spot
-                  WabwaySelectField<String?>(
-                    label: 'Linked spot (optional)',
-                    value: _linkedSpotId,
-                    onChanged: (v) => setState(() => _linkedSpotId = v),
-                    items: [
-                      const WabwaySelectItem(value: null, label: 'None'),
-                      ...widget.spots.map(
-                        (s) => WabwaySelectItem(
-                            value: s.id, label: '${s.name} — ${s.city}'),
-                      ),
-                    ],
+                  // ── Country ───────────────────────────────────────────────
+                  WabwayTextField(
+                    label: 'Country',
+                    hint: 'e.g. Japan',
+                    controller: _countryCtrl,
+                    textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: kSpace4),
 
-                  // Linked documents
+                  // ── Attach documents ──────────────────────────────────────
                   _DocsPicker(
                     docs: widget.docs,
                     selectedIds: _linkedDocIds,
                     onChanged: (id, checked) => setState(() {
-                      if (checked) {
-                        _linkedDocIds.add(id);
-                      } else {
-                        _linkedDocIds.remove(id);
-                      }
+                      if (checked) _linkedDocIds.add(id);
+                      else         _linkedDocIds.remove(id);
                     }),
                   ),
                   const SizedBox(height: kSpace4),
 
+                  // ── Notes ─────────────────────────────────────────────────
                   WabwayTextField(
                     label: 'Notes',
                     hint: 'Optional notes…',
@@ -335,10 +380,9 @@ class _AddItemContentState extends State<_AddItemContent> {
                   ),
                   const SizedBox(height: kSpace3),
 
-                  // Advanced fields toggle
+                  // ── Advanced (links) ──────────────────────────────────────
                   GestureDetector(
-                    onTap: () =>
-                        setState(() => _showAdvanced = !_showAdvanced),
+                    onTap: () => setState(() => _showAdvanced = !_showAdvanced),
                     child: Row(
                       children: [
                         Icon(
@@ -349,11 +393,8 @@ class _AddItemContentState extends State<_AddItemContent> {
                           color: kColorInkSoft,
                         ),
                         const SizedBox(width: kSpace1),
-                        Text(
-                          'Advanced (links)',
-                          style: kStyleCaptionMedium.copyWith(
-                              color: kColorInkSoft),
-                        ),
+                        Text('Advanced (links)',
+                            style: kStyleCaptionMedium.copyWith(color: kColorInkSoft)),
                       ],
                     ),
                   ),
@@ -389,6 +430,351 @@ class _AddItemContentState extends State<_AddItemContent> {
             ),
           ),
         ),
+      ],
+    );
+  }
+}
+
+// ─── Spot quick-pick ──────────────────────────────────────────────────────────
+
+class _SpotPicker extends StatefulWidget {
+  const _SpotPicker({
+    required this.spots,
+    required this.linkedSpotId,
+    required this.onSelected,
+    required this.onClear,
+  });
+  final List<Spot> spots;
+  final String? linkedSpotId;
+  final ValueChanged<Spot> onSelected;
+  final VoidCallback onClear;
+
+  @override
+  State<_SpotPicker> createState() => _SpotPickerState();
+}
+
+class _SpotPickerState extends State<_SpotPicker> {
+  bool _expanded = false;
+  final _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  Spot? get _linked =>
+      widget.linkedSpotId == null
+          ? null
+          : widget.spots.where((s) => s.id == widget.linkedSpotId).firstOrNull;
+
+  List<Spot> get _filtered {
+    if (_query.isEmpty) return widget.spots;
+    final q = _query.toLowerCase();
+    return widget.spots
+        .where((s) =>
+            s.name.toLowerCase().contains(q) ||
+            s.city.toLowerCase().contains(q))
+        .toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final linked = _linked;
+
+    // Linked state — show the selected spot with a clear button
+    if (linked != null && !_expanded) {
+      return Container(
+        padding: const EdgeInsets.symmetric(
+            horizontal: kSpace3, vertical: kSpace2),
+        decoration: BoxDecoration(
+          color: kColorPrimarySoft,
+          borderRadius: kRadiusMd,
+          border: Border.all(color: kColorPrimary.withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.place_rounded, size: 16, color: kColorPrimary),
+            const SizedBox(width: kSpace2),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Filled from spot',
+                      style: kStyleCaption.copyWith(color: kColorPrimary)),
+                  Text(linked.name,
+                      style: kStyleBodySemibold,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                ],
+              ),
+            ),
+            GestureDetector(
+              onTap: () {
+                setState(() => _expanded = true);
+                widget.onClear();
+              },
+              child: const Icon(Icons.swap_horiz_rounded,
+                  size: 16, color: kColorPrimary),
+            ),
+            const SizedBox(width: kSpace2),
+            GestureDetector(
+              onTap: widget.onClear,
+              child: const Icon(Icons.close_rounded,
+                  size: 16, color: kColorPrimary),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Collapsed state
+    if (!_expanded) {
+      return GestureDetector(
+        onTap: () => setState(() => _expanded = true),
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+              horizontal: kSpace3, vertical: kSpace3),
+          decoration: BoxDecoration(
+            color: kColorSurfaceSunken,
+            borderRadius: kRadiusMd,
+            border: Border.all(color: kColorBorder),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.place_outlined, size: 16, color: kColorInkSoft),
+              const SizedBox(width: kSpace2),
+              Text('Fill from a spot',
+                  style: kStyleBody.copyWith(color: kColorInkSoft)),
+              const Spacer(),
+              const Icon(Icons.expand_more_rounded,
+                  size: 16, color: kColorInkSoft),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Expanded search list
+    return Container(
+      decoration: BoxDecoration(
+        color: kColorSurfaceSunken,
+        borderRadius: kRadiusMd,
+        border: Border.all(color: kColorBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(kSpace3, kSpace2, kSpace2, kSpace2),
+            child: Row(
+              children: [
+                const Icon(Icons.search_rounded, size: 16, color: kColorInkSoft),
+                const SizedBox(width: kSpace2),
+                Expanded(
+                  child: TextField(
+                    controller: _searchCtrl,
+                    autofocus: true,
+                    onChanged: (v) => setState(() => _query = v),
+                    style: kStyleBody,
+                    decoration: InputDecoration(
+                      hintText: 'Search spots…',
+                      hintStyle: kStyleBody.copyWith(color: kColorInkSoft),
+                      isDense: true,
+                      border: InputBorder.none,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, size: 16),
+                  color: kColorInkSoft,
+                  onPressed: () => setState(() {
+                    _expanded = false;
+                    _searchCtrl.clear();
+                    _query = '';
+                  }),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 220),
+            child: _filtered.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.all(kSpace4),
+                    child: Text('No spots match',
+                        style: kStyleCaption.copyWith(color: kColorInkSoft)),
+                  )
+                : ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: _filtered.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (_, i) {
+                      final s = _filtered[i];
+                      return ListTile(
+                        dense: true,
+                        leading: Container(
+                          width: 30,
+                          height: 30,
+                          decoration: BoxDecoration(
+                            color: _typeFromCategory(s.category).softColor,
+                            borderRadius: kRadiusSm,
+                          ),
+                          child: Icon(s.category.icon,
+                              size: 14, color: _typeFromCategory(s.category).color),
+                        ),
+                        title: Text(s.name, style: kStyleBodyMedium),
+                        subtitle: Text(s.city,
+                            style: kStyleCaption.copyWith(color: kColorInkSoft)),
+                        onTap: () {
+                          setState(() {
+                            _expanded = false;
+                            _searchCtrl.clear();
+                            _query = '';
+                          });
+                          widget.onSelected(s);
+                        },
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Location / Address field with autocomplete ───────────────────────────────
+
+class _LocationField extends StatefulWidget {
+  const _LocationField({
+    required this.controller,
+    required this.onPlaceSelected,
+  });
+  final TextEditingController controller;
+  final ValueChanged<PlaceSuggestion> onPlaceSelected;
+
+  @override
+  State<_LocationField> createState() => _LocationFieldState();
+}
+
+class _LocationFieldState extends State<_LocationField> {
+  Timer? _debounce;
+  List<PlaceSuggestion> _suggestions = [];
+  bool _showSuggestions = false;
+  bool _loading = false;
+  final _focus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(() {
+      if (!_focus.hasFocus) setState(() => _showSuggestions = false);
+    });
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  void _onChanged(String v) {
+    _debounce?.cancel();
+    if (v.trim().length < 3) {
+      setState(() { _suggestions = []; _showSuggestions = false; });
+      return;
+    }
+    _debounce = Timer(const Duration(milliseconds: 350), () async {
+      if (!mounted) return;
+      setState(() => _loading = true);
+      final results = await PlaceSearchService.searchPhoton(v.trim(), limit: 5);
+      if (!mounted) return;
+      setState(() {
+        _suggestions = results;
+        _showSuggestions = results.isNotEmpty;
+        _loading = false;
+      });
+    });
+  }
+
+  void _select(PlaceSuggestion p) {
+    setState(() { _showSuggestions = false; _suggestions = []; });
+    _focus.unfocus();
+    widget.onPlaceSelected(p);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        WabwayTextField(
+          label: 'Location / Address',
+          hint: 'e.g. 2-3-1 Asakusa, Taito City',
+          controller: widget.controller,
+          focusNode: _focus,
+          textInputAction: TextInputAction.next,
+          onChanged: _onChanged,
+          suffixIcon: _loading ? Icons.hourglass_top_rounded : null,
+        ),
+        if (_showSuggestions)
+          Container(
+            margin: const EdgeInsets.only(top: 2),
+            decoration: BoxDecoration(
+              color: kColorPaper,
+              borderRadius: kRadiusMd,
+              border: Border.all(color: kColorBorder),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              children: _suggestions.map((p) {
+                final subtitle = [
+                  if (p.address.isNotEmpty) p.address,
+                  if (p.city.isNotEmpty) p.city,
+                  if (p.country.isNotEmpty) p.country,
+                ].join(', ');
+                return InkWell(
+                  onTap: () => _select(p),
+                  borderRadius: kRadiusMd,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: kSpace3, vertical: kSpace3),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.place_outlined,
+                            size: 16, color: kColorInkSoft),
+                        const SizedBox(width: kSpace2),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(p.name, style: kStyleBodyMedium),
+                              if (subtitle.isNotEmpty)
+                                Text(subtitle,
+                                    style: kStyleCaption.copyWith(
+                                        color: kColorInkSoft),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
       ],
     );
   }
@@ -485,7 +871,6 @@ class _DocsPickerState extends State<_DocsPicker> {
   @override
   void initState() {
     super.initState();
-    // Auto-expand if any docs are pre-selected (edit mode)
     _expanded = widget.selectedIds.isNotEmpty;
   }
 

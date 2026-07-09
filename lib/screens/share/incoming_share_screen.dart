@@ -92,14 +92,16 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
   bool _daysLoading = false;
   ItineraryItemType _planItemType = ItineraryItemType.activity;
 
-  final _planTitleCtrl = TextEditingController();
-  final _planNotesCtrl = TextEditingController();
+  final _planTitleCtrl  = TextEditingController();
+  final _planNotesCtrl  = TextEditingController();
+  final _captionCtrl    = TextEditingController();
+  bool _scanningPasted  = false;
 
   bool get _inImportMode => widget.share == null;
   bool get _showSourceStep => _inImportMode && _activeShare == null;
 
   bool get _anyScan =>
-      _scanningAi || _scanningOcr || _scanningPlaces || _scanningAudio || _scanningStay || _scanningMaps;
+      _scanningAi || _scanningOcr || _scanningPlaces || _scanningAudio || _scanningStay || _scanningMaps || _scanningPasted;
 
   bool get _canParseItinerary =>
       !kIsWeb &&
@@ -130,6 +132,7 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
     _urlCtrl.dispose();
     _planTitleCtrl.dispose();
     _planNotesCtrl.dispose();
+    _captionCtrl.dispose();
     super.dispose();
   }
 
@@ -418,6 +421,46 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
       );
     } finally {
       if (mounted) setState(() => _scanningAudio = false);
+    }
+  }
+
+  Future<void> _findPlacesInPastedText() async {
+    final text = _captionCtrl.text.trim();
+    if (text.isEmpty || _anyScan) return;
+    setState(() => _scanningPasted = true);
+    try {
+      final result = await SocialPlaceExtractor.extractFromText(text);
+      if (!mounted) return;
+      if (result.places.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+            text.isEmpty
+                ? 'Paste some caption text first'
+                : 'No recognisable places found in the text',
+          ),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 4),
+        ));
+        return;
+      }
+      await Navigator.push<void>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ExtractedSpotsScreen(
+            places: result.places,
+            caption: result.caption,
+            sourceUrl: _activeShare?.rawContent ?? '',
+            tripId: widget.tripId,
+            userId: widget.userId,
+            onDone: () {
+              Navigator.pop(context);
+              widget.onDone?.call();
+            },
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _scanningPasted = false);
     }
   }
 
@@ -1080,7 +1123,7 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
                       disabled: _anyScan,
                       onTap: _findPlaces,
                     ),
-                    const SizedBox(height: kSpace4),
+                    const SizedBox(height: kSpace2),
                     if (SocialPlaceExtractor.audioServerAvailable) ...[
                       _ParseItineraryBanner(
                         icon: Icons.graphic_eq_rounded,
@@ -1090,8 +1133,15 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
                         disabled: _anyScan,
                         onTap: _transcribeAudio,
                       ),
-                      const SizedBox(height: kSpace4),
+                      const SizedBox(height: kSpace2),
                     ],
+                    _PasteCaptionCard(
+                      controller: _captionCtrl,
+                      scanning: _scanningPasted,
+                      disabled: _anyScan,
+                      onFind: _findPlacesInPastedText,
+                    ),
+                    const SizedBox(height: kSpace4),
                   ],
                   if (_canSaveAsStay) ...[
                     _ParseItineraryBanner(
@@ -1189,7 +1239,7 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
                 disabled: _anyScan,
                 onTap: _findPlaces,
               ),
-              const SizedBox(height: kSpace4),
+              const SizedBox(height: kSpace2),
               if (SocialPlaceExtractor.audioServerAvailable) ...[
                 _ParseItineraryBanner(
                   icon: Icons.graphic_eq_rounded,
@@ -1199,8 +1249,15 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
                   disabled: _anyScan,
                   onTap: _transcribeAudio,
                 ),
-                const SizedBox(height: kSpace4),
+                const SizedBox(height: kSpace2),
               ],
+              _PasteCaptionCard(
+                controller: _captionCtrl,
+                scanning: _scanningPasted,
+                disabled: _anyScan,
+                onFind: _findPlacesInPastedText,
+              ),
+              const SizedBox(height: kSpace4),
             ],
             if (_canSaveAsStay) ...[
               _ParseItineraryBanner(
@@ -1284,6 +1341,111 @@ class _SourceTile extends StatelessWidget {
             const Icon(Icons.chevron_right_rounded, color: kColorInkSoft),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ─── Paste caption card ──────────────────────────────────────────────────────
+
+class _PasteCaptionCard extends StatelessWidget {
+  const _PasteCaptionCard({
+    required this.controller,
+    required this.scanning,
+    required this.disabled,
+    required this.onFind,
+  });
+
+  final TextEditingController controller;
+  final bool scanning;
+  final bool disabled;
+  final VoidCallback onFind;
+
+  static const _blue = Color(0xFF4A7AB5);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(kSpace3),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8EEF6),
+        borderRadius: kRadiusMd,
+        border: Border.all(color: _blue.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: _blue.withValues(alpha: 0.15),
+                  borderRadius: kRadiusSm,
+                ),
+                child: scanning
+                    ? const Padding(
+                        padding: EdgeInsets.all(8),
+                        child: CircularProgressIndicator(strokeWidth: 2, color: _blue),
+                      )
+                    : const Icon(Icons.content_paste_rounded, size: 18, color: _blue),
+              ),
+              const SizedBox(width: kSpace3),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      scanning ? 'Scanning…' : 'Paste caption',
+                      style: kStyleBodyMedium.copyWith(color: _blue),
+                    ),
+                    Text(
+                      'Copy & paste the post caption to extract places',
+                      style: kStyleCaption.copyWith(color: kColorInkSoft),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: kSpace3),
+          TextField(
+            controller: controller,
+            enabled: !disabled,
+            maxLines: 4,
+            minLines: 2,
+            style: kStyleBodyMedium,
+            decoration: InputDecoration(
+              hintText: 'Paste caption here…',
+              hintStyle: kStyleCaption.copyWith(color: kColorInkSoft),
+              filled: true,
+              fillColor: Colors.white.withValues(alpha: 0.6),
+              contentPadding: const EdgeInsets.all(kSpace3),
+              border: OutlineInputBorder(
+                borderRadius: kRadiusMd,
+                borderSide: BorderSide(color: _blue.withValues(alpha: 0.3)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: kRadiusMd,
+                borderSide: BorderSide(color: _blue.withValues(alpha: 0.3)),
+              ),
+              focusedBorder: const OutlineInputBorder(
+                borderRadius: kRadiusMd,
+                borderSide: BorderSide(color: _blue),
+              ),
+            ),
+          ),
+          const SizedBox(height: kSpace2),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: disabled ? null : onFind,
+              icon: const Icon(Icons.search_rounded, size: 16, color: _blue),
+              label: Text('Find places', style: kStyleBodyMedium.copyWith(color: _blue)),
+            ),
+          ),
+        ],
       ),
     );
   }

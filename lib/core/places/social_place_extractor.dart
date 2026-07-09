@@ -63,6 +63,28 @@ abstract final class SocialPlaceExtractor {
     }
   }
 
+  /// Extracts places from raw text (caption paste) without any network fetch.
+  /// Always returns a result (never null) — places may be empty.
+  static Future<SocialPlaceResult> extractFromText(String text) async {
+    final candidates = _candidates(text);
+    if (candidates.isEmpty) return SocialPlaceResult(caption: text, places: []);
+
+    final places = <NominatimPlace>[];
+    for (final q in candidates) {
+      final results = await NominatimService.search(q);
+      if (results.isNotEmpty) {
+        final best = results.first;
+        if (!places.any((p) => p.name.toLowerCase() == best.name.toLowerCase())) {
+          places.add(best);
+        }
+      }
+      if (candidates.indexOf(q) < candidates.length - 1) {
+        await Future<void>.delayed(const Duration(milliseconds: 1100));
+      }
+    }
+    return SocialPlaceResult(caption: text, places: places);
+  }
+
   /// Fetches a TikTok/Instagram post caption and geocodes any place
   /// candidates found within it. Returns null if the post is unreachable.
   static Future<SocialPlaceResult?> extract(String url) async {

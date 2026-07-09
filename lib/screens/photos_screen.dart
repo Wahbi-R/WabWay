@@ -178,20 +178,19 @@ class _PhotosScreenState extends State<PhotosScreen> {
                       _GuideCard(expanded: _albums.isEmpty),
                       const SizedBox(height: kSpace4),
                       if (_albums.isEmpty)
-                        Center(
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: kSpace6),
-                            child: WabwayEmptyState(
-                              icon: Icons.photo_library_outlined,
-                              title: 'No albums yet',
-                              description:
-                                  'Add a link to your Google Photos album, iCloud shared album, or any photo collection.',
-                              action: WabwayButton(
-                                label: 'Add album',
-                                icon: Icons.add_rounded,
-                                onPressed: _addAlbum,
+                        Padding(
+                          padding: const EdgeInsets.only(top: kSpace4),
+                          child: Column(
+                            children: [
+                              WabwayEmptyState(
+                                icon: Icons.photo_library_outlined,
+                                title: 'No albums yet',
+                                description:
+                                    'Create a shared album in Google Photos or iCloud, then paste the link here so the whole group can access it.',
                               ),
-                            ),
+                              const SizedBox(height: kSpace5),
+                              _CreateAlbumCard(onAddAlbum: _addAlbum),
+                            ],
                           ),
                         )
                       else
@@ -235,6 +234,123 @@ class _PhotosScreenState extends State<PhotosScreen> {
   }
 }
 
+// ─── Create album card ────────────────────────────────────────────────────────
+
+class _CreateAlbumCard extends StatelessWidget {
+  const _CreateAlbumCard({required this.onAddAlbum});
+  final VoidCallback onAddAlbum;
+
+  static const _googlePhotosUrl = 'https://photos.google.com/';
+  static const _iCloudUrl       = 'https://www.icloud.com/photos/';
+
+  Future<void> _launch(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return WabwayCard(
+      padding: const EdgeInsets.all(kSpace4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Create a shared album', style: kStyleBodySemibold),
+          const SizedBox(height: 2),
+          Text(
+            'Open your photos app, create a collaborative album, then paste the link here.',
+            style: kStyleCaption.copyWith(color: kColorInkSoft),
+          ),
+          const SizedBox(height: kSpace4),
+          Row(
+            children: [
+              Expanded(
+                child: _LaunchButton(
+                  icon: Icons.photo_library_rounded,
+                  color: const Color(0xFF4285F4),
+                  softColor: const Color(0xFFE8F0FE),
+                  label: 'Google Photos',
+                  onTap: () => _launch(_googlePhotosUrl),
+                ),
+              ),
+              const SizedBox(width: kSpace3),
+              Expanded(
+                child: _LaunchButton(
+                  icon: Icons.cloud_rounded,
+                  color: const Color(0xFF3478F6),
+                  softColor: const Color(0xFFE8F1FB),
+                  label: 'iCloud Photos',
+                  onTap: () => _launch(_iCloudUrl),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: kSpace3),
+          const Row(children: [
+            Expanded(child: Divider()),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: kSpace3),
+              child: Text('got a link?',
+                  style: TextStyle(fontSize: 11, color: kColorInkSoft)),
+            ),
+            Expanded(child: Divider()),
+          ]),
+          const SizedBox(height: kSpace3),
+          WabwayButton(
+            label: 'Paste album link',
+            icon: Icons.add_link_rounded,
+            variant: WabwayButtonVariant.secondary,
+            fullWidth: true,
+            onPressed: onAddAlbum,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LaunchButton extends StatelessWidget {
+  const _LaunchButton({
+    required this.icon,
+    required this.color,
+    required this.softColor,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData    icon;
+  final Color       color;
+  final Color       softColor;
+  final String      label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: kSpace3),
+        decoration: BoxDecoration(
+          color: softColor,
+          borderRadius: kRadiusMd,
+          border: Border.all(color: color.withValues(alpha: 0.25)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 22, color: color),
+            const SizedBox(height: kSpace2),
+            Text(label,
+                style: kStyleCaption.copyWith(
+                    color: color, fontWeight: FontWeight.w600)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ─── Guide card ───────────────────────────────────────────────────────────────
 
 class _GuideCard extends StatelessWidget {
@@ -271,10 +387,10 @@ class _GuideCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Divider(height: kSpace4),
-                  _GuideSection(
+                  const _GuideSection(
                     serviceIcon: Icons.photo_library_rounded,
-                    serviceColor: const Color(0xFF4285F4),
-                    serviceSoftColor: const Color(0xFFE8F0FE),
+                    serviceColor: Color(0xFF4285F4),
+                    serviceSoftColor: Color(0xFFE8F0FE),
                     title: 'Google Photos — recommended',
                     subtitle: 'Everyone can add photos directly to one shared album',
                     steps: const [
@@ -288,10 +404,10 @@ class _GuideCard extends StatelessWidget {
                     tip: 'Auto-backup tip: open the shared album → three-dot menu → "Automatically add photos" — Google Photos will suggest your camera roll shots to add.',
                   ),
                   const SizedBox(height: kSpace5),
-                  _GuideSection(
+                  const _GuideSection(
                     serviceIcon: Icons.cloud_rounded,
-                    serviceColor: const Color(0xFF3478F6),
-                    serviceSoftColor: const Color(0xFFE8F1FB),
+                    serviceColor: Color(0xFF3478F6),
+                    serviceSoftColor: Color(0xFFE8F1FB),
                     title: 'iCloud Shared Album',
                     subtitle: 'Works well if everyone is on iPhone',
                     steps: const [
@@ -394,7 +510,7 @@ class _GuideSection extends StatelessWidget {
           const SizedBox(height: kSpace2),
           Container(
             padding: const EdgeInsets.all(kSpace3),
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: kColorPrimarySoft,
               borderRadius: kRadiusSm,
             ),

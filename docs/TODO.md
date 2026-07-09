@@ -103,6 +103,7 @@ Checked items are done. Log the date and a one-liner when completing something.
 - [x] **52. OCR itinerary scanner** — two-pass OCR with `google_mlkit_text_recognition`; Gemini AI fallback for multi-column booking formats; PDF text-layer extraction before image OCR; parse mode shown in banner (2026-07-07, see `docs/features/phase 3/ocr-itinerary-scanner.md`).
 - [x] **53. Changelog sheet** — auto-shows once on upgrade (compares `PackageInfo.buildNumber` to `SharedPrefs last_seen_build`); accessible from More → What's new; `DraggableScrollableSheet` with release list; const `_kChangelog` list in `changelog.dart` (2026-07-09, see `docs/features/phase 3/changelog-sheet.md`).
 - [x] **54. Photo albums** — Photos screen under More; members add links to Google Photos / iCloud / Dropbox albums; service auto-detected from URL; step-by-step guide for Google Photos collaborative albums; Realtime sync; migration `006_trip_photo_albums.sql` applied via `supabase db push` (2026-07-09, see `docs/features/phase 3/photo-albums.md`).
+- [x] **55. Audio transcription for share intake** — `wabway-server/` Python server (faster-whisper + spaCy NER, zero API cost) runs on LG G8 via Termux; Flutter gets "Extract from audio" banner in share screen (hidden when `AUDIO_SERVER_URL` unset); `SocialPlaceExtractor.extractFromAudio` POSTs to server, geocodes returned place names via Nominatim (2026-07-09, see `docs/features/phase 3/audio-transcription.md`).
 
 ---
 

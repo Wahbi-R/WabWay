@@ -230,12 +230,14 @@ class _AddSpotContentState extends State<_AddSpotContent> {
     if (info == null) return;
 
     setState(() {
-      _latitude  = info.latitude;
-      _longitude = info.longitude;
+      _latitude    = info.latitude;
+      _longitude   = info.longitude;
       _placeSource = 'google_maps';
+      if (info.category != null && _category == null) {
+        _category = _categoryFromSlug(info.category!);
+      }
     });
 
-    // Only autofill name if the field is empty
     if (_nameCtrl.text.trim().isEmpty && info.name.isNotEmpty) {
       _nameCtrl.text = info.name;
     }
@@ -249,6 +251,15 @@ class _AddSpotContentState extends State<_AddSpotContent> {
       _countryCtrl.text = info.country!;
     }
   }
+
+  SpotCategory _categoryFromSlug(String slug) => switch (slug) {
+    'food'       => SpotCategory.food,
+    'shopping'   => SpotCategory.shopping,
+    'nature'     => SpotCategory.nature,
+    'nightlife'  => SpotCategory.nightlife,
+    'experience' => SpotCategory.experience,
+    _            => SpotCategory.landmark,
+  };
 
   void _applySuggestion(PlaceSuggestion place) {
     _nameCtrl.text    = place.name;

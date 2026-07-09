@@ -1,6 +1,11 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+const _kAudioServerUrl = String.fromEnvironment(
+  'AUDIO_SERVER_URL',
+  defaultValue: '',
+);
+
 /// Result of resolving a Google Maps URL.
 class MapsPlaceInfo {
   const MapsPlaceInfo({
@@ -11,7 +16,8 @@ class MapsPlaceInfo {
     this.address,
     this.city,
     this.country,
-    this.displayName,
+    this.category,
+    this.website,
   });
 
   final String name;
@@ -21,18 +27,22 @@ class MapsPlaceInfo {
   final String? address;
   final String? city;
   final String? country;
-  final String? displayName;
-
-  bool get hasGeo => true;
+  /// WabWay SpotCategory slug returned by the server ('food', 'landmark', etc.)
+  final String? category;
+  final String? website;
 }
 
 abstract final class MapsImportService {
   static const _kTimeout = Duration(seconds: 8);
 
   /// Resolves any Google Maps URL (including short `maps.app.goo.gl` links)
-  /// and returns enriched place info: name, coordinates, address, city, country.
+  /// and returns enriched place info.
   ///
-  /// Returns null if the URL cannot be resolved or is not a Maps link.
+  /// Pipeline:
+  ///   1. Follow redirects to get the full Maps URL
+  ///   2. Extract place name from URL path + coordinates from @lat,lng
+  ///   3. Call wabway-server /maps/enrich (Google Places API) — best data
+  ///   4. Fall back to Nominatim reverse geocode if server unavailable
   static Future<MapsPlaceInfo?> resolve(String url) async {
     try {
       final resolved = await _resolveRedirects(url.trim());
@@ -41,20 +51,62 @@ abstract final class MapsImportService {
       final coords = _extractCoords(resolved);
       if (coords == null) return null;
 
-      final name = _extractPlaceName(resolved);
+      final nameFromUrl = _extractPlaceName(resolved);
 
-      // Reverse-geocode with Nominatim for address/city/country
+      // Try server (Google Places API) first
+      if (_kAudioServerUrl.isNotEmpty && nameFromUrl != null) {
+        final serverResult = await _enrichViaServer(
+          name: nameFromUrl,
+          lat: coords.$1,
+          lng: coords.$2,
+        );
+        if (serverResult != null) return serverResult.copyWithUrl(resolved);
+      }
+
+      // Fallback: Nominatim reverse geocode
       final geo = await _reverseGeocode(coords.$1, coords.$2);
+      return MapsPlaceInfo(
+        name:     nameFromUrl ?? geo?.displayName?.split(',').first.trim() ?? 'Unknown place',
+        latitude:  coords.$1,
+        longitude: coords.$2,
+        fullUrl:   resolved,
+        address:   geo?.address,
+        city:      geo?.city,
+        country:   geo?.country,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // ─── Server enrichment (Google Places API) ────────────────────────────────
+
+  static Future<MapsPlaceInfo?> _enrichViaServer({
+    required String name,
+    required double lat,
+    required double lng,
+  }) async {
+    try {
+      final uri = Uri.parse('$_kAudioServerUrl/maps/enrich');
+      final response = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'name': name, 'latitude': lat, 'longitude': lng}),
+      ).timeout(_kTimeout);
+
+      if (response.statusCode != 200) return null;
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
 
       return MapsPlaceInfo(
-        name:        name ?? geo?.displayName?.split(',').first.trim() ?? 'Unknown place',
-        latitude:    coords.$1,
-        longitude:   coords.$2,
-        fullUrl:     resolved,
-        address:     geo?.address,
-        city:        geo?.city,
-        country:     geo?.country,
-        displayName: geo?.displayName,
+        name:      (data['name'] as String?)?.trim() ?? name,
+        latitude:  (data['latitude'] as num?)?.toDouble() ?? lat,
+        longitude: (data['longitude'] as num?)?.toDouble() ?? lng,
+        fullUrl:   '',
+        address:   data['address'] as String?,
+        city:      data['city'] as String?,
+        country:   data['country'] as String?,
+        category:  data['category'] as String?,
+        website:   data['website'] as String?,
       );
     } catch (_) {
       return null;
@@ -63,21 +115,15 @@ abstract final class MapsImportService {
 
   // ─── Redirect resolution ──────────────────────────────────────────────────
 
-  /// Follows HTTP redirects (up to 5 hops) to get the final URL.
-  /// `maps.app.goo.gl` links redirect to the full `google.com/maps/place/...` URL.
   static Future<String?> _resolveRedirects(String url) async {
     var current = url;
     for (var i = 0; i < 5; i++) {
       final uri = Uri.tryParse(current);
       if (uri == null) return null;
-
-      // Already a full Maps URL — done
       if (_isFullMapsUrl(current)) return current;
-
       final response = await http.head(uri).timeout(_kTimeout);
       final location = response.headers['location'];
       if (location == null) return current;
-      // Resolve relative redirects
       current = Uri.parse(current).resolve(location).toString();
     }
     return current;
@@ -87,22 +133,16 @@ abstract final class MapsImportService {
       url.contains('google.com/maps') &&
       (url.contains('/place/') || url.contains('@'));
 
-  // ─── Place name extraction ─────────────────────────────────────────────────
+  // ─── Place name extraction ────────────────────────────────────────────────
 
-  /// Extracts the human-readable place name from a full Maps URL path.
-  ///
-  /// Full URL pattern: `.../maps/place/NAME_ENCODED/@lat,lng,...`
   static String? _extractPlaceName(String url) {
-    // Match /maps/place/<name>/ or /maps/place/<name>@
     final match = RegExp(r'/maps/place/([^/@?]+)').firstMatch(url);
     if (match == null) return null;
-    final encoded = match.group(1)!;
-    return Uri.decodeComponent(encoded.replaceAll('+', ' ')).trim();
+    return Uri.decodeComponent(match.group(1)!.replaceAll('+', ' ')).trim();
   }
 
   // ─── Coordinate extraction ────────────────────────────────────────────────
 
-  /// Extracts (lat, lng) from `@lat,lng` in the URL.
   static (double, double)? _extractCoords(String url) {
     final match = RegExp(r'@(-?\d+\.?\d*),(-?\d+\.?\d*)').firstMatch(url);
     if (match == null) return null;
@@ -126,7 +166,6 @@ abstract final class MapsImportService {
 
       if (response.statusCode != 200) return null;
       final json = jsonDecode(response.body) as Map<String, dynamic>;
-
       final displayName = json['display_name'] as String?;
       final addr = json['address'] as Map<String, dynamic>? ?? {};
 
@@ -137,9 +176,6 @@ abstract final class MapsImportService {
               _str(addr['county']))
           ?.trim();
 
-      final country = _str(addr['country'])?.trim();
-
-      // Build a short address from street + house_number + postcode
       final parts = <String>[];
       final house = _str(addr['house_number']);
       final road  = _str(addr['road']) ?? _str(addr['pedestrian']);
@@ -148,13 +184,11 @@ abstract final class MapsImportService {
       if (road  != null) parts.add(road);
       if (post  != null) parts.add(post);
 
-      final address = parts.isNotEmpty ? parts.join(' ') : null;
-
       return _GeoResult(
         displayName: displayName,
-        address:     address,
+        address:     parts.isNotEmpty ? parts.join(' ') : null,
         city:        city,
-        country:     country,
+        country:     _str(addr['country'])?.trim(),
       );
     } catch (_) {
       return null;
@@ -168,14 +202,23 @@ abstract final class MapsImportService {
 }
 
 class _GeoResult {
-  const _GeoResult({
-    this.displayName,
-    this.address,
-    this.city,
-    this.country,
-  });
+  const _GeoResult({this.displayName, this.address, this.city, this.country});
   final String? displayName;
   final String? address;
   final String? city;
   final String? country;
+}
+
+extension _MapsPlaceInfoX on MapsPlaceInfo {
+  MapsPlaceInfo copyWithUrl(String url) => MapsPlaceInfo(
+        name:      name,
+        latitude:  latitude,
+        longitude: longitude,
+        fullUrl:   url,
+        address:   address,
+        city:      city,
+        country:   country,
+        category:  category,
+        website:   website,
+      );
 }

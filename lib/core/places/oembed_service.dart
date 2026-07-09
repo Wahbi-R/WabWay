@@ -1,6 +1,11 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+// Set by SocialPlaceExtractor when the audio server URL is known.
+// Allows OembedService to proxy Instagram/TikTok caption fetching through
+// the phone server (no CORS restrictions there).
+String? _proxyBaseUrl;
+
 class OembedResult {
   const OembedResult({required this.title, this.thumbnailUrl});
   final String  title;
@@ -12,10 +17,40 @@ abstract final class OembedService {
   static const _browserUa =
       'Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
 
+  /// Set the audio server base URL so caption requests can be proxied
+  /// through it, bypassing browser CORS restrictions.
+  static void setProxyUrl(String? url) => _proxyBaseUrl = url;
+
   static Future<OembedResult?> fetch(String url) async {
+    // Try server-side proxy first (avoids CORS on web)
+    final proxy = _proxyBaseUrl;
+    if (proxy != null && proxy.isNotEmpty) {
+      final result = await _proxyCaption(proxy, url);
+      if (result != null) return result;
+    }
     if (url.contains('tiktok.com'))    return _tiktok(url);
     if (url.contains('instagram.com')) return _instagram(url);
     return null;
+  }
+
+  // ── Server-side proxy ─────────────────────────────────────────────────────
+
+  static Future<OembedResult?> _proxyCaption(String baseUrl, String url) async {
+    try {
+      final endpoint = Uri.parse(
+        '$baseUrl/caption?url=${Uri.encodeComponent(url)}',
+      );
+      final res = await http
+          .get(endpoint, headers: {'User-Agent': _ua})
+          .timeout(const Duration(seconds: 15));
+      if (res.statusCode != 200) return null;
+      final j = jsonDecode(res.body) as Map<String, dynamic>;
+      final caption = (j['caption'] as String? ?? '').trim();
+      if (caption.isEmpty) return null;
+      return OembedResult(title: caption);
+    } catch (_) {
+      return null;
+    }
   }
 
   // ── TikTok — free public oEmbed ───────────────────────────────────────────

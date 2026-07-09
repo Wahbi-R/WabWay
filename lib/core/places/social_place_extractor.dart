@@ -7,6 +7,13 @@ import 'oembed_service.dart';
 // Set via --dart-define-from-file=.env. Empty string disables the audio banner.
 const _kAudioServerUrl = String.fromEnvironment('AUDIO_SERVER_URL', defaultValue: '');
 
+// Tell OembedService about the proxy URL so it can route caption fetching
+// through the phone server (avoids CORS on web builds).
+final bool _proxyInit = () {
+  OembedService.setProxyUrl(_kAudioServerUrl.isNotEmpty ? _kAudioServerUrl : null);
+  return true;
+}();
+
 class SocialPlaceResult {
   const SocialPlaceResult({
     required this.caption,
@@ -88,6 +95,7 @@ abstract final class SocialPlaceExtractor {
   /// Fetches a TikTok/Instagram post caption and geocodes any place
   /// candidates found within it. Returns null if the post is unreachable.
   static Future<SocialPlaceResult?> extract(String url) async {
+    _proxyInit; // ensure proxy URL is registered before first fetch
     final meta = await OembedService.fetch(url);
     if (meta == null) return null;
 

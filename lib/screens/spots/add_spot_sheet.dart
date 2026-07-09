@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../core/maps_import_service.dart';
 import '../../core/place_search_service.dart';
 import '../../core/supabase/spot_service.dart';
 import '../../data/spot_data.dart';
@@ -129,19 +130,21 @@ class _AddSpotContent extends StatefulWidget {
 }
 
 class _AddSpotContentState extends State<_AddSpotContent> {
-  final _formKey     = GlobalKey<FormState>();
-  final _searchCtrl  = TextEditingController();
-  final _nameCtrl    = TextEditingController();
-  final _cityCtrl    = TextEditingController();
-  final _areaCtrl    = TextEditingController();
-  final _addressCtrl = TextEditingController();
-  final _mapsCtrl    = TextEditingController();
-  final _sourceCtrl  = TextEditingController();
-  final _notesCtrl   = TextEditingController();
+  final _formKey      = GlobalKey<FormState>();
+  final _searchCtrl   = TextEditingController();
+  final _nameCtrl     = TextEditingController();
+  final _cityCtrl     = TextEditingController();
+  final _areaCtrl     = TextEditingController();
+  final _addressCtrl  = TextEditingController();
+  final _countryCtrl  = TextEditingController();
+  final _mapsCtrl     = TextEditingController();
+  final _sourceCtrl   = TextEditingController();
+  final _notesCtrl    = TextEditingController();
 
   SpotCategory? _category;
   SpotStatus    _status    = SpotStatus.idea;
   bool          _loading   = false;
+  bool          _mapsLoading = false;
   String?       _error;
 
   // Location from suggestion or Maps URL
@@ -163,6 +166,7 @@ class _AddSpotContentState extends State<_AddSpotContent> {
       _cityCtrl.text    = s.city;
       _areaCtrl.text    = s.area;
       _addressCtrl.text = s.address ?? '';
+      _countryCtrl.text = s.country ?? '';
       _mapsCtrl.text    = s.mapsUrl ?? '';
       _sourceCtrl.text  = s.sourceUrl ?? '';
       _notesCtrl.text   = s.notes ?? '';
@@ -179,11 +183,13 @@ class _AddSpotContentState extends State<_AddSpotContent> {
   @override
   void dispose() {
     _searchDebounce?.cancel();
+    _mapsDebounce?.cancel();
     _searchCtrl.dispose();
     _nameCtrl.dispose();
     _cityCtrl.dispose();
     _areaCtrl.dispose();
     _addressCtrl.dispose();
+    _countryCtrl.dispose();
     _mapsCtrl.dispose();
     _sourceCtrl.dispose();
     _notesCtrl.dispose();
@@ -205,15 +211,42 @@ class _AddSpotContentState extends State<_AddSpotContent> {
     });
   }
 
+  Timer? _mapsDebounce;
+
   void _onMapsUrlChanged() {
-    final url = _mapsCtrl.text;
+    final url = _mapsCtrl.text.trim();
     if (!PlaceSearchService.isMapsUrl(url)) return;
-    final coords = PlaceSearchService.parseLatLng(url);
-    if (coords != null) {
-      setState(() {
-        _latitude  = coords.lat;
-        _longitude = coords.lng;
-      });
+
+    _mapsDebounce?.cancel();
+    _mapsDebounce = Timer(const Duration(milliseconds: 600), () => _resolveMapsUrl(url));
+  }
+
+  Future<void> _resolveMapsUrl(String url) async {
+    if (!mounted) return;
+    setState(() => _mapsLoading = true);
+    final info = await MapsImportService.resolve(url);
+    if (!mounted) return;
+    setState(() => _mapsLoading = false);
+    if (info == null) return;
+
+    setState(() {
+      _latitude  = info.latitude;
+      _longitude = info.longitude;
+      _placeSource = 'google_maps';
+    });
+
+    // Only autofill name if the field is empty
+    if (_nameCtrl.text.trim().isEmpty && info.name.isNotEmpty) {
+      _nameCtrl.text = info.name;
+    }
+    if (info.address != null && _addressCtrl.text.trim().isEmpty) {
+      _addressCtrl.text = info.address!;
+    }
+    if (info.city != null && _cityCtrl.text.trim().isEmpty) {
+      _cityCtrl.text = info.city!;
+    }
+    if (info.country != null && _countryCtrl.text.trim().isEmpty) {
+      _countryCtrl.text = info.country!;
     }
   }
 
@@ -222,6 +255,7 @@ class _AddSpotContentState extends State<_AddSpotContent> {
     _cityCtrl.text    = place.city;
     _areaCtrl.text    = place.area;
     _addressCtrl.text = place.address;
+    _countryCtrl.text = place.country;
     _mapsCtrl.text    = place.mapsUrl;
     _searchCtrl.clear();
     setState(() {
@@ -255,6 +289,7 @@ class _AddSpotContentState extends State<_AddSpotContent> {
           mapsUrl:     _mapsCtrl.text.trim().isEmpty   ? null : _mapsCtrl.text.trim(),
           notes:       _notesCtrl.text.trim().isEmpty  ? null : _notesCtrl.text.trim(),
           address:     addrInput,
+          country:     _countryCtrl.text.trim().isEmpty ? null : _countryCtrl.text.trim(),
           latitude:    _latitude,
           longitude:   _longitude,
           placeSource: _placeSource,
@@ -273,6 +308,7 @@ class _AddSpotContentState extends State<_AddSpotContent> {
           mapsUrl:     _mapsCtrl.text.trim().isEmpty   ? null : _mapsCtrl.text.trim(),
           notes:       _notesCtrl.text.trim().isEmpty  ? null : _notesCtrl.text.trim(),
           address:     addrInput,
+          country:     _countryCtrl.text.trim().isEmpty ? null : _countryCtrl.text.trim(),
           latitude:    _latitude,
           longitude:   _longitude,
           placeSource: _placeSource,
@@ -469,6 +505,14 @@ class _AddSpotContentState extends State<_AddSpotContent> {
                   ),
                   const SizedBox(height: kSpace4),
 
+                  WabwayTextField(
+                    label: 'Country',
+                    hint: 'e.g. Japan',
+                    controller: _countryCtrl,
+                    textInputAction: TextInputAction.next,
+                  ),
+                  const SizedBox(height: kSpace4),
+
                   WabwaySelectField<SpotCategory>(
                     label: 'Category',
                     hint: 'Pick a category',
@@ -493,12 +537,28 @@ class _AddSpotContentState extends State<_AddSpotContent> {
 
                   WabwayTextField(
                     label: 'Google Maps URL',
-                    hint: 'https://maps.google.com/…',
+                    hint: 'Paste any Maps link — short or full',
                     controller: _mapsCtrl,
                     prefixIcon: Icons.map_rounded,
+                    suffixIcon: _mapsLoading ? Icons.hourglass_top_rounded : null,
                     keyboardType: TextInputType.url,
                     textInputAction: TextInputAction.next,
                   ),
+                  if (_mapsLoading)
+                    Padding(
+                      padding: const EdgeInsets.only(top: kSpace2),
+                      child: Row(
+                        children: [
+                          const SizedBox(
+                            width: 12, height: 12,
+                            child: CircularProgressIndicator(strokeWidth: 1.5),
+                          ),
+                          const SizedBox(width: kSpace2),
+                          Text('Looking up place info…',
+                              style: kStyleCaption.copyWith(color: kColorInkSoft)),
+                        ],
+                      ),
+                    ),
                   const SizedBox(height: kSpace4),
 
                   WabwayTextField(

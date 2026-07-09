@@ -194,6 +194,7 @@ class Spot {
     this.mapsUrl,
     this.notes,
     this.address,
+    this.country,
     this.latitude,
     this.longitude,
     this.placeSource,
@@ -213,6 +214,7 @@ class Spot {
   final String? mapsUrl;
   final String? notes;
   final String? address;
+  final String? country;
   final double? latitude;
   final double? longitude;
   final String? placeSource;
@@ -234,6 +236,7 @@ class Spot {
     double? latitude,
     double? longitude,
     String? address,
+    String? country,
     String? placeSource,
     String? imageUrl,
   }) => Spot(
@@ -247,6 +250,7 @@ class Spot {
         mapsUrl:     mapsUrl ?? this.mapsUrl,
         notes:       notes ?? this.notes,
         address:     address ?? this.address,
+        country:     country ?? this.country,
         latitude:    latitude ?? this.latitude,
         longitude:   longitude ?? this.longitude,
         placeSource: placeSource ?? this.placeSource,

@@ -11,6 +11,17 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 28,
+    label: 'Spot country + better Maps import',
+    changes: [
+      'Spots now have a Country field — auto-filled when using place search or pasting a Maps link',
+      'Paste any Google Maps link (short or full) — name, city, and country are looked up automatically',
+      'Short links (maps.app.goo.gl) now resolve correctly instead of only extracting coordinates',
+      'Sharing a Google Maps link pre-fills the spot form with place name, city, and country',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 27,
     label: 'Plan item improvements',
     changes: [

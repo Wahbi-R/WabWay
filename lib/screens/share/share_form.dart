@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/maps_import_service.dart';
 import '../../core/place_search_service.dart';
 import '../../data/share_data.dart';
 import '../../theme/app_colors.dart';
@@ -12,6 +13,7 @@ class ShareSaveData {
     required this.title,
     required this.notes,
     this.location,
+    this.country,
     this.category,
     this.docType,
     this.travelType,
@@ -28,6 +30,7 @@ class ShareSaveData {
   final String title;
   final String notes;
   final String? location;
+  final String? country;
   final String? category;
   final String? docType;
   final String? travelType;
@@ -67,6 +70,7 @@ class _ShareFormState extends State<ShareForm> {
   late final TextEditingController _notesCtrl;
   late final TextEditingController _amountCtrl;
   late final TextEditingController _locationCtrl;
+  late final TextEditingController _countryCtrl;
 
   String? _category;
   String? _docType;
@@ -78,6 +82,7 @@ class _ShareFormState extends State<ShareForm> {
   // Maps URL handling
   double? _parsedLat;
   double? _parsedLng;
+  bool _mapsResolving = false;
 
   bool get _isMapsShare =>
       widget.share?.contentType == ShareContentType.googleMapsLink;
@@ -89,14 +94,40 @@ class _ShareFormState extends State<ShareForm> {
     _notesCtrl    = TextEditingController();
     _amountCtrl   = TextEditingController();
     _locationCtrl = TextEditingController();
+    _countryCtrl  = TextEditingController();
 
     if (_isMapsShare) {
       final rawContent = widget.share?.rawContent ?? '';
+      // Quick coord extraction for immediate map-ready badge
       final coords = PlaceSearchService.parseLatLng(rawContent);
       if (coords != null) {
         _parsedLat = coords.lat;
         _parsedLng = coords.lng;
       }
+      // Full async resolution for name + address + city + country
+      _resolveMapsShare(rawContent);
+    }
+  }
+
+  Future<void> _resolveMapsShare(String url) async {
+    setState(() => _mapsResolving = true);
+    final info = await MapsImportService.resolve(url);
+    if (!mounted) return;
+    setState(() => _mapsResolving = false);
+    if (info == null) return;
+
+    setState(() {
+      _parsedLat = info.latitude;
+      _parsedLng = info.longitude;
+    });
+    if (_titleCtrl.text.trim().isEmpty && info.name.isNotEmpty) {
+      _titleCtrl.text = info.name;
+    }
+    if (_locationCtrl.text.trim().isEmpty && info.city != null) {
+      _locationCtrl.text = info.city!;
+    }
+    if (_countryCtrl.text.trim().isEmpty && info.country != null) {
+      _countryCtrl.text = info.country!;
     }
   }
 
@@ -106,6 +137,7 @@ class _ShareFormState extends State<ShareForm> {
     _notesCtrl.dispose();
     _amountCtrl.dispose();
     _locationCtrl.dispose();
+    _countryCtrl.dispose();
     super.dispose();
   }
 
@@ -127,6 +159,7 @@ class _ShareFormState extends State<ShareForm> {
         title:       _titleCtrl.text.trim(),
         notes:       _notesCtrl.text.trim(),
         location:    _locationCtrl.text.trim().isEmpty ? null : _locationCtrl.text.trim(),
+        country:     _countryCtrl.text.trim().isEmpty ? null : _countryCtrl.text.trim(),
         category:    _category,
         docType:     _docType,
         travelType:  _travelType,
@@ -135,7 +168,7 @@ class _ShareFormState extends State<ShareForm> {
         mapsUrl:     _isMapsShare ? widget.share?.rawContent : null,
         latitude:    _parsedLat,
         longitude:   _parsedLng,
-        placeSource: _parsedLat != null ? 'shared_maps_link' : null,
+        placeSource: _parsedLat != null ? 'google_maps' : null,
       ));
     } catch (e) {
       if (mounted) setState(() { _saving = false; _saveError = e.toString(); });
@@ -223,7 +256,18 @@ class _ShareFormState extends State<ShareForm> {
             value: widget.share?.rawContent ?? '',
             icon: Icons.map_rounded,
           ),
-          if (_parsedLat != null) ...[
+          if (_mapsResolving) ...[
+            const SizedBox(height: kSpace2),
+            Row(
+              children: [
+                const SizedBox(width: 12, height: 12,
+                    child: CircularProgressIndicator(strokeWidth: 1.5)),
+                const SizedBox(width: kSpace2),
+                Text('Looking up place info…',
+                    style: kStyleCaption.copyWith(color: kColorInkSoft)),
+              ],
+            ),
+          ] else if (_parsedLat != null) ...[
             const SizedBox(height: kSpace2),
             Row(
               children: [
@@ -245,7 +289,15 @@ class _ShareFormState extends State<ShareForm> {
             prefixIcon: Icons.place_rounded,
             textInputAction: TextInputAction.next,
           ),
-        ] else
+          const SizedBox(height: kSpace3),
+          WabwayTextField(
+            label: 'Country (optional)',
+            hint: 'e.g. Japan',
+            controller: _countryCtrl,
+            prefixIcon: Icons.flag_rounded,
+            textInputAction: TextInputAction.next,
+          ),
+        ] else ...[
           WabwayTextField(
             label: 'Location or address',
             hint: 'e.g. Shinjuku, Tokyo',
@@ -253,6 +305,7 @@ class _ShareFormState extends State<ShareForm> {
             prefixIcon: Icons.place_rounded,
             textInputAction: TextInputAction.next,
           ),
+        ],
         const SizedBox(height: kSpace3),
         WabwaySelectField<String>(
           label: 'Category',

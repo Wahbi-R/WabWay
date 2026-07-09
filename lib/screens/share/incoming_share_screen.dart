@@ -605,6 +605,7 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
           sourceUrl: isMaps ? null : _activeShare!.rawContent,
           mapsUrl: data.mapsUrl,
           notes: data.notes.isEmpty ? null : data.notes,
+          country: data.country,
           latitude: data.latitude,
           longitude: data.longitude,
           placeSource: data.placeSource,

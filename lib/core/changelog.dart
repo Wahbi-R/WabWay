@@ -162,14 +162,20 @@ abstract final class ChangelogService {
     return false;
   }
 
-  /// Show the changelog sheet. Pass [forceShow] true for the settings entry.
+  /// Show the changelog. Uses a centered dialog on wide screens, bottom sheet on mobile.
   static Future<void> show(BuildContext context, {bool forceShow = false}) {
+    final isWide = MediaQuery.sizeOf(context).width >= 600;
+    if (isWide) {
+      return showDialog<void>(
+        context: context,
+        builder: (_) => const _ChangelogDialog(),
+      );
+    }
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      constraints: const BoxConstraints(maxWidth: 560),
       builder: (_) => const _ChangelogSheet(),
     );
   }
@@ -185,14 +191,63 @@ abstract final class ChangelogService {
   }
 }
 
-// ─── Sheet UI ─────────────────────────────────────────────────────────────────
+// ─── Shared content ───────────────────────────────────────────────────────────
+
+Widget _changelogHeader(BuildContext context) {
+  return Padding(
+    padding: const EdgeInsets.fromLTRB(kSpace5, kSpace4, kSpace5, kSpace2),
+    child: Row(
+      children: [
+        Container(
+          width: 36, height: 36,
+          decoration: BoxDecoration(
+            color: kColorPrimarySoft,
+            borderRadius: kRadiusSm,
+          ),
+          child: const Icon(Icons.new_releases_rounded,
+              size: 18, color: kColorPrimary),
+        ),
+        const SizedBox(width: kSpace3),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("What's new", style: kStyleBodyBold),
+            Text('Recent updates to WabWay',
+                style: kStyleCaption.copyWith(color: kColorInkSoft)),
+          ],
+        ),
+        const Spacer(),
+        IconButton(
+          icon: const Icon(Icons.close_rounded),
+          color: kColorInkSoft,
+          onPressed: () => Navigator.pop(context),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _changelogList(ScrollController? scroll) {
+  final releases = _kChangelog.take(10).toList();
+  return ListView.separated(
+    controller: scroll,
+    padding: const EdgeInsets.fromLTRB(kSpace5, kSpace4, kSpace5, kSpace6),
+    itemCount: releases.length,
+    separatorBuilder: (_, __) => const Padding(
+      padding: EdgeInsets.symmetric(vertical: kSpace4),
+      child: Divider(height: 1),
+    ),
+    itemBuilder: (_, i) => _ReleaseBlock(release: releases[i], isLatest: i == 0),
+  );
+}
+
+// ─── Mobile bottom sheet ──────────────────────────────────────────────────────
 
 class _ChangelogSheet extends StatelessWidget {
   const _ChangelogSheet();
 
   @override
   Widget build(BuildContext context) {
-    final releases = _kChangelog.take(10).toList();
     return DraggableScrollableSheet(
       initialChildSize: 0.75,
       minChildSize: 0.4,
@@ -204,7 +259,6 @@ class _ChangelogSheet extends StatelessWidget {
         ),
         child: Column(
           children: [
-            // Handle
             Padding(
               padding: const EdgeInsets.only(top: kSpace3),
               child: Container(
@@ -215,54 +269,35 @@ class _ChangelogSheet extends StatelessWidget {
                 ),
               ),
             ),
-            // Header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(kSpace5, kSpace4, kSpace5, kSpace2),
-              child: Row(
-                children: [
-                  Container(
-                    width: 36, height: 36,
-                    decoration: BoxDecoration(
-                      color: kColorPrimarySoft,
-                      borderRadius: kRadiusSm,
-                    ),
-                    child: const Icon(Icons.new_releases_rounded,
-                        size: 18, color: kColorPrimary),
-                  ),
-                  const SizedBox(width: kSpace3),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("What's new", style: kStyleBodyBold),
-                      Text('Recent updates to WabWay',
-                          style: kStyleCaption.copyWith(color: kColorInkSoft)),
-                    ],
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded),
-                    color: kColorInkSoft,
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
+            _changelogHeader(context),
             const Divider(height: 1),
-            // Releases
-            Expanded(
-              child: ListView.separated(
-                controller: scroll,
-                padding: const EdgeInsets.fromLTRB(
-                    kSpace5, kSpace4, kSpace5, kSpace12),
-                itemCount: releases.length,
-                separatorBuilder: (_, __) => const Padding(
-                  padding: EdgeInsets.symmetric(vertical: kSpace4),
-                  child: Divider(height: 1),
-                ),
-                itemBuilder: (_, i) => _ReleaseBlock(release: releases[i],
-                    isLatest: i == 0),
-              ),
-            ),
+            Expanded(child: _changelogList(scroll)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Desktop dialog ───────────────────────────────────────────────────────────
+
+class _ChangelogDialog extends StatelessWidget {
+  const _ChangelogDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: kColorCream,
+      shape: RoundedRectangleBorder(borderRadius: kRadiusLg),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 48),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520, maxHeight: 680),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _changelogHeader(context),
+            const Divider(height: 1),
+            Flexible(child: _changelogList(null)),
           ],
         ),
       ),

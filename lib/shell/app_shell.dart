@@ -443,6 +443,17 @@ class _WabwaySidebar extends StatelessWidget {
                 ),
               ),
             ),
+            // Footer
+            Padding(
+              padding: const EdgeInsets.fromLTRB(kSpace3, 0, kSpace3, kSpace3),
+              child: _SidebarRow(
+                icon: Icons.new_releases_outlined,
+                selectedIcon: Icons.new_releases_rounded,
+                label: "What's new",
+                isActive: false,
+                onTap: () => ChangelogService.show(context),
+              ),
+            ),
           ],
         ),
       ),

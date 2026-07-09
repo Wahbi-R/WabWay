@@ -378,7 +378,7 @@ class _GuideCard extends StatelessWidget {
                 size: 18, color: kColorPrimary),
           ),
           title: Text('How to share trip photos', style: kStyleBodySemibold),
-          subtitle: Text('Set up a shared album for the whole group',
+          subtitle: Text('Photos don\'t sync automatically — everyone adds their own when ready',
               style: kStyleCaption.copyWith(color: kColorInkSoft)),
           children: [
             Padding(

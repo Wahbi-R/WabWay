@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 81,
+    label: 'Receipt search',
+    changes: [
+      'Search receipts by title, category, or notes — composable with the category filter and sort order',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 80,
     label: 'Internal cleanup',
     changes: [

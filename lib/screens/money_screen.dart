@@ -70,6 +70,8 @@ class _MoneyScreenState extends State<MoneyScreen> {
   _MoneyTab _tab = _MoneyTab.receipts;
   ReceiptCategory? _filterCategory;
   _ReceiptSort _receiptSort = _ReceiptSort.newestFirst;
+  String _receiptSearch = '';
+  final _searchCtrl = TextEditingController();
   String? _selectedReceiptId;
   String? _selectedWithdrawalId;
 
@@ -114,6 +116,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
   void dispose() {
     _debounce?.cancel();
     _realtimeChannel?.unsubscribe();
+    _searchCtrl.dispose();
     super.dispose();
   }
 
@@ -252,9 +255,17 @@ class _MoneyScreenState extends State<MoneyScreen> {
   // mixed in with a filtered subset that includes a different sort order.
 
   List<Receipt> get _filteredReceipts {
-    final base = _filterCategory == null
-        ? List<Receipt>.from(_receipts)
-        : _receipts.where((r) => r.category == _filterCategory).toList();
+    final q = _receiptSearch.toLowerCase().trim();
+    bool matchesSearch(Receipt r) {
+      if (q.isEmpty) return true;
+      return r.title.toLowerCase().contains(q) ||
+          r.category.label.toLowerCase().contains(q) ||
+          (r.notes?.toLowerCase().contains(q) ?? false);
+    }
+    final base = _receipts.where((r) {
+      if (_filterCategory != null && r.category != _filterCategory) return false;
+      return matchesSearch(r);
+    }).toList();
     base.sort((a, b) => switch (_receiptSort) {
       _ReceiptSort.newestFirst   => b.date.compareTo(a.date),
       _ReceiptSort.oldestFirst   => a.date.compareTo(b.date),
@@ -476,6 +487,14 @@ class _MoneyScreenState extends State<MoneyScreen> {
         children: [
           _SpendingSummaryCard(receipts: _receipts, homeCurrency: _homeCurrency),
           _SpendingByMemberCard(receipts: _receipts, homeCurrency: _homeCurrency, members: _members),
+          WabwaySearchBar(
+            controller: _searchCtrl,
+            hint: 'Search receipts…',
+            onChanged: (v) => setState(() {
+              _receiptSearch = v;
+              _selectedReceiptId = null;
+            }),
+          ),
           Row(
             children: [
               Expanded(
@@ -494,9 +513,15 @@ class _MoneyScreenState extends State<MoneyScreen> {
             child: listItems.isEmpty
                 ? Center(
                     child: WabwayEmptyState(
-                      icon: Icons.filter_list_rounded,
-                      title: 'No ${_filterCategory?.label ?? ''} receipts',
-                      description: 'Try a different category filter.',
+                      icon: _receiptSearch.isNotEmpty
+                          ? Icons.search_off_rounded
+                          : Icons.filter_list_rounded,
+                      title: _receiptSearch.isNotEmpty
+                          ? 'No results for "$_receiptSearch"'
+                          : 'No ${_filterCategory?.label ?? ''} receipts',
+                      description: _receiptSearch.isNotEmpty
+                          ? 'Try a different search term.'
+                          : 'Try a different category filter.',
                     ),
                   )
                 : ListView.builder(
@@ -707,14 +732,28 @@ class _MoneyScreenState extends State<MoneyScreen> {
                           receipts: _receipts, homeCurrency: _homeCurrency),
                       _SpendingByMemberCard(
                           receipts: _receipts, homeCurrency: _homeCurrency, members: _members),
+                      WabwaySearchBar(
+                        controller: _searchCtrl,
+                        hint: 'Search receipts…',
+                        onChanged: (v) => setState(() {
+                          _receiptSearch = v;
+                          _selectedReceiptId = null;
+                        }),
+                      ),
                       _receiptFilterStrip(),
                       Expanded(
                         child: _receiptListItems.isEmpty
                             ? Center(
                                 child: WabwayEmptyState(
-                                  icon: Icons.filter_list_rounded,
-                                  title: 'No ${_filterCategory?.label ?? ''} receipts',
-                                  description: 'Try a different category filter.',
+                                  icon: _receiptSearch.isNotEmpty
+                                      ? Icons.search_off_rounded
+                                      : Icons.filter_list_rounded,
+                                  title: _receiptSearch.isNotEmpty
+                                      ? 'No results for "$_receiptSearch"'
+                                      : 'No ${_filterCategory?.label ?? ''} receipts',
+                                  description: _receiptSearch.isNotEmpty
+                                      ? 'Try a different search term.'
+                                      : 'Try a different category filter.',
                                 ),
                               )
                             : ListView.builder(

@@ -25,6 +25,7 @@ Future<Receipt?> showAddReceiptSheet(
   List<TripMember>? members,
   Receipt? existingReceipt,
   String homeCurrency = 'CAD',
+  bool isDuplicate = false,
 }) {
   final effectiveUserId = userId ?? supabase.auth.currentUser?.id ?? kYouId;
   final effectiveMembers = (members != null && members.isNotEmpty)
@@ -52,6 +53,7 @@ Future<Receipt?> showAddReceiptSheet(
             members:         effectiveMembers,
             existingReceipt: existingReceipt,
             homeCurrency:    homeCurrency,
+            isDuplicate:     isDuplicate,
             onSubmit: (r) => Navigator.pop(dialogCtx, r),
           ),
         ),
@@ -67,6 +69,7 @@ Future<Receipt?> showAddReceiptSheet(
     builder: (ctx) => _AddReceiptSheet(
       tripId:          tripId,
       userId:          effectiveUserId,
+      isDuplicate:     isDuplicate,
       members:         effectiveMembers,
       existingReceipt: existingReceipt,
       homeCurrency:    homeCurrency,
@@ -83,6 +86,7 @@ class _AddReceiptSheet extends StatelessWidget {
     required this.members,
     required this.homeCurrency,
     this.existingReceipt,
+    this.isDuplicate = false,
   });
 
   final ValueChanged<Receipt> onSubmit;
@@ -91,6 +95,7 @@ class _AddReceiptSheet extends StatelessWidget {
   final List<TripMember> members;
   final String homeCurrency;
   final Receipt? existingReceipt;
+  final bool isDuplicate;
 
   @override
   Widget build(BuildContext context) {
@@ -108,6 +113,7 @@ class _AddReceiptSheet extends StatelessWidget {
           userId:           userId,
           members:          members,
           existingReceipt:  existingReceipt,
+          isDuplicate:      isDuplicate,
           homeCurrency:     homeCurrency,
           scrollController: ctrl,
           onSubmit:         onSubmit,
@@ -128,6 +134,7 @@ class _AddReceiptContent extends StatefulWidget {
     required this.members,
     required this.homeCurrency,
     this.existingReceipt,
+    this.isDuplicate = false,
     this.scrollController,
     this.showDragHandle = false,
   });
@@ -140,6 +147,8 @@ class _AddReceiptContent extends StatefulWidget {
   final String homeCurrency;
   /// When set, the form pre-fills with this receipt and updates rather than creates.
   final Receipt? existingReceipt;
+  /// When true, pre-fills from [existingReceipt] but creates a new receipt instead of editing.
+  final bool isDuplicate;
   final ScrollController? scrollController;
   final bool showDragHandle;
 
@@ -216,7 +225,7 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
   List<TripDocument> _linkedDocs    = [];
   Set<String>        _originalDocIds = {};
 
-  bool get _isEditing => widget.existingReceipt != null;
+  bool get _isEditing => widget.existingReceipt != null && !widget.isDuplicate;
 
   @override
   void initState() {
@@ -247,7 +256,8 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
       }
 
       // Pre-load existing linked documents so the user can see and remove them.
-      DocService.loadLinkedDocuments(
+      // Skipped for duplication — the new receipt starts with no documents.
+      if (!widget.isDuplicate) DocService.loadLinkedDocuments(
         linkedType: DocLinkedType.receipt,
         linkedId:   ex.id,
       ).then((docs) {
@@ -434,7 +444,7 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
           padding: const EdgeInsets.fromLTRB(kSpace4, kSpace3, kSpace4, 0),
           child: Row(
             children: [
-              Text(_isEditing ? 'Edit receipt' : 'Add receipt', style: kStyleTitle),
+              Text(widget.isDuplicate ? 'Duplicate receipt' : _isEditing ? 'Edit receipt' : 'Add receipt', style: kStyleTitle),
               const Spacer(),
               WabwayIconButton(
                 icon: Icons.close_rounded,
@@ -651,7 +661,7 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
         Padding(
           padding: EdgeInsets.fromLTRB(kSpace4, kSpace3, kSpace4, kSpace4 + navBarPad),
           child: WabwayButton(
-            label: _isEditing ? 'Save changes' : 'Add receipt',
+            label: widget.isDuplicate ? 'Save as new' : _isEditing ? 'Save changes' : 'Add receipt',
             icon: Icons.receipt_long_rounded,
             fullWidth: true,
             size: WabwayButtonSize.lg,

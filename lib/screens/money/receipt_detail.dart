@@ -83,6 +83,18 @@ class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
     }
   }
 
+  Future<void> _duplicateReceipt() async {
+    await showAddReceiptSheet(
+      context,
+      tripId:          widget.tripId,
+      userId:          widget.myId,
+      members:         widget.members,
+      existingReceipt: _receipt,
+      isDuplicate:     true,
+    );
+    // The caller (money screen) refreshes on its own via its realtime channel.
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -100,6 +112,24 @@ class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
             color: kColorInkSoft,
             tooltip: 'Edit',
             onPressed: _editReceipt,
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert_rounded, color: kColorInkSoft),
+            onSelected: (v) {
+              if (v == 'duplicate') _duplicateReceipt();
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'duplicate',
+                child: Row(
+                  children: [
+                    Icon(Icons.copy_rounded, size: 18),
+                    SizedBox(width: 10),
+                    Text('Duplicate'),
+                  ],
+                ),
+              ),
+            ],
           ),
           if (widget.onDelete != null)
             IconButton(

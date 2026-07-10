@@ -1,4 +1,5 @@
 import '../offline_cache.dart';
+import '../../data/date_utils.dart';
 import '../../data/money_data.dart';
 import 'client.dart';
 
@@ -267,8 +268,5 @@ abstract final class MoneyService {
 
   // ── Helpers ───────────────────────────────────────────────────────────────────
 
-  static String _fmtDate(DateTime d) =>
-      '${d.year.toString().padLeft(4, '0')}-'
-      '${d.month.toString().padLeft(2, '0')}-'
-      '${d.day.toString().padLeft(2, '0')}';
+  static String _fmtDate(DateTime d) => isoDate(d);
 }

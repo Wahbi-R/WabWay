@@ -21,7 +21,16 @@ Both `money_data.dart` and `plan_data.dart` now re-export it via `export 'date_u
 - `lib/screens/accommodations/accommodations_screen.dart` — same
 - `lib/screens/plan_screen.dart`, `plan/day_card.dart`, `plan/item_detail.dart`, `travel/travel_item_detail.dart` — `fmtDayDate` → `fmtDate`
 
+## Build 58 additions
+
+Added `isoDate(DateTime)` to `date_utils.dart` for the ISO 8601 DB format. Updated all 4 service files:
+
+- `plan_service.dart` — `_fmtDate` → `isoDate`
+- `travel_service.dart` — `_fmtDate` → `isoDate`
+- `money_service.dart` — `_fmtDate` → `isoDate`
+- `trip_service.dart` — `_fmtDate` → `isoDate`; also cleaned up inline formatting in `createTrip`
+
 ## What stays private
 
-- `_fmtDate` in `trip_settings_sheet.dart`, `parsed_itinerary_screen.dart` — different format (includes year or is ISO); intentionally separate
-- `_fmtDate` in service files (`plan_service`, `travel_service`, etc.) — ISO 8601 format for DB writes; these could use `DateTime.toIso8601String().substring(0,10)` but are left scoped to avoid unintended coupling
+- `_fmtDate` in `trip_settings_sheet.dart` — date picker display format; different use case
+- `_fmtDate` in `parsed_itinerary_screen.dart` — includes year (e.g. "Jan 7, 2025"); intentionally different

@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 58,
+    label: 'Code cleanup — date utils, ISO formatting',
+    changes: [
+      'Consolidated 5 duplicate ISO date-formatting blocks (yyyy-MM-dd) across service files into a single isoDate() helper — internal cleanup only, no visible changes',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 57,
     label: 'Spending by member',
     changes: [

@@ -1,6 +1,7 @@
-import 'dart:typed_data';
+﻿import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
 import 'client.dart';
+import '../../data/date_utils.dart';
 import '../trip/app_trip.dart';
 import '../trip/app_trip_member.dart';
 
@@ -26,14 +27,8 @@ abstract final class TripService {
       'p_name': name.trim(),
       if (destination != null && destination.trim().isNotEmpty)
         'p_destination': destination.trim(),
-      if (startDate != null)
-        'p_start_date': '${startDate.year.toString().padLeft(4, '0')}-'
-            '${startDate.month.toString().padLeft(2, '0')}-'
-            '${startDate.day.toString().padLeft(2, '0')}',
-      if (endDate != null)
-        'p_end_date': '${endDate.year.toString().padLeft(4, '0')}-'
-            '${endDate.month.toString().padLeft(2, '0')}-'
-            '${endDate.day.toString().padLeft(2, '0')}',
+      if (startDate != null) 'p_start_date': isoDate(startDate),
+      if (endDate != null)   'p_end_date':   isoDate(endDate),
       'p_default_currency': defaultCurrency.toUpperCase(),
     });
     return tripId as String;
@@ -101,9 +96,6 @@ abstract final class TripService {
     bool clearEndDate      = false,
     bool clearCoverImage   = false,
   }) async {
-    String _pad(int n, int w) => n.toString().padLeft(w, '0');
-    String _fmtDate(DateTime d) =>
-        '${_pad(d.year, 4)}-${_pad(d.month, 2)}-${_pad(d.day, 2)}';
 
     final updates = <String, dynamic>{
       if (name != null) 'name': name.trim(),
@@ -111,9 +103,9 @@ abstract final class TripService {
       else if (destination != null && destination.trim().isNotEmpty)
         'destination': destination.trim(),
       if (clearStartDate) 'start_date': null
-      else if (startDate != null) 'start_date': _fmtDate(startDate),
+      else if (startDate != null) 'start_date': isoDate(startDate),
       if (clearEndDate) 'end_date': null
-      else if (endDate != null) 'end_date': _fmtDate(endDate),
+      else if (endDate != null) 'end_date': isoDate(endDate),
       if (defaultCurrency != null) 'default_currency': defaultCurrency.toUpperCase(),
       if (homeCurrency != null) 'home_currency': homeCurrency.toUpperCase(),
       if (clearCoverImage) 'cover_image_url': null

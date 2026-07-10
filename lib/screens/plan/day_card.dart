@@ -22,6 +22,7 @@ class TripDayCard extends StatefulWidget {
     this.onDayTap,
     this.daySelected = false,
     this.onEditDay,
+    this.onDeleteDay,
     this.onReorder,
     this.onToggleDone,
   });
@@ -34,6 +35,7 @@ class TripDayCard extends StatefulWidget {
   final VoidCallback? onDayTap;
   final bool daySelected;
   final VoidCallback? onEditDay;
+  final VoidCallback? onDeleteDay;
   final ValueChanged<List<ItineraryItem>>? onReorder;
   // Called with an item id when the user taps the timeline dot to check/uncheck.
   final ValueChanged<String>? onToggleDone;
@@ -72,6 +74,7 @@ class _TripDayCardState extends State<TripDayCard> {
             selected: widget.daySelected,
             onTap: headerTappable ? _handleHeaderTap : null,
             onEdit: widget.onEditDay,
+            onDelete: widget.onDeleteDay,
           ),
           const Divider(height: 1, color: kColorBorder),
           if (items.isEmpty)
@@ -117,6 +120,8 @@ class _TripDayCardState extends State<TripDayCard> {
 
 // ─── Day header ───────────────────────────────────────────────────────────────
 
+enum _DayMenuAction { edit, delete }
+
 class _DayHeader extends StatelessWidget {
   const _DayHeader({
     required this.day,
@@ -126,6 +131,7 @@ class _DayHeader extends StatelessWidget {
     required this.selected,
     this.onTap,
     this.onEdit,
+    this.onDelete,
   });
 
   final TripDay day;
@@ -135,6 +141,7 @@ class _DayHeader extends StatelessWidget {
   final bool selected;
   final VoidCallback? onTap;
   final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -255,12 +262,37 @@ class _DayHeader extends StatelessWidget {
                     ),
                   );
                 }),
-              if (onEdit != null) ...[
+              if (onEdit != null || onDelete != null) ...[
                 const SizedBox(width: kSpace2),
-                GestureDetector(
-                  onTap: onEdit,
-                  child: const Icon(Icons.edit_outlined,
-                      size: 16, color: kColorInkSoft),
+                PopupMenuButton<_DayMenuAction>(
+                  padding: EdgeInsets.zero,
+                  iconSize: 18,
+                  iconColor: kColorInkSoft,
+                  icon: const Icon(Icons.more_vert_rounded),
+                  onSelected: (action) {
+                    if (action == _DayMenuAction.edit) onEdit?.call();
+                    if (action == _DayMenuAction.delete) onDelete?.call();
+                  },
+                  itemBuilder: (_) => [
+                    if (onEdit != null)
+                      const PopupMenuItem(
+                        value: _DayMenuAction.edit,
+                        child: Row(children: [
+                          Icon(Icons.edit_outlined, size: 16),
+                          SizedBox(width: 10),
+                          Text('Edit day'),
+                        ]),
+                      ),
+                    if (onDelete != null)
+                      const PopupMenuItem(
+                        value: _DayMenuAction.delete,
+                        child: Row(children: [
+                          Icon(Icons.delete_outline_rounded, size: 16, color: Colors.red),
+                          SizedBox(width: 10),
+                          Text('Delete day', style: TextStyle(color: Colors.red)),
+                        ]),
+                      ),
+                  ],
                 ),
               ],
             ],

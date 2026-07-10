@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 97,
+    label: 'Delete plan day',
+    changes: [
+      'Day card header now shows a ⋮ menu with "Edit day" and "Delete day" options',
+      'Deleting a day shows a confirmation dialog and removes the day and all its items permanently',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 96,
     label: 'Map category filter',
     changes: [

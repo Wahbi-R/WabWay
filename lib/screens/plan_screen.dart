@@ -351,6 +351,32 @@ class _PlanScreenState extends State<PlanScreen> {
     });
   }
 
+  Future<void> _deleteDay(TripDay day) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete day?'),
+        content: Text(
+          'Day ${day.dayNumber} (${day.city}) and all its itinerary items will be permanently deleted.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _days.removeWhere((d) => d.id == day.id));
+    PlanService.deleteDay(day.id).catchError((_) => _loadAll(silent: true));
+  }
+
   void _onMoveItem(ItineraryItem item, String newDayId) {
     final fromDay = _days.where((d) => d.id == item.dayId).firstOrNull;
     final toDay   = _days.where((d) => d.id == newDayId).firstOrNull;
@@ -617,6 +643,7 @@ class _PlanScreenState extends State<PlanScreen> {
                                                       onDayTap: () => _selectDay(_days[di].id),
                                                       daySelected: _selectedDayId == _days[di].id,
                                                       onEditDay: () => _onEditDay(_days[di]),
+                                                      onDeleteDay: () => _deleteDay(_days[di]),
                                                       onReorder: (newOrder) =>
                                                           _onReorderItems(_days[di].id, newOrder),
                                                       onToggleDone: _toggleItemDone,
@@ -829,6 +856,7 @@ class _PlanScreenState extends State<PlanScreen> {
                                         },
                                         onAddItem: () => _addItem(context, _days[di].id),
                                         onEditDay: () => _onEditDay(_days[di]),
+                                        onDeleteDay: () => _deleteDay(_days[di]),
                                         onReorder: (newOrder) =>
                                             _onReorderItems(_days[di].id, newOrder),
                                         onToggleDone: _toggleItemDone,

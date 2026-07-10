@@ -10,13 +10,16 @@ import '../core/supabase/plan_service.dart';
 import '../core/supabase/spot_service.dart';
 import '../core/supabase/travel_service.dart';
 import '../core/trip/app_trip.dart';
+import '../core/trip/app_trip_member.dart';
 import '../core/trip/trip_state.dart';
 import '../core/update_checker.dart';
 import 'onboarding_screen.dart';
 import 'trips/trip_settings_sheet.dart';
 import '../data/activity_data.dart';
+import '../data/docs_data.dart';
 import '../data/money_data.dart';
 import '../data/plan_data.dart';
+import '../data/spot_data.dart';
 import '../data/travel_data.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
@@ -24,24 +27,30 @@ import '../theme/app_text_theme.dart';
 import 'share/incoming_share_screen.dart';
 import 'notification_settings_screen.dart';
 import 'global_search_screen.dart';
+import 'docs/doc_detail.dart';
+import 'money/receipt_detail.dart';
+import 'plan/item_detail.dart';
+import 'spots/spot_detail.dart';
+import 'travel/travel_item_detail.dart';
 
 // ─── Loaded data ──────────────────────────────────────────────────────────────
 
 class _HomeData {
   const _HomeData({
-    required this.spotCount,
-    required this.docCount,
+    required this.spots,
+    required this.docs,
     required this.days,
     required this.travelItems,
     required this.receipts,
     required this.balancesByCurrency,
     required this.homeCurrency,
     required this.memberMap,
+    required this.members,
     required this.activityEvents,
   });
 
-  final int spotCount;
-  final int docCount;
+  final List<Spot> spots;
+  final List<TripDocument> docs;
   final List<TripDay> days;
   final List<TravelItem> travelItems;
   final List<Receipt> receipts;
@@ -50,7 +59,13 @@ class _HomeData {
   final Map<String, List<MemberBalance>> balancesByCurrency;
   final String homeCurrency;
   final Map<String, String> memberMap; // userId → displayName
+  // Full member list stored here so the activity feed can open receipt detail
+  // screens (which need TripMember objects, not just names).
+  final List<AppTripMember> members;
   final List<ActivityEvent> activityEvents;
+
+  int get spotCount => spots.length;
+  int get docCount  => docs.length;
 
   // Sum of home-currency equivalents — consistent across multi-currency trips.
   double get totalSpent => receipts.fold(0.0, (s, r) => s + r.homeAmount);
@@ -135,8 +150,8 @@ class _HomeScreenState extends State<HomeScreen> {
         ActivityService.loadEvents(trip.id),
       ]);
 
-      final spots        = results[0] as List;
-      final docs         = results[1] as List;
+      final spots        = results[0] as List<Spot>;
+      final docs         = results[1] as List<TripDocument>;
       final days         = results[2] as List<TripDay>;
       final travelItems  = results[3] as List<TravelItem>;
       final receipts     = results[4] as List<Receipt>;
@@ -159,14 +174,15 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _error = null;
         _data = _HomeData(
-          spotCount: spots.length,
-          docCount: docs.length,
+          spots: spots,
+          docs: docs,
           days: days,
           travelItems: travelItems,
           receipts: receipts,
           balancesByCurrency: balancesByCurrency,
           homeCurrency: trip.homeCurrency,
           memberMap: memberMap,
+          members: members,
           activityEvents: activities,
         );
       });
@@ -285,7 +301,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: kSpace4),
             Text('Recent activity', style: kStyleOverline),
             const SizedBox(height: kSpace3),
-            _ActivityFeed(data: data),
+            _ActivityFeed(data: data, trip: trip, myId: myId),
             const SizedBox(height: kSpace16),
           ],
         ),
@@ -565,21 +581,6 @@ class _QuickBalanceCard extends StatelessWidget {
   const _QuickBalanceCard({required this.data});
   final _HomeData? data;
 
-  // TODO: Settle up — build money settlement flow (calculate per-member balances,
-  // allow marking debts as paid). Needs new DB table or computed view.
-  Widget _settleUpButton() => TextButton(
-        onPressed: () {},
-        style: TextButton.styleFrom(
-          foregroundColor: kColorPrimaryDark,
-          backgroundColor: kColorPaper,
-          shape: const RoundedRectangleBorder(borderRadius: kRadiusMd),
-        ),
-        child: Text(
-          'Settle up',
-          style: kStyleBodySemibold.copyWith(color: kColorPrimaryDark),
-        ),
-      );
-
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
@@ -590,61 +591,26 @@ class _QuickBalanceCard extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.all(kSpace4),
-        child: LayoutBuilder(
-          builder: (_, constraints) {
-            final isNarrow = constraints.maxWidth < 400;
-            final content = _buildContent();
-            const walletIcon = Icon(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(
               Icons.account_balance_wallet_rounded,
               color: kColorPrimary,
               size: 20,
-            );
-
-            if (isNarrow) {
-              return Column(
+            ),
+            const SizedBox(width: kSpace3),
+            Expanded(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      walletIcon,
-                      const SizedBox(width: kSpace3),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Your balance', style: kStyleCaption),
-                            const SizedBox(height: kSpace1),
-                            content,
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: kSpace3),
-                  SizedBox(width: double.infinity, child: _settleUpButton()),
+                  Text('Your balance', style: kStyleCaption),
+                  const SizedBox(height: kSpace1),
+                  _buildContent(),
                 ],
-              );
-            }
-
-            return Row(
-              children: [
-                walletIcon,
-                const SizedBox(width: kSpace3),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Your balance', style: kStyleCaption),
-                      const SizedBox(height: kSpace1),
-                      content,
-                    ],
-                  ),
-                ),
-                _settleUpButton(),
-              ],
-            );
-          },
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -777,8 +743,96 @@ class _UpcomingCard extends StatelessWidget {
 // ─── Activity feed ────────────────────────────────────────────────────────────
 
 class _ActivityFeed extends StatelessWidget {
-  const _ActivityFeed({required this.data});
+  const _ActivityFeed({
+    required this.data,
+    required this.trip,
+    required this.myId,
+  });
   final _HomeData? data;
+  final AppTrip trip;
+  final String myId;
+
+  // Returns a navigation closure if the event type maps to a navigable detail
+  // screen and the entity can be found in the already-loaded data. Returns null
+  // for events that don't have a detail screen (member joined, links, etc.).
+  void Function(BuildContext)? _onTapFor(ActivityEvent ev) {
+    final d = data!;
+
+    switch (ev.type) {
+      case ActivityEventType.spotAdded:
+        final spot = d.spots.where((s) => s.id == ev.entityId).firstOrNull;
+        if (spot == null) return null;
+        return (ctx) => Navigator.push(ctx, MaterialPageRoute(
+          builder: (_) => SpotDetailScreen(spot: spot, docs: d.docs),
+        ));
+
+      case ActivityEventType.documentAdded:
+        final doc = d.docs.where((doc) => doc.id == ev.entityId).firstOrNull;
+        if (doc == null) return null;
+        return (ctx) => Navigator.push(ctx, MaterialPageRoute(
+          builder: (_) => DocDetailScreen(
+            doc:            doc,
+            tripId:         trip.id,
+            tripName:       trip.name,
+            availableSpots: d.spots,
+          ),
+        ));
+
+      case ActivityEventType.travelItemAdded:
+        final item = d.travelItems.where((t) => t.id == ev.entityId).firstOrNull;
+        if (item == null) return null;
+        return (ctx) => Navigator.push(ctx, MaterialPageRoute(
+          builder: (_) => TravelItemDetailScreen(
+            item: item,
+            docs: d.docs,
+            days: d.days,
+          ),
+        ));
+
+      case ActivityEventType.receiptAdded:
+        final receipt = d.receipts.where((r) => r.id == ev.entityId).firstOrNull;
+        if (receipt == null) return null;
+        // Convert AppTripMember → TripMember for the receipt detail screen.
+        final moneyMembers = d.members.isEmpty
+            ? [TripMember(id: myId.isEmpty ? 'you' : myId, name: 'You')]
+            : d.members.map((m) => TripMember(
+                  id:   m.userId,
+                  name: m.userId == myId ? 'You' : m.profile.displayName,
+                )).toList();
+        return (ctx) => Navigator.push(ctx, MaterialPageRoute(
+          builder: (_) => ReceiptDetailScreen(
+            receipt: receipt,
+            myId:    myId,
+            members: moneyMembers,
+            tripId:  trip.id,
+          ),
+        ));
+
+      case ActivityEventType.planItemAdded:
+        final day = d.days.where(
+          (day) => day.items.any((i) => i.id == ev.entityId),
+        ).firstOrNull;
+        if (day == null) return null;
+        final item = day.items.where((i) => i.id == ev.entityId).firstOrNull;
+        if (item == null) return null;
+        return (ctx) => Navigator.push(ctx, MaterialPageRoute(
+          builder: (_) => ItemDetailScreen(
+            item:  item,
+            day:   day,
+            docs:  d.docs,
+            spots: d.spots,
+            days:  d.days,
+          ),
+        ));
+
+      // Member joined and link added have no detail screens to navigate to.
+      case ActivityEventType.withdrawalAdded:
+      case ActivityEventType.linkAdded:
+      case ActivityEventType.memberJoined:
+      case ActivityEventType.unknown:
+        return null;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -798,7 +852,6 @@ class _ActivityFeed extends StatelessWidget {
       );
     }
 
-    final myId  = ProfileState.of(context).id;
     final events = data!.activityEvents;
 
     if (events.isEmpty) {
@@ -818,12 +871,12 @@ class _ActivityFeed extends StatelessWidget {
       decoration: kCardDecoration(),
       child: Column(
         children: events.asMap().entries.map((entry) {
-          final i    = entry.key;
-          final ev   = entry.value;
+          final i      = entry.key;
+          final ev     = entry.value;
           final isLast = i == events.length - 1;
 
           final actorLabel = ev.actorId == myId ? 'You' : ev.actorName;
-          final subtitle   = ev.entityTitle;
+          final onTap      = _onTapFor(ev);
 
           return Column(
             children: [
@@ -841,17 +894,28 @@ class _ActivityFeed extends StatelessWidget {
                   ),
                   child: Icon(ev.type.icon, size: 18, color: ev.type.color),
                 ),
-                title: Text(
-                  '$actorLabel ${ev.type.verb}',
-                  style: kStyleBodyMedium,
-                ),
-                subtitle: subtitle != null && subtitle.isNotEmpty
+                title: Text('$actorLabel ${ev.type.verb}', style: kStyleBodyMedium),
+                subtitle: ev.entityTitle != null && ev.entityTitle!.isNotEmpty
                     ? Padding(
                         padding: const EdgeInsets.only(top: 2),
-                        child: Text(subtitle, style: kStyleCaption),
+                        child: Text(ev.entityTitle!, style: kStyleCaption),
                       )
                     : null,
-                trailing: Text(_relativeTime(ev.createdAt), style: kStyleOverline),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(_relativeTime(ev.createdAt), style: kStyleOverline),
+                    if (onTap != null) ...[
+                      const SizedBox(width: kSpace1),
+                      const Icon(
+                        Icons.chevron_right_rounded,
+                        size: 16,
+                        color: kColorInkSoft,
+                      ),
+                    ],
+                  ],
+                ),
+                onTap: onTap != null ? () => onTap(context) : null,
               ),
               if (!isLast) const Divider(height: 1, indent: kSpace4 + 36 + kSpace3),
             ],

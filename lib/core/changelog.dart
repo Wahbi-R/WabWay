@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 37,
+    label: 'Tappable activity feed',
+    changes: [
+      'Activity events on the home screen are now tappable — tap any spot, document, travel item, receipt, or plan item event to jump straight to the detail screen',
+      'A chevron arrow appears on tappable events so you know which ones navigate somewhere',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 36,
     label: 'Receipt filters + travel order',
     changes: [

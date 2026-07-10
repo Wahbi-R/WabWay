@@ -46,6 +46,9 @@ class _PlanScreenState extends State<PlanScreen> {
   String? _selectedDayId;
   bool _unplannedExpanded = true;
 
+  String _search = '';
+  final _searchCtrl = TextEditingController();
+
   ItineraryItem? get _selectedItem => itemById(_days, _selectedItemId ?? '');
   TripDay? get _selectedDay =>
       _selectedItem == null ? null : dayForItem(_days, _selectedItemId ?? '');
@@ -78,9 +81,29 @@ class _PlanScreenState extends State<PlanScreen> {
 
   @override
   void dispose() {
+    _searchCtrl.dispose();
     _channel?.unsubscribe();
     _debounce?.cancel();
     super.dispose();
+  }
+
+  // ─── Search ───────────────────────────────────────────────────────────────────
+
+  // Flatten all itinerary items across days and filter by the query.
+  // Returns (item, day) pairs so search results can show day context.
+  List<({ItineraryItem item, TripDay day})> get _planSearchResults {
+    final q = _search.toLowerCase().trim();
+    if (q.isEmpty) return const [];
+    bool m(String? s) => s != null && s.toLowerCase().contains(q);
+    final out = <({ItineraryItem item, TripDay day})>[];
+    for (final day in _days) {
+      for (final item in day.sortedItems) {
+        if (m(item.title) || m(item.city) || m(item.location) || m(item.notes)) {
+          out.add((item: item, day: day));
+        }
+      }
+    }
+    return out;
   }
 
   // ─── Data loading ─────────────────────────────────────────────────────────────
@@ -538,43 +561,55 @@ class _PlanScreenState extends State<PlanScreen> {
                             width: 420,
                             child: (_days.isEmpty && _unplannedSpots.isEmpty)
                                 ? _buildEmptyTimeline(context)
-                                : ListView.builder(
-                                    padding: const EdgeInsets.all(kSpace4),
-                                    itemCount: _days.length +
-                                        (_unplannedSpots.isNotEmpty ? 1 : 0),
-                                    itemBuilder: (ctx, i) {
-                                      if (_unplannedSpots.isNotEmpty && i == 0) {
-                                        return Padding(
-                                          padding: const EdgeInsets.only(bottom: kSpace3),
-                                          child: _UnplannedSpotsSection(
-                                            spots: _unplannedSpots,
-                                            expanded: _unplannedExpanded,
-                                            onToggle: () => setState(() =>
-                                                _unplannedExpanded = !_unplannedExpanded),
-                                            onSpotTap: (spot) =>
-                                                _addItemForSpot(context, spot),
-                                          ),
-                                        );
-                                      }
-                                      final di = i - (_unplannedSpots.isNotEmpty ? 1 : 0);
-                                      return Padding(
-                                        padding: EdgeInsets.only(
-                                            bottom: di < _days.length - 1 ? kSpace3 : 0),
-                                        child: TripDayCard(
-                                          day: _days[di],
-                                          selectedItemId: _selectedItemId,
-                                          onItemTap: _selectItem,
-                                          onAddItem: () =>
-                                              _addItem(context, _days[di].id),
-                                          isDesktop: true,
-                                          onDayTap: () => _selectDay(_days[di].id),
-                                          daySelected: _selectedDayId == _days[di].id,
-                                          onEditDay: () => _onEditDay(_days[di]),
-                                          onReorder: (newOrder) =>
-                                              _onReorderItems(_days[di].id, newOrder),
-                                        ),
-                                      );
-                                    },
+                                : Column(
+                                    children: [
+                                      _PlanSearchBar(
+                                        controller: _searchCtrl,
+                                        onChanged: (v) => setState(() => _search = v),
+                                      ),
+                                      Expanded(
+                                        child: _search.isNotEmpty
+                                            ? _buildDesktopSearchResults()
+                                            : ListView.builder(
+                                                padding: const EdgeInsets.all(kSpace4),
+                                                itemCount: _days.length +
+                                                    (_unplannedSpots.isNotEmpty ? 1 : 0),
+                                                itemBuilder: (ctx, i) {
+                                                  if (_unplannedSpots.isNotEmpty && i == 0) {
+                                                    return Padding(
+                                                      padding: const EdgeInsets.only(bottom: kSpace3),
+                                                      child: _UnplannedSpotsSection(
+                                                        spots: _unplannedSpots,
+                                                        expanded: _unplannedExpanded,
+                                                        onToggle: () => setState(() =>
+                                                            _unplannedExpanded = !_unplannedExpanded),
+                                                        onSpotTap: (spot) =>
+                                                            _addItemForSpot(context, spot),
+                                                      ),
+                                                    );
+                                                  }
+                                                  final di = i - (_unplannedSpots.isNotEmpty ? 1 : 0);
+                                                  return Padding(
+                                                    padding: EdgeInsets.only(
+                                                        bottom: di < _days.length - 1 ? kSpace3 : 0),
+                                                    child: TripDayCard(
+                                                      day: _days[di],
+                                                      selectedItemId: _selectedItemId,
+                                                      onItemTap: _selectItem,
+                                                      onAddItem: () =>
+                                                          _addItem(context, _days[di].id),
+                                                      isDesktop: true,
+                                                      onDayTap: () => _selectDay(_days[di].id),
+                                                      daySelected: _selectedDayId == _days[di].id,
+                                                      onEditDay: () => _onEditDay(_days[di]),
+                                                      onReorder: (newOrder) =>
+                                                          _onReorderItems(_days[di].id, newOrder),
+                                                    ),
+                                                  );
+                                                },
+                                              ),
+                                      ),
+                                    ],
                                   ),
                           ),
                           const VerticalDivider(
@@ -716,63 +751,75 @@ class _PlanScreenState extends State<PlanScreen> {
                         ],
                       ),
                     )
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(kSpace4),
-                      itemCount: _days.length +
-                          (_unplannedSpots.isNotEmpty ? 1 : 0),
-                      itemBuilder: (ctx, i) {
-                        if (_unplannedSpots.isNotEmpty && i == 0) {
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: kSpace3),
-                            child: _UnplannedSpotsSection(
-                              spots: _unplannedSpots,
-                              expanded: _unplannedExpanded,
-                              onToggle: () => setState(
-                                  () => _unplannedExpanded = !_unplannedExpanded),
-                              onSpotTap: (spot) =>
-                                  _addItemForSpot(context, spot),
-                            ),
-                          );
-                        }
-                        final di = i - (_unplannedSpots.isNotEmpty ? 1 : 0);
-                        return Padding(
-                          padding: EdgeInsets.only(
-                              bottom: di < _days.length - 1 ? kSpace3 : 0),
-                          child: TripDayCard(
-                            day: _days[di],
-                            onItemTap: (id) {
-                              final item = itemById(_days, id);
-                              final day  = dayForItem(_days, id);
-                              if (item != null && day != null) {
-                                final spots = _spots;
-                                final docs  = _docs;
-                                final days  = List<TripDay>.from(_days);
-                                Navigator.push(
-                                  ctx,
-                                  MaterialPageRoute(
-                                    builder: (_) => ItemDetailScreen(
-                                      item: item,
-                                      day: day,
-                                      spots: spots,
-                                      docs: docs,
-                                      days: days,
-                                      onDelete: () => _deleteItem(id),
-                                      onUpdated: _updateItem,
-                                      onMove: (newDayId) =>
-                                          _onMoveItem(item, newDayId),
-                                      onDuplicate: () => _onDuplicateItem(item),
-                                    ),
-                                  ),
-                                );
-                              }
-                            },
-                            onAddItem: () => _addItem(context, _days[di].id),
-                            onEditDay: () => _onEditDay(_days[di]),
-                            onReorder: (newOrder) =>
-                                _onReorderItems(_days[di].id, newOrder),
-                          ),
-                        );
-                      },
+                  : Column(
+                      children: [
+                        _PlanSearchBar(
+                          controller: _searchCtrl,
+                          onChanged: (v) => setState(() => _search = v),
+                        ),
+                        Expanded(
+                          child: _search.isNotEmpty
+                              ? _buildMobileSearchResults(context)
+                              : ListView.builder(
+                                  padding: const EdgeInsets.all(kSpace4),
+                                  itemCount: _days.length +
+                                      (_unplannedSpots.isNotEmpty ? 1 : 0),
+                                  itemBuilder: (ctx, i) {
+                                    if (_unplannedSpots.isNotEmpty && i == 0) {
+                                      return Padding(
+                                        padding: const EdgeInsets.only(bottom: kSpace3),
+                                        child: _UnplannedSpotsSection(
+                                          spots: _unplannedSpots,
+                                          expanded: _unplannedExpanded,
+                                          onToggle: () => setState(
+                                              () => _unplannedExpanded = !_unplannedExpanded),
+                                          onSpotTap: (spot) =>
+                                              _addItemForSpot(context, spot),
+                                        ),
+                                      );
+                                    }
+                                    final di = i - (_unplannedSpots.isNotEmpty ? 1 : 0);
+                                    return Padding(
+                                      padding: EdgeInsets.only(
+                                          bottom: di < _days.length - 1 ? kSpace3 : 0),
+                                      child: TripDayCard(
+                                        day: _days[di],
+                                        onItemTap: (id) {
+                                          final item = itemById(_days, id);
+                                          final day  = dayForItem(_days, id);
+                                          if (item != null && day != null) {
+                                            final spots = _spots;
+                                            final docs  = _docs;
+                                            final days  = List<TripDay>.from(_days);
+                                            Navigator.push(
+                                              ctx,
+                                              MaterialPageRoute(
+                                                builder: (_) => ItemDetailScreen(
+                                                  item: item,
+                                                  day: day,
+                                                  spots: spots,
+                                                  docs: docs,
+                                                  days: days,
+                                                  onDelete: () => _deleteItem(id),
+                                                  onUpdated: _updateItem,
+                                                  onMove: (newDayId) =>
+                                                      _onMoveItem(item, newDayId),
+                                                  onDuplicate: () => _onDuplicateItem(item),
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        },
+                                        onAddItem: () => _addItem(context, _days[di].id),
+                                        onEditDay: () => _onEditDay(_days[di]),
+                                        onReorder: (newOrder) =>
+                                            _onReorderItems(_days[di].id, newOrder),
+                                      ),
+                                    );
+                                  },
+                                ),
+                        ),
+                      ],
                     ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'plan_fab',
@@ -788,6 +835,167 @@ class _PlanScreenState extends State<PlanScreen> {
           'Add item',
           style: kStyleButtonMd.copyWith(color: kColorTextOnPrimary),
         ),
+      ),
+    );
+  }
+
+  Widget _buildDesktopSearchResults() {
+    final results = _planSearchResults;
+    if (results.isEmpty) {
+      return Center(
+        child: WabwayEmptyState(
+          icon: Icons.search_off_rounded,
+          title: 'No results for "$_search"',
+          description: 'Try a different keyword.',
+        ),
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.all(kSpace4),
+      itemCount: results.length,
+      separatorBuilder: (_, __) => const SizedBox(height: kSpace2),
+      itemBuilder: (_, i) {
+        final r = results[i];
+        return _PlanSearchResultTile(
+          item: r.item,
+          day:  r.day,
+          onTap: () => _selectItem(r.item.id),
+        );
+      },
+    );
+  }
+
+  Widget _buildMobileSearchResults(BuildContext context) {
+    final results = _planSearchResults;
+    if (results.isEmpty) {
+      return Center(
+        child: WabwayEmptyState(
+          icon: Icons.search_off_rounded,
+          title: 'No results for "$_search"',
+          description: 'Try a different keyword.',
+        ),
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.all(kSpace4),
+      itemCount: results.length,
+      separatorBuilder: (_, __) => const SizedBox(height: kSpace2),
+      itemBuilder: (ctx, i) {
+        final r = results[i];
+        final spots = _spots;
+        final docs  = _docs;
+        final days  = List<TripDay>.from(_days);
+        return _PlanSearchResultTile(
+          item: r.item,
+          day:  r.day,
+          onTap: () => Navigator.push(
+            ctx,
+            MaterialPageRoute(
+              builder: (_) => ItemDetailScreen(
+                item:      r.item,
+                day:       r.day,
+                spots:     spots,
+                docs:      docs,
+                days:      days,
+                onDelete:  () => _deleteItem(r.item.id),
+                onUpdated: _updateItem,
+                onMove:    (newDayId) => _onMoveItem(r.item, newDayId),
+                onDuplicate: () => _onDuplicateItem(r.item),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ─── Plan search bar ──────────────────────────────────────────────────────────
+
+class _PlanSearchBar extends StatelessWidget {
+  const _PlanSearchBar({required this.controller, required this.onChanged});
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(kSpace4, kSpace3, kSpace4, 0),
+      child: TextField(
+        controller: controller,
+        style: kStyleBody,
+        decoration: InputDecoration(
+          hintText: 'Search plan items…',
+          hintStyle: kStyleBody.copyWith(color: kColorInkSoft),
+          prefixIcon: const Icon(Icons.search_rounded, size: 18, color: kColorInkSoft),
+          suffixIcon: controller.text.isNotEmpty
+              ? GestureDetector(
+                  onTap: () {
+                    controller.clear();
+                    onChanged('');
+                  },
+                  child: const Icon(Icons.close_rounded, size: 16, color: kColorInkSoft),
+                )
+              : null,
+          filled: true,
+          fillColor: kColorBgRaised,
+          border: const OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorBorder)),
+          enabledBorder: const OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorBorder)),
+          focusedBorder: const OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorPrimary)),
+          contentPadding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: kSpace2),
+          isDense: true,
+        ),
+        onChanged: onChanged,
+      ),
+    );
+  }
+}
+
+// ─── Plan search result tile ──────────────────────────────────────────────────
+
+class _PlanSearchResultTile extends StatelessWidget {
+  const _PlanSearchResultTile({
+    required this.item,
+    required this.day,
+    required this.onTap,
+  });
+  final ItineraryItem item;
+  final TripDay day;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return WabwayCard(
+      hoverable: true,
+      onTap: onTap,
+      padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: kSpace3),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: kColorPrimary.withValues(alpha: 0.1),
+              borderRadius: kRadiusMd,
+            ),
+            child: Icon(item.type.icon, size: 18, color: kColorPrimary),
+          ),
+          const SizedBox(width: kSpace3),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(item.title, style: kStyleBodyMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 2),
+                Text(
+                  'Day ${day.dayNumber} · ${day.city}',
+                  style: kStyleCaption.copyWith(color: kColorInkSoft),
+                ),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right_rounded, size: 18, color: kColorInkSoft),
+        ],
       ),
     );
   }

@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 46,
+    label: 'Plan search',
+    changes: [
+      'Search plan items by title, location, city, or notes — a search bar appears at the top of the Plan screen whenever days are loaded',
+      'Matching items are shown in a flat results list with their day context (Day 3 · Tokyo); tapping opens the full item detail as usual',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 45,
     label: 'Receipt date grouping',
     changes: [

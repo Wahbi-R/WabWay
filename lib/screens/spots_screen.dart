@@ -651,6 +651,7 @@ class _MobileLayout extends StatelessWidget {
             child: _CategoryFilterStrip(
               selected: filterCategory,
               onChanged: onFilterCategory,
+              spots: spots,
             ),
           ),
           spots.isEmpty
@@ -780,6 +781,7 @@ class _DesktopLayout extends StatelessWidget {
                       _CategoryFilterStrip(
                         selected: filterCategory,
                         onChanged: onFilterCategory,
+                        spots: spots,
                       ),
                       Expanded(
                         child: spots.isEmpty
@@ -954,10 +956,13 @@ class _CategoryFilterStrip extends StatefulWidget {
   const _CategoryFilterStrip({
     required this.selected,
     required this.onChanged,
+    required this.spots,
   });
 
   final SpotCategory? selected;
   final ValueChanged<SpotCategory?> onChanged;
+  // Full (unfiltered) spot list — used to show counts per category.
+  final List<Spot> spots;
 
   @override
   State<_CategoryFilterStrip> createState() => _CategoryFilterStripState();
@@ -1012,22 +1017,25 @@ class _CategoryFilterStripState extends State<_CategoryFilterStrip> {
               ),
               children: [
                 WabwayTag(
-                  label: 'All',
+                  label: 'All (${widget.spots.length})',
                   selected: widget.selected == null,
                   onTap: () => widget.onChanged(null),
                 ),
-                ...SpotCategory.values.map(
-                  (c) => Padding(
+                ...SpotCategory.values
+                    .where((c) => widget.spots.any((s) => s.category == c))
+                    .map((c) {
+                  final count = widget.spots.where((s) => s.category == c).length;
+                  return Padding(
                     padding: const EdgeInsets.only(left: kSpace2),
                     child: WabwayTag(
-                      label: c.label,
+                      label: '${c.label} ($count)',
                       selected: widget.selected == c,
                       onTap: () => widget.onChanged(
                         widget.selected == c ? null : c,
                       ),
                     ),
-                  ),
-                ),
+                  );
+                }),
               ],
             ),
           ),

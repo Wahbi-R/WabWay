@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 48,
+    label: 'Spot category counts',
+    changes: [
+      'Category filter chips on the Spots screen now show counts ("Food (5)", "Activity (3)") — consistent with the Links and Money filter strips',
+      'Categories with no spots in the current list are hidden, keeping the strip compact',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 47,
     label: 'Stays search',
     changes: [

@@ -14,7 +14,7 @@ const _kChangelog = <_Release>[
     build: 90,
     label: 'Text encoding fix',
     changes: [
-      'Fixed garbled characters (â€", Â·, â€¦, etc.) that appeared in the plan, docs, accommodations, and travel screens',
+      'Fixed garbled text characters that appeared in the plan, docs, accommodations, and travel screens',
     ],
   ),
   _Release(

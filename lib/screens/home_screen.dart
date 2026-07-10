@@ -194,10 +194,17 @@ class _HomeScreenState extends State<HomeScreen> {
       icon: const Icon(Icons.search_rounded),
       color: kColorInkSoft,
       tooltip: 'Search',
-      onPressed: () => showGlobalSearch(
-        context,
-        tripId: TripState.tripOf(context).id,
-      ),
+      onPressed: () {
+        final trip    = TripState.tripOf(context);
+        final members = TripState.membersOf(context);
+        showGlobalSearch(
+          context,
+          tripId:   trip.id,
+          tripName: trip.name,
+          userId:   ProfileState.of(context).id,
+          members:  members,
+        );
+      },
     ),
     IconButton(
       icon: const Icon(Icons.notifications_outlined),

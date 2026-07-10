@@ -66,11 +66,15 @@ class _TravelScreenState extends State<TravelScreen> {
     super.dispose();
   }
 
+  bool _offline = false;
+
   // ─── Data loading ─────────────────────────────────────────────────────────────
 
-  Future<void> _loadAll() async {
+  // silent=false shows a full loading spinner (first load / retry);
+  // silent=true silently refreshes in the background after a realtime event.
+  Future<void> _loadAll({bool silent = false}) async {
     if (_activeTripId.isEmpty) return;
-    setState(() { _loading = true; _error = null; });
+    if (!silent) setState(() { _loading = true; _error = null; });
     try {
       final itemsFuture = TravelService.loadItems(_activeTripId);
       final docsFuture  = DocService.loadDocuments(_activeTripId);
@@ -80,49 +84,19 @@ class _TravelScreenState extends State<TravelScreen> {
       final days  = await daysFuture;
       if (!mounted) return;
       setState(() {
-        _items
-          ..clear()
-          ..addAll(items);
-        _docs
-          ..clear()
-          ..addAll(docs);
-        _days
-          ..clear()
-          ..addAll(days);
-        _loading = false;
+        _items..clear()..addAll(items);
+        _docs..clear()..addAll(docs);
+        _days..clear()..addAll(days);
+        if (!silent) _loading = false;
+        _offline = false;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() { _loading = false; _error = e.toString(); });
-    }
-  }
-
-  bool _offline = false;
-
-  Future<void> _silentReload() async {
-    if (!mounted || _activeTripId.isEmpty) return;
-    try {
-      final itemsFuture = TravelService.loadItems(_activeTripId);
-      final docsFuture  = DocService.loadDocuments(_activeTripId);
-      final daysFuture  = PlanService.loadAll(_activeTripId);
-      final items = await itemsFuture;
-      final docs  = await docsFuture;
-      final days  = await daysFuture;
-      if (!mounted) return;
-      setState(() {
-        _items
-          ..clear()
-          ..addAll(items);
-        _docs
-          ..clear()
-          ..addAll(docs);
-        _days
-          ..clear()
-          ..addAll(days);
-        _offline = false;
-      });
-    } catch (_) {
-      if (mounted) setState(() => _offline = true);
+      if (silent) {
+        setState(() => _offline = true);
+      } else {
+        setState(() { _loading = false; _error = e.toString(); });
+      }
     }
   }
 
@@ -148,7 +122,7 @@ class _TravelScreenState extends State<TravelScreen> {
 
   void _debounceReload() {
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 400), _silentReload);
+    _debounce = Timer(const Duration(milliseconds: 400), () => _loadAll(silent: true));
   }
 
   // ─── UI actions ───────────────────────────────────────────────────────────────
@@ -160,7 +134,7 @@ class _TravelScreenState extends State<TravelScreen> {
       _items.removeWhere((i) => i.id == id);
       if (_selectedId == id) _selectedId = null;
     });
-    TravelService.deleteItem(id).catchError((_) => _silentReload());
+    TravelService.deleteItem(id).catchError((_) => _loadAll(silent: true));
   }
 
   void _updateItem(TravelItem updated) {
@@ -170,11 +144,11 @@ class _TravelScreenState extends State<TravelScreen> {
       if (idx != -1) _items[idx] = updated;
       _selectedId = updated.id;
     });
-    TravelService.updateItem(updated).catchError((_) => _silentReload());
+    TravelService.updateItem(updated).catchError((_) => _loadAll(silent: true));
     if (old != null && _userId.isNotEmpty) {
       TravelService.syncDocLinks(
         updated.id, old.linkedDocIds, updated.linkedDocIds, _userId,
-      ).catchError((_) => _silentReload());
+      ).catchError((_) => _loadAll(silent: true));
     }
   }
 
@@ -250,7 +224,7 @@ class _TravelScreenState extends State<TravelScreen> {
         base,
         Positioned(
           left: 0, right: 0, bottom: 0,
-          child: OfflineBanner(onRetry: _silentReload),
+          child: OfflineBanner(onRetry: () => _loadAll(silent: true)),
         ),
       ],
     );

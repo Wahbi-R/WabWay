@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 72,
+    label: 'Trip pinboard',
+    changes: [
+      'Post notes the whole group can see — great for check-in codes, meet times, and reminders',
+      'Pinned notes appear on the Home screen; manage them from Settings',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 71,
     label: 'UI polish — receipts & spots',
     changes: [

@@ -33,6 +33,9 @@ import 'money/receipt_detail.dart';
 import 'plan/item_detail.dart';
 import 'spots/spot_detail.dart';
 import 'travel/travel_item_detail.dart';
+import 'pins_screen.dart';
+import '../core/supabase/pins_service.dart';
+import '../data/pins_data.dart';
 
 // ─── Loaded data ──────────────────────────────────────────────────────────────
 
@@ -338,6 +341,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 currency: trip.homeCurrency,
               ),
             ],
+            const SizedBox(height: kSpace4),
+            _PinboardCard(tripId: trip.id),
             if (data != null && data.todayDay != null) ...[
               const SizedBox(height: kSpace4),
               _TodayAgendaCard(day: data.todayDay!),
@@ -825,6 +830,88 @@ class _BudgetProgressBar extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+// ─── Pinboard card ────────────────────────────────────────────────────────────
+// Self-loading: shows pinned trip notes without adding to _HomeData.
+// Hidden when there are no active pins, so it adds zero noise to empty trips.
+
+class _PinboardCard extends StatefulWidget {
+  const _PinboardCard({required this.tripId});
+  final String tripId;
+
+  @override
+  State<_PinboardCard> createState() => _PinboardCardState();
+}
+
+class _PinboardCardState extends State<_PinboardCard> {
+  List<TripPin> _pins = [];
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final pins = await PinsService.fetchPinned(widget.tripId);
+    if (mounted) setState(() { _pins = pins; _loaded = true; });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_loaded || _pins.isEmpty) return const SizedBox.shrink();
+
+    return DecoratedBox(
+      decoration: kCardDecoration(),
+      child: Padding(
+        padding: const EdgeInsets.all(kSpace4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.push_pin_rounded, size: 14, color: kColorPrimary),
+                const SizedBox(width: 4),
+                Text('Pinboard', style: kStyleOverline.copyWith(color: kColorPrimary)),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const PinsScreen()),
+                  ).then((_) => _load()),
+                  child: Text(
+                    'See all',
+                    style: kStyleOverline.copyWith(color: kColorPrimary),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: kSpace3),
+            ..._pins.take(3).map((pin) => Padding(
+              padding: const EdgeInsets.only(bottom: kSpace3),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.circle, size: 6, color: kColorPrimary),
+                  const SizedBox(width: kSpace2),
+                  Expanded(
+                    child: Text(
+                      pin.body,
+                      style: kStyleBody,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            )),
+          ],
+        ),
+      ),
     );
   }
 }

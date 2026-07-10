@@ -8,6 +8,7 @@ import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
 import '../widgets/widgets.dart';
 import 'emergency_screen.dart';
+import 'pins_screen.dart';
 import 'members/invite_sheet.dart';
 import 'trips/trip_settings_sheet.dart';
 
@@ -102,6 +103,15 @@ class SettingsScreen extends StatelessWidget {
                       onTap: () => Navigator.push(
                         ctx,
                         MaterialPageRoute(builder: (_) => const EmergencyScreen()),
+                      ),
+                    ),
+                    const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
+                    _SettingsTile(
+                      icon: Icons.push_pin_rounded,
+                      label: 'Pinboard',
+                      onTap: () => Navigator.push(
+                        ctx,
+                        MaterialPageRoute(builder: (_) => const PinsScreen()),
                       ),
                     ),
                   ],

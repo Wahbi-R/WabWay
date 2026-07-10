@@ -29,6 +29,11 @@ class _LinksScreenState extends State<LinksScreen> {
   String? _activeTripId;
   RealtimeChannel? _channel;
   Timer? _debounce;
+  LinkCategory? _filterCategory;
+
+  List<TripLink> get _filteredLinks => _filterCategory == null
+      ? _links
+      : _links.where((l) => l.category == _filterCategory).toList();
 
   @override
   void didChangeDependencies() {
@@ -171,21 +176,42 @@ class _LinksScreenState extends State<LinksScreen> {
                     )
                   : RefreshIndicator(
                       onRefresh: _load,
-                      child: ListView.builder(
-                        padding: EdgeInsets.fromLTRB(
-                          kSpace4,
-                          kSpace3,
-                          kSpace4,
-                          kSpace8 + MediaQuery.paddingOf(context).bottom,
-                        ),
-                        itemCount: _links.length,
-                        itemBuilder: (_, i) => Padding(
-                          padding: const EdgeInsets.only(bottom: kSpace3),
-                          child: _LinkCard(
-                            link: _links[i],
-                            onDelete: () => _deleteLink(_links[i]),
+                      child: CustomScrollView(
+                        slivers: [
+                          SliverToBoxAdapter(
+                            child: _LinkFilterStrip(
+                              selected: _filterCategory,
+                              links: _links,
+                              onChanged: (cat) => setState(() => _filterCategory = cat),
+                            ),
                           ),
-                        ),
+                          SliverPadding(
+                            padding: EdgeInsets.fromLTRB(
+                              kSpace4,
+                              kSpace3,
+                              kSpace4,
+                              kSpace8 + MediaQuery.paddingOf(context).bottom,
+                            ),
+                            sliver: _filteredLinks.isEmpty
+                                ? SliverToBoxAdapter(
+                                    child: Center(
+                                      child: WabwayEmptyState(
+                                        icon: _filterCategory!.icon,
+                                        title: 'No ${_filterCategory!.label} links',
+                                        description: 'Add some to see them here.',
+                                      ),
+                                    ),
+                                  )
+                                : SliverList.separated(
+                                    itemCount: _filteredLinks.length,
+                                    separatorBuilder: (_, __) => const SizedBox(height: kSpace3),
+                                    itemBuilder: (_, i) => _LinkCard(
+                                      link: _filteredLinks[i],
+                                      onDelete: () => _deleteLink(_filteredLinks[i]),
+                                    ),
+                                  ),
+                          ),
+                        ],
                       ),
                     ),
       floatingActionButton: _links.isNotEmpty
@@ -205,6 +231,56 @@ class _LinksScreenState extends State<LinksScreen> {
           child: OfflineBanner(onRetry: _load),
         ),
       ],
+    );
+  }
+}
+
+// ─── Category filter strip ────────────────────────────────────────────────────
+
+class _LinkFilterStrip extends StatelessWidget {
+  const _LinkFilterStrip({
+    required this.selected,
+    required this.links,
+    required this.onChanged,
+  });
+
+  final LinkCategory? selected;
+  final List<TripLink> links;
+  final ValueChanged<LinkCategory?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    // Only show when at least 2 different categories are present.
+    final present = LinkCategory.values
+        .where((c) => links.any((l) => l.category == c))
+        .toList();
+    if (present.length < 2) return const SizedBox.shrink();
+
+    return SizedBox(
+      height: 52,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: kSpace4, vertical: kSpace3),
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(right: kSpace2),
+            child: WabwayTag(
+              label: 'All (${links.length})',
+              selected: selected == null,
+              onTap: () => onChanged(null),
+            ),
+          ),
+          for (final cat in present)
+            Padding(
+              padding: const EdgeInsets.only(right: kSpace2),
+              child: WabwayTag(
+                label: '${cat.label} (${links.where((l) => l.category == cat).length})',
+                selected: selected == cat,
+                onTap: () => onChanged(selected == cat ? null : cat),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

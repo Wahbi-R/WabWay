@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' show min, max;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -29,6 +30,7 @@ class _MapScreenState extends State<MapScreen> {
   bool _showMap = true;
   String? _activeTripId;
   RealtimeChannel? _realtimeChannel;
+  Timer? _debounce;
 
   final _mapController = MapController();
   bool _needsFit = true;   // fit-to-bounds on first successful load only
@@ -46,6 +48,7 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _realtimeChannel?.unsubscribe();
     _mapController.dispose();
     super.dispose();
@@ -64,26 +67,35 @@ class _MapScreenState extends State<MapScreen> {
             column: 'trip_id',
             value: tripId,
           ),
-          callback: (_) { if (mounted) _load(tripId); },
+          callback: (_) {
+            _debounce?.cancel();
+            _debounce = Timer(const Duration(milliseconds: 400),
+                () { if (mounted) _load(tripId, silent: true); });
+          },
         )
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'spot_votes',
-          callback: (_) { if (mounted) _load(tripId); },
+          callback: (_) {
+            _debounce?.cancel();
+            _debounce = Timer(const Duration(milliseconds: 400),
+                () { if (mounted) _load(tripId, silent: true); });
+          },
         )
         .subscribe();
   }
 
-  Future<void> _load(String tripId) async {
-    setState(() { _loading = true; _error = false; });
+  Future<void> _load(String tripId, {bool silent = false}) async {
+    if (!silent) setState(() { _loading = true; _error = false; });
     try {
       final spots = await SpotService.loadSpots(tripId);
       if (!mounted) return;
-      setState(() { _spots = spots; _loading = false; });
+      setState(() { _spots = spots; _loading = false; _error = false; });
       _fitIfNeeded();
     } catch (_) {
-      if (mounted) setState(() { _loading = false; _error = true; });
+      if (!mounted) return;
+      if (!silent) setState(() { _loading = false; _error = true; });
     }
   }
 
@@ -180,7 +192,7 @@ class _MapScreenState extends State<MapScreen> {
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
             tooltip: 'Refresh',
-            onPressed: _activeTripId == null ? null : () => _load(_activeTripId!),
+            onPressed: _activeTripId == null ? null : () => _load(_activeTripId!), // explicit user refresh — show spinner
           ),
           // Map / List toggle
           Padding(

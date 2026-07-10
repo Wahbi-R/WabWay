@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 39,
+    label: 'Links filter + map polish',
+    changes: [
+      'Filter saved links by category — Food & drink, Stay, Activity, Article, Social, and more — with a single tap; shows counts and auto-hides when all links share the same category',
+      'Map screen realtime updates no longer flash a loading spinner — changes stream in silently while you browse spots',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 38,
     label: 'Cash withdrawal notes',
     changes: [

@@ -28,6 +28,7 @@ class _MapScreenState extends State<MapScreen> {
   bool _loading = true;
   bool _error = false;
   bool _showMap = true;
+  Set<SpotCategory> _hiddenCategories = {};
   String? _activeTripId;
   RealtimeChannel? _realtimeChannel;
   Timer? _debounce;
@@ -131,6 +132,18 @@ class _MapScreenState extends State<MapScreen> {
 
   List<Spot> get _mappedSpots =>
       _spots.where((s) => s.isMapReady).toList();
+
+  List<Spot> get _visibleSpots => _hiddenCategories.isEmpty
+      ? _mappedSpots
+      : _mappedSpots.where((s) => !_hiddenCategories.contains(s.category)).toList();
+
+  List<SpotCategory> get _presentCategories {
+    final seen = <SpotCategory>{};
+    for (final s in _mappedSpots) {
+      seen.add(s.category);
+    }
+    return SpotCategory.values.where(seen.contains).toList();
+  }
 
   LatLng get _center {
     final mapped = _mappedSpots;
@@ -242,6 +255,70 @@ class _MapScreenState extends State<MapScreen> {
 
   // ─── Map view ────────────────────────────────────────────────────────────────
 
+  Widget _categoryFilterStrip() {
+    final cats = _presentCategories;
+    if (cats.length < 2) return const SizedBox.shrink();
+    return Positioned(
+      top: kSpace2,
+      left: 0,
+      right: 0,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: kSpace3),
+        child: Row(
+          children: cats.map((cat) {
+            final hidden = _hiddenCategories.contains(cat);
+            final count  = _mappedSpots.where((s) => s.category == cat).length;
+            return Padding(
+              padding: const EdgeInsets.only(right: kSpace2),
+              child: GestureDetector(
+                onTap: () => setState(() {
+                  if (hidden) {
+                    _hiddenCategories.remove(cat);
+                  } else {
+                    _hiddenCategories.add(cat);
+                  }
+                }),
+                child: AnimatedContainer(
+                  duration: kDurationFast,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: hidden
+                        ? kColorInkSoft.withValues(alpha: 0.08)
+                        : kColorPaper,
+                    borderRadius: kRadiusPill,
+                    border: Border.all(
+                      color: hidden ? kColorBorder : kColorBorderStrong,
+                    ),
+                    boxShadow: hidden ? [] : kShadowSm,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        cat.icon,
+                        size: 13,
+                        color: hidden ? kColorInkSoft : kColorInk,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        '${cat.label} $count',
+                        style: kStyleCaption.copyWith(
+                          color: hidden ? kColorInkSoft : kColorInk,
+                          fontWeight: hidden ? FontWeight.w400 : FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
   Widget _buildMap() {
     final mapped = _mappedSpots;
 
@@ -254,6 +331,8 @@ class _MapScreenState extends State<MapScreen> {
         ),
       );
     }
+
+    final visible = _visibleSpots;
 
     return Stack(
       children: [
@@ -277,7 +356,7 @@ class _MapScreenState extends State<MapScreen> {
               additionalOptions: const {'lang': 'en'},
             ),
             MarkerLayer(
-              markers: mapped.map((spot) {
+              markers: visible.map((spot) {
                 return Marker(
                   point: LatLng(spot.latitude!, spot.longitude!),
                   width: 40,
@@ -291,6 +370,7 @@ class _MapScreenState extends State<MapScreen> {
             ),
           ],
         ),
+        _categoryFilterStrip(),
 
         // Unmapped count banner
         if (_spots.length > mapped.length)

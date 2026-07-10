@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 96,
+    label: 'Map category filter',
+    changes: [
+      'Map now shows category chips at the top — tap to hide/show spots by type (Restaurant, Hotel, etc.)',
+      'Only appears when 2+ categories are present; chip count shows how many spots are in each category',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 95,
     label: 'Packing list reorder',
     changes: [

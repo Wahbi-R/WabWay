@@ -287,6 +287,7 @@ class _TravelScreenState extends State<TravelScreen> {
                           _filter = _filter == t ? null : t;
                           _selectedId = null;
                         }),
+                        items: _items,
                       ),
                       Expanded(child: _buildList(desktop: true)),
                     ],
@@ -347,6 +348,7 @@ class _TravelScreenState extends State<TravelScreen> {
           _FilterChips(
             selected: _filter,
             onSelect: (t) => setState(() => _filter = _filter == t ? null : t),
+            items: _items,
           ),
           Expanded(child: _buildList(desktop: false)),
         ],
@@ -556,25 +558,34 @@ class _FilterChips extends StatelessWidget {
   const _FilterChips({
     required this.selected,
     required this.onSelect,
+    required this.items,
   });
 
   final TravelItemType? selected;
   final ValueChanged<TravelItemType> onSelect;
+  // Full unfiltered list — used to compute per-type counts and hide empty types.
+  final List<TravelItem> items;
 
   @override
   Widget build(BuildContext context) {
+    final presentTypes = TravelItemType.values
+        .where((t) => items.any((i) => i.type == t))
+        .toList();
+    if (presentTypes.length < 2) return const SizedBox.shrink();
     return SizedBox(
       height: 48,
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: kSpace4, vertical: kSpace2),
-        children: TravelItemType.values.map((type) {
+        children: presentTypes.map((type) {
           final isActive = selected == type;
+          final count = items.where((i) => i.type == type).length;
           return Padding(
             padding: const EdgeInsets.only(right: kSpace2),
             child: _FilterChip(
               type: type,
               isActive: isActive,
+              count: count,
               onTap: () => onSelect(type),
             ),
           );
@@ -588,10 +599,12 @@ class _FilterChip extends StatefulWidget {
   const _FilterChip({
     required this.type,
     required this.isActive,
+    required this.count,
     required this.onTap,
   });
   final TravelItemType type;
   final bool isActive;
+  final int count;
   final VoidCallback onTap;
 
   @override
@@ -634,7 +647,7 @@ class _FilterChipState extends State<_FilterChip> {
               ),
               const SizedBox(width: 5),
               Text(
-                widget.type.label,
+                '${widget.type.label} (${widget.count})',
                 style: kStyleCaption.copyWith(
                   color: widget.isActive ? Colors.white : kColorInk,
                   fontWeight: widget.isActive ? FontWeight.w600 : FontWeight.w500,

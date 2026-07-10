@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 49,
+    label: 'Travel type filter counts',
+    changes: [
+      'Travel type filter chips now show counts ("Flight (2)", "Train (3)") and only appear when 2+ types are present in the list — consistent with spots and links',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 48,
     label: 'Spot category counts',
     changes: [

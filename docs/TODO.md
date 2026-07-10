@@ -115,6 +115,7 @@ Checked items are done. Log the date and a one-liner when completing something.
 - [x] **60. Multi-currency receipts** — `home_currency` on trips (default CAD, settable in Trip Settings); exchange rate auto-fetched from Frankfurter API at time of receipt creation and locked in; optional transaction fee field; `home_amount` stored once and never recalculated; ReceiptListTile shows original and home-currency amounts; migration `007_multi_currency_receipts.sql` applied via `supabase db push` (2026-07-09, see `docs/features/phase 3/multi-currency-receipts.md`).
 - [x] **61. Auto-fetch spot thumbnails** — on spots load, spots with `imageUrl == null` are queued for Wikipedia thumbnail lookup in background; `_thumbnailAttempted` set prevents re-fetching; results streamed into list and written back to DB (2026-07-09).
 - [x] **62. Plan item improvements** — spot picker at top of add-item sheet autofills title/address/city/country/mapsUrl and links the spot; location field now autocompletes via Photon; country field added to `ItineraryItem`; migration `008_itinerary_country.sql` (2026-07-09, see `docs/features/phase 3/plan-item-improvements.md`).
+- [x] **122. Receipt CSV export** — share button in Money → Receipts exports current filtered/sorted receipts as a CSV with date, title, category, amounts, paid-by, and notes (2026-07-10, build 73).
 - [x] **121. Trip pinboard** — shared notice board for group notes (check-in codes, meet times, reminders); pinned notes appear on home screen; post/unpin/delete from Settings → Pinboard; backed by `trip_pins` table (migration 016) (2026-07-10, build 72, see `docs/features/phase 3/trip-pinboard.md`).
 - [x] **120. UI polish — receipt notes preview + spot comment count** — receipt notes now shown inline (1 line) in the receipt list tile; spot comment count shown next to vote summary in the spot list tile (2026-07-10, build 71).
 - [x] **119. Plan item comments** — trip members can leave short group notes on any itinerary item; comments load on item open with avatar + timestamp; backed by `itinerary_item_comments` table (migration 015) (2026-07-10, build 70, see `docs/features/phase 3/plan-item-comments.md`).
@@ -184,5 +185,5 @@ Checked items are done. Log the date and a one-liner when completing something.
 | `home_screen.dart:164,194` | Bell / notifications icon | Route to notification settings screen (see #18) |
 | `home_screen.dart:370` | "Settle up" | Real settlement flow (see #17) |
 | `more_screen.dart:222` | Notifications settings row | Notification settings screen (see #18) |
-| `spots_screen.dart:386` | Filter icon | Advanced filter sheet (see #13) |
+| `spots_screen.dart:386` | Filter icon | ~~Advanced filter sheet~~ — **done**, filter sheet for status + city already implemented |
 | `incoming_share_screen.dart:94` | Travel / Links / Map share destinations | Wire to real flows (see #5) |

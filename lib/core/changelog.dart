@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 73,
+    label: 'Receipt CSV export',
+    changes: [
+      'Export your receipts as a CSV file from the Money tab — useful for expense reports or sharing with an accountant',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 72,
     label: 'Trip pinboard',
     changes: [

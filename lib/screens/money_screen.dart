@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
 import '../core/supabase/client.dart';
@@ -307,6 +309,39 @@ class _MoneyScreenState extends State<MoneyScreen> {
 
   String get _homeCurrency => TripState.tripOf(context).homeCurrency;
 
+  void _exportReceipts() {
+    final receipts = _filteredReceipts;
+    if (receipts.isEmpty) return;
+    if (kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Export is not supported on web.', style: kStyleBody.copyWith(color: Colors.white)),
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
+    final tripName = TripState.maybeOf(context)?.trip.name ?? 'Trip';
+    final buf = StringBuffer();
+    buf.writeln('Date,Title,Category,Amount,Currency,Home Amount,Home Currency,Paid By,Splits,Notes');
+    for (final r in receipts) {
+      final payer = memberById(r.paidById, _members);
+      buf.writeln([
+        _csvCell(r.date.toIso8601String().substring(0, 10)),
+        _csvCell(r.title),
+        _csvCell(r.category.label),
+        _csvCell(r.amount.toStringAsFixed(2)),
+        _csvCell(r.currency),
+        _csvCell(r.homeAmount.toStringAsFixed(2)),
+        _csvCell(_homeCurrency),
+        _csvCell(payer.name),
+        _csvCell('${r.splits.length}'),
+        _csvCell(r.notes ?? ''),
+      ].join(','));
+    }
+    Share.share(buf.toString(), subject: '$tripName — Receipts');
+  }
+
+  static String _csvCell(String v) => '"${v.replaceAll('"', '""')}"';
+
   Future<void> _addReceipt(BuildContext context) async {
     if (_activeTripId == null) return;
     final receipt = await showAddReceiptSheet(
@@ -613,11 +648,18 @@ class _MoneyScreenState extends State<MoneyScreen> {
             ],
           ),
           actions: [
-            if (_tab == _MoneyTab.receipts && _receipts.isNotEmpty)
+            if (_tab == _MoneyTab.receipts && _receipts.isNotEmpty) ...[
               _SortButton(
                 current: _receiptSort,
                 onChanged: (s) => setState(() => _receiptSort = s),
               ),
+              IconButton(
+                icon: const Icon(Icons.ios_share_rounded),
+                color: kColorInkSoft,
+                tooltip: 'Export receipts as CSV',
+                onPressed: _exportReceipts,
+              ),
+            ],
             IconButton(
               icon: const Icon(Icons.currency_exchange_rounded, size: 20),
               color: kColorInkSoft,

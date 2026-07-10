@@ -28,6 +28,7 @@ import 'share/incoming_share_screen.dart';
 import 'notification_settings_screen.dart';
 import 'global_search_screen.dart';
 import 'docs/doc_detail.dart';
+import 'money/add_receipt_sheet.dart';
 import 'money/receipt_detail.dart';
 import 'plan/item_detail.dart';
 import 'spots/spot_detail.dart';
@@ -291,6 +292,25 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: Text('Home', style: kStyleTitle),
         actions: _appBarActions(context),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          final tripMembers = members
+              .map((m) => TripMember(id: m.userId, name: m.profile.displayName))
+              .toList();
+          await showAddReceiptSheet(
+            context,
+            tripId: trip.id,
+            userId: ProfileState.of(context).id,
+            members: tripMembers,
+            homeCurrency: data?.homeCurrency ?? 'CAD',
+          );
+          _refresh();
+        },
+        backgroundColor: kColorPrimary,
+        foregroundColor: Colors.white,
+        tooltip: 'Add expense',
+        child: const Icon(Icons.add_rounded),
       ),
       body: RefreshIndicator(
         onRefresh: _refresh,

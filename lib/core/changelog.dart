@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 61,
+    label: 'Quick expense button',
+    changes: [
+      'Tap the + button on the home screen to log an expense instantly — no more navigating to Money first',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 60,
     label: 'Copy address & confirmation number',
     changes: [

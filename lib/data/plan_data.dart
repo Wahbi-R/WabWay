@@ -70,6 +70,7 @@ class ItineraryItem {
     this.linkedSpotId,
     this.linkedDocIds = const [],
     this.sortOrder = 0,
+    this.isDone = false,
   });
 
   final String id;
@@ -88,9 +89,28 @@ class ItineraryItem {
   final String? linkedSpotId;
   final List<String> linkedDocIds;
   final int sortOrder;
+  final bool isDone;
 
   bool get hasTime => time != null;
   bool get hasLinks => linkedSpotId != null || linkedDocIds.isNotEmpty;
+
+  ItineraryItem copyWith({bool? isDone}) => ItineraryItem(
+        id:              id,
+        dayId:           dayId,
+        title:           title,
+        type:            type,
+        time:            time,
+        city:            city,
+        country:         country,
+        location:        location,
+        mapsUrl:         mapsUrl,
+        confirmationUrl: confirmationUrl,
+        notes:           notes,
+        linkedSpotId:    linkedSpotId,
+        linkedDocIds:    linkedDocIds,
+        sortOrder:       sortOrder,
+        isDone:          isDone ?? this.isDone,
+      );
 }
 
 // ─── Trip day ─────────────────────────────────────────────────────────────────

@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 51,
+    label: 'Check off plan items',
+    changes: [
+      'Tap the coloured dot on any plan item to mark it done — the title gets a strikethrough and the dot turns into a green checkmark; tap again to uncheck',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 50,
     label: 'WabwaySearchBar widget',
     changes: [

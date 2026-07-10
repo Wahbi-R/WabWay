@@ -207,6 +207,20 @@ class _PlanScreenState extends State<PlanScreen> {
     PlanService.updateItem(updated).catchError((_) => _loadAll(silent: true));
   }
 
+  // Optimistically flips isDone and persists with a lightweight update.
+  void _toggleItemDone(String itemId) {
+    for (final day in _days) {
+      final idx = day.items.indexWhere((i) => i.id == itemId);
+      if (idx != -1) {
+        final newDone = !day.items[idx].isDone;
+        setState(() => day.items[idx] = day.items[idx].copyWith(isDone: newDone));
+        PlanService.toggleDone(itemId, done: newDone)
+            .catchError((_) => _loadAll(silent: true));
+        return;
+      }
+    }
+  }
+
   Future<void> _addItem(BuildContext context, String dayId) async {
     final messenger = ScaffoldMessenger.of(context);
     final draft = await showAddItemSheet(
@@ -605,6 +619,7 @@ class _PlanScreenState extends State<PlanScreen> {
                                                       onEditDay: () => _onEditDay(_days[di]),
                                                       onReorder: (newOrder) =>
                                                           _onReorderItems(_days[di].id, newOrder),
+                                                      onToggleDone: _toggleItemDone,
                                                     ),
                                                   );
                                                 },
@@ -816,6 +831,7 @@ class _PlanScreenState extends State<PlanScreen> {
                                         onEditDay: () => _onEditDay(_days[di]),
                                         onReorder: (newOrder) =>
                                             _onReorderItems(_days[di].id, newOrder),
+                                        onToggleDone: _toggleItemDone,
                                       ),
                                     );
                                   },

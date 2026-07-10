@@ -21,6 +21,7 @@ class TripDayCard extends StatefulWidget {
     this.daySelected = false,
     this.onEditDay,
     this.onReorder,
+    this.onToggleDone,
   });
 
   final TripDay day;
@@ -32,6 +33,8 @@ class TripDayCard extends StatefulWidget {
   final bool daySelected;
   final VoidCallback? onEditDay;
   final ValueChanged<List<ItineraryItem>>? onReorder;
+  // Called with an item id when the user taps the timeline dot to check/uncheck.
+  final ValueChanged<String>? onToggleDone;
 
   @override
   State<TripDayCard> createState() => _TripDayCardState();
@@ -78,6 +81,7 @@ class _TripDayCardState extends State<TripDayCard> {
               onItemTap: widget.onItemTap,
               onAddItem: widget.onAddItem,
               onReorder: widget.onReorder!,
+              onToggleDone: widget.onToggleDone,
             )
           else
             Column(
@@ -88,6 +92,9 @@ class _TripDayCardState extends State<TripDayCard> {
                     isLast: i == items.length - 1,
                     selected: items[i].id == widget.selectedItemId,
                     onTap: () => widget.onItemTap(items[i].id),
+                    onToggleDone: widget.onToggleDone != null
+                        ? () => widget.onToggleDone!(items[i].id)
+                        : null,
                   ),
                   if (i < items.length - 1)
                     const Divider(
@@ -323,6 +330,7 @@ class _ReorderableItemList extends StatefulWidget {
     required this.onItemTap,
     required this.onAddItem,
     required this.onReorder,
+    this.onToggleDone,
   });
 
   final List<ItineraryItem> items;
@@ -330,6 +338,7 @@ class _ReorderableItemList extends StatefulWidget {
   final ValueChanged<String> onItemTap;
   final VoidCallback onAddItem;
   final ValueChanged<List<ItineraryItem>> onReorder;
+  final ValueChanged<String>? onToggleDone;
 
   @override
   State<_ReorderableItemList> createState() => _ReorderableItemListState();
@@ -396,6 +405,9 @@ class _ReorderableItemListState extends State<_ReorderableItemList> {
                         isLast: isLast,
                         selected: item.id == widget.selectedItemId,
                         onTap: () => widget.onItemTap(item.id),
+                        onToggleDone: widget.onToggleDone != null
+                            ? () => widget.onToggleDone!(item.id)
+                            : null,
                       ),
                     ),
                   ],

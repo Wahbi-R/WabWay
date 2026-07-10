@@ -45,6 +45,7 @@ abstract final class PlanService {
       linkedSpotId:    row['linked_spot_id'] as String?,
       linkedDocIds:    docIds,
       sortOrder:       (row['sort_order'] as num?)?.toInt() ?? 0,
+      isDone:          (row['is_done'] as bool?) ?? false,
     );
   }
 
@@ -193,7 +194,16 @@ abstract final class PlanService {
       'confirmation_url': item.confirmationUrl,
       'notes':            item.notes,
       'linked_spot_id':   item.linkedSpotId,
+      'is_done':          item.isDone,
     }).eq('id', item.id);
+  }
+
+  // Lightweight toggle — avoids sending the full payload on every checkbox tap.
+  static Future<void> toggleDone(String itemId, {required bool done}) async {
+    await supabase
+        .from('itinerary_items')
+        .update({'is_done': done})
+        .eq('id', itemId);
   }
 
   static Future<void> deleteItem(String itemId) async {

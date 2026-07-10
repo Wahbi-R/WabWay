@@ -14,15 +14,23 @@ class ItineraryItemTile extends StatelessWidget {
     required this.isLast,
     this.selected = false,
     required this.onTap,
+    this.onToggleDone,
   });
 
   final ItineraryItem item;
   final bool isLast;
   final bool selected;
   final VoidCallback onTap;
+  // Null means the done feature isn't wired in this context (e.g. search results).
+  final VoidCallback? onToggleDone;
 
   @override
   Widget build(BuildContext context) {
+    final dotColor = item.isDone ? kColorInkSoft.withValues(alpha: 0.35) : item.type.color;
+    final titleColor = item.isDone
+        ? kColorInkSoft
+        : (selected ? item.type.color : kColorInk);
+
     return InkWell(
       onTap: onTap,
       child: AnimatedContainer(
@@ -35,7 +43,7 @@ class ItineraryItemTile extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Time column
+              // Time column — dims when done
               SizedBox(
                 width: 50,
                 child: Padding(
@@ -46,7 +54,9 @@ class ItineraryItemTile extends StatelessWidget {
                           style: GoogleFonts.ibmPlexMono(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: selected ? item.type.color : kColorInkSoft,
+                            color: item.isDone
+                                ? kColorInkSoft.withValues(alpha: 0.4)
+                                : (selected ? item.type.color : kColorInkSoft),
                           ),
                           textAlign: TextAlign.right,
                         )
@@ -63,19 +73,38 @@ class ItineraryItemTile extends StatelessWidget {
 
               const SizedBox(width: kSpace3),
 
-              // Timeline dot + vertical line
+              // Timeline dot — tappable done toggle
               Column(
                 children: [
-                  const SizedBox(height: 16),
-                  Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: item.type.color,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: item.type.color.withValues(alpha: 0.3),
-                        width: 2,
+                  const SizedBox(height: 12),
+                  GestureDetector(
+                    onTap: onToggleDone,
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      // Larger tap target without growing the visual dot
+                      padding: const EdgeInsets.all(4),
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 200),
+                        child: item.isDone
+                            ? Icon(
+                                Icons.check_circle_rounded,
+                                key: const ValueKey('done'),
+                                size: 14,
+                                color: kColorPrimary.withValues(alpha: 0.6),
+                              )
+                            : Container(
+                                key: const ValueKey('undone'),
+                                width: 10,
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  color: dotColor,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: dotColor.withValues(alpha: 0.3),
+                                    width: 2,
+                                  ),
+                                ),
+                              ),
                       ),
                     ),
                   ),
@@ -96,7 +125,7 @@ class ItineraryItemTile extends StatelessWidget {
 
               const SizedBox(width: kSpace3),
 
-              // Content
+              // Content — title dims + strikethrough when done
               Expanded(
                 child: Padding(
                   padding: EdgeInsets.only(
@@ -109,27 +138,34 @@ class ItineraryItemTile extends StatelessWidget {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Type icon
                           Padding(
                             padding: const EdgeInsets.only(top: 1, right: 6),
                             child: Icon(
                               item.type.icon,
                               size: 14,
-                              color: item.type.color,
+                              color: item.isDone
+                                  ? kColorInkSoft.withValues(alpha: 0.4)
+                                  : item.type.color,
                             ),
                           ),
                           Expanded(
                             child: Text(
                               item.title,
                               style: kStyleBodyMedium.copyWith(
-                                color: selected ? item.type.color : kColorInk,
+                                color: titleColor,
+                                decoration: item.isDone
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                                decorationColor: kColorInkSoft,
                               ),
                             ),
                           ),
-                          if (item.hasLinks) _LinkBadges(item: item),
+                          if (item.hasLinks && !item.isDone)
+                            _LinkBadges(item: item),
                         ],
                       ),
-                      if (item.city != null || item.location != null) ...[
+                      if ((item.city != null || item.location != null) &&
+                          !item.isDone) ...[
                         const SizedBox(height: 2),
                         Text(
                           item.location ?? item.city!,
@@ -146,15 +182,16 @@ class ItineraryItemTile extends StatelessWidget {
                 ),
               ),
 
-              // Chevron
-              Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: Icon(
-                  Icons.chevron_right_rounded,
-                  size: 16,
-                  color: kColorInkSoft.withValues(alpha: 0.5),
+              // Chevron — hidden when done to de-clutter
+              if (!item.isDone)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Icon(
+                    Icons.chevron_right_rounded,
+                    size: 16,
+                    color: kColorInkSoft.withValues(alpha: 0.5),
+                  ),
                 ),
-              ),
             ],
           ),
         ),

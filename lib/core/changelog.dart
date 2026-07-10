@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 75,
+    label: 'Member trip dates',
+    changes: [
+      'Set personal arrival and departure dates on the Members screen — the group can see when each person is joining and leaving',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 74,
     label: 'Pinboard realtime',
     changes: [

@@ -37,7 +37,7 @@ abstract final class TripService {
   static Future<List<AppTripMember>> loadTripMembers(String tripId) async {
     final data = await supabase
         .from('trip_members')
-        .select('user_id, role, profiles(*)')
+        .select('user_id, role, arrival_date, departure_date, profiles(*)')
         .eq('trip_id', tripId);
     return (data as List)
         .map((m) => AppTripMember.fromMap(m as Map<String, dynamic>))
@@ -51,6 +51,22 @@ abstract final class TripService {
         .delete()
         .eq('trip_id', tripId)
         .eq('user_id', userId);
+  }
+
+  static Future<void> updateMemberDates(
+    String tripId,
+    String userId, {
+    DateTime? arrivalDate,
+    DateTime? departureDate,
+    bool clearArrival = false,
+    bool clearDeparture = false,
+  }) async {
+    await supabase.from('trip_members').update({
+      if (clearArrival)    'arrival_date':   null
+      else if (arrivalDate != null) 'arrival_date': arrivalDate.toIso8601String().substring(0, 10),
+      if (clearDeparture)  'departure_date': null
+      else if (departureDate != null) 'departure_date': departureDate.toIso8601String().substring(0, 10),
+    }).eq('trip_id', tripId).eq('user_id', userId);
   }
 
   static Future<void> removeMember(String tripId, String userId) async {

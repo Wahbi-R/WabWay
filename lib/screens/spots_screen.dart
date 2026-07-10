@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
 import '../core/auth/profile_state.dart';
@@ -313,6 +315,47 @@ class _SpotsScreenState extends State<SpotsScreen> {
     }
   }
 
+  // ─── Export ──────────────────────────────────────────────────────────────────
+
+  // Shares the currently visible spots (after filter + sort) as a CSV.
+  // Each row: Name, City, Area, Country, Category, Status, Address, Maps URL, Notes.
+  void _exportSpots() {
+    final visible = _filtered;
+    if (visible.isEmpty) return;
+
+    final tripName = TripState.maybeOf(context)?.trip.name ?? 'Trip';
+
+    final buf = StringBuffer();
+    buf.writeln('Name,City,Area,Country,Category,Status,Address,Maps URL,Notes');
+    for (final s in visible) {
+      buf.writeln([
+        _csvCell(s.name),
+        _csvCell(s.city),
+        _csvCell(s.area),
+        _csvCell(s.country ?? ''),
+        _csvCell(s.category.label),
+        _csvCell(s.status.label),
+        _csvCell(s.address ?? ''),
+        _csvCell(s.mapsUrl ?? ''),
+        _csvCell(s.notes ?? ''),
+      ].join(','));
+    }
+
+    if (kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Export is not supported on web.',
+            style: kStyleBody.copyWith(color: Colors.white)),
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
+
+    unawaited(Share.share(buf.toString(), subject: '$tripName — Spots'));
+  }
+
+  // Wraps a CSV cell value in quotes, escaping any internal quotes.
+  static String _csvCell(String v) => '"${v.replaceAll('"', '""')}"';
+
   // ─── Advanced filter ─────────────────────────────────────────────────────────
 
   Future<void> _openFilterSheet() async {
@@ -420,6 +463,7 @@ class _SpotsScreenState extends State<SpotsScreen> {
               }
             }),
             onSortChange: (s) => setState(() => _sortBy = s),
+            onExport: _exportSpots,
             onVote: _onVote,
             onDelete: _deleteSpot,
             onEdit: _onEditSpot,
@@ -446,6 +490,7 @@ class _SpotsScreenState extends State<SpotsScreen> {
             }),
             onSortChange: (s) => setState(() => _sortBy = s),
             onFilter: _openFilterSheet,
+            onExport: _exportSpots,
             onAdd: () => _addSpot(context),
           );
     if (!_offline) return body;
@@ -499,6 +544,7 @@ class _MobileLayout extends StatelessWidget {
     required this.onToggleSearch,
     required this.onSortChange,
     required this.onFilter,
+    required this.onExport,
     required this.onAdd,
   });
 
@@ -516,6 +562,7 @@ class _MobileLayout extends StatelessWidget {
   final VoidCallback onToggleSearch;
   final ValueChanged<_SpotSort> onSortChange;
   final VoidCallback onFilter;
+  final VoidCallback onExport;
   final VoidCallback onAdd;
 
   @override
@@ -537,6 +584,14 @@ class _MobileLayout extends StatelessWidget {
                 color: kColorInkSoft,
                 onPressed: onToggleSearch,
               ),
+              // Share the filtered list as a CSV
+              if (!showSearch && spots.isNotEmpty)
+                IconButton(
+                  icon: const Icon(Icons.ios_share_rounded),
+                  color: kColorInkSoft,
+                  tooltip: 'Export spots as CSV',
+                  onPressed: onExport,
+                ),
               // Sort popup — icon is highlighted when a non-default sort is active
               PopupMenuButton<_SpotSort>(
                 icon: Icon(
@@ -662,6 +717,7 @@ class _DesktopLayout extends StatelessWidget {
     required this.onSearch,
     required this.onToggleSearch,
     required this.onSortChange,
+    required this.onExport,
     required this.onVote,
     required this.onDelete,
     required this.onEdit,
@@ -684,6 +740,7 @@ class _DesktopLayout extends StatelessWidget {
   final ValueChanged<String> onSearch;
   final VoidCallback onToggleSearch;
   final ValueChanged<_SpotSort> onSortChange;
+  final VoidCallback onExport;
   final void Function(String, VoteType?) onVote;
   final Future<void> Function(String) onDelete;
   final ValueChanged<Spot> onEdit;
@@ -699,9 +756,11 @@ class _DesktopLayout extends StatelessWidget {
             showSearch: showSearch,
             searchCtrl: searchCtrl,
             sortBy: sortBy,
+            hasSpots: spots.isNotEmpty,
             onSearch: onSearch,
             onToggleSearch: onToggleSearch,
             onSortChange: onSortChange,
+            onExport: onExport,
             onAdd: onAdd,
           ),
 
@@ -782,18 +841,22 @@ class _DesktopTopBar extends StatelessWidget {
     required this.showSearch,
     required this.searchCtrl,
     required this.sortBy,
+    required this.hasSpots,
     required this.onSearch,
     required this.onToggleSearch,
     required this.onSortChange,
+    required this.onExport,
     required this.onAdd,
   });
 
   final bool showSearch;
   final TextEditingController searchCtrl;
   final _SpotSort sortBy;
+  final bool hasSpots;
   final ValueChanged<String> onSearch;
   final VoidCallback onToggleSearch;
   final ValueChanged<_SpotSort> onSortChange;
+  final VoidCallback onExport;
   final VoidCallback onAdd;
 
   @override
@@ -820,6 +883,13 @@ class _DesktopTopBar extends StatelessWidget {
             label: showSearch ? 'Close search' : 'Search',
             onPressed: onToggleSearch,
           ),
+          const SizedBox(width: kSpace2),
+          if (hasSpots)
+            WabwayIconButton(
+              icon: Icons.ios_share_rounded,
+              label: 'Export CSV',
+              onPressed: onExport,
+            ),
           const SizedBox(width: kSpace2),
           // Sort popup for desktop
           PopupMenuButton<_SpotSort>(

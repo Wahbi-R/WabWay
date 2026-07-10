@@ -13,6 +13,7 @@ import '../core/trip/app_trip.dart';
 import '../core/trip/trip_state.dart';
 import '../core/update_checker.dart';
 import 'onboarding_screen.dart';
+import 'trips/trip_settings_sheet.dart';
 import '../data/activity_data.dart';
 import '../data/money_data.dart';
 import '../data/plan_data.dart';
@@ -239,6 +240,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     final data = _data;
+    final myId   = ProfileState.of(context).id;
+    final isOwner = members.any((m) => m.userId == myId && m.isOwner);
 
     return Scaffold(
       backgroundColor: kColorCream,
@@ -255,7 +258,13 @@ class _HomeScreenState extends State<HomeScreen> {
               _UpdateBanner(info: _updateInfo!, onDismiss: () => setState(() => _updateInfo = null)),
               const SizedBox(height: kSpace3),
             ],
-            _TripHero(trip: trip, memberCount: members.length, data: data),
+            _TripHero(
+              trip: trip,
+              memberCount: members.length,
+              data: data,
+              // Owners can tap the hero to edit trip details inline
+              onTap: isOwner ? () => showTripSettingsSheet(context, trip: trip) : null,
+            ),
             const SizedBox(height: kSpace4),
             _QuickBalanceCard(data: data),
             if (data != null &&
@@ -405,11 +414,14 @@ class _TripHero extends StatelessWidget {
     required this.trip,
     required this.memberCount,
     required this.data,
+    this.onTap,
   });
 
   final AppTrip trip;
   final int memberCount;
   final _HomeData? data;
+  // Non-null for owners: tapping the hero opens Trip Settings directly
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -418,7 +430,9 @@ class _TripHero extends StatelessWidget {
     final memberLabel = memberCount == 1 ? '1 member' : '$memberCount members';
     final metaLine   = [if (dateLabel.isNotEmpty) dateLabel, memberLabel].join('  ·  ');
 
-    return DecoratedBox(
+    return GestureDetector(
+      onTap: onTap,
+      child: DecoratedBox(
       decoration: BoxDecoration(
         color: kColorSurfaceSunken,
         borderRadius: kRadiusLg,
@@ -429,12 +443,21 @@ class _TripHero extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'TRIP',
-              style: kStyleOverline.copyWith(
-                color: kColorPrimary,
-                letterSpacing: kTextXs * kTrackingWide,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'TRIP',
+                    style: kStyleOverline.copyWith(
+                      color: kColorPrimary,
+                      letterSpacing: kTextXs * kTrackingWide,
+                    ),
+                  ),
+                ),
+                // Subtle edit hint shown only to the trip owner
+                if (onTap != null)
+                  const Icon(Icons.edit_rounded, size: 14, color: kColorInkSoft),
+              ],
             ),
             const SizedBox(height: kSpace2),
             Text(
@@ -495,6 +518,7 @@ class _TripHero extends StatelessWidget {
           ],
         ),
       ),
+    ), // GestureDetector
     );
   }
 }

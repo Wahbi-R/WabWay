@@ -11,6 +11,17 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 32,
+    label: 'Spot export + tappable trip hero',
+    changes: [
+      'Export your visible spots as a CSV — tap the export icon in the Spots screen to share a spreadsheet with name, city, category, status, address, and notes for every spot currently shown',
+      'Filters and sort order are respected: the CSV contains exactly what you see on screen',
+      'Trip owners can now tap the home screen hero card to open Trip Settings directly — a small edit icon appears as a hint',
+      'Non-owners see the card as before: no tap, no icon',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 31,
     label: 'Spot sorting + trip countdown',
     changes: [

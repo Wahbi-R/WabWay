@@ -2,6 +2,17 @@ import 'package:flutter/widgets.dart';
 import 'app_trip.dart';
 import 'app_trip_member.dart';
 
+// InheritedWidget that broadcasts the active trip and its member list down
+// the widget tree without threading them through every constructor.
+//
+// Usage inside any descendant:
+//   final trip    = TripState.tripOf(context);     // throws if missing
+//   final members = TripState.membersOf(context);  // returns [] if missing
+//   TripState.refresh(context);                    // tells TripGate to re-fetch
+//
+// Secondary screens pushed from the More screen must wrap their builder in
+// ProfileState + TripState so the InheritedWidgets survive the new route.
+// Use the _pushWithState() helper in more_screen.dart for this.
 class TripState extends InheritedWidget {
   const TripState({
     super.key,

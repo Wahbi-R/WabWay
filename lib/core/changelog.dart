@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 36,
+    label: 'Receipt filters + travel order',
+    changes: [
+      'Filter receipts by category — Food, Transport, Stay, Activity, Shopping, or Other — with a single tap; the chip shows how many receipts are in each category',
+      'Filter is hidden when all receipts fall into the same category, so it only appears when it helps',
+      'Travel items are now sorted by departure date so the list reads like the trip timeline — draft bookings with no date appear at the end',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 35,
     label: 'Spot notes in list',
     changes: [

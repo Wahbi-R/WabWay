@@ -44,8 +44,20 @@ class _TravelScreenState extends State<TravelScreen> {
   TravelItem? get _selectedItem =>
       _selectedId == null ? null : _items.where((i) => i.id == _selectedId).firstOrNull;
 
-  List<TravelItem> get _filtered =>
-      _filter == null ? _items : _items.where((i) => i.type == _filter).toList();
+  // Sorted chronologically so the list reads like the trip timeline.
+  // Items without a date (draft bookings) fall to the end.
+  List<TravelItem> get _filtered {
+    final items = _filter == null
+        ? List<TravelItem>.from(_items)
+        : _items.where((i) => i.type == _filter).toList();
+    items.sort((a, b) {
+      if (a.date == null && b.date == null) return 0;
+      if (a.date == null) return 1;
+      if (b.date == null) return -1;
+      return a.date!.compareTo(b.date!);
+    });
+    return items;
+  }
 
   @override
   void didChangeDependencies() {

@@ -38,6 +38,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
   int _pendingSyncCount = 0;
 
   _MoneyTab _tab = _MoneyTab.receipts;
+  ReceiptCategory? _filterCategory;
   String? _selectedReceiptId;
   String? _selectedWithdrawalId;
 
@@ -193,6 +194,10 @@ class _MoneyScreenState extends State<MoneyScreen> {
   }
 
   // ── Derived state ─────────────────────────────────────────────────────────────
+
+  List<Receipt> get _filteredReceipts => _filterCategory == null
+      ? _receipts
+      : _receipts.where((r) => r.category == _filterCategory).toList();
 
   Map<String, List<MemberBalance>> get _balancesByCurrency =>
       calculateBalancesGrouped(_receipts, _withdrawals, myId: _userId, members: _members);
@@ -359,18 +364,41 @@ class _MoneyScreenState extends State<MoneyScreen> {
           label: 'No receipts yet',
         );
       }
-      return ListView.separated(
-        padding: const EdgeInsets.all(kSpace4),
-        itemCount: _receipts.length,
-        separatorBuilder: (_, __) => const SizedBox(height: kSpace2),
-        itemBuilder: (_, i) => ReceiptListTile(
-          receipt:      _receipts[i],
-          myId:         _userId,
-          members:      _members,
-          homeCurrency: _homeCurrency,
-          selected:     _selectedReceiptId == _receipts[i].id,
-          onTap: () => setState(() => _selectedReceiptId = _receipts[i].id),
-        ),
+      final filtered = _filteredReceipts;
+      return Column(
+        children: [
+          _ReceiptFilterStrip(
+            selected: _filterCategory,
+            receipts: _receipts,
+            onChanged: (c) => setState(() {
+              _filterCategory = c;
+              _selectedReceiptId = null;
+            }),
+          ),
+          Expanded(
+            child: filtered.isEmpty
+                ? Center(
+                    child: WabwayEmptyState(
+                      icon: Icons.filter_list_rounded,
+                      title: 'No ${_filterCategory?.label ?? ''} receipts',
+                      description: 'Try a different category filter.',
+                    ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.all(kSpace4),
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: kSpace2),
+                    itemBuilder: (_, i) => ReceiptListTile(
+                      receipt:      filtered[i],
+                      myId:         _userId,
+                      members:      _members,
+                      homeCurrency: _homeCurrency,
+                      selected:     _selectedReceiptId == filtered[i].id,
+                      onTap: () => setState(() => _selectedReceiptId = filtered[i].id),
+                    ),
+                  ),
+          ),
+        ],
       );
     }
 
@@ -518,47 +546,71 @@ class _MoneyScreenState extends State<MoneyScreen> {
         body: TabBarView(
           physics: const NeverScrollableScrollPhysics(),
           children: [
-            // Receipts tab
+            // Receipts tab — filter strip + list
             _receipts.isEmpty
-                ? const WabwayEmptyState(
-                    icon: Icons.receipt_long_rounded,
-                    title: 'No receipts yet',
-                    description: 'Tap + to add the first expense.',
+                ? const Center(
+                    child: WabwayEmptyState(
+                      icon: Icons.receipt_long_rounded,
+                      title: 'No receipts yet',
+                      description: 'Tap + to add the first expense.',
+                    ),
                   )
-                : ListView.separated(
-                    padding: const EdgeInsets.all(kSpace4),
-                    itemCount: _receipts.length,
-                    separatorBuilder: (_, __) =>
-                        const SizedBox(height: kSpace2),
-                    itemBuilder: (ctx, i) {
-                      final r = _receipts[i];
-                      return ReceiptListTile(
-                        receipt:      r,
-                        myId:         _userId,
-                        members:      _members,
-                        homeCurrency: _homeCurrency,
-                        onTap: () => Navigator.push(
-                          ctx,
-                          MaterialPageRoute(
-                            builder: (_) => ReceiptDetailScreen(
-                              receipt:   r,
-                              myId:      _userId,
-                              members:   _members,
-                              tripId:    _activeTripId!,
-                              onDelete:  () => _deleteReceipt(r.id),
-                              onUpdated: (updated) {
-                                if (mounted) {
-                                  setState(() {
-                                    final idx = _receipts.indexWhere((x) => x.id == updated.id);
-                                    if (idx >= 0) _receipts[idx] = updated;
-                                  });
-                                }
-                              },
-                            ),
-                          ),
-                        ),
-                      );
-                    },
+                : Column(
+                    children: [
+                      _ReceiptFilterStrip(
+                        selected: _filterCategory,
+                        receipts: _receipts,
+                        onChanged: (c) => setState(() {
+                          _filterCategory = c;
+                          _selectedReceiptId = null;
+                        }),
+                      ),
+                      Expanded(
+                        child: _filteredReceipts.isEmpty
+                            ? Center(
+                                child: WabwayEmptyState(
+                                  icon: Icons.filter_list_rounded,
+                                  title: 'No ${_filterCategory?.label ?? ''} receipts',
+                                  description: 'Try a different category filter.',
+                                ),
+                              )
+                            : ListView.separated(
+                                padding: const EdgeInsets.all(kSpace4),
+                                itemCount: _filteredReceipts.length,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(height: kSpace2),
+                                itemBuilder: (ctx, i) {
+                                  final r = _filteredReceipts[i];
+                                  return ReceiptListTile(
+                                    receipt:      r,
+                                    myId:         _userId,
+                                    members:      _members,
+                                    homeCurrency: _homeCurrency,
+                                    onTap: () => Navigator.push(
+                                      ctx,
+                                      MaterialPageRoute(
+                                        builder: (_) => ReceiptDetailScreen(
+                                          receipt:   r,
+                                          myId:      _userId,
+                                          members:   _members,
+                                          tripId:    _activeTripId!,
+                                          onDelete:  () => _deleteReceipt(r.id),
+                                          onUpdated: (updated) {
+                                            if (mounted) {
+                                              setState(() {
+                                                final idx = _receipts.indexWhere((x) => x.id == updated.id);
+                                                if (idx >= 0) _receipts[idx] = updated;
+                                              });
+                                            }
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
                   ),
 
             // Cash tab
@@ -745,6 +797,58 @@ class _DesktopTabChip extends StatelessWidget {
             fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ─── Receipt category filter strip ────────────────────────────────────────────
+
+class _ReceiptFilterStrip extends StatelessWidget {
+  const _ReceiptFilterStrip({
+    required this.selected,
+    required this.receipts,
+    required this.onChanged,
+  });
+
+  final ReceiptCategory? selected;
+  final List<Receipt> receipts;
+  final ValueChanged<ReceiptCategory?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    // Only show categories that actually appear in the receipt list.
+    final present = ReceiptCategory.values
+        .where((c) => receipts.any((r) => r.category == c))
+        .toList();
+    if (present.length < 2) return const SizedBox.shrink();
+
+    final allCount = receipts.length;
+    return SizedBox(
+      height: 52,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: kSpace4, vertical: kSpace3),
+        children: [
+          // "All" chip
+          Padding(
+            padding: const EdgeInsets.only(right: kSpace2),
+            child: WabwayTag(
+              label: 'All ($allCount)',
+              selected: selected == null,
+              onTap: () => onChanged(null),
+            ),
+          ),
+          for (final cat in present)
+            Padding(
+              padding: const EdgeInsets.only(right: kSpace2),
+              child: WabwayTag(
+                label: '${cat.label} (${receipts.where((r) => r.category == cat).length})',
+                selected: selected == cat,
+                onTap: () => onChanged(selected == cat ? null : cat),
+              ),
+            ),
+        ],
       ),
     );
   }

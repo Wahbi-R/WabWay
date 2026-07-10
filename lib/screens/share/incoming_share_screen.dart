@@ -146,7 +146,7 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
   Future<void> _pickFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'docx', 'xlsx', 'webp', 'heic'],
+      allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'docx', 'xlsx', 'csv', 'webp', 'heic'],
       withData: true,
     );
     if (result == null || result.files.isEmpty || !mounted) return;
@@ -154,6 +154,25 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
     if (f.bytes == null) return;
     final bytes = f.bytes!;
     final ext = f.extension?.toLowerCase() ?? 'jpg';
+
+    // CSV → go straight to the Takeout import screen
+    if (ext == 'csv') {
+      await Navigator.push<void>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MapsImportScreen(
+            result: const MapsParseResult(places: [], isList: false),
+            initialBytes: bytes,
+            initialExt: 'csv',
+            tripId: widget.tripId,
+            userId: widget.userId,
+            onDone: widget.onDone,
+          ),
+        ),
+      );
+      return;
+    }
+
     final nameWithoutExt = f.name.replaceAll(RegExp(r'\.[^.]+$'), '');
     final id = DateTime.now().millisecondsSinceEpoch.toString();
     setState(() {
@@ -497,6 +516,33 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
     }
   }
 
+  bool get _isCsvShare =>
+      _activeShare?.contentType == ShareContentType.csvFile;
+
+  Future<void> _importFromCsv() async {
+    final filePath = _activeShare?.filePath;
+    final inMemBytes = _fileBytes;
+    final bytes = inMemBytes ??
+        (filePath != null ? await readFileAsBytes(filePath) : null);
+    if (bytes == null || !mounted) return;
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MapsImportScreen(
+          result: const MapsParseResult(places: [], isList: false),
+          initialBytes: bytes,
+          initialExt: 'csv',
+          tripId: widget.tripId,
+          userId: widget.userId,
+          onDone: () {
+            Navigator.pop(context);
+            widget.onDone?.call();
+          },
+        ),
+      ),
+    );
+  }
+
   Future<void> _parseWithAi() async {
     final filePath = _activeShare?.filePath;
     final inMemBytes = _fileBytes;
@@ -770,6 +816,8 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
       case 'heic':
       case 'bmp':
         return ShareContentType.screenshot;
+      case 'csv':
+        return ShareContentType.csvFile;
       default:
         return ShareContentType.blogArticle;
     }
@@ -1107,6 +1155,17 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
                     ),
                     const SizedBox(height: kSpace4),
                   ],
+                  if (_isCsvShare) ...[
+                    _ParseItineraryBanner(
+                      icon: Icons.table_chart_rounded,
+                      label: 'Import spots from CSV',
+                      subtitle: 'Import saved places from Google Takeout',
+                      scanning: false,
+                      disabled: _anyScan,
+                      onTap: _importFromCsv,
+                    ),
+                    const SizedBox(height: kSpace4),
+                  ],
                   if (_canImportMaps) ...[
                     _ParseItineraryBanner(
                       icon: Icons.pin_drop_rounded,
@@ -1220,6 +1279,17 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
                 scanning: _scanningOcr,
                 disabled: _anyScan,
                 onTap: _parseWithOcr,
+              ),
+              const SizedBox(height: kSpace4),
+            ],
+            if (_isCsvShare) ...[
+              _ParseItineraryBanner(
+                icon: Icons.table_chart_rounded,
+                label: 'Import spots from CSV',
+                subtitle: 'Import saved places from Google Takeout',
+                scanning: false,
+                disabled: _anyScan,
+                onTap: _importFromCsv,
               ),
               const SizedBox(height: kSpace4),
             ],
@@ -1674,5 +1744,7 @@ class _ContentTypeInfoCard extends StatelessWidget {
           'Screenshots are usually confirmations or reference images — save as a document.',
         ShareContentType.accommodationLink =>
           'Accommodation links can be saved as stays — tap "Save as stay" to parse the listing details automatically.',
+        ShareContentType.csvFile =>
+          'CSV files from Google Takeout contain your saved places — tap "Import spots from CSV" to add them all.',
       };
 }

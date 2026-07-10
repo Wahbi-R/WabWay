@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../../core/images/wikipedia_image_service.dart';
@@ -18,12 +19,17 @@ class MapsImportScreen extends StatefulWidget {
     required this.tripId,
     required this.userId,
     this.onDone,
+    this.initialBytes,
+    this.initialExt,
   });
 
   final MapsParseResult result;
   final String          tripId;
   final String          userId;
   final VoidCallback?   onDone;
+  /// Pre-loaded file bytes (CSV or JSON) to parse immediately on open.
+  final Uint8List?      initialBytes;
+  final String?         initialExt;
 
   @override
   State<MapsImportScreen> createState() => _MapsImportScreenState();
@@ -46,6 +52,11 @@ class _MapsImportScreenState extends State<MapsImportScreen> {
     _places     = List.of(widget.result.places);
     _selected   = List.filled(_places.length, true);
     _categories = _places.map((p) => p.category).toList();
+    if (widget.initialBytes != null) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _parseTakeoutBytes(widget.initialBytes!, widget.initialExt ?? 'csv'),
+      );
+    }
   }
 
   void _setPlaces(List<MapsPlace> places) {
@@ -85,23 +96,11 @@ class _MapsImportScreenState extends State<MapsImportScreen> {
     }
   }
 
-  Future<void> _loadFromTakeout() async {
+  Future<void> _parseTakeoutBytes(Uint8List bytes, String ext) async {
     setState(() => _loadingTakeout = true);
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['json', 'csv'],
-        withData: true,
-      );
-      if (result == null || result.files.isEmpty) return;
-      final file  = result.files.first;
-      final bytes = file.bytes;
-      if (bytes == null) return;
-
-      final isCsv = (file.extension ?? '').toLowerCase() == 'csv';
-
+      final isCsv = ext.toLowerCase() == 'csv';
       if (isCsv) {
-        // Fast sync parse — show list immediately, geocode in background
         final fast = TakeoutParser.parseCsvFast(bytes);
         if (!mounted) return;
         if (fast.isEmpty) {
@@ -115,7 +114,6 @@ class _MapsImportScreenState extends State<MapsImportScreen> {
         }
         _setPlaces(fast);
         setState(() => _loadingTakeout = false);
-        // Background geocoding — updates cards live as results come in
         _startBackgroundGeocoding();
         return;
       } else {
@@ -135,6 +133,21 @@ class _MapsImportScreenState extends State<MapsImportScreen> {
     } finally {
       if (mounted) setState(() => _loadingTakeout = false);
     }
+  }
+
+  Future<void> _loadFromTakeout() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['json', 'csv'],
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty) return;
+    final file  = result.files.first;
+    final bytes = file.bytes;
+    if (bytes == null) return;
+    final ext = (file.extension ?? 'csv').toLowerCase();
+    await _parseTakeoutBytes(bytes, ext);
+    if (mounted) setState(() => _loadingTakeout = false);
   }
 
   Future<void> _startBackgroundGeocoding() async {

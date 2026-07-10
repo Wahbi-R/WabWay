@@ -100,6 +100,7 @@ class ShareHandler extends ChangeNotifier {
     if (f.type == SharedMediaType.image) return ShareContentType.screenshot;
     final lower = f.path.toLowerCase();
     if (lower.endsWith('.pdf')) return ShareContentType.pdfFile;
+    if (lower.endsWith('.csv')) return ShareContentType.csvFile;
     return ShareContentType.screenshot;
   }
 }

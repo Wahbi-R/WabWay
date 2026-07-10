@@ -12,7 +12,8 @@ enum ShareContentType {
   pdfFile,
   receiptPhoto,
   screenshot,
-  accommodationLink;
+  accommodationLink,
+  csvFile;
 
   String get label => switch (this) {
         ShareContentType.googleMapsLink => 'Google Maps link',
@@ -25,6 +26,7 @@ enum ShareContentType {
         ShareContentType.receiptPhoto => 'Receipt photo',
         ShareContentType.screenshot        => 'Screenshot',
         ShareContentType.accommodationLink => 'Accommodation listing',
+        ShareContentType.csvFile           => 'CSV file',
       };
 
   String get sourceName => switch (this) {
@@ -38,6 +40,7 @@ enum ShareContentType {
         ShareContentType.receiptPhoto => 'Photos',
         ShareContentType.screenshot        => 'Photos',
         ShareContentType.accommodationLink => 'Web',
+        ShareContentType.csvFile           => 'Files',
       };
 
   IconData get icon => switch (this) {
@@ -51,6 +54,7 @@ enum ShareContentType {
         ShareContentType.receiptPhoto => Icons.receipt_long_rounded,
         ShareContentType.screenshot        => Icons.screenshot_monitor_rounded,
         ShareContentType.accommodationLink => Icons.hotel_rounded,
+        ShareContentType.csvFile           => Icons.table_chart_rounded,
       };
 
   Color get color => switch (this) {
@@ -64,6 +68,7 @@ enum ShareContentType {
         ShareContentType.receiptPhoto => const Color(0xFF7D9A75),
         ShareContentType.screenshot        => const Color(0xFF6F665D),
         ShareContentType.accommodationLink => const Color(0xFF4A9B8A),
+        ShareContentType.csvFile           => const Color(0xFF4A7AB5),
       };
 
   Color get softColor => switch (this) {
@@ -77,6 +82,7 @@ enum ShareContentType {
         ShareContentType.receiptPhoto => const Color(0xFFEEF4EC),
         ShareContentType.screenshot        => const Color(0xFFEEEAE3),
         ShareContentType.accommodationLink => const Color(0xFFE8F3F1),
+        ShareContentType.csvFile           => const Color(0xFFE8EEF6),
       };
 
   List<ShareDestination> get suggestedDestinations => switch (this) {
@@ -105,6 +111,7 @@ enum ShareContentType {
           ],
         ShareContentType.screenshot        => [ShareDestination.document],
         ShareContentType.accommodationLink => [ShareDestination.travelItem],
+        ShareContentType.csvFile           => [ShareDestination.spot],
       };
 }
 

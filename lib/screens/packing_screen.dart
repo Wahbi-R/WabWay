@@ -99,6 +99,41 @@ class _PackingScreenState extends State<PackingScreen> {
     await PackingService.setPackedState(item.id, !item.isPacked, userId);
   }
 
+  Future<void> _rename(PackingItem item) async {
+    final ctrl = TextEditingController(text: item.title);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: kColorPaper,
+        shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
+        title: Text('Rename item', style: kStyleBodySemibold),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          style: kStyleBody,
+          decoration: InputDecoration(
+            hintText: 'Item name',
+            hintStyle: TextStyle(color: kColorInkSoft.withAlpha(120)),
+            border: OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorBorder)),
+            focusedBorder: OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorPrimary, width: 1.5)),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          ),
+          onSubmitted: (_) => Navigator.pop(ctx, true),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text('Save', style: TextStyle(color: kColorPrimary))),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted || ctrl.text.trim().isEmpty || ctrl.text.trim() == item.title) return;
+    setState(() {
+      final idx = _items.indexWhere((i) => i.id == item.id);
+      if (idx >= 0) _items[idx] = item.copyWith(title: ctrl.text.trim());
+    });
+    await PackingService.renameItem(item.id, ctrl.text.trim());
+  }
+
   Future<void> _delete(PackingItem item) async {
     await PackingService.deleteItem(item.id);
     _load(silent: true);
@@ -138,6 +173,7 @@ class _PackingScreenState extends State<PackingScreen> {
             _PackingTile(
               item: entry,
               onToggle: () => _toggle(entry),
+              onRename: () => _rename(entry),
               onDelete: () => _delete(entry),
             ),
             if (!isLast)
@@ -227,15 +263,19 @@ class _EmptyState extends StatelessWidget {
 
 // ─── Packing tile ─────────────────────────────────────────────────────────────
 
+enum _TileAction { rename, delete }
+
 class _PackingTile extends StatelessWidget {
   const _PackingTile({
     required this.item,
     required this.onToggle,
+    required this.onRename,
     required this.onDelete,
   });
 
   final PackingItem item;
   final VoidCallback onToggle;
+  final VoidCallback onRename;
   final VoidCallback onDelete;
 
   @override
@@ -293,10 +333,22 @@ class _PackingTile extends StatelessWidget {
               ),
             )
           : null,
-      trailing: IconButton(
-        icon: const Icon(Icons.close_rounded, size: 18),
-        color: kColorInkSoft,
-        onPressed: onDelete,
+      trailing: PopupMenuButton<_TileAction>(
+        icon: const Icon(Icons.more_vert_rounded, size: 18, color: kColorInkSoft),
+        padding: EdgeInsets.zero,
+        itemBuilder: (_) => [
+          const PopupMenuItem(value: _TileAction.rename, child: Text('Rename')),
+          PopupMenuItem(
+            value: _TileAction.delete,
+            child: Text('Delete', style: TextStyle(color: kColorDanger)),
+          ),
+        ],
+        onSelected: (action) {
+          switch (action) {
+            case _TileAction.rename: onRename();
+            case _TileAction.delete: onDelete();
+          }
+        },
       ),
       onTap: onToggle,
     );

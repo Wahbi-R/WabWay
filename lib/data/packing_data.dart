@@ -19,10 +19,10 @@ class PackingItem {
   final String? packedBy;    // userId
   final int sortOrder;
 
-  PackingItem copyWith({bool? isPacked, String? packedBy}) => PackingItem(
+  PackingItem copyWith({String? title, bool? isPacked, String? packedBy}) => PackingItem(
         id: id,
         tripId: tripId,
-        title: title,
+        title: title ?? this.title,
         isPacked: isPacked ?? this.isPacked,
         createdBy: createdBy,
         assignedTo: assignedTo,

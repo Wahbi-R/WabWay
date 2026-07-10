@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 87,
+    label: 'Packing item rename',
+    changes: [
+      'Packing items now have a menu — tap the three-dot icon to rename or delete an item',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 86,
     label: 'Link editing',
     changes: [

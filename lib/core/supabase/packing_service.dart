@@ -44,6 +44,13 @@ abstract final class PackingService {
     }).eq('id', itemId);
   }
 
+  static Future<void> renameItem(String itemId, String title) async {
+    await supabase
+        .from('packing_items')
+        .update({'title': title.trim()})
+        .eq('id', itemId);
+  }
+
   static Future<void> deleteItem(String itemId) async {
     await supabase.from('packing_items').delete().eq('id', itemId);
   }

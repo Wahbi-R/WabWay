@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/supabase/doc_service.dart';
@@ -318,6 +319,8 @@ class _MetaCard extends StatelessWidget {
                   rows[i].$2 == 'Time' ||
                   rows[i].$2 == 'Check-in' ||
                   rows[i].$2 == 'Check-out',
+              copyable: rows[i].$2 == 'Confirmation' ||
+                  rows[i].$2 == 'Address',
             ),
           ],
         ],
@@ -332,16 +335,18 @@ class _MetaRow extends StatelessWidget {
     required this.label,
     required this.value,
     this.isMono = false,
+    this.copyable = false,
   });
 
   final IconData icon;
   final String label;
   final String value;
   final bool isMono;
+  final bool copyable;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    final row = Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(icon, size: 16, color: kColorInkSoft),
@@ -362,7 +367,23 @@ class _MetaRow extends StatelessWidget {
             textAlign: TextAlign.end,
           ),
         ),
+        if (copyable) ...[
+          const SizedBox(width: kSpace2),
+          const Icon(Icons.copy_rounded, size: 12, color: kColorInkSoft),
+        ],
       ],
+    );
+    if (!copyable) return row;
+    return GestureDetector(
+      onTap: () async {
+        await Clipboard.setData(ClipboardData(text: value));
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Copied'), duration: Duration(seconds: 2)),
+          );
+        }
+      },
+      child: row,
     );
   }
 }

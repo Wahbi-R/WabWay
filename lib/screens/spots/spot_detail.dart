@@ -275,21 +275,33 @@ class _SpotDetailContentState extends State<SpotDetailContent> {
                 ],
               ),
 
-              // ── Address line (if from dataset)
+              // ── Address line (if from dataset) — tap to copy
               if (widget.spot.address != null) ...[
                 const SizedBox(height: kSpace1),
-                Row(
-                  children: [
-                    const SizedBox(width: 18),
-                    Expanded(
-                      child: Text(
-                        widget.spot.address!,
-                        style: kStyleCaption.copyWith(color: kColorInkSoft),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                GestureDetector(
+                  onTap: () async {
+                    await Clipboard.setData(ClipboardData(text: widget.spot.address!));
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Address copied'), duration: Duration(seconds: 2)),
+                      );
+                    }
+                  },
+                  child: Row(
+                    children: [
+                      const SizedBox(width: 18),
+                      Expanded(
+                        child: Text(
+                          widget.spot.address!,
+                          style: kStyleCaption.copyWith(color: kColorInkSoft),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: kSpace2),
+                      const Icon(Icons.copy_rounded, size: 12, color: kColorInkSoft),
+                    ],
+                  ),
                 ),
               ],
               const SizedBox(height: kSpace4),

@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 60,
+    label: 'Copy address & confirmation number',
+    changes: [
+      'Tap a spot address to copy it — handy for pasting into Maps or a message on the go',
+      'Travel item confirmation numbers and addresses now have a copy icon — one tap copies to clipboard',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 59,
     label: "Today's agenda on home",
     changes: [

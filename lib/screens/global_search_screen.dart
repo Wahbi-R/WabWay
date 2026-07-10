@@ -106,6 +106,9 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
     super.dispose();
   }
 
+  // All five data sources are fetched in parallel so the search screen is
+  // ready in one round-trip instead of five sequential ones. The order of
+  // results[0..4] must match the order of the Future.wait list.
   Future<void> _loadAll() async {
     try {
       final results = await Future.wait([
@@ -153,6 +156,8 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
 
     for (final s in _spots) {
       if (m(s.name) || m(s.city) || m(s.notes) || m(s.area)) {
+        // Capture loop variables before the closure to avoid late-binding bugs
+        // where every result would navigate to the last item in the list.
         final spot = s;
         final docs = List<TripDocument>.unmodifiable(_docs);
         out.add(_Result(

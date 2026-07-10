@@ -8,7 +8,7 @@ import '../../core/ocr/itinerary_scanner.dart';
 import '../../core/places/google_maps_parser.dart';
 import '../../core/places/listing_parser.dart';
 import '../../core/places/social_place_extractor.dart';
-import '../../core/platform/platform_file.dart'
+import '../../core/platform/platform_file.dart';
 import '../../core/share/file_type_registry.dart';
 import '../../core/auth/profile_state.dart';
 import '../../core/supabase/doc_service.dart';

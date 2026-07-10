@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 44,
+    label: 'Code comments pass',
+    changes: [
+      'Added human-style comments to money_screen, global_search_screen, links_screen, travel_screen, and map_screen explaining non-obvious logic such as the parallel fetch strategy, closure capture pattern, and silent-reload debounce',
+      'Fixed missing semicolon on an import in incoming_share_screen that was causing a parse error',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 43,
     label: 'Travel search',
     changes: [

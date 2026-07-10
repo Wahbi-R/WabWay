@@ -216,6 +216,10 @@ class _MoneyScreenState extends State<MoneyScreen> {
   }
 
   // ── Derived state ─────────────────────────────────────────────────────────────
+  //
+  // _filteredReceipts is the single source of truth for what the list shows.
+  // Sort is applied after the category filter so you never see "Newest first"
+  // mixed in with a filtered subset that includes a different sort order.
 
   List<Receipt> get _filteredReceipts {
     final base = _filterCategory == null
@@ -548,6 +552,8 @@ class _MoneyScreenState extends State<MoneyScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text('Money', style: kStyleTitle),
+              // Orange "N pending" badge appears when receipts were added while
+              // offline and are still waiting in the local sync queue.
               if (_pendingSyncCount > 0) ...[
                 const SizedBox(width: 8),
                 Container(

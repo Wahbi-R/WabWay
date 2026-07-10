@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 40,
+    label: 'Spending by category',
+    changes: [
+      'A spending breakdown card now appears at the top of the Receipts tab when your trip has expenses in more than one category — shows each category\'s total and a mini progress bar so you can see where the money went at a glance',
+      'The breakdown uses the home-currency equivalent for all amounts, so mixed-currency trips still show a consistent total',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 39,
     label: 'Links filter + map polish',
     changes: [

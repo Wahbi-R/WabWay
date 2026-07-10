@@ -367,6 +367,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
       final filtered = _filteredReceipts;
       return Column(
         children: [
+          _SpendingSummaryCard(receipts: _receipts, homeCurrency: _homeCurrency),
           _ReceiptFilterStrip(
             selected: _filterCategory,
             receipts: _receipts,
@@ -557,6 +558,8 @@ class _MoneyScreenState extends State<MoneyScreen> {
                   )
                 : Column(
                     children: [
+                      _SpendingSummaryCard(
+                          receipts: _receipts, homeCurrency: _homeCurrency),
                       _ReceiptFilterStrip(
                         selected: _filterCategory,
                         receipts: _receipts,
@@ -796,6 +799,89 @@ class _DesktopTabChip extends StatelessWidget {
             color: selected ? kColorPrimaryDark : kColorInkSoft,
             fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Spending summary by category ────────────────────────────────────────────
+//
+// Shows a compact card with total spend and per-category bars using homeAmount
+// (the locked home-currency equivalent). Hidden when all receipts are in one
+// category — it only adds value when there's something to compare.
+
+class _SpendingSummaryCard extends StatelessWidget {
+  const _SpendingSummaryCard({
+    required this.receipts,
+    required this.homeCurrency,
+  });
+
+  final List<Receipt> receipts;
+  final String homeCurrency;
+
+  @override
+  Widget build(BuildContext context) {
+    final Map<ReceiptCategory, double> totals = {};
+    for (final r in receipts) {
+      totals[r.category] = (totals[r.category] ?? 0.0) + r.homeAmount;
+    }
+    if (totals.length < 2) return const SizedBox.shrink();
+
+    final grandTotal = receipts.fold(0.0, (s, r) => s + r.homeAmount);
+    final sorted = totals.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(kSpace4, kSpace4, kSpace4, 0),
+      child: WabwayCard(
+        padding: const EdgeInsets.symmetric(horizontal: kSpace4, vertical: kSpace3),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text('Spending by category',
+                    style: kStyleCaption.copyWith(color: kColorInkSoft)),
+                const Spacer(),
+                Text(fmtAmount(grandTotal, homeCurrency),
+                    style: kStyleBodySemibold),
+              ],
+            ),
+            const SizedBox(height: kSpace3),
+            ...sorted.map((e) {
+              final pct = grandTotal > 0 ? e.value / grandTotal : 0.0;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: kSpace2),
+                child: Row(
+                  children: [
+                    Icon(e.key.icon, size: 12, color: e.key.color),
+                    const SizedBox(width: kSpace2),
+                    Expanded(
+                      child: Text(e.key.label,
+                          style: kStyleCaption.copyWith(color: kColorInkSoft)),
+                    ),
+                    Text(fmtAmount(e.value, homeCurrency),
+                        style: kStyleCaptionMedium),
+                    const SizedBox(width: kSpace3),
+                    // Mini bar showing proportion of total spend.
+                    SizedBox(
+                      width: 48,
+                      child: ClipRRect(
+                        borderRadius: kRadiusPill,
+                        child: LinearProgressIndicator(
+                          value: pct,
+                          backgroundColor: e.key.softColor,
+                          color: e.key.color,
+                          minHeight: 4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
         ),
       ),
     );

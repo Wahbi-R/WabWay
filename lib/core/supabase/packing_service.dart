@@ -62,6 +62,17 @@ abstract final class PackingService {
     await supabase.from('packing_items').delete().eq('id', itemId);
   }
 
+  static Future<void> reorderItems(List<PackingItem> ordered) async {
+    if (ordered.isEmpty) return;
+    await supabase.from('packing_items').upsert(
+      ordered.asMap().entries.map((e) => {
+        'id': e.value.id,
+        'sort_order': e.key,
+      }).toList(),
+      onConflict: 'id',
+    );
+  }
+
   static RealtimeChannel subscribe(
     String tripId,
     void Function() onChanged,

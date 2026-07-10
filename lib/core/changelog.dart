@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 95,
+    label: 'Packing list reorder',
+    changes: [
+      'Drag the ≡ handle on any unpacked packing item to rearrange it — order is saved for everyone',
+      'Searching hides handles to avoid confusion while filtering',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 94,
     label: 'Spot status quick actions',
     changes: [

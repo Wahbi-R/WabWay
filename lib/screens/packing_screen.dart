@@ -181,54 +181,102 @@ class _PackingScreenState extends State<PackingScreen> {
     _load(silent: true);
   }
 
+  void _reorder(int oldIndex, int newIndex, List<PackingItem> unpacked) {
+    if (newIndex > oldIndex) newIndex -= 1;
+    final moved = unpacked.removeAt(oldIndex);
+    unpacked.insert(newIndex, moved);
+    final packed = _items.where((i) => i.isPacked).toList();
+    setState(() => _items = [...unpacked, ...packed]);
+    PackingService.reorderItems(unpacked).catchError((_) => _load(silent: true));
+  }
+
   Widget _buildList() {
-    final visible  = _filtered;
-    final unpacked = visible.where((i) => !i.isPacked).toList();
-    final packed   = visible.where((i) => i.isPacked).toList();
+    final visible     = _filtered;
+    final canReorder  = _search.isEmpty;
+    final unpacked    = canReorder
+        ? _items.where((i) => !i.isPacked).toList()
+        : visible.where((i) => !i.isPacked).toList();
+    final packed      = visible.where((i) => i.isPacked).toList();
 
-    // Build a flat entry list: unpacked items, then an optional "Packed" header
-    // + packed items. A null entry is used as the section header sentinel.
-    final entries = <PackingItem?>[];
-    entries.addAll(unpacked.map((i) => i));
-    if (packed.isNotEmpty) {
-      entries.add(null); // section header
-      entries.addAll(packed.map((i) => i));
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(vertical: kSpace3),
-      itemCount: entries.length,
-      itemBuilder: (_, i) {
-        final entry = entries[i];
-        if (entry == null) {
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(kSpace4, kSpace4, kSpace4, kSpace2),
-            child: Text(
-              'Packed (${packed.length})',
-              style: kStyleCaptionMedium.copyWith(color: kColorInkSoft),
-            ),
-          );
-        }
-        final isLast = i == entries.length - 1 ||
-            (i < entries.length - 1 && entries[i + 1] == null);
-        return Column(
-          children: [
-            _PackingTile(
-              item: entry,
-              onToggle: () => _toggle(entry),
-              onAssign: () => _assign(entry),
-              onRename: () => _rename(entry),
-              onDelete: () => _delete(entry),
-            ),
-            if (!isLast)
-              const Divider(
-                height: 1,
-                indent: kSpace4 + 40 + kSpace3,
-                endIndent: kSpace4,
-              ),
-          ],
+    Widget tile(PackingItem entry, {int? index, bool showHandle = false}) =>
+        _PackingTile(
+          key: ValueKey(entry.id),
+          item: entry,
+          onToggle: () => _toggle(entry),
+          onAssign: () => _assign(entry),
+          onRename: () => _rename(entry),
+          onDelete: () => _delete(entry),
+          index: index,
+          showHandle: showHandle,
         );
-      },
+
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.only(top: kSpace3),
+          sliver: SliverReorderableList(
+            itemCount: unpacked.length,
+            itemBuilder: (_, i) {
+              final entry = unpacked[i];
+              final isLast = i == unpacked.length - 1;
+              return KeyedSubtree(
+                key: ValueKey(entry.id),
+                child: Column(
+                  children: [
+                    tile(entry, index: i, showHandle: canReorder),
+                    if (!isLast)
+                      const Divider(
+                        height: 1,
+                        indent: kSpace4 + 40 + kSpace3,
+                        endIndent: kSpace4,
+                      ),
+                  ],
+                ),
+              );
+            },
+            onReorder: (oldIdx, newIdx) =>
+                _reorder(oldIdx, newIdx, List.of(unpacked)),
+            proxyDecorator: (child, _, animation) => Material(
+              elevation: 4,
+              shadowColor: kColorInk.withValues(alpha: 0.12),
+              borderRadius: kRadiusMd,
+              child: child,
+            ),
+          ),
+        ),
+        if (packed.isNotEmpty) ...[
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(kSpace4, kSpace4, kSpace4, kSpace2),
+              child: Text(
+                'Packed (${packed.length})',
+                style: kStyleCaptionMedium.copyWith(color: kColorInkSoft),
+              ),
+            ),
+          ),
+          SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (_, i) {
+                final entry = packed[i];
+                final isLast = i == packed.length - 1;
+                return Column(
+                  children: [
+                    tile(entry),
+                    if (!isLast)
+                      const Divider(
+                        height: 1,
+                        indent: kSpace4 + 40 + kSpace3,
+                        endIndent: kSpace4,
+                      ),
+                  ],
+                );
+              },
+              childCount: packed.length,
+            ),
+          ),
+        ],
+        const SliverPadding(padding: EdgeInsets.only(bottom: kSpace8)),
+      ],
     );
   }
 
@@ -330,11 +378,14 @@ enum _TileAction { assign, rename, delete }
 
 class _PackingTile extends StatelessWidget {
   const _PackingTile({
+    super.key,
     required this.item,
     required this.onToggle,
     required this.onAssign,
     required this.onRename,
     required this.onDelete,
+    this.index,
+    this.showHandle = false,
   });
 
   final PackingItem item;
@@ -342,6 +393,8 @@ class _PackingTile extends StatelessWidget {
   final VoidCallback onAssign;
   final VoidCallback onRename;
   final VoidCallback onDelete;
+  final int? index;
+  final bool showHandle;
 
   @override
   Widget build(BuildContext context) {
@@ -409,27 +462,40 @@ class _PackingTile extends StatelessWidget {
               ),
             )
           : null,
-      trailing: PopupMenuButton<_TileAction>(
-        icon: const Icon(Icons.more_vert_rounded, size: 18, color: kColorInkSoft),
-        padding: EdgeInsets.zero,
-        itemBuilder: (_) => [
-          PopupMenuItem(
-            value: _TileAction.assign,
-            child: Text(alreadyAssigned ? 'Reassign' : 'Assign to...'),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          PopupMenuButton<_TileAction>(
+            icon: const Icon(Icons.more_vert_rounded, size: 18, color: kColorInkSoft),
+            padding: EdgeInsets.zero,
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: _TileAction.assign,
+                child: Text(alreadyAssigned ? 'Reassign' : 'Assign to...'),
+              ),
+              const PopupMenuItem(value: _TileAction.rename, child: Text('Rename')),
+              PopupMenuItem(
+                value: _TileAction.delete,
+                child: Text('Delete', style: TextStyle(color: kColorDanger)),
+              ),
+            ],
+            onSelected: (action) {
+              switch (action) {
+                case _TileAction.assign: onAssign();
+                case _TileAction.rename: onRename();
+                case _TileAction.delete: onDelete();
+              }
+            },
           ),
-          const PopupMenuItem(value: _TileAction.rename, child: Text('Rename')),
-          PopupMenuItem(
-            value: _TileAction.delete,
-            child: Text('Delete', style: TextStyle(color: kColorDanger)),
-          ),
+          if (showHandle && index != null)
+            ReorderableDragStartListener(
+              index: index!,
+              child: const Padding(
+                padding: EdgeInsets.only(left: 4),
+                child: Icon(Icons.drag_handle_rounded, size: 18, color: kColorInkSoft),
+              ),
+            ),
         ],
-        onSelected: (action) {
-          switch (action) {
-            case _TileAction.assign: onAssign();
-            case _TileAction.rename: onRename();
-            case _TileAction.delete: onDelete();
-          }
-        },
       ),
       onTap: onToggle,
     );

@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 63,
+    label: 'Emergency info card',
+    changes: [
+      'New Emergency Info screen under Settings: store insurance, card emergency line, embassy contacts, nearest hospital — tap phone numbers to dial, tap codes to copy',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 62,
     label: 'Offline currency converter',
     changes: [

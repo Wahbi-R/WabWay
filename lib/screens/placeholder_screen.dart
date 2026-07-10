@@ -7,6 +7,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
 import '../widgets/widgets.dart';
+import 'emergency_screen.dart';
 import 'members/invite_sheet.dart';
 import 'trips/trip_settings_sheet.dart';
 
@@ -93,6 +94,15 @@ class SettingsScreen extends StatelessWidget {
                       icon: Icons.person_add_rounded,
                       label: 'Invite members',
                       onTap: () => showInviteSheet(ctx, tripId: trip.id),
+                    ),
+                    const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
+                    _SettingsTile(
+                      icon: Icons.health_and_safety_rounded,
+                      label: 'Emergency info',
+                      onTap: () => Navigator.push(
+                        ctx,
+                        MaterialPageRoute(builder: (_) => const EmergencyScreen()),
+                      ),
                     ),
                   ],
                 ),

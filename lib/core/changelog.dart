@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 79,
+    label: 'Links in global search',
+    changes: [
+      'Saved links now appear in global search — search by title, domain, URL, or notes; tap to open in browser',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 78,
     label: 'Duplicate receipt',
     changes: [

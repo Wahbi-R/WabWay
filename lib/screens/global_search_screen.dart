@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../core/supabase/accommodation_service.dart';
 import '../core/supabase/doc_service.dart';
+import '../core/supabase/links_service.dart';
 import '../core/supabase/money_service.dart';
 import '../core/supabase/packing_service.dart';
 import '../core/supabase/plan_service.dart';
@@ -9,6 +11,7 @@ import '../core/supabase/travel_service.dart';
 import '../core/trip/app_trip_member.dart';
 import '../data/accommodation_data.dart';
 import '../data/docs_data.dart';
+import '../data/links_data.dart';
 import '../data/money_data.dart';
 import '../data/packing_data.dart';
 import '../data/plan_data.dart';
@@ -50,7 +53,7 @@ Future<void> showGlobalSearch(
 
 // ─── Result model ─────────────────────────────────────────────────────────────
 
-enum _ResultKind { spot, doc, travel, receipt, plan, stay, packing }
+enum _ResultKind { spot, doc, travel, receipt, plan, stay, packing, link }
 
 class _Result {
   const _Result({
@@ -97,6 +100,7 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
   List<Receipt> _receipts = [];
   List<Accommodation> _stays = [];
   List<PackingItem> _packingItems = [];
+  List<TripLink> _links = [];
   // Full day objects kept so we can find the containing day for plan items.
   List<TripDay> _planDays = [];
   List<ItineraryItem> _planItems = [];
@@ -113,9 +117,8 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
     super.dispose();
   }
 
-  // All six data sources are fetched in parallel so the search screen is
-  // ready in one round-trip instead of six sequential ones. The order of
-  // results[0..5] must match the order of the Future.wait list.
+  // All data sources are fetched in parallel so the search screen is ready
+  // in one round-trip. The order of results must match the Future.wait list.
   Future<void> _loadAll() async {
     try {
       final results = await Future.wait([
@@ -126,6 +129,7 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
         PlanService.loadAll(widget.tripId),
         AccommodationService.loadAll(widget.tripId),
         PackingService.fetchAll(widget.tripId),
+        LinksService.loadLinks(widget.tripId),
       ]);
       if (!mounted) return;
       final days = results[4] as List<TripDay>;
@@ -138,6 +142,7 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
         _planItems    = days.expand((d) => d.items).toList();
         _stays        = results[5] as List<Accommodation>;
         _packingItems = results[6] as List<PackingItem>;
+        _links        = results[7] as List<TripLink>;
         _loading      = false;
       });
     } catch (_) {
@@ -325,6 +330,22 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
       }
     }
 
+    for (final l in _links) {
+      if (m(l.title) || m(l.domain) || m(l.url) || m(l.notes)) {
+        final link = l;
+        out.add(_Result(
+          kind:     _ResultKind.link,
+          title:    l.title,
+          subtitle: '${l.category.label} · ${l.domain}',
+          icon:     Icons.link_rounded,
+          onTap: (_) => launchUrl(
+            Uri.parse(link.url),
+            mode: LaunchMode.externalApplication,
+          ),
+        ));
+      }
+    }
+
     return out;
   }
 
@@ -336,6 +357,7 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
     _ResultKind.plan:    'Itinerary',
     _ResultKind.stay:    'Stays',
     _ResultKind.packing: 'Packing list',
+    _ResultKind.link:    'Links',
   };
 
   @override
@@ -395,7 +417,7 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
                     icon: Icons.search_rounded,
                     title: 'Search across your trip',
                     description:
-                        'Type to search spots, documents, travel, receipts, and itinerary items.',
+                        'Type to search spots, documents, travel, receipts, itinerary items, and links.',
                   ),
                 )
               : results.isEmpty

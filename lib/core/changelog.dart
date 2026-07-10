@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 43,
+    label: 'Travel search',
+    changes: [
+      'Search travel items by title, location, destination, confirmation number, or notes — the search bar appears at the top of the Travel screen',
+      'Search and type filter (Flight, Hotel, Train, etc.) work together so you can find, for example, all trains to Osaka',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 42,
     label: 'Receipt sorting',
     changes: [

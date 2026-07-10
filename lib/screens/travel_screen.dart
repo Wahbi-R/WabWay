@@ -39,7 +39,10 @@ class _TravelScreenState extends State<TravelScreen> {
   Timer? _debounce;
 
   TravelItemType? _filter;
+  String _search = '';
   String? _selectedId;
+
+  final _searchCtrl = TextEditingController();
 
   TravelItem? get _selectedItem =>
       _selectedId == null ? null : _items.where((i) => i.id == _selectedId).firstOrNull;
@@ -47,9 +50,17 @@ class _TravelScreenState extends State<TravelScreen> {
   // Sorted chronologically so the list reads like the trip timeline.
   // Items without a date (draft bookings) fall to the end.
   List<TravelItem> get _filtered {
-    final items = _filter == null
+    var items = _filter == null
         ? List<TravelItem>.from(_items)
         : _items.where((i) => i.type == _filter).toList();
+    final q = _search.toLowerCase().trim();
+    if (q.isNotEmpty) {
+      bool m(String? s) => s != null && s.toLowerCase().contains(q);
+      items = items
+          .where((i) => m(i.title) || m(i.location) || m(i.destination) ||
+              m(i.confirmationNumber) || m(i.notes))
+          .toList();
+    }
     items.sort((a, b) {
       if (a.date == null && b.date == null) return 0;
       if (a.date == null) return 1;
@@ -75,6 +86,7 @@ class _TravelScreenState extends State<TravelScreen> {
   void dispose() {
     _channel?.unsubscribe();
     _debounce?.cancel();
+    _searchCtrl.dispose();
     super.dispose();
   }
 
@@ -261,6 +273,14 @@ class _TravelScreenState extends State<TravelScreen> {
                   width: 420,
                   child: Column(
                     children: [
+                      _TravelSearchBar(
+                        controller: _searchCtrl,
+                        onChanged: (v) => setState(() => _search = v),
+                        onClear: () {
+                          _searchCtrl.clear();
+                          setState(() => _search = '');
+                        },
+                      ),
                       _FilterChips(
                         selected: _filter,
                         onSelect: (t) => setState(() {
@@ -316,6 +336,14 @@ class _TravelScreenState extends State<TravelScreen> {
       ),
       body: Column(
         children: [
+          _TravelSearchBar(
+            controller: _searchCtrl,
+            onChanged: (v) => setState(() => _search = v),
+            onClear: () {
+              _searchCtrl.clear();
+              setState(() => _search = '');
+            },
+          ),
           _FilterChips(
             selected: _filter,
             onSelect: (t) => setState(() => _filter = _filter == t ? null : t),
@@ -342,7 +370,7 @@ class _TravelScreenState extends State<TravelScreen> {
 
     if (items.isEmpty) {
       return Center(
-        child: _filter == null
+        child: _filter == null && _search.isEmpty
             ? Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -362,7 +390,13 @@ class _TravelScreenState extends State<TravelScreen> {
                   ],
                 ],
               )
-            : WabwayEmptyState(
+            : _search.isNotEmpty
+                ? WabwayEmptyState(
+                    icon: Icons.search_off_rounded,
+                    title: 'No results for "$_search"',
+                    description: 'Try a different search term.',
+                  )
+                : WabwayEmptyState(
                 icon: _filter!.icon,
                 title: 'No ${_filter!.label.toLowerCase()}s',
                 description:
@@ -455,6 +489,62 @@ class _DesktopTravelBar extends StatelessWidget {
             onPressed: onAdd,
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Search bar ───────────────────────────────────────────────────────────────
+
+class _TravelSearchBar extends StatelessWidget {
+  const _TravelSearchBar({
+    required this.controller,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(kSpace4, kSpace3, kSpace4, 0),
+      child: TextField(
+        controller: controller,
+        style: kStyleBody,
+        decoration: InputDecoration(
+          hintText: 'Search travel…',
+          hintStyle: kStyleBody.copyWith(color: kColorInkSoft),
+          prefixIcon:
+              const Icon(Icons.search_rounded, size: 18, color: kColorInkSoft),
+          suffixIcon: controller.text.isNotEmpty
+              ? GestureDetector(
+                  onTap: onClear,
+                  child: const Icon(Icons.close_rounded,
+                      size: 16, color: kColorInkSoft),
+                )
+              : null,
+          filled: true,
+          fillColor: kColorBgRaised,
+          border: const OutlineInputBorder(
+            borderRadius: kRadiusMd,
+            borderSide: BorderSide(color: kColorBorder),
+          ),
+          enabledBorder: const OutlineInputBorder(
+            borderRadius: kRadiusMd,
+            borderSide: BorderSide(color: kColorBorder),
+          ),
+          focusedBorder: const OutlineInputBorder(
+            borderRadius: kRadiusMd,
+            borderSide: BorderSide(color: kColorPrimary),
+          ),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: kSpace3, vertical: kSpace2),
+          isDense: true,
+        ),
+        onChanged: onChanged,
       ),
     );
   }

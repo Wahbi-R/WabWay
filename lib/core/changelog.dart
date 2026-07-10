@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 53,
+    label: 'Search stays in global search',
+    changes: [
+      'Global search now includes your saved accommodations — search by hotel name, city, address, or notes and tap to open the stay detail',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 52,
     label: 'Day completion badge',
     changes: [

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import '../core/supabase/accommodation_service.dart';
 import '../core/supabase/doc_service.dart';
 import '../core/supabase/money_service.dart';
 import '../core/supabase/plan_service.dart';
 import '../core/supabase/spot_service.dart';
 import '../core/supabase/travel_service.dart';
 import '../core/trip/app_trip_member.dart';
+import '../data/accommodation_data.dart';
 import '../data/docs_data.dart';
 import '../data/money_data.dart';
 import '../data/plan_data.dart';
@@ -14,6 +16,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
 import '../widgets/widgets.dart';
+import 'accommodations/add_accommodation_sheet.dart';
 import 'docs/doc_detail.dart';
 import 'money/receipt_detail.dart';
 import 'plan/item_detail.dart';
@@ -45,7 +48,7 @@ Future<void> showGlobalSearch(
 
 // ─── Result model ─────────────────────────────────────────────────────────────
 
-enum _ResultKind { spot, doc, travel, receipt, plan }
+enum _ResultKind { spot, doc, travel, receipt, plan, stay }
 
 class _Result {
   const _Result({
@@ -90,6 +93,7 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
   List<TripDocument> _docs = [];
   List<TravelItem> _travel = [];
   List<Receipt> _receipts = [];
+  List<Accommodation> _stays = [];
   // Full day objects kept so we can find the containing day for plan items.
   List<TripDay> _planDays = [];
   List<ItineraryItem> _planItems = [];
@@ -106,9 +110,9 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
     super.dispose();
   }
 
-  // All five data sources are fetched in parallel so the search screen is
-  // ready in one round-trip instead of five sequential ones. The order of
-  // results[0..4] must match the order of the Future.wait list.
+  // All six data sources are fetched in parallel so the search screen is
+  // ready in one round-trip instead of six sequential ones. The order of
+  // results[0..5] must match the order of the Future.wait list.
   Future<void> _loadAll() async {
     try {
       final results = await Future.wait([
@@ -117,6 +121,7 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
         TravelService.loadItems(widget.tripId),
         MoneyService.loadReceipts(widget.tripId),
         PlanService.loadAll(widget.tripId),
+        AccommodationService.loadAll(widget.tripId),
       ]);
       if (!mounted) return;
       final days = results[4] as List<TripDay>;
@@ -127,6 +132,7 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
         _receipts  = results[3] as List<Receipt>;
         _planDays  = days;
         _planItems = days.expand((d) => d.items).toList();
+        _stays     = results[5] as List<Accommodation>;
         _loading   = false;
       });
     } catch (_) {
@@ -277,6 +283,31 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
       }
     }
 
+    for (final a in _stays) {
+      if (m(a.name) || m(a.city) || m(a.address) || m(a.notes)) {
+        final stay = a;
+        out.add(_Result(
+          kind:     _ResultKind.stay,
+          title:    a.name,
+          subtitle: [a.city.isNotEmpty ? a.city : null, a.status.label]
+              .whereType<String>()
+              .join(' · '),
+          icon:     Icons.hotel_rounded,
+          onTap: (ctx) => showModalBottomSheet<void>(
+            context: ctx,
+            isScrollControlled: true,
+            useSafeArea: true,
+            backgroundColor: Colors.transparent,
+            builder: (_) => AddAccommodationSheet(
+              tripId:  widget.tripId,
+              userId:  widget.userId,
+              editing: stay,
+            ),
+          ),
+        ));
+      }
+    }
+
     return out;
   }
 
@@ -286,6 +317,7 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
     _ResultKind.travel:  'Travel',
     _ResultKind.receipt: 'Receipts',
     _ResultKind.plan:    'Itinerary',
+    _ResultKind.stay:    'Stays',
   };
 
   @override
@@ -310,7 +342,7 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
           autofocus: true,
           style: kStyleBody,
           decoration: InputDecoration(
-            hintText: 'Search spots, docs, travel, receipts…',
+            hintText: 'Search spots, stays, travel, docs, receipts…',
             hintStyle: kStyleBody.copyWith(color: kColorInkSoft),
             border: InputBorder.none,
           ),

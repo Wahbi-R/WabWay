@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 65,
+    label: 'Tap to mark done from home',
+    changes: [
+      "Tap any item on today's home card to mark it done — no need to navigate to Plan; update is instant with automatic rollback if offline",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 64,
     label: 'Packing list',
     changes: [

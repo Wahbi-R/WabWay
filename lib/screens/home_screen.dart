@@ -782,14 +782,40 @@ class _UpcomingCard extends StatelessWidget {
 
 // ─── Today's agenda card (shown when today is a plan day) ────────────────────
 
-class _TodayAgendaCard extends StatelessWidget {
+class _TodayAgendaCard extends StatefulWidget {
   const _TodayAgendaCard({required this.day});
   final TripDay day;
 
   @override
+  State<_TodayAgendaCard> createState() => _TodayAgendaCardState();
+}
+
+class _TodayAgendaCardState extends State<_TodayAgendaCard> {
+  // Local done-state overrides for optimistic toggle; cleared on rebuild.
+  late Map<String, bool> _doneOverride;
+
+  @override
+  void initState() {
+    super.initState();
+    _doneOverride = {};
+  }
+
+  bool _isDone(ItineraryItem item) => _doneOverride[item.id] ?? item.isDone;
+
+  Future<void> _toggle(ItineraryItem item) async {
+    final newDone = !_isDone(item);
+    setState(() => _doneOverride[item.id] = newDone);
+    try {
+      await PlanService.toggleDone(item.id, done: newDone);
+    } catch (_) {
+      if (mounted) setState(() => _doneOverride[item.id] = !newDone);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final items     = day.sortedItems;
-    final doneCount = items.where((i) => i.isDone).length;
+    final items     = widget.day.sortedItems;
+    final doneCount = items.where(_isDone).length;
     final total     = items.length;
 
     return Column(
@@ -821,7 +847,7 @@ class _TodayAgendaCard extends StatelessWidget {
                     const Icon(Icons.calendar_month_rounded, size: 14, color: kColorInkSoft),
                     const SizedBox(width: kSpace2),
                     Text(
-                      'Day ${day.dayNumber}  ·  ${day.city}  ·  ${fmtDate(day.date)}',
+                      'Day ${widget.day.dayNumber}  ·  ${widget.day.city}  ·  ${fmtDate(widget.day.date)}',
                       style: kStyleCaption.copyWith(color: kColorInkSoft),
                     ),
                   ],
@@ -837,6 +863,7 @@ class _TodayAgendaCard extends StatelessWidget {
                 ...items.asMap().entries.map((e) {
                   final i    = e.key;
                   final item = e.value;
+                  final done   = _isDone(item);
                   final isLast = i == items.length - 1;
                   return Column(
                     children: [
@@ -845,26 +872,27 @@ class _TodayAgendaCard extends StatelessWidget {
                       ListTile(
                         contentPadding: const EdgeInsets.symmetric(
                             horizontal: kSpace4, vertical: kSpace1),
+                        onTap: () => _toggle(item),
                         leading: Container(
                           width: 28,
                           height: 28,
                           decoration: BoxDecoration(
-                            color: item.isDone
+                            color: done
                                 ? kColorPrimary.withValues(alpha: 0.12)
                                 : item.type.color.withValues(alpha: 0.12),
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
-                            item.isDone ? Icons.check_rounded : item.type.icon,
+                            done ? Icons.check_rounded : item.type.icon,
                             size: 14,
-                            color: item.isDone ? kColorPrimary : item.type.color,
+                            color: done ? kColorPrimary : item.type.color,
                           ),
                         ),
                         title: Text(
                           item.title,
                           style: kStyleBodyMedium.copyWith(
-                            decoration: item.isDone ? TextDecoration.lineThrough : null,
-                            color: item.isDone ? kColorInkSoft : kColorInk,
+                            decoration: done ? TextDecoration.lineThrough : null,
+                            color: done ? kColorInkSoft : kColorInk,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,

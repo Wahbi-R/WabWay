@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import '../../data/share_data.dart';
+import 'file_type_registry.dart';
 
 /// Singleton that bridges Android ACTION_SEND intents to an [IncomingShare].
 ///
@@ -98,9 +99,7 @@ class ShareHandler extends ChangeNotifier {
 
   static ShareContentType _fileContentType(SharedMediaFile f) {
     if (f.type == SharedMediaType.image) return ShareContentType.screenshot;
-    final lower = f.path.toLowerCase();
-    if (lower.endsWith('.pdf')) return ShareContentType.pdfFile;
-    if (lower.endsWith('.csv')) return ShareContentType.csvFile;
-    return ShareContentType.screenshot;
+    final ext = f.path.split('.').last;
+    return FileTypeRegistry.contentTypeFromExt(ext);
   }
 }

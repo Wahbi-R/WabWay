@@ -45,6 +45,7 @@
                     android:host="wabway.wabble.ca"
                     android:pathPrefix="/"/>
             </intent-filter>
+            <!-- ↓ Keep MIME types in sync with FileTypeRegistry in lib/core/share/file_type_registry.dart -->
             <!-- Receive shared text / URLs -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND"/>

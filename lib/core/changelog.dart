@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 29,
+    label: 'CSV import & share support',
+    changes: [
+      'Share a CSV from Google Takeout directly to WabWay — goes straight to the import screen',
+      'WabWay now appears in the share menu for CSV, XLS, and XLSX files',
+      'Picking a CSV in the in-app import picker no longer asks you to pick the file a second time',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 28,
     label: 'Spot country + better Maps import',
     changes: [

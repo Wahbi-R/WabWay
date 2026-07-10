@@ -8,7 +8,8 @@ import '../../core/ocr/itinerary_scanner.dart';
 import '../../core/places/google_maps_parser.dart';
 import '../../core/places/listing_parser.dart';
 import '../../core/places/social_place_extractor.dart';
-import '../../core/platform/platform_file.dart';
+import '../../core/platform/platform_file.dart'
+import '../../core/share/file_type_registry.dart';
 import '../../core/auth/profile_state.dart';
 import '../../core/supabase/doc_service.dart';
 import '../../core/supabase/links_service.dart';
@@ -146,7 +147,7 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
   Future<void> _pickFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'docx', 'xlsx', 'csv', 'webp', 'heic'],
+      allowedExtensions: FileTypeRegistry.shareExtensions,
       withData: true,
     );
     if (result == null || result.files.isEmpty || !mounted) return;
@@ -805,23 +806,8 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
     return contentType == ShareContentType.screenshot ? 'png' : '';
   }
 
-  static ShareContentType _contentTypeFromFile(String? ext) {
-    switch (ext?.toLowerCase()) {
-      case 'pdf':
-        return ShareContentType.pdfFile;
-      case 'jpg':
-      case 'jpeg':
-      case 'png':
-      case 'webp':
-      case 'heic':
-      case 'bmp':
-        return ShareContentType.screenshot;
-      case 'csv':
-        return ShareContentType.csvFile;
-      default:
-        return ShareContentType.blogArticle;
-    }
-  }
+  static ShareContentType _contentTypeFromFile(String? ext) =>
+      FileTypeRegistry.contentTypeFromExt(ext);
 
   static String _titleFromUrl(String url) {
     try {

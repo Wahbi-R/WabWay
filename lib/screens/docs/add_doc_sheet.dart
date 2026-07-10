@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import '../../core/share/file_type_registry.dart';
 import '../../core/supabase/doc_service.dart';
 import '../../data/docs_data.dart';
 import '../../data/spot_data.dart';
@@ -147,7 +148,7 @@ class _AddDocContentState extends State<_AddDocContent> {
   Future<void> _pickFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'docx', 'xlsx', 'webp'],
+      allowedExtensions: FileTypeRegistry.docExtensions,
       withData: true,
     );
     if (result == null || result.files.isEmpty) return;

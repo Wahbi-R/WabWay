@@ -26,8 +26,11 @@ class _AccommodationsScreenState extends State<AccommodationsScreen> {
 
   String? _activeTripId;
   AccommodationStatus? _filterStatus;
+  String _search = '';
   RealtimeChannel? _channel;
   Timer? _debounce;
+
+  final _searchCtrl = TextEditingController();
 
   @override
   void didChangeDependencies() {
@@ -42,6 +45,7 @@ class _AccommodationsScreenState extends State<AccommodationsScreen> {
 
   @override
   void dispose() {
+    _searchCtrl.dispose();
     _debounce?.cancel();
     _channel?.unsubscribe();
     super.dispose();
@@ -85,8 +89,15 @@ class _AccommodationsScreenState extends State<AccommodationsScreen> {
   }
 
   List<Accommodation> get _filtered {
-    if (_filterStatus == null) return _items;
-    return _items.where((a) => a.status == _filterStatus).toList();
+    var list = _filterStatus == null
+        ? _items
+        : _items.where((a) => a.status == _filterStatus).toList();
+    final q = _search.toLowerCase().trim();
+    if (q.isNotEmpty) {
+      bool m(String? s) => s != null && s.toLowerCase().contains(q);
+      list = list.where((a) => m(a.name) || m(a.city) || m(a.address) || m(a.notes)).toList();
+    }
+    return list;
   }
 
   int _count(AccommodationStatus? status) {
@@ -170,6 +181,37 @@ class _AccommodationsScreenState extends State<AccommodationsScreen> {
             pinned: true,
           ),
           SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(kSpace4, kSpace3, kSpace4, 0),
+              child: TextField(
+                controller: _searchCtrl,
+                style: kStyleBody,
+                decoration: InputDecoration(
+                  hintText: 'Search stays…',
+                  hintStyle: kStyleBody.copyWith(color: kColorInkSoft),
+                  prefixIcon: const Icon(Icons.search_rounded, size: 18, color: kColorInkSoft),
+                  suffixIcon: _search.isNotEmpty
+                      ? GestureDetector(
+                          onTap: () {
+                            _searchCtrl.clear();
+                            setState(() => _search = '');
+                          },
+                          child: const Icon(Icons.close_rounded, size: 16, color: kColorInkSoft),
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: kColorBgRaised,
+                  border: const OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorBorder)),
+                  enabledBorder: const OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorBorder)),
+                  focusedBorder: const OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorPrimary)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: kSpace2),
+                  isDense: true,
+                ),
+                onChanged: (v) => setState(() => _search = v),
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
             child: _FilterStrip(
               selected: _filterStatus,
               counts: {
@@ -184,16 +226,26 @@ class _AccommodationsScreenState extends State<AccommodationsScreen> {
           filtered.isEmpty
               ? SliverFillRemaining(
                   child: Center(
-                    child: WabwayEmptyState(
-                      icon: Icons.hotel_rounded,
-                      title: 'No stays yet',
-                      description: 'Share or paste a listing URL to add one.',
-                      action: WabwayButton(
-                        label: 'Add stay',
-                        icon: Icons.add_rounded,
-                        onPressed: () => _openAdd(context),
-                      ),
-                    ),
+                    child: _items.isEmpty
+                        ? WabwayEmptyState(
+                            icon: Icons.hotel_rounded,
+                            title: 'No stays yet',
+                            description: 'Share or paste a listing URL to add one.',
+                            action: WabwayButton(
+                              label: 'Add stay',
+                              icon: Icons.add_rounded,
+                              onPressed: () => _openAdd(context),
+                            ),
+                          )
+                        : WabwayEmptyState(
+                            icon: _search.isNotEmpty ? Icons.search_off_rounded : Icons.hotel_rounded,
+                            title: _search.isNotEmpty
+                                ? 'No results for "$_search"'
+                                : 'No ${_filterStatus?.label ?? ''} stays',
+                            description: _search.isNotEmpty
+                                ? 'Try a different search term.'
+                                : 'Change the filter to see others.',
+                          ),
                   ),
                 )
               : SliverPadding(

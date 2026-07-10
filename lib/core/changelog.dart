@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 47,
+    label: 'Stays search',
+    changes: [
+      'Search accommodations by name, city, address, or notes — the search bar appears above the status filter on the Stays screen',
+      'Search and status filter work together so you can find, for example, all booked stays in Tokyo',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 46,
     label: 'Plan search',
     changes: [

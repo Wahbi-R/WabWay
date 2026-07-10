@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 62,
+    label: 'Offline currency converter',
+    changes: [
+      'Tap the exchange icon on the Money screen to convert any logged currency to your home currency — uses stored receipt rates, works offline',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 61,
     label: 'Quick expense button',
     changes: [

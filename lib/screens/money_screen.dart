@@ -18,6 +18,7 @@ import 'money/add_receipt_sheet.dart';
 import 'money/cash_list_tile.dart';
 import 'money/cash_detail.dart';
 import 'money/add_cash_sheet.dart';
+import 'money/currency_converter_sheet.dart';
 import 'money/settle_up_panel.dart';
 
 enum _MoneyTab { receipts, cash, settleUp }
@@ -617,6 +618,16 @@ class _MoneyScreenState extends State<MoneyScreen> {
                 current: _receiptSort,
                 onChanged: (s) => setState(() => _receiptSort = s),
               ),
+            IconButton(
+              icon: const Icon(Icons.currency_exchange_rounded, size: 20),
+              color: kColorInkSoft,
+              tooltip: 'Currency converter',
+              onPressed: () => showCurrencyConverterSheet(
+                context,
+                homeCurrency: _homeCurrency,
+                receipts: _receipts,
+              ),
+            ),
             if (_tab != _MoneyTab.settleUp)
               IconButton(
                 icon: const Icon(Icons.add_rounded),

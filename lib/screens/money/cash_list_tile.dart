@@ -66,6 +66,15 @@ class CashListTile extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
+                  if (withdrawal.notes != null && withdrawal.notes!.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      withdrawal.notes!,
+                      style: kStyleCaption.copyWith(color: kColorInkSoft),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ],
               ),
             ),

@@ -47,6 +47,8 @@ class _SpotsScreenState extends State<SpotsScreen> {
   String? _activeTripId;
   RealtimeChannel? _realtimeChannel;
   Timer? _debounce;
+  // Tracks spots for which we've already kicked off a thumbnail fetch this session.
+  // Without this, every silent reload would re-request images that already failed.
   final _thumbnailAttempted = <String>{};
 
   String? _selectedId;
@@ -169,6 +171,9 @@ class _SpotsScreenState extends State<SpotsScreen> {
     }
   }
 
+  // Fired after every successful load. Kicks off background Wikipedia lookups
+  // for spots that have no image yet. Each lookup is fire-and-forget — results
+  // stream in over ~1-2 seconds and update the list row by row.
   void _fetchMissingThumbnails(List<Spot> spots) {
     final missing = spots
         .where((s) => s.imageUrl == null && !_thumbnailAttempted.contains(s.id))

@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 38,
+    label: 'Cash withdrawal notes',
+    changes: [
+      'Cash withdrawal notes now show in the list — useful for recording which ATM you used or any transaction details worth remembering',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 37,
     label: 'Tappable activity feed',
     changes: [

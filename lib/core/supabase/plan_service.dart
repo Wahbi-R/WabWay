@@ -276,6 +276,34 @@ abstract final class PlanService {
     }
   }
 
+  // ── Item comments ─────────────────────────────────────────────────────────────
+
+  static Future<List<ItineraryItemComment>> fetchComments(String itemId) async {
+    final rows = await supabase
+        .from('itinerary_item_comments')
+        .select()
+        .eq('item_id', itemId)
+        .order('created_at');
+    return rows.map(ItineraryItemComment.fromMap).toList();
+  }
+
+  static Future<ItineraryItemComment> addComment({
+    required String itemId,
+    required String authorId,
+    required String body,
+  }) async {
+    final row = await supabase
+        .from('itinerary_item_comments')
+        .insert({'item_id': itemId, 'author_id': authorId, 'body': body.trim()})
+        .select()
+        .single();
+    return ItineraryItemComment.fromMap(row);
+  }
+
+  static Future<void> deleteComment(String commentId) async {
+    await supabase.from('itinerary_item_comments').delete().eq('id', commentId);
+  }
+
   // ── Helpers ───────────────────────────────────────────────────────────────────
 
   static String _fmtDate(DateTime d) => isoDate(d);

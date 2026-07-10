@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 70,
+    label: 'Plan item comments',
+    changes: [
+      'Leave notes on any plan item — useful for last-minute updates ("restaurant closed Mondays") the whole group can see',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 69,
     label: 'Mark spots as visited',
     changes: [

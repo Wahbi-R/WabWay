@@ -114,6 +114,33 @@ class ItineraryItem {
       );
 }
 
+// ─── Item comment ─────────────────────────────────────────────────────────────
+
+class ItineraryItemComment {
+  ItineraryItemComment({
+    required this.id,
+    required this.itemId,
+    required this.authorId,
+    required this.body,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String itemId;
+  final String authorId;
+  final String body;
+  final DateTime createdAt;
+
+  factory ItineraryItemComment.fromMap(Map<String, dynamic> m) =>
+      ItineraryItemComment(
+        id:        m['id'] as String,
+        itemId:    m['item_id'] as String,
+        authorId:  m['author_id'] as String,
+        body:      m['body'] as String,
+        createdAt: DateTime.parse(m['created_at'] as String),
+      );
+}
+
 // ─── Trip day ─────────────────────────────────────────────────────────────────
 
 class TripDay {

@@ -1,10 +1,12 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../core/auth/profile_state.dart';
 import '../../core/supabase/doc_service.dart';
+import '../../core/supabase/plan_service.dart';
 import '../../data/plan_data.dart';
 import '../../data/docs_data.dart';
-import '../../data/spot_data.dart';
+import '../../data/spot_data.dart' show Spot, fmtCommentTime;
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
@@ -74,7 +76,7 @@ class ItemDetailScreen extends StatelessWidget {
 
 // â”€â”€â”€ Shared content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-class ItemDetailContent extends StatelessWidget {
+class ItemDetailContent extends StatefulWidget {
   const ItemDetailContent({
     super.key,
     required this.item,
@@ -99,25 +101,77 @@ class ItemDetailContent extends StatelessWidget {
   final VoidCallback? onDuplicate;
 
   @override
+  State<ItemDetailContent> createState() => _ItemDetailContentState();
+}
+
+class _ItemDetailContentState extends State<ItemDetailContent> {
+  List<ItineraryItemComment> _comments = [];
+  bool _commentsLoading = true;
+  bool _commentSubmitting = false;
+  final _commentCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadComments();
+  }
+
+  @override
+  void dispose() {
+    _commentCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadComments() async {
+    final comments = await PlanService.fetchComments(widget.item.id);
+    if (mounted) setState(() { _comments = comments; _commentsLoading = false; });
+  }
+
+  Future<void> _submitComment() async {
+    final body = _commentCtrl.text.trim();
+    if (body.isEmpty || _commentSubmitting) return;
+    final authorId = ProfileState.maybeOf(context)?.id;
+    if (authorId == null) return;
+    setState(() => _commentSubmitting = true);
+    try {
+      final comment = await PlanService.addComment(
+        itemId: widget.item.id,
+        authorId: authorId,
+        body: body,
+      );
+      if (mounted) {
+        setState(() {
+          _comments.add(comment);
+          _commentCtrl.clear();
+          _commentSubmitting = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _commentSubmitting = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final linkedSpot = item.linkedSpotId != null
-        ? spots.where((s) => s.id == item.linkedSpotId).firstOrNull
+    final linkedSpot = widget.item.linkedSpotId != null
+        ? widget.spots.where((s) => s.id == widget.item.linkedSpotId).firstOrNull
         : null;
-    final linkedDocs = item.linkedDocIds
-        .map((id) => docs.where((d) => d.id == id).firstOrNull)
+    final linkedDocs = widget.item.linkedDocIds
+        .map((id) => widget.docs.where((d) => d.id == id).firstOrNull)
         .whereType<TripDocument>()
         .toList();
+    final myName = ProfileState.maybeOf(context)?.displayName ?? 'You';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _ItemHeader(item: item, day: day),
+        _ItemHeader(item: widget.item, day: widget.day),
         Padding(
           padding: const EdgeInsets.all(kSpace4),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _MetaCard(item: item),
+              _MetaCard(item: widget.item),
 
               if (linkedSpot != null) ...[
                 const SizedBox(height: kSpace4),
@@ -129,16 +183,49 @@ class ItemDetailContent extends StatelessWidget {
                 _DocsSection(docs: linkedDocs),
               ],
 
-              if (item.notes != null && item.notes!.isNotEmpty) ...[
+              if (widget.item.notes != null && widget.item.notes!.isNotEmpty) ...[
                 const SizedBox(height: kSpace4),
-                WabwayNotesSection(notes: item.notes!),
+                WabwayNotesSection(notes: widget.item.notes!),
               ],
 
               const SizedBox(height: kSpace4),
               _ActionsSection(
-                item: item, spots: spots, docs: docs, days: days,
-                onDelete: onDelete, onUpdated: onUpdated,
-                onMove: onMove, onDuplicate: onDuplicate,
+                item: widget.item, spots: widget.spots, docs: widget.docs, days: widget.days,
+                onDelete: widget.onDelete, onUpdated: widget.onUpdated,
+                onMove: widget.onMove, onDuplicate: widget.onDuplicate,
+              ),
+
+              // ── Comments ─────────────────────────────────────────────────────
+              const SizedBox(height: kSpace4),
+              const Divider(height: 1),
+              const SizedBox(height: kSpace4),
+              Row(
+                children: [
+                  Text('Comments', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
+                  if (_comments.isNotEmpty) ...[
+                    const SizedBox(width: kSpace2),
+                    WabwayBadge(label: '${_comments.length}', tone: WabwayBadgeTone.neutral),
+                  ],
+                ],
+              ),
+              const SizedBox(height: kSpace3),
+
+              if (_commentsLoading)
+                const Center(child: WabwayLoadingIndicator())
+              else if (_comments.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: kSpace3),
+                  child: Text('No comments yet. Leave a note for the group.', style: kStyleCaption),
+                )
+              else
+                ..._comments.map((c) => _ItemCommentRow(comment: c)),
+
+              const SizedBox(height: kSpace3),
+              _ItemCommentInput(
+                controller: _commentCtrl,
+                myName: myName,
+                loading: _commentSubmitting,
+                onSubmit: _submitComment,
               ),
               const SizedBox(height: kSpace8),
             ],
@@ -774,3 +861,109 @@ class _MoveToDaySheet extends StatelessWidget {
   }
 }
 
+// ─── Item comment widgets ─────────────────────────────────────────────────────
+
+String _commentAuthorName(BuildContext context, String authorId) {
+  final me = ProfileState.maybeOf(context);
+  if (me?.id == authorId) return 'You';
+  return authorId.length >= 8 ? authorId.substring(0, 8) : authorId;
+}
+
+class _ItemCommentRow extends StatelessWidget {
+  const _ItemCommentRow({required this.comment});
+  final ItineraryItemComment comment;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = _commentAuthorName(context, comment.authorId);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: kSpace4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          WabwayAvatar(name: name, size: WabwayAvatarSize.sm),
+          const SizedBox(width: kSpace3),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(name, style: kStyleBodySemibold),
+                    const Spacer(),
+                    Text(fmtCommentTime(comment.createdAt), style: kStyleOverline),
+                  ],
+                ),
+                const SizedBox(height: kSpace1),
+                Text(comment.body, style: kStyleBody),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ItemCommentInput extends StatelessWidget {
+  const _ItemCommentInput({
+    required this.controller,
+    required this.myName,
+    required this.loading,
+    required this.onSubmit,
+  });
+  final TextEditingController controller;
+  final String myName;
+  final bool loading;
+  final VoidCallback onSubmit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        WabwayAvatar(name: myName, size: WabwayAvatarSize.sm),
+        const SizedBox(width: kSpace3),
+        Expanded(
+          child: TextField(
+            controller: controller,
+            maxLines: null,
+            keyboardType: TextInputType.multiline,
+            textInputAction: TextInputAction.newline,
+            style: kStyleBody,
+            decoration: InputDecoration(
+              hintText: 'Add a note for the group…',
+              hintStyle: kStyleBody.copyWith(color: kColorInkSoft),
+              filled: true,
+              fillColor: kColorSurfaceSunken,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: kSpace4,
+                vertical: kSpace3,
+              ),
+              border: const OutlineInputBorder(
+                borderRadius: kRadiusSm,
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: const OutlineInputBorder(
+                borderRadius: kRadiusSm,
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: const OutlineInputBorder(
+                borderRadius: kRadiusSm,
+                borderSide: BorderSide(color: kColorPrimary),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: kSpace2),
+        WabwayIconButton(
+          icon: loading ? Icons.hourglass_empty_rounded : Icons.send_rounded,
+          label: 'Send',
+          variant: WabwayIconButtonVariant.solid,
+          size: WabwayIconButtonSize.sm,
+          onPressed: loading ? null : onSubmit,
+        ),
+      ],
+    );
+  }
+}

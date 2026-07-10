@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../core/supabase/accommodation_service.dart';
 import '../core/supabase/doc_service.dart';
 import '../core/supabase/money_service.dart';
+import '../core/supabase/packing_service.dart';
 import '../core/supabase/plan_service.dart';
 import '../core/supabase/spot_service.dart';
 import '../core/supabase/travel_service.dart';
@@ -9,6 +10,7 @@ import '../core/trip/app_trip_member.dart';
 import '../data/accommodation_data.dart';
 import '../data/docs_data.dart';
 import '../data/money_data.dart';
+import '../data/packing_data.dart';
 import '../data/plan_data.dart';
 import '../data/spot_data.dart';
 import '../data/travel_data.dart';
@@ -48,7 +50,7 @@ Future<void> showGlobalSearch(
 
 // ─── Result model ─────────────────────────────────────────────────────────────
 
-enum _ResultKind { spot, doc, travel, receipt, plan, stay }
+enum _ResultKind { spot, doc, travel, receipt, plan, stay, packing }
 
 class _Result {
   const _Result({
@@ -94,6 +96,7 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
   List<TravelItem> _travel = [];
   List<Receipt> _receipts = [];
   List<Accommodation> _stays = [];
+  List<PackingItem> _packingItems = [];
   // Full day objects kept so we can find the containing day for plan items.
   List<TripDay> _planDays = [];
   List<ItineraryItem> _planItems = [];
@@ -122,18 +125,20 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
         MoneyService.loadReceipts(widget.tripId),
         PlanService.loadAll(widget.tripId),
         AccommodationService.loadAll(widget.tripId),
+        PackingService.fetchAll(widget.tripId),
       ]);
       if (!mounted) return;
       final days = results[4] as List<TripDay>;
       setState(() {
-        _spots     = results[0] as List<Spot>;
-        _docs      = results[1] as List<TripDocument>;
-        _travel    = results[2] as List<TravelItem>;
-        _receipts  = results[3] as List<Receipt>;
-        _planDays  = days;
-        _planItems = days.expand((d) => d.items).toList();
-        _stays     = results[5] as List<Accommodation>;
-        _loading   = false;
+        _spots        = results[0] as List<Spot>;
+        _docs         = results[1] as List<TripDocument>;
+        _travel       = results[2] as List<TravelItem>;
+        _receipts     = results[3] as List<Receipt>;
+        _planDays     = days;
+        _planItems    = days.expand((d) => d.items).toList();
+        _stays        = results[5] as List<Accommodation>;
+        _packingItems = results[6] as List<PackingItem>;
+        _loading      = false;
       });
     } catch (_) {
       if (mounted) setState(() => _loading = false);
@@ -308,6 +313,18 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
       }
     }
 
+    for (final p in _packingItems) {
+      if (m(p.title)) {
+        out.add(_Result(
+          kind:     _ResultKind.packing,
+          title:    p.title,
+          subtitle: p.isPacked ? 'Packed ✓' : 'Not yet packed',
+          icon:     Icons.luggage_rounded,
+          onTap: (_) {},
+        ));
+      }
+    }
+
     return out;
   }
 
@@ -318,6 +335,7 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
     _ResultKind.receipt: 'Receipts',
     _ResultKind.plan:    'Itinerary',
     _ResultKind.stay:    'Stays',
+    _ResultKind.packing: 'Packing list',
   };
 
   @override

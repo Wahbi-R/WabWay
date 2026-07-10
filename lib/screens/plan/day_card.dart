@@ -1,5 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../core/trip/app_trip_member.dart';
+import '../../core/trip/trip_state.dart';
 import '../../data/plan_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
@@ -282,6 +284,8 @@ class _DayHeader extends StatelessWidget {
                   )
                 : const SizedBox.shrink(),
           ),
+
+          _MemberPresenceRow(date: day.date),
         ],
       ),
     );
@@ -437,6 +441,109 @@ class _ReorderableItemListState extends State<_ReorderableItemList> {
 }
 
 // â”€â”€â”€ Add item row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+// ─── Member presence row ──────────────────────────────────────────────────────
+
+// Shows which members are present on a given day, based on their arrival/
+// departure dates. Hidden when no member has dates set (avoid noise).
+class _MemberPresenceRow extends StatelessWidget {
+  const _MemberPresenceRow({required this.date});
+  final DateTime date;
+
+  bool _isPresent(AppTripMember m) {
+    final d = DateTime(date.year, date.month, date.day);
+    if (m.arrivalDate != null) {
+      final arr = DateTime(m.arrivalDate!.year, m.arrivalDate!.month, m.arrivalDate!.day);
+      if (d.isBefore(arr)) return false;
+    }
+    if (m.departureDate != null) {
+      final dep = DateTime(m.departureDate!.year, m.departureDate!.month, m.departureDate!.day);
+      if (d.isAfter(dep)) return false;
+    }
+    return true;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final members = TripState.membersOf(context);
+    // Only show when at least one member has travel dates configured.
+    final anyHasDates = members.any((m) => m.hasDates);
+    if (!anyHasDates) return const SizedBox.shrink();
+
+    final present  = members.where(_isPresent).toList();
+    final absent   = members.where((m) => !_isPresent(m)).toList();
+    // If everyone is present, no need to show the row.
+    if (absent.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(kSpace4, 0, kSpace4, kSpace3),
+      child: Row(
+        children: [
+          const Icon(Icons.group_rounded, size: 12, color: kColorInkSoft),
+          const SizedBox(width: kSpace2),
+          ...present.map(
+            (m) => Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: _TinyAvatar(name: m.profile.displayName, present: true),
+            ),
+          ),
+          ...absent.map(
+            (m) => Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: _TinyAvatar(name: m.profile.displayName, present: false),
+            ),
+          ),
+          const SizedBox(width: kSpace2),
+          Text(
+            absent.length == 1
+                ? '${absent.first.profile.displayName.split(' ').first} not here'
+                : '${absent.length} members not here',
+            style: kStyleCaption.copyWith(fontSize: 11, color: kColorInkSoft),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TinyAvatar extends StatelessWidget {
+  const _TinyAvatar({required this.name, required this.present});
+  final String name;
+  final bool present;
+
+  @override
+  Widget build(BuildContext context) {
+    final initials = name.trim().split(' ')
+        .where((w) => w.isNotEmpty)
+        .take(2)
+        .map((w) => w[0])
+        .join()
+        .toUpperCase();
+    return Container(
+      width: 18,
+      height: 18,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: present ? kColorPrimarySoft : kColorSurfaceSunken,
+        border: Border.all(
+          color: present ? kColorPrimary.withValues(alpha: 0.3) : kColorBorder,
+        ),
+      ),
+      child: Center(
+        child: Text(
+          initials,
+          style: TextStyle(
+            fontSize: 8,
+            fontWeight: FontWeight.w700,
+            color: present ? kColorPrimaryDark : kColorInkSoft,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Add item row ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 class _AddItemRow extends StatelessWidget {
   const _AddItemRow({required this.onTap});

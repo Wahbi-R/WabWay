@@ -22,6 +22,27 @@ import 'money/settle_up_panel.dart';
 
 enum _MoneyTab { receipts, cash, settleUp }
 
+enum _ReceiptSort {
+  newestFirst,
+  oldestFirst,
+  highestAmount,
+  lowestAmount;
+
+  String get label => switch (this) {
+    _ReceiptSort.newestFirst    => 'Newest first',
+    _ReceiptSort.oldestFirst    => 'Oldest first',
+    _ReceiptSort.highestAmount  => 'Highest amount',
+    _ReceiptSort.lowestAmount   => 'Lowest amount',
+  };
+
+  IconData get icon => switch (this) {
+    _ReceiptSort.newestFirst    => Icons.arrow_downward_rounded,
+    _ReceiptSort.oldestFirst    => Icons.arrow_upward_rounded,
+    _ReceiptSort.highestAmount  => Icons.arrow_downward_rounded,
+    _ReceiptSort.lowestAmount   => Icons.arrow_upward_rounded,
+  };
+}
+
 class MoneyScreen extends StatefulWidget {
   const MoneyScreen({super.key});
 
@@ -39,6 +60,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
 
   _MoneyTab _tab = _MoneyTab.receipts;
   ReceiptCategory? _filterCategory;
+  _ReceiptSort _receiptSort = _ReceiptSort.newestFirst;
   String? _selectedReceiptId;
   String? _selectedWithdrawalId;
 
@@ -195,9 +217,18 @@ class _MoneyScreenState extends State<MoneyScreen> {
 
   // ── Derived state ─────────────────────────────────────────────────────────────
 
-  List<Receipt> get _filteredReceipts => _filterCategory == null
-      ? _receipts
-      : _receipts.where((r) => r.category == _filterCategory).toList();
+  List<Receipt> get _filteredReceipts {
+    final base = _filterCategory == null
+        ? List<Receipt>.from(_receipts)
+        : _receipts.where((r) => r.category == _filterCategory).toList();
+    base.sort((a, b) => switch (_receiptSort) {
+      _ReceiptSort.newestFirst   => b.date.compareTo(a.date),
+      _ReceiptSort.oldestFirst   => a.date.compareTo(b.date),
+      _ReceiptSort.highestAmount => b.homeAmount.compareTo(a.homeAmount),
+      _ReceiptSort.lowestAmount  => a.homeAmount.compareTo(b.homeAmount),
+    });
+    return base;
+  }
 
   Map<String, List<MemberBalance>> get _balancesByCurrency =>
       calculateBalancesGrouped(_receipts, _withdrawals, myId: _userId, members: _members);
@@ -368,13 +399,26 @@ class _MoneyScreenState extends State<MoneyScreen> {
       return Column(
         children: [
           _SpendingSummaryCard(receipts: _receipts, homeCurrency: _homeCurrency),
-          _ReceiptFilterStrip(
-            selected: _filterCategory,
-            receipts: _receipts,
-            onChanged: (c) => setState(() {
-              _filterCategory = c;
-              _selectedReceiptId = null;
-            }),
+          Row(
+            children: [
+              Expanded(
+                child: _ReceiptFilterStrip(
+                  selected: _filterCategory,
+                  receipts: _receipts,
+                  onChanged: (c) => setState(() {
+                    _filterCategory = c;
+                    _selectedReceiptId = null;
+                  }),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(right: kSpace3),
+                child: _SortButton(
+                  current: _receiptSort,
+                  onChanged: (s) => setState(() => _receiptSort = s),
+                ),
+              ),
+            ],
           ),
           Expanded(
             child: filtered.isEmpty
@@ -525,6 +569,11 @@ class _MoneyScreenState extends State<MoneyScreen> {
             ],
           ),
           actions: [
+            if (_tab == _MoneyTab.receipts && _receipts.isNotEmpty)
+              _SortButton(
+                current: _receiptSort,
+                onChanged: (s) => setState(() => _receiptSort = s),
+              ),
             if (_tab != _MoneyTab.settleUp)
               IconButton(
                 icon: const Icon(Icons.add_rounded),
@@ -936,6 +985,52 @@ class _ReceiptFilterStrip extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+// ─── Receipt sort button ──────────────────────────────────────────────────────
+
+class _SortButton extends StatelessWidget {
+  const _SortButton({required this.current, required this.onChanged});
+  final _ReceiptSort current;
+  final ValueChanged<_ReceiptSort> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    // Highlight the icon when the sort is non-default so the user knows
+    // something is active.
+    final isDefault = current == _ReceiptSort.newestFirst;
+    return PopupMenuButton<_ReceiptSort>(
+      tooltip: 'Sort receipts',
+      icon: Icon(
+        Icons.sort_rounded,
+        size: 20,
+        color: isDefault ? kColorInkSoft : kColorPrimary,
+      ),
+      initialValue: current,
+      onSelected: onChanged,
+      itemBuilder: (_) => _ReceiptSort.values
+          .map((s) => PopupMenuItem<_ReceiptSort>(
+                value: s,
+                child: Row(
+                  children: [
+                    Icon(s.icon, size: 16,
+                        color: s == current ? kColorPrimary : kColorInkSoft),
+                    const SizedBox(width: kSpace2),
+                    Text(
+                      s.label,
+                      style: kStyleBody.copyWith(
+                        color: s == current ? kColorPrimary : kColorInk,
+                        fontWeight: s == current
+                            ? FontWeight.w600
+                            : FontWeight.normal,
+                      ),
+                    ),
+                  ],
+                ),
+              ))
+          .toList(),
     );
   }
 }

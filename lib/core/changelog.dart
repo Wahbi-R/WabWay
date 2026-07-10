@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 42,
+    label: 'Receipt sorting',
+    changes: [
+      'Sort receipts by newest first, oldest first, highest amount, or lowest amount — tap the sort icon next to the filter chips to switch modes',
+      'The sort icon turns blue when a non-default sort is active so you always know the list is sorted',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 41,
     label: 'Links search',
     changes: [

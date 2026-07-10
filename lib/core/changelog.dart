@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 34,
+    label: 'Multi-currency balance',
+    changes: [
+      'Home screen balance card now shows debts and credits in every currency separately — no more missing JPY debts when your trip also has CAD expenses',
+      'Total spent on the home screen now uses home-currency equivalents so the number is consistent when you mix currencies',
+      'Accommodations screen now updates in real-time when a trip-mate adds or edits a stay',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 33,
     label: 'Tappable search results',
     changes: [

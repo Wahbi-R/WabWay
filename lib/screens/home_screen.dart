@@ -34,9 +34,9 @@ class _HomeData {
     required this.days,
     required this.travelItems,
     required this.receipts,
-    required this.balances,
+    required this.balancesByCurrency,
+    required this.homeCurrency,
     required this.memberMap,
-    required this.currency,
     required this.activityEvents,
   });
 
@@ -45,12 +45,15 @@ class _HomeData {
   final List<TripDay> days;
   final List<TravelItem> travelItems;
   final List<Receipt> receipts;
-  final List<MemberBalance> balances;
+  // balancesByCurrency[currency] = per-member net balances in that currency.
+  // Multi-currency trips will have multiple entries here.
+  final Map<String, List<MemberBalance>> balancesByCurrency;
+  final String homeCurrency;
   final Map<String, String> memberMap; // userId → displayName
-  final String currency;
   final List<ActivityEvent> activityEvents;
 
-  double get totalSpent => receipts.fold(0.0, (s, r) => s + r.amount);
+  // Sum of home-currency equivalents — consistent across multi-currency trips.
+  double get totalSpent => receipts.fold(0.0, (s, r) => s + r.homeAmount);
 
   TripDay? get nextDay {
     final today = _today();
@@ -145,7 +148,7 @@ class _HomeScreenState extends State<HomeScreen> {
           .map((m) => TripMember(id: m.userId, name: m.profile.displayName))
           .toList();
 
-      final balances = calculateBalances(
+      final balancesByCurrency = calculateBalancesGrouped(
         receipts,
         withdrawals.cast(),
         myId: myId,
@@ -161,9 +164,9 @@ class _HomeScreenState extends State<HomeScreen> {
           days: days,
           travelItems: travelItems,
           receipts: receipts,
-          balances: balances,
+          balancesByCurrency: balancesByCurrency,
+          homeCurrency: trip.homeCurrency,
           memberMap: memberMap,
-          currency: trip.defaultCurrency,
           activityEvents: activities,
         );
       });
@@ -516,7 +519,7 @@ class _TripHero extends StatelessWidget {
                   child: _HeroStat(
                     label: 'Total spent',
                     value: data != null
-                        ? fmtAmount(data!.totalSpent, data!.currency)
+                        ? fmtAmount(data!.totalSpent, data!.homeCurrency)
                         : '—',
                   ),
                 ),
@@ -656,12 +659,39 @@ class _QuickBalanceCard extends StatelessWidget {
       );
     }
 
-    final owes = data!.balances.where((b) => b.net < -0.5).toList()
-      ..sort((a, b) => a.net.compareTo(b.net));
-    final owed = data!.balances.where((b) => b.net > 0.5).toList()
-      ..sort((a, b) => b.net.compareTo(a.net));
+    final byCurrency = data!.balancesByCurrency;
 
-    if (owes.isEmpty && owed.isEmpty) {
+    // Gather the most significant debt and credit across all currencies.
+    // Multi-currency trips can have debts in e.g. JPY and USD simultaneously.
+    final lines = <Widget>[];
+    bool anyBalance = false;
+
+    for (final entry in byCurrency.entries) {
+      final currency = entry.key;
+      final balances = entry.value;
+
+      final owes = balances.where((b) => b.net < -0.5).toList()
+        ..sort((a, b) => a.net.compareTo(b.net));
+      final owed = balances.where((b) => b.net > 0.5).toList()
+        ..sort((a, b) => b.net.compareTo(a.net));
+
+      if (owes.isNotEmpty) {
+        anyBalance = true;
+        lines.add(Text(
+          'You owe ${owes.first.member.name}: ${fmtAmount(-owes.first.net, currency)}',
+          style: kStyleBodySemibold.copyWith(color: kColorPrimaryDark),
+        ));
+      }
+      if (owed.isNotEmpty) {
+        anyBalance = true;
+        lines.add(Text(
+          '${owed.first.member.name} owes you ${fmtAmount(owed.first.net, currency)}',
+          style: kStyleBodySemibold.copyWith(color: kColorSuccess),
+        ));
+      }
+    }
+
+    if (!anyBalance) {
       return Text(
         data!.receipts.isEmpty ? 'No expenses yet' : 'All settled up',
         style: kStyleBodySemibold.copyWith(color: kColorInkSoft),
@@ -670,20 +700,7 @@ class _QuickBalanceCard extends StatelessWidget {
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (owes.isNotEmpty)
-          Text(
-            'You owe ${owes.first.member.name}: '
-            '${fmtAmount(-owes.first.net, data!.currency)}',
-            style: kStyleBodySemibold.copyWith(color: kColorPrimaryDark),
-          ),
-        if (owed.isNotEmpty)
-          Text(
-            '${owed.first.member.name} owes you '
-            '${fmtAmount(owed.first.net, data!.currency)}',
-            style: kStyleBodySemibold.copyWith(color: kColorSuccess),
-          ),
-      ],
+      children: lines,
     );
   }
 }

@@ -1,4 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'
+    show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
 import '../../core/supabase/accommodation_service.dart';
 import '../../core/supabase/client.dart';
 import '../../core/trip/trip_state.dart';
@@ -23,6 +26,8 @@ class _AccommodationsScreenState extends State<AccommodationsScreen> {
 
   String? _activeTripId;
   AccommodationStatus? _filterStatus;
+  RealtimeChannel? _channel;
+  Timer? _debounce;
 
   @override
   void didChangeDependencies() {
@@ -31,7 +36,39 @@ class _AccommodationsScreenState extends State<AccommodationsScreen> {
     if (tripId != _activeTripId) {
       _activeTripId = tripId;
       _load();
+      _subscribe(tripId);
     }
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _channel?.unsubscribe();
+    super.dispose();
+  }
+
+  void _subscribe(String tripId) {
+    _channel?.unsubscribe();
+    _channel = supabase
+        .channel('accommodations-$tripId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'accommodations',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'trip_id',
+            value: tripId,
+          ),
+          callback: (_) {
+            _debounce?.cancel();
+            _debounce = Timer(
+              const Duration(milliseconds: 400),
+              () => _load(silent: true),
+            );
+          },
+        )
+        .subscribe();
   }
 
   Future<void> _load({bool silent = false}) async {

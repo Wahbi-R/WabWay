@@ -20,6 +20,13 @@ import 'spots/spot_list_tile.dart';
 import 'spots/spot_detail.dart';
 import 'spots/add_spot_sheet.dart';
 
+// Sort modes available on the spots list. Applied after filters and search.
+enum _SpotSort {
+  newest,      // DB insertion order — default
+  alphabetical, // A→Z by spot name
+  mostVoted,   // highest must-do vote count first, then total votes
+}
+
 class SpotsScreen extends StatefulWidget {
   const SpotsScreen({super.key});
 
@@ -46,6 +53,7 @@ class _SpotsScreenState extends State<SpotsScreen> {
   String? _filterCity;
   String _searchQuery = '';
   bool _showSearch = false;
+  _SpotSort _sortBy = _SpotSort.newest;
   final _searchCtrl = TextEditingController();
 
   int get _advancedFilterCount =>
@@ -181,7 +189,7 @@ class _SpotsScreenState extends State<SpotsScreen> {
   }
 
   List<Spot> get _filtered {
-    return _spots.where((s) {
+    final list = _spots.where((s) {
       final q = _searchQuery.toLowerCase();
       final matchesSearch = q.isEmpty ||
           s.name.toLowerCase().contains(q) ||
@@ -193,6 +201,25 @@ class _SpotsScreenState extends State<SpotsScreen> {
           s.city.toLowerCase() == _filterCity!.toLowerCase();
       return matchesSearch && matchesCat && matchesStatus && matchesCity;
     }).toList();
+
+    switch (_sortBy) {
+      case _SpotSort.alphabetical:
+        list.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      case _SpotSort.mostVoted:
+        // Sort by must-do votes first, then total votes as tiebreaker
+        list.sort((a, b) {
+          final aMust = a.votes.voters(VoteType.mustDo).length;
+          final bMust = b.votes.voters(VoteType.mustDo).length;
+          if (bMust != aMust) return bMust.compareTo(aMust);
+          final aTotal = VoteType.values.fold(0, (sum, v) => sum + a.votes.voters(v).length);
+          final bTotal = VoteType.values.fold(0, (sum, v) => sum + b.votes.voters(v).length);
+          return bTotal.compareTo(aTotal);
+        });
+      case _SpotSort.newest:
+        break; // _spots is already in newest-first order (insert at index 0)
+    }
+
+    return list;
   }
 
   Set<String> get _availableCities {
@@ -380,6 +407,7 @@ class _SpotsScreenState extends State<SpotsScreen> {
             searchQuery: _searchQuery,
             searchCtrl: _searchCtrl,
             showSearch: _showSearch,
+            sortBy: _sortBy,
             canDelete: _canDelete,
             onSelectSpot: (s) => setState(() => _selectedId = s?.id),
             onFilterCategory: (c) => setState(() => _filterCategory = c),
@@ -391,6 +419,7 @@ class _SpotsScreenState extends State<SpotsScreen> {
                 _searchCtrl.clear();
               }
             }),
+            onSortChange: (s) => setState(() => _sortBy = s),
             onVote: _onVote,
             onDelete: _deleteSpot,
             onEdit: _onEditSpot,
@@ -404,6 +433,7 @@ class _SpotsScreenState extends State<SpotsScreen> {
             searchQuery: _searchQuery,
             searchCtrl: _searchCtrl,
             showSearch: _showSearch,
+            sortBy: _sortBy,
             onOpenSpot: (s) => _openDetailMobile(context, s),
             onFilterCategory: (c) => setState(() => _filterCategory = c),
             onSearch: (q) => setState(() => _searchQuery = q),
@@ -414,6 +444,7 @@ class _SpotsScreenState extends State<SpotsScreen> {
                 _searchCtrl.clear();
               }
             }),
+            onSortChange: (s) => setState(() => _sortBy = s),
             onFilter: _openFilterSheet,
             onAdd: () => _addSpot(context),
           );
@@ -430,6 +461,26 @@ class _SpotsScreenState extends State<SpotsScreen> {
   }
 }
 
+// Helper that builds a checked PopupMenuItem for the sort menu.
+PopupMenuItem<_SpotSort> _sortMenuItem(
+    _SpotSort value, String label, _SpotSort current) {
+  return PopupMenuItem(
+    value: value,
+    child: Row(
+      children: [
+        SizedBox(
+          width: 20,
+          child: current == value
+              ? const Icon(Icons.check_rounded, size: 16, color: kColorPrimary)
+              : null,
+        ),
+        const SizedBox(width: kSpace2),
+        Text(label),
+      ],
+    ),
+  );
+}
+
 // ─── Mobile layout ─────────────────────────────────────────────────────────────
 
 class _MobileLayout extends StatelessWidget {
@@ -441,10 +492,12 @@ class _MobileLayout extends StatelessWidget {
     required this.searchQuery,
     required this.searchCtrl,
     required this.showSearch,
+    required this.sortBy,
     required this.onOpenSpot,
     required this.onFilterCategory,
     required this.onSearch,
     required this.onToggleSearch,
+    required this.onSortChange,
     required this.onFilter,
     required this.onAdd,
   });
@@ -456,10 +509,12 @@ class _MobileLayout extends StatelessWidget {
   final String searchQuery;
   final TextEditingController searchCtrl;
   final bool showSearch;
+  final _SpotSort sortBy;
   final ValueChanged<Spot> onOpenSpot;
   final ValueChanged<SpotCategory?> onFilterCategory;
   final ValueChanged<String> onSearch;
   final VoidCallback onToggleSearch;
+  final ValueChanged<_SpotSort> onSortChange;
   final VoidCallback onFilter;
   final VoidCallback onAdd;
 
@@ -481,6 +536,20 @@ class _MobileLayout extends StatelessWidget {
                 ),
                 color: kColorInkSoft,
                 onPressed: onToggleSearch,
+              ),
+              // Sort popup — icon is highlighted when a non-default sort is active
+              PopupMenuButton<_SpotSort>(
+                icon: Icon(
+                  Icons.sort_rounded,
+                  color: sortBy != _SpotSort.newest ? kColorPrimary : kColorInkSoft,
+                ),
+                tooltip: 'Sort',
+                onSelected: onSortChange,
+                itemBuilder: (_) => [
+                  _sortMenuItem(_SpotSort.newest,       'Newest first', sortBy),
+                  _sortMenuItem(_SpotSort.alphabetical, 'A – Z',        sortBy),
+                  _sortMenuItem(_SpotSort.mostVoted,    'Most voted',   sortBy),
+                ],
               ),
               Stack(
                 clipBehavior: Clip.none,
@@ -586,11 +655,13 @@ class _DesktopLayout extends StatelessWidget {
     required this.searchQuery,
     required this.searchCtrl,
     required this.showSearch,
+    required this.sortBy,
     required this.canDelete,
     required this.onSelectSpot,
     required this.onFilterCategory,
     required this.onSearch,
     required this.onToggleSearch,
+    required this.onSortChange,
     required this.onVote,
     required this.onDelete,
     required this.onEdit,
@@ -606,11 +677,13 @@ class _DesktopLayout extends StatelessWidget {
   final String searchQuery;
   final TextEditingController searchCtrl;
   final bool showSearch;
+  final _SpotSort sortBy;
   final bool Function(Spot) canDelete;
   final ValueChanged<Spot?> onSelectSpot;
   final ValueChanged<SpotCategory?> onFilterCategory;
   final ValueChanged<String> onSearch;
   final VoidCallback onToggleSearch;
+  final ValueChanged<_SpotSort> onSortChange;
   final void Function(String, VoteType?) onVote;
   final Future<void> Function(String) onDelete;
   final ValueChanged<Spot> onEdit;
@@ -625,8 +698,10 @@ class _DesktopLayout extends StatelessWidget {
           _DesktopTopBar(
             showSearch: showSearch,
             searchCtrl: searchCtrl,
+            sortBy: sortBy,
             onSearch: onSearch,
             onToggleSearch: onToggleSearch,
+            onSortChange: onSortChange,
             onAdd: onAdd,
           ),
 
@@ -706,15 +781,19 @@ class _DesktopTopBar extends StatelessWidget {
   const _DesktopTopBar({
     required this.showSearch,
     required this.searchCtrl,
+    required this.sortBy,
     required this.onSearch,
     required this.onToggleSearch,
+    required this.onSortChange,
     required this.onAdd,
   });
 
   final bool showSearch;
   final TextEditingController searchCtrl;
+  final _SpotSort sortBy;
   final ValueChanged<String> onSearch;
   final VoidCallback onToggleSearch;
+  final ValueChanged<_SpotSort> onSortChange;
   final VoidCallback onAdd;
 
   @override
@@ -740,6 +819,22 @@ class _DesktopTopBar extends StatelessWidget {
             icon: showSearch ? Icons.close_rounded : Icons.search_rounded,
             label: showSearch ? 'Close search' : 'Search',
             onPressed: onToggleSearch,
+          ),
+          const SizedBox(width: kSpace2),
+          // Sort popup for desktop
+          PopupMenuButton<_SpotSort>(
+            icon: Icon(
+              Icons.sort_rounded,
+              color: sortBy != _SpotSort.newest ? kColorPrimary : kColorInkSoft,
+              size: 20,
+            ),
+            tooltip: 'Sort',
+            onSelected: onSortChange,
+            itemBuilder: (_) => [
+              _sortMenuItem(_SpotSort.newest,       'Newest first', sortBy),
+              _sortMenuItem(_SpotSort.alphabetical, 'A – Z',        sortBy),
+              _sortMenuItem(_SpotSort.mostVoted,    'Most voted',   sortBy),
+            ],
           ),
           const SizedBox(width: kSpace2),
           WabwayButton(

@@ -180,6 +180,37 @@ class _HomeScreenState extends State<HomeScreen> {
     return _load();
   }
 
+  // Shared AppBar actions — import, global search, notification settings.
+  // Defined once here so the error-state and success-state scaffolds stay in sync.
+  List<Widget> _appBarActions(BuildContext context) => [
+    IconButton(
+      icon: const Icon(Icons.download_rounded),
+      color: kColorInkSoft,
+      tooltip: 'Import',
+      onPressed: () => showImportScreen(context),
+    ),
+    IconButton(
+      icon: const Icon(Icons.search_rounded),
+      color: kColorInkSoft,
+      tooltip: 'Search',
+      onPressed: () => showGlobalSearch(
+        context,
+        tripId: TripState.tripOf(context).id,
+      ),
+    ),
+    IconButton(
+      icon: const Icon(Icons.notifications_outlined),
+      color: kColorInkSoft,
+      onPressed: () => Navigator.push<void>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const NotificationSettingsScreen(),
+        ),
+      ),
+    ),
+    const SizedBox(width: kSpace2),
+  ];
+
   @override
   Widget build(BuildContext context) {
     final trip = TripState.tripOf(context);
@@ -190,34 +221,7 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: kColorCream,
         appBar: AppBar(
           title: Text('Home', style: kStyleTitle),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.download_rounded),
-              color: kColorInkSoft,
-              tooltip: 'Import',
-              onPressed: () => showImportScreen(context),
-            ),
-            IconButton(
-              icon: const Icon(Icons.search_rounded),
-              color: kColorInkSoft,
-              tooltip: 'Search',
-              onPressed: () => showGlobalSearch(
-                context,
-                tripId: TripState.tripOf(context).id,
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.notifications_outlined),
-              color: kColorInkSoft,
-              onPressed: () => Navigator.push<void>(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const NotificationSettingsScreen(),
-                ),
-              ),
-            ),
-            const SizedBox(width: kSpace2),
-          ],
+          actions: _appBarActions(context),
         ),
         body: Center(
           child: Column(
@@ -240,34 +244,7 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: kColorCream,
       appBar: AppBar(
         title: Text('Home', style: kStyleTitle),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.download_rounded),
-            color: kColorInkSoft,
-            tooltip: 'Import',
-            onPressed: () => showImportScreen(context),
-          ),
-          IconButton(
-            icon: const Icon(Icons.search_rounded),
-            color: kColorInkSoft,
-            tooltip: 'Search',
-            onPressed: () => showGlobalSearch(
-              context,
-              tripId: TripState.tripOf(context).id,
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            color: kColorInkSoft,
-            onPressed: () => Navigator.push<void>(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const NotificationSettingsScreen(),
-              ),
-            ),
-          ),
-          const SizedBox(width: kSpace2),
-        ],
+        actions: _appBarActions(context),
       ),
       body: RefreshIndicator(
         onRefresh: _refresh,
@@ -299,6 +276,35 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+// Returns a human-readable trip countdown string for the hero card:
+//   "Starts in 12 days" / "Day 3 of 14" / "Ended yesterday"
+// Returns null when the trip has no dates set.
+String? _tripCountdown(DateTime? start, DateTime? end) {
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+
+  if (start != null && today.isBefore(start)) {
+    final days = start.difference(today).inDays;
+    if (days == 0) return 'Starts today';
+    if (days == 1) return 'Starts tomorrow';
+    return 'Starts in $days days';
+  }
+  if (end != null && today.isAfter(end)) {
+    final days = today.difference(end).inDays;
+    if (days == 0) return 'Ended today';
+    if (days == 1) return 'Ended yesterday';
+    return 'Ended $days days ago';
+  }
+  // Trip is currently active
+  if (start != null && end != null) {
+    final day   = today.difference(start).inDays + 1;
+    final total = end.difference(start).inDays + 1;
+    return 'Day $day of $total';
+  }
+  if (start != null) return 'Day ${today.difference(start).inDays + 1}';
+  return null;
+}
 
 String _fmtTripDates(DateTime? start, DateTime? end) {
   if (start == null && end == null) return '';
@@ -407,9 +413,10 @@ class _TripHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dateLabel = _fmtTripDates(trip.startDate, trip.endDate);
+    final dateLabel  = _fmtTripDates(trip.startDate, trip.endDate);
+    final countdown  = _tripCountdown(trip.startDate, trip.endDate);
     final memberLabel = memberCount == 1 ? '1 member' : '$memberCount members';
-    final metaLine = [if (dateLabel.isNotEmpty) dateLabel, memberLabel].join('  ·  ');
+    final metaLine   = [if (dateLabel.isNotEmpty) dateLabel, memberLabel].join('  ·  ');
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -445,6 +452,21 @@ class _TripHero extends StatelessWidget {
             ],
             const SizedBox(height: kSpace2),
             Text(metaLine, style: kStyleCaption),
+            if (countdown != null) ...[
+              const SizedBox(height: kSpace2),
+              // Pill chip showing days until departure, current day, or days since return
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: kSpace2, vertical: 2),
+                decoration: BoxDecoration(
+                  color: kColorPrimary.withValues(alpha: 0.12),
+                  borderRadius: kRadiusPill,
+                ),
+                child: Text(
+                  countdown,
+                  style: kStyleOverline.copyWith(color: kColorPrimaryDark),
+                ),
+              ),
+            ],
             const SizedBox(height: kSpace5),
             Row(
               children: [

@@ -11,6 +11,17 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 31,
+    label: 'Spot sorting + trip countdown',
+    changes: [
+      'Sort your spots by "Newest first", "A – Z", or "Most voted" — tap the sort icon in the Spots screen',
+      'Must-do votes rank highest when sorting by Most voted, with total vote count as tiebreaker',
+      'Trip hero on the Home screen now shows how many days until departure, which day of the trip you\'re on, or how long ago the trip ended',
+      'Countdown is hidden automatically when the trip has no start or end date set',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 30,
     label: 'Google Places search',
     changes: [

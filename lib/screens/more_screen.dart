@@ -9,8 +9,6 @@ import 'account_sheets.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_theme.dart';
 import '../theme/app_decorations.dart';
-import '../widgets/wabway_button.dart';
-import '../widgets/wabway_text_field.dart';
 import 'accommodations/accommodations_screen.dart';
 import 'docs_screen.dart';
 import 'map_screen.dart';
@@ -25,6 +23,28 @@ import 'trips/trip_switcher_sheet.dart';
 import 'diagnostics_screen.dart';
 import 'notification_settings_screen.dart';
 import '../core/changelog.dart';
+
+// Pushes a secondary screen with the active trip + current profile already
+// injected via InheritedWidgets. All six "Explore" routes use this helper to
+// avoid repeating ~12 lines of state-passing boilerplate for each screen.
+void _pushWithState(BuildContext context, Widget screen) {
+  final trip    = TripState.tripOf(context);
+  final members = TripState.membersOf(context);
+  final profile = ProfileState.of(context);
+  Navigator.push<void>(
+    context,
+    MaterialPageRoute(
+      builder: (_) => ProfileState(
+        profile: profile,
+        child: TripState(
+          trip: trip,
+          members: members,
+          child: screen,
+        ),
+      ),
+    ),
+  );
+}
 
 class MoreScreen extends StatelessWidget {
   const MoreScreen({super.key});
@@ -230,139 +250,37 @@ class MoreScreen extends StatelessWidget {
                   _SettingsRow(
                     icon: Icons.map_rounded,
                     label: 'Map',
-                    onTap: () {
-                      final trip = TripState.tripOf(context);
-                      final members = TripState.membersOf(context);
-                      final profile = ProfileState.of(context);
-                      Navigator.push<void>(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ProfileState(
-                            profile: profile,
-                            child: TripState(
-                              trip: trip,
-                              members: members,
-                              child: const MapScreen(),
-                            ),
-                          ),
-                        ),
-                      );
-                    },
+                    onTap: () => _pushWithState(context, const MapScreen()),
                   ),
                   const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
                   _SettingsRow(
                     icon: Icons.flight_rounded,
                     label: 'Travel',
-                    onTap: () {
-                      final trip = TripState.tripOf(context);
-                      final members = TripState.membersOf(context);
-                      final profile = ProfileState.of(context);
-                      Navigator.push<void>(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ProfileState(
-                            profile: profile,
-                            child: TripState(
-                              trip: trip,
-                              members: members,
-                              child: const TravelScreen(),
-                            ),
-                          ),
-                        ),
-                      );
-                    },
+                    onTap: () => _pushWithState(context, const TravelScreen()),
                   ),
                   const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
                   _SettingsRow(
                     icon: Icons.photo_library_rounded,
                     label: 'Photos',
-                    onTap: () {
-                      final trip = TripState.tripOf(context);
-                      final members = TripState.membersOf(context);
-                      final profile = ProfileState.of(context);
-                      Navigator.push<void>(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ProfileState(
-                            profile: profile,
-                            child: TripState(
-                              trip: trip,
-                              members: members,
-                              child: const PhotosScreen(),
-                            ),
-                          ),
-                        ),
-                      );
-                    },
+                    onTap: () => _pushWithState(context, const PhotosScreen()),
                   ),
                   const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
                   _SettingsRow(
                     icon: Icons.link_rounded,
                     label: 'Links',
-                    onTap: () {
-                      final trip = TripState.tripOf(context);
-                      final members = TripState.membersOf(context);
-                      final profile = ProfileState.of(context);
-                      Navigator.push<void>(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ProfileState(
-                            profile: profile,
-                            child: TripState(
-                              trip: trip,
-                              members: members,
-                              child: const LinksScreen(),
-                            ),
-                          ),
-                        ),
-                      );
-                    },
+                    onTap: () => _pushWithState(context, const LinksScreen()),
                   ),
                   const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
                   _SettingsRow(
                     icon: Icons.hotel_rounded,
                     label: 'Stays',
-                    onTap: () {
-                      final trip = TripState.tripOf(context);
-                      final members = TripState.membersOf(context);
-                      final profile = ProfileState.of(context);
-                      Navigator.push<void>(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ProfileState(
-                            profile: profile,
-                            child: TripState(
-                              trip: trip,
-                              members: members,
-                              child: const AccommodationsScreen(),
-                            ),
-                          ),
-                        ),
-                      );
-                    },
+                    onTap: () => _pushWithState(context, const AccommodationsScreen()),
                   ),
                   const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
                   _SettingsRow(
                     icon: Icons.folder_rounded,
                     label: 'Documents',
-                    onTap: () {
-                      final trip = TripState.tripOf(context);
-                      final members = TripState.membersOf(context);
-                      final profile = ProfileState.of(context);
-                      Navigator.push<void>(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ProfileState(
-                            profile: profile,
-                            child: TripState(
-                              trip: trip,
-                              members: members,
-                              child: const DocsScreen(),
-                            ),
-                          ),
-                        ),
-                      );
-                    },
+                    onTap: () => _pushWithState(context, const DocsScreen()),
                   ),
                 ],
               ),
@@ -593,20 +511,6 @@ class _SectionHeader extends StatelessWidget {
 }
 
 // ─── Trip actions ─────────────────────────────────────────────────────────────
-
-void _showEditTripNameSheet(BuildContext context, trip) {
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    backgroundColor: Colors.transparent,
-    builder: (_) => _EditTripNameSheet(
-      initialName: trip.name,
-      tripId: trip.id,
-      onSaved: (_) => TripState.refresh(context),
-    ),
-  );
-}
 
 Future<void> _confirmRemoveMember(
     BuildContext context, String tripId, member) async {
@@ -899,102 +803,6 @@ class _TransferOwnershipSheetState extends State<_TransferOwnershipSheet> {
         ));
       }
     }
-  }
-}
-
-class _EditTripNameSheet extends StatefulWidget {
-  const _EditTripNameSheet({
-    required this.initialName,
-    required this.tripId,
-    required this.onSaved,
-  });
-  final String initialName;
-  final String tripId;
-  final ValueChanged<String> onSaved;
-
-  @override
-  State<_EditTripNameSheet> createState() => _EditTripNameSheetState();
-}
-
-class _EditTripNameSheetState extends State<_EditTripNameSheet> {
-  late final TextEditingController _ctrl;
-  bool _loading = false;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = TextEditingController(text: widget.initialName);
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    final name = _ctrl.text.trim();
-    if (name.isEmpty) {
-      setState(() => _error = 'Trip name cannot be empty.');
-      return;
-    }
-    setState(() { _loading = true; _error = null; });
-    try {
-      await TripService.updateTripName(widget.tripId, name);
-      if (mounted) {
-        widget.onSaved(name);
-        Navigator.of(context).pop();
-      }
-    } catch (e) {
-      if (mounted) setState(() { _loading = false; _error = e.toString(); });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: DecoratedBox(
-        decoration: const BoxDecoration(
-          color: kColorPaper,
-          borderRadius: kRadiusSheet,
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(kSpace6, kSpace5, kSpace6, kSpace8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 36, height: 4,
-                  decoration: const BoxDecoration(color: kColorBorder, borderRadius: kRadiusPill),
-                ),
-              ),
-              const SizedBox(height: kSpace4),
-              Text('Edit trip name', style: kStyleTitle),
-              const SizedBox(height: kSpace5),
-              WabwayTextField(
-                label: 'Trip name',
-                controller: _ctrl,
-                autofocus: true,
-                textInputAction: TextInputAction.done,
-                onSubmitted: (_) => _save(),
-                error: _error,
-              ),
-              const SizedBox(height: kSpace4),
-              WabwayButton(
-                label: 'Save',
-                onPressed: _loading ? null : _save,
-                loading: _loading,
-                fullWidth: true,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
 

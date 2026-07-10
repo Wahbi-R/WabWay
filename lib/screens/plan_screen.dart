@@ -85,9 +85,11 @@ class _PlanScreenState extends State<PlanScreen> {
 
   // ─── Data loading ─────────────────────────────────────────────────────────────
 
-  Future<void> _loadAll() async {
+  // Loads all plan data. Pass silent:true for background refreshes triggered by
+  // real-time CDC events — the loading spinner stays hidden to avoid a flash.
+  Future<void> _loadAll({bool silent = false}) async {
     if (_activeTripId.isEmpty) return;
-    setState(() { _loading = true; _error = null; });
+    if (!silent) setState(() { _loading = true; _error = null; });
     try {
       final daysFuture  = PlanService.loadAll(_activeTripId);
       final spotsFuture = SpotService.loadSpots(_activeTripId);
@@ -106,36 +108,12 @@ class _PlanScreenState extends State<PlanScreen> {
         _docs
           ..clear()
           ..addAll(docs);
-        _loading = false;
+        if (!silent) _loading = false;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() { _loading = false; _error = e.toString(); });
+      if (!silent) setState(() { _loading = false; _error = e.toString(); });
     }
-  }
-
-  Future<void> _silentReload() async {
-    if (!mounted || _activeTripId.isEmpty) return;
-    try {
-      final daysFuture  = PlanService.loadAll(_activeTripId);
-      final spotsFuture = SpotService.loadSpots(_activeTripId);
-      final docsFuture  = DocService.loadDocuments(_activeTripId);
-      final days  = await daysFuture;
-      final spots = await spotsFuture;
-      final docs  = await docsFuture;
-      if (!mounted) return;
-      setState(() {
-        _days
-          ..clear()
-          ..addAll(days);
-        _spots
-          ..clear()
-          ..addAll(spots);
-        _docs
-          ..clear()
-          ..addAll(docs);
-      });
-    } catch (_) {}
   }
 
   // ─── Realtime ─────────────────────────────────────────────────────────────────
@@ -171,7 +149,7 @@ class _PlanScreenState extends State<PlanScreen> {
 
   void _debounceReload() {
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 400), _silentReload);
+    _debounce = Timer(const Duration(milliseconds: 400), () => _loadAll(silent: true));
   }
 
   // ─── UI actions ───────────────────────────────────────────────────────────────
@@ -189,7 +167,7 @@ class _PlanScreenState extends State<PlanScreen> {
       }
       if (_selectedItemId == itemId) _selectedItemId = null;
     });
-    PlanService.deleteItem(itemId).catchError((_) => _silentReload());
+    PlanService.deleteItem(itemId).catchError((_) => _loadAll(silent: true));
   }
 
   void _updateItem(ItineraryItem updated) {
@@ -203,7 +181,7 @@ class _PlanScreenState extends State<PlanScreen> {
       }
       _selectedItemId = updated.id;
     });
-    PlanService.updateItem(updated).catchError((_) => _silentReload());
+    PlanService.updateItem(updated).catchError((_) => _loadAll(silent: true));
   }
 
   Future<void> _addItem(BuildContext context, String dayId) async {
@@ -332,7 +310,7 @@ class _PlanScreenState extends State<PlanScreen> {
       });
       PlanService.updateDay(
         day.id, city: city, date: date, notes: notes, clearNotes: clearNotes,
-      ).catchError((_) => _silentReload());
+      ).catchError((_) => _loadAll(silent: true));
     });
   }
 
@@ -352,7 +330,7 @@ class _PlanScreenState extends State<PlanScreen> {
       toDay.items.add(moved);
       _selectedItemId = item.id;
     });
-    PlanService.moveItem(item.id, newDayId).catchError((_) => _silentReload());
+    PlanService.moveItem(item.id, newDayId).catchError((_) => _loadAll(silent: true));
   }
 
   void _onReorderItems(String dayId, List<ItineraryItem> newOrder) {
@@ -363,7 +341,7 @@ class _PlanScreenState extends State<PlanScreen> {
         ..clear()
         ..addAll(newOrder);
     });
-    PlanService.reorderItemsInDay(newOrder).catchError((_) => _silentReload());
+    PlanService.reorderItemsInDay(newOrder).catchError((_) => _loadAll(silent: true));
   }
 
   Future<void> _onDuplicateItem(ItineraryItem item) async {

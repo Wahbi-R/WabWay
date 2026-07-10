@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 90,
+    label: 'Text encoding fix',
+    changes: [
+      'Fixed garbled characters (â€", Â·, â€¦, etc.) that appeared in the plan, docs, accommodations, and travel screens',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 89,
     label: 'Packing list search',
     changes: [

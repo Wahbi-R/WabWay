@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/auth/profile_state.dart';
 import '../../core/supabase/client.dart';
@@ -20,7 +20,7 @@ String _uploaderName(BuildContext context, String userId) {
   return userId.length >= 8 ? userId.substring(0, 8) : userId;
 }
 
-// â”€â”€â”€ Grid card (mobile 2-col) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Grid card (mobile 2-col) ─────────────────────────────────────────────────
 
 class DocGridCard extends StatelessWidget {
   const DocGridCard({
@@ -128,7 +128,7 @@ class DocGridCard extends StatelessWidget {
   }
 }
 
-// â”€â”€â”€ List row (desktop left panel) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── List row (desktop left panel) ────────────────────────────────────────────
 
 class DocListRow extends StatelessWidget {
   const DocListRow({
@@ -181,7 +181,7 @@ class DocListRow extends StatelessWidget {
           ),
           const SizedBox(width: kSpace3),
 
-          // Middle â€” title + meta
+          // Middle — title + meta
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -201,7 +201,7 @@ class DocListRow extends StatelessWidget {
                     ),
                     if (doc.links.isNotEmpty) ...[
                       Text(
-                        ' Â· ',
+                        ' · ',
                         style: kStyleCaption.copyWith(color: kColorInkSoft, fontSize: 12),
                       ),
                       const Icon(Icons.link_rounded, size: 11, color: kColorInkSoft),
@@ -218,7 +218,7 @@ class DocListRow extends StatelessWidget {
           ),
           const SizedBox(width: kSpace2),
 
-          // Right â€” ext + date
+          // Right — ext + date
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -236,7 +236,7 @@ class DocListRow extends StatelessWidget {
   }
 }
 
-// â”€â”€â”€ Icon area helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Icon area helpers ────────────────────────────────────────────────────────
 
 class _IconArea extends StatelessWidget {
   const _IconArea({required this.doc, this.showBadge = false});
@@ -281,7 +281,7 @@ class _SmallIconBox extends StatelessWidget {
   }
 }
 
-// â”€â”€â”€ Extension badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Extension badge ──────────────────────────────────────────────────────────
 
 class _ExtBadge extends StatelessWidget {
   const _ExtBadge({
@@ -315,7 +315,7 @@ class _ExtBadge extends StatelessWidget {
   }
 }
 
-// â”€â”€â”€ Shared ext badge widget (exported) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Shared ext badge widget (exported) ──────────────────────────────────────
 
 class DocExtBadge extends StatelessWidget {
   const DocExtBadge({super.key, required this.doc});

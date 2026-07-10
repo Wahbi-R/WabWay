@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/trip/app_trip_member.dart';
 import '../../core/trip/trip_state.dart';
@@ -9,7 +9,7 @@ import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 import 'item_tile.dart';
 
-// â”€â”€â”€ Trip day card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Trip day card ────────────────────────────────────────────────────────────
 
 class TripDayCard extends StatefulWidget {
   const TripDayCard({
@@ -115,7 +115,7 @@ class _TripDayCardState extends State<TripDayCard> {
   }
 }
 
-// â”€â”€â”€ Day header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Day header ───────────────────────────────────────────────────────────────
 
 class _DayHeader extends StatelessWidget {
   const _DayHeader({
@@ -178,7 +178,7 @@ class _DayHeader extends StatelessWidget {
                               color: selected ? kColorPrimary : kColorInk,
                             )),
                         const SizedBox(width: kSpace2),
-                        Text('Â·',
+                        Text('·',
                             style:
                                 kStyleCaption.copyWith(color: kColorInkSoft)),
                         const SizedBox(width: kSpace2),
@@ -205,7 +205,7 @@ class _DayHeader extends StatelessWidget {
                         if (hasNotes && !expanded) ...[
                           Flexible(
                             child: Text(
-                              '  Â·  ${day.notes}',
+                              '  ·  ${day.notes}',
                               style: kStyleCaption.copyWith(
                                   fontSize: 11, color: kColorInkSoft),
                               maxLines: 1,
@@ -230,7 +230,7 @@ class _DayHeader extends StatelessWidget {
                 ),
               ),
 
-              // Completion badge â€” shows "X/Y done" when some are checked off,
+              // Completion badge — shows "X/Y done" when some are checked off,
               // plain count when none are done yet.
               if (day.items.isNotEmpty)
                 Builder(builder: (context) {
@@ -301,7 +301,7 @@ class _DayHeader extends StatelessWidget {
   }
 }
 
-// â”€â”€â”€ Empty day body â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Empty day body ───────────────────────────────────────────────────────────
 
 class _EmptyDayBody extends StatelessWidget {
   const _EmptyDayBody({required this.onAddItem});
@@ -332,7 +332,7 @@ class _EmptyDayBody extends StatelessWidget {
   }
 }
 
-// â”€â”€â”€ Reorderable item list â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Reorderable item list ────────────────────────────────────────────────────
 
 class _ReorderableItemList extends StatefulWidget {
   const _ReorderableItemList({
@@ -440,7 +440,7 @@ class _ReorderableItemListState extends State<_ReorderableItemList> {
   }
 }
 
-// â”€â”€â”€ Add item row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Add item row ─────────────────────────────────────────────────────────────
 
 // ─── Member presence row ──────────────────────────────────────────────────────
 

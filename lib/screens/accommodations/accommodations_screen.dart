@@ -172,7 +172,7 @@ class _AccommodationsScreenState extends State<AccommodationsScreen> {
           SliverToBoxAdapter(
             child: WabwaySearchBar(
               controller: _searchCtrl,
-              hint: 'Search staysâ€¦',
+              hint: 'Search stays…',
               onChanged: (v) => setState(() => _search = v),
             ),
           ),
@@ -347,7 +347,7 @@ class _AccommodationCard extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         item.city.isNotEmpty
-                            ? '${item.city} Â· ${source.label}'
+                            ? '${item.city} · ${source.label}'
                             : source.label,
                         style: kStyleCaption,
                         maxLines: 1,

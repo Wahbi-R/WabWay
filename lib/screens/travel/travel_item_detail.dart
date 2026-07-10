@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -12,7 +12,7 @@ import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 import 'add_travel_sheet.dart';
 
-// â”€â”€â”€ Mobile screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Mobile screen ────────────────────────────────────────────────────────────
 
 class TravelItemDetailScreen extends StatelessWidget {
   const TravelItemDetailScreen({
@@ -58,7 +58,7 @@ class TravelItemDetailScreen extends StatelessWidget {
   }
 }
 
-// â”€â”€â”€ Shared detail content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Shared detail content ────────────────────────────────────────────────────
 
 class TravelItemDetailContent extends StatelessWidget {
   const TravelItemDetailContent({
@@ -134,7 +134,7 @@ class TravelItemDetailContent extends StatelessWidget {
   }
 }
 
-// â”€â”€â”€ Header band â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Header band ──────────────────────────────────────────────────────────────
 
 class _TravelDetailHeader extends StatelessWidget {
   const _TravelDetailHeader({required this.item});
@@ -232,7 +232,7 @@ class _TravelDetailHeader extends StatelessWidget {
                   const SizedBox(width: 4),
                   Flexible(
                     child: Text(
-                      '${item.location!} â†’ ${item.destination!}',
+                      '${item.location!} → ${item.destination!}',
                       style: kStyleCaption.copyWith(
                           color: color.withValues(alpha: 0.8)),
                     ),
@@ -261,7 +261,7 @@ class _TravelDetailHeader extends StatelessWidget {
   }
 }
 
-// â”€â”€â”€ Metadata card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Metadata card ────────────────────────────────────────────────────────────
 
 class _MetaCard extends StatelessWidget {
   const _MetaCard({required this.item});
@@ -388,7 +388,7 @@ class _MetaRow extends StatelessWidget {
   }
 }
 
-// â”€â”€â”€ Linked documents â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Linked documents ─────────────────────────────────────────────────────────
 
 class _DocsSection extends StatelessWidget {
   const _DocsSection({required this.docs});
@@ -437,7 +437,7 @@ class _DocTile extends StatelessWidget {
                 children: [
                   Text(doc.title, style: kStyleBodyMedium),
                   Text(
-                    '${doc.type.label} Â· ${doc.extUpper}',
+                    '${doc.type.label} · ${doc.extUpper}',
                     style: kStyleCaption.copyWith(color: kColorInkSoft, fontSize: 12),
                   ),
                 ],
@@ -452,7 +452,7 @@ class _DocTile extends StatelessWidget {
 
 }
 
-// â”€â”€â”€ Linked plan item â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Linked plan item ─────────────────────────────────────────────────────────
 
 class _PlanItemSection extends StatelessWidget {
   const _PlanItemSection({required this.item, required this.day});
@@ -494,7 +494,7 @@ class _PlanItemSection extends StatelessWidget {
                   children: [
                     Text(item.title, style: kStyleBodyMedium),
                     Text(
-                      'Day ${day.dayNumber} Â· ${fmtDate(day.date)}',
+                      'Day ${day.dayNumber} · ${fmtDate(day.date)}',
                       style: kStyleCaption.copyWith(
                           color: kColorInkSoft, fontSize: 12),
                     ),
@@ -555,7 +555,7 @@ class _PlanDaySection extends StatelessWidget {
                   children: [
                     Text('Day ${day.dayNumber}', style: kStyleBodyMedium),
                     Text(
-                      '${fmtDate(day.date)} Â· ${day.city}',
+                      '${fmtDate(day.date)} · ${day.city}',
                       style: kStyleCaption.copyWith(
                           color: kColorInkSoft, fontSize: 12),
                     ),
@@ -572,7 +572,7 @@ class _PlanDaySection extends StatelessWidget {
   }
 }
 
-// â”€â”€â”€ Notes section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Notes section ────────────────────────────────────────────────────────────
 
 class _NotesSection extends StatelessWidget {
   const _NotesSection({required this.notes});
@@ -599,7 +599,7 @@ class _NotesSection extends StatelessWidget {
   }
 }
 
-// â”€â”€â”€ Actions section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Actions section ──────────────────────────────────────────────────────────
 
 class _ActionsSection extends StatelessWidget {
   const _ActionsSection({
@@ -722,7 +722,7 @@ class _ActionsSection extends StatelessWidget {
   }
 }
 
-// â”€â”€â”€ Shared helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Shared helpers ───────────────────────────────────────────────────────────
 
 Future<void> _openDoc(BuildContext context, TripDocument doc) async {
   final String? url;
@@ -753,7 +753,7 @@ Future<void> _openDoc(BuildContext context, TripDocument doc) async {
   }
 }
 
-// â”€â”€â”€ Mobile actions sheet â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Mobile actions sheet ─────────────────────────────────────────────────────
 
 void _showActionsSheet(
   BuildContext context,
@@ -857,7 +857,7 @@ class _SheetTile extends StatelessWidget {
   }
 }
 
-// â”€â”€â”€ Type badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Type badge ───────────────────────────────────────────────────────────────
 
 class _TypeBadge extends StatelessWidget {
   const _TypeBadge({required this.type});
@@ -890,7 +890,7 @@ class _TypeBadge extends StatelessWidget {
   }
 }
 
-// â”€â”€â”€ Status badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Status badge ─────────────────────────────────────────────────────────────
 
 class _StatusBadge extends StatelessWidget {
   const _StatusBadge({required this.status});

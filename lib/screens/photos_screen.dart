@@ -155,7 +155,7 @@ class _PhotosScreenState extends State<PhotosScreen> {
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const WabwayLoadingIndicator()
           : _error
               ? Center(
                   child: WabwayEmptyState(

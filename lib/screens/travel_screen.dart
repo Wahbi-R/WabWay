@@ -220,12 +220,7 @@ class _TravelScreenState extends State<TravelScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Scaffold(
-        backgroundColor: kColorCream,
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
+    if (_loading) return const WabwayLoadingScaffold();
 
     if (_error != null) {
       return Scaffold(

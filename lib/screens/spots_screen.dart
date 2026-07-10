@@ -408,21 +408,7 @@ class _SpotsScreenState extends State<SpotsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Scaffold(
-        backgroundColor: kColorCream,
-        body: Center(
-          child: SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation(kColorPrimary),
-            ),
-          ),
-        ),
-      );
-    }
+    if (_loading) return const WabwayLoadingScaffold();
 
     if (_error) {
       return Scaffold(

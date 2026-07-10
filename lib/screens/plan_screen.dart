@@ -738,7 +738,7 @@ class _PlanScreenState extends State<PlanScreen> {
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const WabwayLoadingIndicator()
           : _error != null
               ? Center(
                   child: WabwayEmptyState(

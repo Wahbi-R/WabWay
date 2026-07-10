@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 54,
+    label: 'Loading state refactor',
+    changes: [
+      'Extracted WabwayLoadingScaffold and WabwayLoadingIndicator widgets — 8 screens no longer have copy-pasted loading blocks; consistent spinner across the whole app',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 53,
     label: 'Search stays in global search',
     changes: [

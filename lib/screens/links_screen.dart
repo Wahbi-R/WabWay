@@ -162,7 +162,7 @@ class _LinksScreenState extends State<LinksScreen> {
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const WabwayLoadingIndicator()
           : _error
               ? Center(
                   child: WabwayEmptyState(

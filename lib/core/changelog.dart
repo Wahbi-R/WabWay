@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 57,
+    label: 'Spending by member',
+    changes: [
+      'New "Spending by member" card on the Receipts tab shows who paid the most and their proportion of total group spending — auto-hides when only one person paid',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 56,
     label: 'WabwayFilterStrip — shared filter chips',
     changes: [

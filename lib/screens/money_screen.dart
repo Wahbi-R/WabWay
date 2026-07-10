@@ -439,6 +439,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
       return Column(
         children: [
           _SpendingSummaryCard(receipts: _receipts, homeCurrency: _homeCurrency),
+          _SpendingByMemberCard(receipts: _receipts, homeCurrency: _homeCurrency, members: _members),
           Row(
             children: [
               Expanded(
@@ -651,6 +652,8 @@ class _MoneyScreenState extends State<MoneyScreen> {
                     children: [
                       _SpendingSummaryCard(
                           receipts: _receipts, homeCurrency: _homeCurrency),
+                      _SpendingByMemberCard(
+                          receipts: _receipts, homeCurrency: _homeCurrency, members: _members),
                       _receiptFilterStrip(),
                       Expanded(
                         child: _receiptListItems.isEmpty
@@ -986,6 +989,91 @@ class _SpendingSummaryCard extends StatelessWidget {
                           value: pct,
                           backgroundColor: e.key.softColor,
                           color: e.key.color,
+                          minHeight: 4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Spending by member ───────────────────────────────────────────────────────
+
+class _SpendingByMemberCard extends StatelessWidget {
+  const _SpendingByMemberCard({
+    required this.receipts,
+    required this.homeCurrency,
+    required this.members,
+  });
+
+  final List<Receipt> receipts;
+  final String homeCurrency;
+  final List<TripMember> members;
+
+  @override
+  Widget build(BuildContext context) {
+    final Map<String, double> paid = {};
+    for (final r in receipts) {
+      paid[r.paidById] = (paid[r.paidById] ?? 0.0) + r.homeAmount;
+    }
+    // Only show when at least 2 different people paid.
+    if (paid.length < 2) return const SizedBox.shrink();
+
+    final grandTotal = paid.values.fold(0.0, (s, v) => s + v);
+    final sorted = paid.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final memberName = {for (final m in members) m.id: m.name};
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(kSpace4, kSpace3, kSpace4, 0),
+      child: WabwayCard(
+        padding: const EdgeInsets.symmetric(horizontal: kSpace4, vertical: kSpace3),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text('Spending by member',
+                    style: kStyleCaption.copyWith(color: kColorInkSoft)),
+                const Spacer(),
+                Text(fmtAmount(grandTotal, homeCurrency),
+                    style: kStyleBodySemibold),
+              ],
+            ),
+            const SizedBox(height: kSpace3),
+            ...sorted.map((e) {
+              final name = memberName[e.key] ?? e.key.substring(0, 4);
+              final initials = name.trim().split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join().toUpperCase();
+              final pct = grandTotal > 0 ? e.value / grandTotal : 0.0;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: kSpace2),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 8,
+                      backgroundColor: kColorPrimarySoft,
+                      child: Text(initials, style: kStyleCaption.copyWith(fontSize: 8, color: kColorPrimaryDark)),
+                    ),
+                    const SizedBox(width: kSpace2),
+                    Expanded(
+                      child: Text(name, style: kStyleCaption.copyWith(color: kColorInkSoft)),
+                    ),
+                    Text(fmtAmount(e.value, homeCurrency), style: kStyleCaptionMedium),
+                    const SizedBox(width: kSpace3),
+                    SizedBox(
+                      width: 48,
+                      child: ClipRRect(
+                        borderRadius: kRadiusPill,
+                        child: LinearProgressIndicator(
+                          value: pct,
+                          backgroundColor: kColorPrimarySoft,
+                          color: kColorPrimary,
                           minHeight: 4,
                         ),
                       ),

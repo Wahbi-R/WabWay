@@ -45,6 +45,8 @@ jobs:
           echo "SUPABASE_URL=${{ vars.SUPABASE_URL }}" > .env
           echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
           echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
+          echo "AUDIO_SERVER_URL=${{ vars.AUDIO_SERVER_URL }}" >> .env
+          echo "GOOGLE_PLACES_API_KEY=${{ secrets.GOOGLE_PLACES_API_KEY }}" >> .env
 
       - name: Flutter pub get
         run: flutter pub get

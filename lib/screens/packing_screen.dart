@@ -104,6 +104,54 @@ class _PackingScreenState extends State<PackingScreen> {
     _load(silent: true);
   }
 
+  Widget _buildList() {
+    final unpacked = _items.where((i) => !i.isPacked).toList();
+    final packed   = _items.where((i) => i.isPacked).toList();
+
+    // Build a flat entry list: unpacked items, then an optional "Packed" header
+    // + packed items. A null entry is used as the section header sentinel.
+    final entries = <PackingItem?>[];
+    entries.addAll(unpacked.map((i) => i));
+    if (packed.isNotEmpty) {
+      entries.add(null); // section header
+      entries.addAll(packed.map((i) => i));
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: kSpace3),
+      itemCount: entries.length,
+      itemBuilder: (_, i) {
+        final entry = entries[i];
+        if (entry == null) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(kSpace4, kSpace4, kSpace4, kSpace2),
+            child: Text(
+              'Packed (${packed.length})',
+              style: kStyleCaptionMedium.copyWith(color: kColorInkSoft),
+            ),
+          );
+        }
+        final isLast = i == entries.length - 1 ||
+            (i < entries.length - 1 && entries[i + 1] == null);
+        return Column(
+          children: [
+            _PackingTile(
+              item: entry,
+              onToggle: () => _toggle(entry),
+              onDelete: () => _delete(entry),
+            ),
+            if (!isLast)
+              const Divider(
+                height: 1,
+                indent: kSpace4 + 40 + kSpace3,
+                endIndent: kSpace4,
+              ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) return const WabwayLoadingScaffold();
@@ -141,23 +189,7 @@ class _PackingScreenState extends State<PackingScreen> {
         onRefresh: () => _load(),
         child: total == 0
             ? _EmptyState(onAdd: _addItem)
-            : ListView.separated(
-                padding: const EdgeInsets.symmetric(vertical: kSpace3),
-                itemCount: _items.length,
-                separatorBuilder: (_, __) => const Divider(
-                  height: 1,
-                  indent: kSpace4 + 40 + kSpace3,
-                  endIndent: kSpace4,
-                ),
-                itemBuilder: (_, i) {
-                  final item = _items[i];
-                  return _PackingTile(
-                    item: item,
-                    onToggle: () => _toggle(item),
-                    onDelete: () => _delete(item),
-                  );
-                },
-              ),
+            : _buildList(),
       ),
     );
   }

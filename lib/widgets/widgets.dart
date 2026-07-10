@@ -12,3 +12,4 @@ export 'wabway_tag.dart';
 export 'wabway_text_field.dart';
 export 'destination_autocomplete.dart';
 export 'offline_banner.dart';
+export 'place_search_field.dart';

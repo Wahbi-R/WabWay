@@ -11,6 +11,18 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 30,
+    label: 'Google Places search',
+    changes: [
+      'Place search now uses Google Places (via the WabWay server) for much better results — restaurants, shops, and local businesses are found instantly',
+      'Search fires when you press Enter or tap the search icon, not on every keystroke — no accidental API charges',
+      'Falls back to Photon (OpenStreetMap) automatically when the server is unavailable',
+      'Both the Add Spot and Add Plan Item location fields share the same search widget and engine',
+      'Google Takeout CSV geocoding also uses Google Places as the first lookup before falling back to Nominatim',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 29,
     label: 'CSV import & share support',
     changes: [

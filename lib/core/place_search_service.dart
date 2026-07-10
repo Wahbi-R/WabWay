@@ -3,7 +3,80 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../data/spot_data.dart';
 
+const _kServerUrl = String.fromEnvironment('AUDIO_SERVER_URL', defaultValue: '');
+
 abstract final class PlaceSearchService {
+  static const _kTimeout = Duration(seconds: 8);
+
+  /// Search for places by text query. Calls the wabway-server Google Places
+  /// endpoint when available, falls back to Photon (OSM) otherwise.
+  static Future<List<PlaceSuggestion>> search(
+    String query, {
+    double? latitude,
+    double? longitude,
+    int limit = 6,
+  }) async {
+    if (query.trim().isEmpty) return [];
+    if (_kServerUrl.isNotEmpty) {
+      final results = await _searchViaServer(
+        query, lat: latitude, lng: longitude, limit: limit,
+      );
+      if (results != null) return results;
+    }
+    return searchPhoton(query, limit: limit);
+  }
+
+  static Future<List<PlaceSuggestion>?> _searchViaServer(
+    String query, {
+    double? lat,
+    double? lng,
+    int limit = 6,
+  }) async {
+    try {
+      final body = <String, dynamic>{'query': query.trim(), 'limit': limit};
+      if (lat != null && lng != null) {
+        body['latitude']  = lat;
+        body['longitude'] = lng;
+      }
+      final response = await http.post(
+        Uri.parse('$_kServerUrl/places/search'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      ).timeout(_kTimeout);
+      if (response.statusCode != 200) return null;
+      final list = jsonDecode(response.body) as List<dynamic>;
+      if (list.isEmpty) return null; // fall through to Photon
+      return list.map((r) {
+        final m = r as Map<String, dynamic>;
+        final lat  = (m['latitude']  as num?)?.toDouble() ?? 0.0;
+        final lng  = (m['longitude'] as num?)?.toDouble() ?? 0.0;
+        final city = (m['city'] as String?)?.trim() ?? '';
+        return PlaceSuggestion(
+          name:      (m['name']    as String?)?.trim() ?? '',
+          address:   (m['address'] as String?)?.trim() ?? '',
+          city:      city,
+          area:      '',
+          country:   (m['country'] as String?)?.trim() ?? '',
+          category:  _categoryFromSlug(m['category'] as String? ?? ''),
+          latitude:  lat,
+          longitude: lng,
+          mapsUrl:   lat != 0 ? 'https://www.google.com/maps/search/?api=1&query=$lat,$lng' : '',
+        );
+      }).toList();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static SpotCategory _categoryFromSlug(String slug) => switch (slug) {
+    'food'       => SpotCategory.food,
+    'shopping'   => SpotCategory.shopping,
+    'nature'     => SpotCategory.nature,
+    'nightlife'  => SpotCategory.nightlife,
+    'experience' => SpotCategory.experience,
+    _            => SpotCategory.landmark,
+  };
+
   static Future<List<PlaceSuggestion>> searchPhoton(
     String query, {
     int limit = 6,

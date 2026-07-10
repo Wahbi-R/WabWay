@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'google_maps_parser.dart';
 import 'nominatim_service.dart';
+import '../place_search_service.dart';
 import '../../data/spot_data.dart';
 
 /// Parses Google Takeout exports for Google Maps / Saved data.
@@ -93,8 +94,21 @@ abstract final class TakeoutParser {
   static Future<MapsPlace> geocodePlace(MapsPlace place) async {
     if (place.hasCoords) return place; // already resolved
 
-    // Try Nominatim directly with the place name — faster than going through
-    // GoogleMapsParser which also fetches the (JS-rendered) Maps page.
+    // Step 0: try Google Places (via wabway-server) — best for named businesses.
+    final gpResults = await PlaceSearchService.search(place.name, limit: 1);
+    if (gpResults.isNotEmpty) {
+      final r = gpResults.first;
+      if (r.latitude != 0 || r.longitude != 0) {
+        return place.copyWith(
+          lat:      r.latitude,
+          lon:      r.longitude,
+          city:     r.city.isNotEmpty ? r.city : null,
+          category: r.category,
+        );
+      }
+    }
+
+    // Step 1: Nominatim directly with the place name.
     final hits = await NominatimService.search(place.name);
     if (hits.isNotEmpty) {
       final h = hits.first;

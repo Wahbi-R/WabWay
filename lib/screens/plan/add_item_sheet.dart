@@ -1,13 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import '../../core/place_search_service.dart';
 import '../../data/plan_data.dart';
 import '../../data/docs_data.dart';
 import '../../data/spot_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
+import '../../widgets/place_search_field.dart';
 import '../../widgets/widgets.dart';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -318,10 +318,12 @@ class _AddItemContentState extends State<_AddItemContent> {
                   ),
                   const SizedBox(height: kSpace4),
 
-                  // ── Location / Address (with autocomplete) ────────────────
-                  _LocationField(
+                  // ── Location / Address (with place search) ────────────────
+                  PlaceSearchField(
+                    label: 'Location / Address',
+                    hint: 'e.g. 2-3-1 Asakusa, Taito City',
                     controller: _locationCtrl,
-                    onPlaceSelected: (p) {
+                    onSelected: (p) {
                       setState(() {
                         _locationCtrl.text = p.address.isNotEmpty
                             ? '${p.name}, ${p.address}'
@@ -642,140 +644,6 @@ class _SpotPickerState extends State<_SpotPicker> {
           ),
         ],
       ),
-    );
-  }
-}
-
-// ─── Location / Address field with autocomplete ───────────────────────────────
-
-class _LocationField extends StatefulWidget {
-  const _LocationField({
-    required this.controller,
-    required this.onPlaceSelected,
-  });
-  final TextEditingController controller;
-  final ValueChanged<PlaceSuggestion> onPlaceSelected;
-
-  @override
-  State<_LocationField> createState() => _LocationFieldState();
-}
-
-class _LocationFieldState extends State<_LocationField> {
-  Timer? _debounce;
-  List<PlaceSuggestion> _suggestions = [];
-  bool _showSuggestions = false;
-  bool _loading = false;
-  final _focus = FocusNode();
-
-  @override
-  void initState() {
-    super.initState();
-    _focus.addListener(() {
-      if (!_focus.hasFocus) setState(() => _showSuggestions = false);
-    });
-  }
-
-  @override
-  void dispose() {
-    _debounce?.cancel();
-    _focus.dispose();
-    super.dispose();
-  }
-
-  void _onChanged(String v) {
-    _debounce?.cancel();
-    if (v.trim().length < 3) {
-      setState(() { _suggestions = []; _showSuggestions = false; });
-      return;
-    }
-    _debounce = Timer(const Duration(milliseconds: 350), () async {
-      if (!mounted) return;
-      setState(() => _loading = true);
-      final results = await PlaceSearchService.searchPhoton(v.trim(), limit: 5);
-      if (!mounted) return;
-      setState(() {
-        _suggestions = results;
-        _showSuggestions = results.isNotEmpty;
-        _loading = false;
-      });
-    });
-  }
-
-  void _select(PlaceSuggestion p) {
-    setState(() { _showSuggestions = false; _suggestions = []; });
-    _focus.unfocus();
-    widget.onPlaceSelected(p);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        WabwayTextField(
-          label: 'Location / Address',
-          hint: 'e.g. 2-3-1 Asakusa, Taito City',
-          controller: widget.controller,
-          focusNode: _focus,
-          textInputAction: TextInputAction.next,
-          onChanged: _onChanged,
-          suffixIcon: _loading ? Icons.hourglass_top_rounded : null,
-        ),
-        if (_showSuggestions)
-          Container(
-            margin: const EdgeInsets.only(top: 2),
-            decoration: BoxDecoration(
-              color: kColorPaper,
-              borderRadius: kRadiusMd,
-              border: Border.all(color: kColorBorder),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.06),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              children: _suggestions.map((p) {
-                final subtitle = [
-                  if (p.address.isNotEmpty) p.address,
-                  if (p.city.isNotEmpty) p.city,
-                  if (p.country.isNotEmpty) p.country,
-                ].join(', ');
-                return InkWell(
-                  onTap: () => _select(p),
-                  borderRadius: kRadiusMd,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: kSpace3, vertical: kSpace3),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.place_outlined,
-                            size: 16, color: kColorInkSoft),
-                        const SizedBox(width: kSpace2),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(p.name, style: kStyleBodyMedium),
-                              if (subtitle.isNotEmpty)
-                                Text(subtitle,
-                                    style: kStyleCaption.copyWith(
-                                        color: kColorInkSoft),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-      ],
     );
   }
 }

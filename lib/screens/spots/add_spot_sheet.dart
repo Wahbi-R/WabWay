@@ -7,6 +7,7 @@ import '../../data/spot_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
+import '../../widgets/place_search_field.dart';
 import '../../widgets/widgets.dart';
 
 Future<Spot?> showAddSpotSheet(
@@ -131,7 +132,6 @@ class _AddSpotContent extends StatefulWidget {
 
 class _AddSpotContentState extends State<_AddSpotContent> {
   final _formKey      = GlobalKey<FormState>();
-  final _searchCtrl   = TextEditingController();
   final _nameCtrl     = TextEditingController();
   final _cityCtrl     = TextEditingController();
   final _areaCtrl     = TextEditingController();
@@ -152,10 +152,6 @@ class _AddSpotContentState extends State<_AddSpotContent> {
   double? _longitude;
   String? _placeSource;
 
-  List<PlaceSuggestion> _suggestions = [];
-  bool _showSuggestions = false;
-  bool _searchLoading = false;
-  Timer? _searchDebounce;
 
   @override
   void initState() {
@@ -182,9 +178,7 @@ class _AddSpotContentState extends State<_AddSpotContent> {
 
   @override
   void dispose() {
-    _searchDebounce?.cancel();
     _mapsDebounce?.cancel();
-    _searchCtrl.dispose();
     _nameCtrl.dispose();
     _cityCtrl.dispose();
     _areaCtrl.dispose();
@@ -194,21 +188,6 @@ class _AddSpotContentState extends State<_AddSpotContent> {
     _sourceCtrl.dispose();
     _notesCtrl.dispose();
     super.dispose();
-  }
-
-  void _onSearchChanged(String query) {
-    _searchDebounce?.cancel();
-    if (query.trim().isEmpty) {
-      setState(() { _suggestions = []; _showSuggestions = false; _searchLoading = false; });
-      return;
-    }
-    setState(() { _suggestions = []; _showSuggestions = true; _searchLoading = true; });
-
-    _searchDebounce = Timer(const Duration(milliseconds: 350), () async {
-      final results = await PlaceSearchService.searchPhoton(query);
-      if (!mounted) return;
-      setState(() { _suggestions = results; _searchLoading = false; });
-    });
   }
 
   Timer? _mapsDebounce;
@@ -268,18 +247,12 @@ class _AddSpotContentState extends State<_AddSpotContent> {
     _addressCtrl.text = place.address;
     _countryCtrl.text = place.country;
     _mapsCtrl.text    = place.mapsUrl;
-    _searchCtrl.clear();
     setState(() {
-      _category        = place.category;
-      _latitude        = place.latitude;
-      _longitude       = place.longitude;
-
-      _placeSource     = 'photon';
-      _suggestions     = [];
-      _showSuggestions = false;
-      _searchLoading   = false;
+      _category    = place.category;
+      _latitude    = place.latitude;
+      _longitude   = place.longitude;
+      _placeSource = 'place_search';
     });
-    _searchDebounce?.cancel();
   }
 
   Future<void> _submit() async {
@@ -355,93 +328,15 @@ class _AddSpotContentState extends State<_AddSpotContent> {
           ),
         ),
 
-        // ── Place search bar ─────────────────────────────────────────────
+        // ── Place search ─────────────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.fromLTRB(kSpace4, kSpace3, kSpace4, 0),
-          child: TextField(
-            controller: _searchCtrl,
-            onChanged: _onSearchChanged,
-            textInputAction: TextInputAction.search,
-            decoration: InputDecoration(
-              hintText: 'Search a place (Senso-ji, Shibuya…)',
-              hintStyle: kStyleBody.copyWith(color: kColorInkSoft),
-              prefixIcon: const Icon(Icons.search_rounded, color: kColorInkSoft),
-              suffixIcon: _searchCtrl.text.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear_rounded, size: 18),
-                      color: kColorInkSoft,
-                      onPressed: () {
-                        _searchCtrl.clear();
-                        setState(() {
-                          _suggestions     = [];
-                          _showSuggestions = false;
-                        });
-                      },
-                    )
-                  : null,
-              filled: true,
-              fillColor: kColorSurfaceSunken,
-              contentPadding: const EdgeInsets.symmetric(
-                  horizontal: kSpace3, vertical: 10),
-              border: const OutlineInputBorder(
-                borderRadius: kRadiusMd,
-                borderSide: BorderSide.none,
-              ),
-            ),
+          child: PlaceSearchField(
+            label: 'Search a place',
+            hint: 'Senso-ji, Hinoya Curry Tokyo…',
+            onSelected: _applySuggestion,
           ),
         ),
-
-        // ── Suggestion list ──────────────────────────────────────────────
-        if (_showSuggestions) ...[
-          const SizedBox(height: kSpace2),
-          if (_searchLoading && _suggestions.isEmpty)
-            const Padding(
-              padding: EdgeInsets.fromLTRB(kSpace4, 0, kSpace4, kSpace2),
-              child: Center(child: SizedBox(
-                width: 16, height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )),
-            )
-          else if (_suggestions.isEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(kSpace4, 0, kSpace4, kSpace2),
-              child: Text(
-                'No matches — fill the form manually',
-                style: kStyleCaption.copyWith(color: kColorInkSoft),
-              ),
-            )
-          else
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 240),
-              child: ListView.separated(
-                shrinkWrap: true,
-                padding: const EdgeInsets.symmetric(horizontal: kSpace4),
-                itemCount: _suggestions.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (_, i) {
-                  final place = _suggestions[i];
-                  return ListTile(
-                    dense: true,
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: kSpace2, vertical: 2),
-                    leading: Icon(
-                      _categoryIcon(place.category),
-                      size: 18,
-                      color: kColorInkSoft,
-                    ),
-                    title: Text(place.name, style: kStyleBody),
-                    subtitle: Text(
-                      [place.area, place.city]
-                          .where((s) => s.isNotEmpty)
-                          .join(', '),
-                      style: kStyleCaption.copyWith(color: kColorInkSoft),
-                    ),
-                    onTap: () => _applySuggestion(place),
-                  );
-                },
-              ),
-            ),
-        ],
 
         const Divider(height: kSpace4),
 
@@ -617,12 +512,4 @@ class _AddSpotContentState extends State<_AddSpotContent> {
     );
   }
 
-  IconData _categoryIcon(SpotCategory cat) => switch (cat) {
-        SpotCategory.food       => Icons.restaurant_rounded,
-        SpotCategory.landmark   => Icons.account_balance_rounded,
-        SpotCategory.nature     => Icons.park_rounded,
-        SpotCategory.experience => Icons.star_rounded,
-        SpotCategory.shopping   => Icons.shopping_bag_rounded,
-        SpotCategory.nightlife  => Icons.nightlife_rounded,
-      };
 }

@@ -26,6 +26,8 @@ class WabwayTextField extends StatelessWidget {
     this.readOnly = false,
     this.focusNode,
     this.inputFormatters,
+    this.onSuffixTap,
+    this.onFieldSubmitted,
   });
 
   final String? label;
@@ -33,9 +35,11 @@ class WabwayTextField extends StatelessWidget {
   final TextEditingController? controller;
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
+  final ValueChanged<String>? onFieldSubmitted;
   final FormFieldValidator<String>? validator;
   final IconData? prefixIcon;
   final IconData? suffixIcon;
+  final VoidCallback? onSuffixTap;
   final String? error;
   final String? helpText;
   final TextInputType? keyboardType;
@@ -61,7 +65,7 @@ class WabwayTextField extends StatelessWidget {
         TextFormField(
           controller: controller,
           onChanged: onChanged,
-          onFieldSubmitted: onSubmitted,
+          onFieldSubmitted: onFieldSubmitted ?? onSubmitted,
           validator: validator,
           keyboardType: maxLines > 1 ? TextInputType.multiline : keyboardType,
           textInputAction: textInputAction,
@@ -82,7 +86,10 @@ class WabwayTextField extends StatelessWidget {
                   )
                 : null,
             suffix: suffixIcon != null
-                ? Icon(suffixIcon, size: 18, color: kColorInkSoft)
+                ? GestureDetector(
+                    onTap: onSuffixTap,
+                    child: Icon(suffixIcon, size: 18, color: kColorInkSoft),
+                  )
                 : null,
           ).copyWith(
             errorText: error,

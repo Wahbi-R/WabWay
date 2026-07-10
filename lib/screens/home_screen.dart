@@ -70,6 +70,8 @@ class _HomeData {
   // Sum of home-currency equivalents — consistent across multi-currency trips.
   double get totalSpent => receipts.fold(0.0, (s, r) => s + r.homeAmount);
 
+  // First day from today (inclusive) that has at least one itinerary item.
+  // Days are sorted chronologically by PlanService, so the first match is correct.
   TripDay? get nextDay {
     final today = _today();
     for (final d in days) {
@@ -78,6 +80,8 @@ class _HomeData {
     return null;
   }
 
+  // Nearest upcoming travel booking by departure date.
+  // Linear scan — travelItems is small enough that sorting would be overkill.
   TravelItem? get nextTravelItem {
     final today = _today();
     TravelItem? result;
@@ -140,6 +144,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final myId = ProfileState.of(context).id;
 
     try {
+      // All seven sources in one round-trip so the home screen loads in parallel.
+      // results[0..6] must stay in sync with the list order below.
       final results = await Future.wait([
         SpotService.loadSpots(trip.id),
         DocService.loadDocuments(trip.id),

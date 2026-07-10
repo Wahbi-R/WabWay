@@ -228,24 +228,31 @@ class _DayHeader extends StatelessWidget {
                 ),
               ),
 
-              // Item count badge
+              // Completion badge — shows "X/Y done" when some are checked off,
+              // plain count when none are done yet.
               if (day.items.isNotEmpty)
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: const BoxDecoration(
-                    color: kColorSurfaceSunken,
-                    borderRadius: kRadiusPill,
-                  ),
-                  child: Text(
-                    '${day.items.length}',
-                    style: kStyleCaption.copyWith(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: kColorInkSoft,
+                Builder(builder: (context) {
+                  final done  = day.items.where((i) => i.isDone).length;
+                  final total = day.items.length;
+                  final allDone = done == total;
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: allDone
+                          ? kColorPrimary.withValues(alpha: 0.12)
+                          : kColorSurfaceSunken,
+                      borderRadius: kRadiusPill,
                     ),
-                  ),
-                ),
+                    child: Text(
+                      done > 0 ? '$done/$total' : '$total',
+                      style: kStyleCaption.copyWith(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: allDone ? kColorPrimary : kColorInkSoft,
+                      ),
+                    ),
+                  );
+                }),
               if (onEdit != null) ...[
                 const SizedBox(width: kSpace2),
                 GestureDetector(

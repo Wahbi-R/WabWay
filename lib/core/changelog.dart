@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 52,
+    label: 'Day completion badge',
+    changes: [
+      'Plan day headers now show a "2/5" done/total badge when items are checked off — turns green when the whole day is complete',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 51,
     label: 'Check off plan items',
     changes: [

@@ -5,6 +5,21 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 
+// Returns a short countdown label relative to today, or null when there is
+// no date or the item's start date has already passed.
+String? _countdownLabel(TravelItem item) {
+  final start = item.date;
+  if (start == null) return null;
+  final now   = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final day   = DateTime(start.year, start.month, start.day);
+  if (today.isAfter(day)) return null;
+  final diff = day.difference(today).inDays;
+  if (diff == 0) return 'Today!';
+  if (diff == 1) return 'Tomorrow';
+  return 'In $diff days';
+}
+
 class TravelItemCard extends StatefulWidget {
   const TravelItemCard({
     super.key,
@@ -120,6 +135,16 @@ class _TravelItemCardState extends State<TravelItemCard> {
                         if (item.hasDate) ...[
                           const SizedBox(height: kSpace2),
                           _DateRow(item: item),
+                        ],
+                        if (_countdownLabel(item) != null) ...[
+                          const SizedBox(height: kSpace1),
+                          Text(
+                            _countdownLabel(item)!,
+                            style: kStyleCaption.copyWith(
+                              color: color,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ],
                         if (item.hasConfirmation) ...[
                           const SizedBox(height: kSpace2),

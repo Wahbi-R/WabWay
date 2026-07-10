@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 91,
+    label: 'Travel item countdown',
+    changes: [
+      'Travel cards now show how many days away the departure/event is ("Tomorrow", "In 3 days")',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 90,
     label: 'Text encoding fix',
     changes: [

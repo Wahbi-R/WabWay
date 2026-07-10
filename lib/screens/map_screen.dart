@@ -413,6 +413,7 @@ class _SpotMarker extends StatelessWidget {
         SpotStatus.confirmed => kColorSuccess,
         SpotStatus.planned   => const Color(0xFF7D9A75),
         SpotStatus.booked    => kColorSuccess,
+        SpotStatus.visited   => kColorSuccess,
         SpotStatus.skipped   => kColorDanger,
       };
 
@@ -488,6 +489,7 @@ class _SpotListRow extends StatelessWidget {
         SpotStatus.confirmed => kColorSuccess,
         SpotStatus.planned   => const Color(0xFF7D9A75),
         SpotStatus.booked    => kColorSuccess,
+        SpotStatus.visited   => kColorSuccess,
         SpotStatus.skipped   => kColorDanger,
       };
 

@@ -137,25 +137,28 @@ class _PackingScreenState extends State<PackingScreen> {
           const SizedBox(width: 4),
         ],
       ),
-      body: total == 0
-          ? _EmptyState(onAdd: _addItem)
-          : ListView.separated(
-              padding: const EdgeInsets.symmetric(vertical: kSpace3),
-              itemCount: _items.length,
-              separatorBuilder: (_, __) => const Divider(
-                height: 1,
-                indent: kSpace4 + 40 + kSpace3,
-                endIndent: kSpace4,
+      body: RefreshIndicator(
+        onRefresh: () => _load(),
+        child: total == 0
+            ? _EmptyState(onAdd: _addItem)
+            : ListView.separated(
+                padding: const EdgeInsets.symmetric(vertical: kSpace3),
+                itemCount: _items.length,
+                separatorBuilder: (_, __) => const Divider(
+                  height: 1,
+                  indent: kSpace4 + 40 + kSpace3,
+                  endIndent: kSpace4,
+                ),
+                itemBuilder: (_, i) {
+                  final item = _items[i];
+                  return _PackingTile(
+                    item: item,
+                    onToggle: () => _toggle(item),
+                    onDelete: () => _delete(item),
+                  );
+                },
               ),
-              itemBuilder: (_, i) {
-                final item = _items[i];
-                return _PackingTile(
-                  item: item,
-                  onToggle: () => _toggle(item),
-                  onDelete: () => _delete(item),
-                );
-              },
-            ),
+      ),
     );
   }
 }

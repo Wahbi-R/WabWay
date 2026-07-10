@@ -31,6 +31,7 @@ abstract final class SpotService {
         'confirmed'  => SpotStatus.confirmed,
         'planned'    => SpotStatus.planned,
         'booked'     => SpotStatus.booked,
+        'visited'    => SpotStatus.visited,
         'skipped'    => SpotStatus.skipped,
         _            => SpotStatus.idea,
       };
@@ -42,6 +43,7 @@ abstract final class SpotService {
         SpotStatus.confirmed => 'confirmed',
         SpotStatus.planned   => 'planned',
         SpotStatus.booked    => 'booked',
+        SpotStatus.visited   => 'visited',
         SpotStatus.skipped   => 'skipped',
       };
 

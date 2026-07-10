@@ -10,6 +10,7 @@ enum SpotStatus {
   confirmed,
   planned,
   booked,
+  visited,
   skipped;
 
   String get label => switch (this) {
@@ -19,6 +20,7 @@ enum SpotStatus {
     SpotStatus.confirmed => 'Confirmed',
     SpotStatus.planned   => 'Planned',
     SpotStatus.booked    => 'Booked',
+    SpotStatus.visited   => 'Visited',
     SpotStatus.skipped   => 'Skipped',
   };
 
@@ -29,6 +31,7 @@ enum SpotStatus {
     SpotStatus.confirmed => WabwayBadgeTone.success,
     SpotStatus.planned   => WabwayBadgeTone.secondary,
     SpotStatus.booked    => WabwayBadgeTone.success,
+    SpotStatus.visited   => WabwayBadgeTone.success,
     SpotStatus.skipped   => WabwayBadgeTone.danger,
   };
 }

@@ -167,6 +167,30 @@ class _SpotDetailContentState extends State<SpotDetailContent> {
     widget.onVote?.call(type);
   }
 
+  Future<void> _markVisited() async {
+    try {
+      final updated = await SpotService.updateSpot(
+        spotId: widget.spot.id,
+        name: widget.spot.name,
+        city: widget.spot.city,
+        area: widget.spot.area,
+        category: widget.spot.category,
+        status: SpotStatus.visited,
+        notes: widget.spot.notes,
+        mapsUrl: widget.spot.mapsUrl,
+        sourceUrl: widget.spot.sourceUrl,
+        address: widget.spot.address,
+      );
+      if (mounted) widget.onEdit?.call(updated);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not update: $e'), duration: const Duration(seconds: 3)),
+        );
+      }
+    }
+  }
+
   Future<void> _submitComment() async {
     final text = _commentCtrl.text.trim();
     if (text.isEmpty || _commentLoading) return;
@@ -392,6 +416,29 @@ class _SpotDetailContentState extends State<SpotDetailContent> {
                 ),
                 const SizedBox(height: kSpace3),
                 _GroupVotesSummary(votes: widget.spot.votes),
+              ],
+
+              // ── Mark as visited quick action
+              if (widget.onEdit != null &&
+                  widget.spot.status != SpotStatus.visited &&
+                  widget.spot.status != SpotStatus.skipped) ...[
+                const SizedBox(height: kSpace4),
+                const Divider(height: 1),
+                const SizedBox(height: kSpace4),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _markVisited,
+                    icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
+                    label: const Text('Mark as visited'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: kColorSuccess,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: kRadiusMd),
+                    ),
+                  ),
+                ),
               ],
 
               const SizedBox(height: kSpace4),

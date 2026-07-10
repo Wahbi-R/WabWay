@@ -10,6 +10,7 @@ export 'wabway_loading_state.dart';
 export 'wabway_select_field.dart';
 export 'wabway_tag.dart';
 export 'wabway_text_field.dart';
+export 'wabway_search_bar.dart';
 export 'destination_autocomplete.dart';
 export 'offline_banner.dart';
 export 'place_search_field.dart';

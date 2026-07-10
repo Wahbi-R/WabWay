@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 50,
+    label: 'WabwaySearchBar widget',
+    changes: [
+      'Extracted a shared WabwaySearchBar widget that replaces the repeated TextField implementation in Links, Travel, Plan, and Stays screens — same look, less code to maintain',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 49,
     label: 'Travel type filter counts',
     changes: [

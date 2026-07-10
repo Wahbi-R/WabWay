@@ -273,13 +273,10 @@ class _TravelScreenState extends State<TravelScreen> {
                   width: 420,
                   child: Column(
                     children: [
-                      _TravelSearchBar(
+                      WabwaySearchBar(
                         controller: _searchCtrl,
+                        hint: 'Search travel…',
                         onChanged: (v) => setState(() => _search = v),
-                        onClear: () {
-                          _searchCtrl.clear();
-                          setState(() => _search = '');
-                        },
                       ),
                       _FilterChips(
                         selected: _filter,
@@ -337,13 +334,10 @@ class _TravelScreenState extends State<TravelScreen> {
       ),
       body: Column(
         children: [
-          _TravelSearchBar(
+          WabwaySearchBar(
             controller: _searchCtrl,
+            hint: 'Search travel…',
             onChanged: (v) => setState(() => _search = v),
-            onClear: () {
-              _searchCtrl.clear();
-              setState(() => _search = '');
-            },
           ),
           _FilterChips(
             selected: _filter,
@@ -491,62 +485,6 @@ class _DesktopTravelBar extends StatelessWidget {
             onPressed: onAdd,
           ),
         ],
-      ),
-    );
-  }
-}
-
-// ─── Search bar ───────────────────────────────────────────────────────────────
-
-class _TravelSearchBar extends StatelessWidget {
-  const _TravelSearchBar({
-    required this.controller,
-    required this.onChanged,
-    required this.onClear,
-  });
-
-  final TextEditingController controller;
-  final ValueChanged<String> onChanged;
-  final VoidCallback onClear;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(kSpace4, kSpace3, kSpace4, 0),
-      child: TextField(
-        controller: controller,
-        style: kStyleBody,
-        decoration: InputDecoration(
-          hintText: 'Search travel…',
-          hintStyle: kStyleBody.copyWith(color: kColorInkSoft),
-          prefixIcon:
-              const Icon(Icons.search_rounded, size: 18, color: kColorInkSoft),
-          suffixIcon: controller.text.isNotEmpty
-              ? GestureDetector(
-                  onTap: onClear,
-                  child: const Icon(Icons.close_rounded,
-                      size: 16, color: kColorInkSoft),
-                )
-              : null,
-          filled: true,
-          fillColor: kColorBgRaised,
-          border: const OutlineInputBorder(
-            borderRadius: kRadiusMd,
-            borderSide: BorderSide(color: kColorBorder),
-          ),
-          enabledBorder: const OutlineInputBorder(
-            borderRadius: kRadiusMd,
-            borderSide: BorderSide(color: kColorBorder),
-          ),
-          focusedBorder: const OutlineInputBorder(
-            borderRadius: kRadiusMd,
-            borderSide: BorderSide(color: kColorPrimary),
-          ),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: kSpace3, vertical: kSpace2),
-          isDense: true,
-        ),
-        onChanged: onChanged,
       ),
     );
   }

@@ -563,8 +563,9 @@ class _PlanScreenState extends State<PlanScreen> {
                                 ? _buildEmptyTimeline(context)
                                 : Column(
                                     children: [
-                                      _PlanSearchBar(
+                                      WabwaySearchBar(
                                         controller: _searchCtrl,
+                                        hint: 'Search plan items…',
                                         onChanged: (v) => setState(() => _search = v),
                                       ),
                                       Expanded(
@@ -753,8 +754,9 @@ class _PlanScreenState extends State<PlanScreen> {
                     )
                   : Column(
                       children: [
-                        _PlanSearchBar(
+                        WabwaySearchBar(
                           controller: _searchCtrl,
+                          hint: 'Search plan items…',
                           onChanged: (v) => setState(() => _search = v),
                         ),
                         Expanded(
@@ -906,47 +908,6 @@ class _PlanScreenState extends State<PlanScreen> {
           ),
         );
       },
-    );
-  }
-}
-
-// ─── Plan search bar ──────────────────────────────────────────────────────────
-
-class _PlanSearchBar extends StatelessWidget {
-  const _PlanSearchBar({required this.controller, required this.onChanged});
-  final TextEditingController controller;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(kSpace4, kSpace3, kSpace4, 0),
-      child: TextField(
-        controller: controller,
-        style: kStyleBody,
-        decoration: InputDecoration(
-          hintText: 'Search plan items…',
-          hintStyle: kStyleBody.copyWith(color: kColorInkSoft),
-          prefixIcon: const Icon(Icons.search_rounded, size: 18, color: kColorInkSoft),
-          suffixIcon: controller.text.isNotEmpty
-              ? GestureDetector(
-                  onTap: () {
-                    controller.clear();
-                    onChanged('');
-                  },
-                  child: const Icon(Icons.close_rounded, size: 16, color: kColorInkSoft),
-                )
-              : null,
-          filled: true,
-          fillColor: kColorBgRaised,
-          border: const OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorBorder)),
-          enabledBorder: const OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorBorder)),
-          focusedBorder: const OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorPrimary)),
-          contentPadding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: kSpace2),
-          isDense: true,
-        ),
-        onChanged: onChanged,
-      ),
     );
   }
 }

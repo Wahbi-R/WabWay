@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
@@ -6,6 +6,7 @@ import '../../core/supabase/accommodation_service.dart';
 import '../../core/supabase/client.dart';
 import '../../core/trip/trip_state.dart';
 import '../../data/accommodation_data.dart';
+import '../../data/date_utils.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
@@ -23,6 +24,7 @@ class _AccommodationsScreenState extends State<AccommodationsScreen> {
   List<Accommodation> _items = [];
   bool _loading = true;
   bool _error   = false;
+  bool _offline  = false;
 
   String? _activeTripId;
   AccommodationStatus? _filterStatus;
@@ -81,9 +83,10 @@ class _AccommodationsScreenState extends State<AccommodationsScreen> {
       final tripId = TripState.tripOf(context).id;
       final items  = await AccommodationService.loadAll(tripId);
       if (!mounted) return;
-      setState(() { _items = items; _loading = false; });
+      setState(() { _items = items; _loading = false; _offline = false; });
     } catch (_) {
       if (!mounted) return;
+      if (silent) { setState(() => _offline = true); return; }
       setState(() { _loading = false; _error = true; });
     }
   }
@@ -158,7 +161,7 @@ class _AccommodationsScreenState extends State<AccommodationsScreen> {
 
     final filtered = _filtered;
 
-    return Scaffold(
+    final scaffold = Scaffold(
       backgroundColor: kColorCream,
       body: CustomScrollView(
         slivers: [
@@ -169,7 +172,7 @@ class _AccommodationsScreenState extends State<AccommodationsScreen> {
           SliverToBoxAdapter(
             child: WabwaySearchBar(
               controller: _searchCtrl,
-              hint: 'Search stays…',
+              hint: 'Search staysâ€¦',
               onChanged: (v) => setState(() => _search = v),
             ),
           ),
@@ -234,10 +237,20 @@ class _AccommodationsScreenState extends State<AccommodationsScreen> {
         ),
       ),
     );
+    if (!_offline) return scaffold;
+    return Stack(
+      children: [
+        scaffold,
+        Positioned(
+          left: 0, right: 0, bottom: 0,
+          child: OfflineBanner(onRetry: _load),
+        ),
+      ],
+    );
   }
 }
 
-// ─── Filter strip ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ Filter strip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _FilterStrip extends StatelessWidget {
   const _FilterStrip({
@@ -281,7 +294,7 @@ class _FilterStrip extends StatelessWidget {
   }
 }
 
-// ─── Accommodation card ───────────────────────────────────────────────────────
+// â”€â”€â”€ Accommodation card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _AccommodationCard extends StatelessWidget {
   const _AccommodationCard({required this.item, required this.onTap});
@@ -306,7 +319,7 @@ class _AccommodationCard extends StatelessWidget {
 
     String? dateStr;
     if (item.checkIn != null && item.checkOut != null) {
-      dateStr = '${_fmtDate(item.checkIn!)} → ${_fmtDate(item.checkOut!)}';
+      dateStr = '${fmtDate(item.checkIn!)} â†’ ${fmtDate(item.checkOut!)}';
       if (nightStr != null) dateStr = '$dateStr ($nightStr)';
     }
 
@@ -360,7 +373,7 @@ class _AccommodationCard extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         item.city.isNotEmpty
-                            ? '${item.city} · ${source.label}'
+                            ? '${item.city} Â· ${source.label}'
                             : source.label,
                         style: kStyleCaption,
                         maxLines: 1,
@@ -398,17 +411,11 @@ class _AccommodationCard extends StatelessWidget {
     );
   }
 
-  static String _fmtDate(DateTime dt) {
-    const months = ['Jan','Feb','Mar','Apr','May','Jun',
-                    'Jul','Aug','Sep','Oct','Nov','Dec'];
-    return '${months[dt.month - 1]} ${dt.day}';
-  }
-
   static String _currencySymbol(String code) => switch (code) {
         'USD' => '\$',
-        'EUR' => '€',
-        'GBP' => '£',
-        'JPY' => '¥',
+        'EUR' => 'â‚¬',
+        'GBP' => 'Â£',
+        'JPY' => 'Â¥',
         'CAD' => 'CA\$',
         'AUD' => 'A\$',
         _     => '$code ',
@@ -430,7 +437,7 @@ class _ImagePlaceholder extends StatelessWidget {
   }
 }
 
-// ─── Sheet result ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ Sheet result â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class AccommodationSheetResult {
   const AccommodationSheetResult({this.accommodation, this.deleted = false});

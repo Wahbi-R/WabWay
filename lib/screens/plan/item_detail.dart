@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/supabase/doc_service.dart';
@@ -11,7 +11,7 @@ import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 import 'add_item_sheet.dart';
 
-// ─── Mobile screen ────────────────────────────────────────────────────────────
+// â”€â”€â”€ Mobile screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class ItemDetailScreen extends StatelessWidget {
   const ItemDetailScreen({
@@ -72,7 +72,7 @@ class ItemDetailScreen extends StatelessWidget {
   }
 }
 
-// ─── Shared content ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Shared content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class ItemDetailContent extends StatelessWidget {
   const ItemDetailContent({
@@ -149,7 +149,7 @@ class ItemDetailContent extends StatelessWidget {
   }
 }
 
-// ─── Header band ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Header band â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _ItemHeader extends StatelessWidget {
   const _ItemHeader({required this.item, required this.day});
@@ -193,7 +193,7 @@ class _ItemHeader extends StatelessWidget {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          'Day ${day.dayNumber} · ${fmtDayDate(day.date)}',
+                          'Day ${day.dayNumber} Â· ${fmtDate(day.date)}',
                           style: kStyleCaption.copyWith(
                             color: item.type.color.withValues(alpha: 0.8),
                             fontSize: 12,
@@ -253,7 +253,7 @@ class _ItemHeader extends StatelessWidget {
   }
 }
 
-// ─── Metadata card ────────────────────────────────────────────────────────────
+// â”€â”€â”€ Metadata card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _MetaCard extends StatelessWidget {
   const _MetaCard({required this.item});
@@ -296,7 +296,7 @@ class _MetaCard extends StatelessWidget {
   }
 }
 
-// ─── Linked spot section ──────────────────────────────────────────────────────
+// â”€â”€â”€ Linked spot section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _SpotSection extends StatelessWidget {
   const _SpotSection({required this.spot});
@@ -355,7 +355,7 @@ class _SpotSection extends StatelessWidget {
   }
 }
 
-// ─── Linked documents section ─────────────────────────────────────────────────
+// â”€â”€â”€ Linked documents section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _DocsSection extends StatelessWidget {
   const _DocsSection({required this.docs});
@@ -417,7 +417,7 @@ class _DocChip extends StatelessWidget {
   }
 }
 
-// ─── Actions section ──────────────────────────────────────────────────────────
+// â”€â”€â”€ Actions section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _ActionsSection extends StatelessWidget {
   const _ActionsSection({
@@ -564,7 +564,7 @@ class _ActionsSection extends StatelessWidget {
   }
 }
 
-// ─── Shared helpers ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Shared helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 Future<void> _openMaps(BuildContext context, String url) async {
   final uri = Uri.parse(url);
@@ -607,7 +607,7 @@ Future<void> _openDoc(BuildContext context, TripDocument doc) async {
   }
 }
 
-// ─── Mobile actions sheet ─────────────────────────────────────────────────────
+// â”€â”€â”€ Mobile actions sheet â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 void _showActionsSheet(
   BuildContext context,
@@ -699,7 +699,7 @@ void _showActionsSheet(
   );
 }
 
-// ─── Move-to-day picker ────────────────────────────────────────────────────────
+// â”€â”€â”€ Move-to-day picker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _MoveToDaySheet extends StatelessWidget {
   const _MoveToDaySheet({required this.days});
@@ -753,10 +753,10 @@ class _MoveToDaySheet extends StatelessWidget {
                           ),
                         ),
                         title: Text(
-                          'Day ${day.dayNumber} · ${day.city}',
+                          'Day ${day.dayNumber} Â· ${day.city}',
                           style: kStyleBodyMedium,
                         ),
-                        subtitle: Text(fmtDayDate(day.date),
+                        subtitle: Text(fmtDate(day.date),
                             style: kStyleCaption),
                         onTap: () => Navigator.pop(context, day.id),
                       ),

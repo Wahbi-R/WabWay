@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+export 'date_utils.dart' show fmtDate;
 
 // ─── Item type ────────────────────────────────────────────────────────────────
 
@@ -658,14 +659,6 @@ final kMockTripDays = <TripDay>[
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-String fmtDayDate(DateTime d) {
-  const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-  ];
-  return '${months[d.month - 1]} ${d.day}';
-}
 
 ItineraryItem? itemById(List<TripDay> days, String id) {
   for (final day in days) {

@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -87,7 +87,7 @@ class _PlanScreenState extends State<PlanScreen> {
     super.dispose();
   }
 
-  // ─── Search ───────────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Search â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   // Flatten all itinerary items across days and filter by the query.
   // Returns (item, day) pairs so search results can show day context.
@@ -106,10 +106,10 @@ class _PlanScreenState extends State<PlanScreen> {
     return out;
   }
 
-  // ─── Data loading ─────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Data loading â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   // Loads all plan data. Pass silent:true for background refreshes triggered by
-  // real-time CDC events — the loading spinner stays hidden to avoid a flash.
+  // real-time CDC events â€” the loading spinner stays hidden to avoid a flash.
   Future<void> _loadAll({bool silent = false}) async {
     if (_activeTripId.isEmpty) return;
     if (!silent) setState(() { _loading = true; _error = null; });
@@ -139,7 +139,7 @@ class _PlanScreenState extends State<PlanScreen> {
     }
   }
 
-  // ─── Realtime ─────────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Realtime â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   void _subscribeRealtime(String tripId) {
     _channel?.unsubscribe();
@@ -175,7 +175,7 @@ class _PlanScreenState extends State<PlanScreen> {
     _debounce = Timer(const Duration(milliseconds: 400), () => _loadAll(silent: true));
   }
 
-  // ─── UI actions ───────────────────────────────────────────────────────────────
+  // â”€â”€â”€ UI actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   void _selectItem(String id) =>
       setState(() { _selectedItemId = id; _selectedDayId = null; });
@@ -427,10 +427,10 @@ class _PlanScreenState extends State<PlanScreen> {
     final buf = StringBuffer();
     final tripState = TripState.maybeOf(context);
     final tripName = tripState?.trip.name ?? 'Trip';
-    buf.writeln('$tripName — Itinerary');
+    buf.writeln('$tripName â€” Itinerary');
     buf.writeln('=' * 40);
     for (final day in _days) {
-      buf.writeln('\nDay ${day.dayNumber} · ${day.city} · ${fmtDayDate(day.date)}');
+      buf.writeln('\nDay ${day.dayNumber} Â· ${day.city} Â· ${fmtDate(day.date)}');
       if (day.notes != null && day.notes!.isNotEmpty) {
         buf.writeln('  Note: ${day.notes}');
       }
@@ -440,7 +440,7 @@ class _PlanScreenState extends State<PlanScreen> {
       } else {
         for (final item in items) {
           final time = item.time != null ? '[${item.time}] ' : '';
-          buf.write('  • $time${item.title}');
+          buf.write('  â€¢ $time${item.title}');
           if (item.location != null && item.location!.isNotEmpty) {
             buf.write(' @ ${item.location}');
           }
@@ -460,7 +460,7 @@ class _PlanScreenState extends State<PlanScreen> {
       ));
       return;
     }
-    unawaited(Share.share(text, subject: '$tripName — Itinerary'));
+    unawaited(Share.share(text, subject: '$tripName â€” Itinerary'));
   }
 
   Future<void> _exportToCalendar() async {
@@ -523,7 +523,7 @@ class _PlanScreenState extends State<PlanScreen> {
       if (!mounted) return;
       await Share.shareXFiles(
         [XFile(file.path, mimeType: 'text/calendar')],
-        subject: '$tripName — Calendar',
+        subject: '$tripName â€” Calendar',
       );
     } catch (e) {
       if (mounted) {
@@ -536,7 +536,7 @@ class _PlanScreenState extends State<PlanScreen> {
     }
   }
 
-  // ─── Build ────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Build â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   @override
   Widget build(BuildContext context) {
@@ -544,7 +544,7 @@ class _PlanScreenState extends State<PlanScreen> {
     return isDesktop ? _buildDesktop(context) : _buildMobile(context);
   }
 
-  // ─── Desktop ──────────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Desktop â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Widget _buildDesktop(BuildContext context) {
     return Scaffold(
@@ -579,7 +579,7 @@ class _PlanScreenState extends State<PlanScreen> {
                                     children: [
                                       WabwaySearchBar(
                                         controller: _searchCtrl,
-                                        hint: 'Search plan items…',
+                                        hint: 'Search plan itemsâ€¦',
                                         onChanged: (v) => setState(() => _search = v),
                                       ),
                                       Expanded(
@@ -705,7 +705,7 @@ class _PlanScreenState extends State<PlanScreen> {
     );
   }
 
-  // ─── Mobile ───────────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Mobile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Widget _buildMobile(BuildContext context) {
     return Scaffold(
@@ -771,7 +771,7 @@ class _PlanScreenState extends State<PlanScreen> {
                       children: [
                         WabwaySearchBar(
                           controller: _searchCtrl,
-                          hint: 'Search plan items…',
+                          hint: 'Search plan itemsâ€¦',
                           onChanged: (v) => setState(() => _search = v),
                         ),
                         Expanded(
@@ -928,7 +928,7 @@ class _PlanScreenState extends State<PlanScreen> {
   }
 }
 
-// ─── Plan search result tile ──────────────────────────────────────────────────
+// â”€â”€â”€ Plan search result tile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _PlanSearchResultTile extends StatelessWidget {
   const _PlanSearchResultTile({
@@ -965,7 +965,7 @@ class _PlanSearchResultTile extends StatelessWidget {
                 Text(item.title, style: kStyleBodyMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 2),
                 Text(
-                  'Day ${day.dayNumber} · ${day.city}',
+                  'Day ${day.dayNumber} Â· ${day.city}',
                   style: kStyleCaption.copyWith(color: kColorInkSoft),
                 ),
               ],
@@ -978,7 +978,7 @@ class _PlanSearchResultTile extends StatelessWidget {
   }
 }
 
-// ─── Desktop day detail panel ─────────────────────────────────────────────────
+// â”€â”€â”€ Desktop day detail panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _DayDetailPanel extends StatelessWidget {
   const _DayDetailPanel({
@@ -1033,7 +1033,7 @@ class _DayDetailPanel extends StatelessWidget {
                       Text('Day ${day.dayNumber}',
                           style: kStyleTitle.copyWith(fontSize: 20)),
                       Text(
-                        fmtDayDate(day.date),
+                        fmtDate(day.date),
                         style: GoogleFonts.ibmPlexMono(
                           fontSize: kTextSm,
                           color: kColorInkSoft,
@@ -1136,7 +1136,7 @@ class _DayDetailPanel extends StatelessWidget {
   }
 }
 
-// ─── Edit day sheet ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Edit day sheet â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 typedef _EditDaySaved = void Function(
   String? city, DateTime? date, String? notes, bool clearNotes);
@@ -1283,7 +1283,7 @@ class _EditDaySheetState extends State<_EditDaySheet> {
   }
 }
 
-// ─── Desktop top bar ──────────────────────────────────────────────────────────
+// â”€â”€â”€ Desktop top bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _DesktopPlanBar extends StatelessWidget {
   const _DesktopPlanBar({
@@ -1362,9 +1362,9 @@ class _DesktopPlanBar extends StatelessWidget {
   }
 }
 
-// ─── Add day dialog ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Add day dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-// ─── Day picker sheet (for unplanned spots) ───────────────────────────────────
+// â”€â”€â”€ Day picker sheet (for unplanned spots) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 Future<(String dayId, TimeOfDay? time)?> _showDayPickerSheet(
   BuildContext context, {
@@ -1477,7 +1477,7 @@ class _DayPickerSheetState extends State<_DayPickerSheet> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(day.city, style: kStyleBodyMedium),
-                                Text(fmtDayDate(day.date),
+                                Text(fmtDate(day.date),
                                     style: kStyleCaption.copyWith(
                                         color: kColorInkSoft)),
                               ],
@@ -1556,7 +1556,7 @@ class _DayPickerSheetState extends State<_DayPickerSheet> {
   }
 }
 
-// ─── Unplanned spots section ──────────────────────────────────────────────────
+// â”€â”€â”€ Unplanned spots section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _UnplannedSpotsSection extends StatelessWidget {
   const _UnplannedSpotsSection({
@@ -1668,7 +1668,7 @@ class _UnplannedSpotRow extends StatelessWidget {
                       Text(spot.name, style: kStyleBodyMedium),
                       const SizedBox(height: 2),
                       Text(
-                        '${spot.city}${spot.area.isNotEmpty ? ' · ${spot.area}' : ''}',
+                        '${spot.city}${spot.area.isNotEmpty ? ' Â· ${spot.area}' : ''}',
                         style: kStyleCaption.copyWith(color: kColorInkSoft),
                       ),
                     ],
@@ -1692,7 +1692,7 @@ class _UnplannedSpotRow extends StatelessWidget {
   }
 }
 
-// ─── Add day dialog ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Add day dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 Future<TripDay?> _showAddDayDialog(BuildContext context) {
   return showDialog<TripDay>(

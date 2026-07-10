@@ -1,39 +1,14 @@
 import 'package:flutter/material.dart';
 import '../core/auth/profile_state.dart';
 import '../core/supabase/auth_service.dart';
+import '../core/trip/trip_state.dart';
 import 'account_sheets.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
 import '../widgets/widgets.dart';
-
-class PlaceholderScreen extends StatelessWidget {
-  const PlaceholderScreen({
-    super.key,
-    required this.title,
-    required this.icon,
-    this.body,
-  });
-
-  final String title;
-  final IconData icon;
-  final String? body;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: kColorCream,
-      appBar: AppBar(title: Text(title, style: kStyleTitle)),
-      body: Center(
-        child: WabwayEmptyState(
-          icon: icon,
-          title: 'Nothing here yet',
-          description: body ?? '$title is coming soon.',
-        ),
-      ),
-    );
-  }
-}
+import 'members/invite_sheet.dart';
+import 'trips/trip_settings_sheet.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -100,18 +75,30 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: kSpace4),
           Text('TRIP', style: kStyleOverline),
           const SizedBox(height: kSpace3),
-          DecoratedBox(
-            decoration: kCardDecoration(),
-            child: const Material(
-              color: Colors.transparent,
-              child: WabwayEmptyState(
-                icon: Icons.settings_rounded,
-                title: 'Coming soon',
-                description:
-                    'Trip settings, invite codes, and notifications will appear here.',
+          Builder(builder: (ctx) {
+            final trip = TripState.tripOf(ctx);
+            return DecoratedBox(
+              decoration: kCardDecoration(),
+              child: Material(
+                color: Colors.transparent,
+                child: Column(
+                  children: [
+                    _SettingsTile(
+                      icon: Icons.tune_rounded,
+                      label: 'Trip settings',
+                      onTap: () => showTripSettingsSheet(ctx, trip: trip),
+                    ),
+                    const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
+                    _SettingsTile(
+                      icon: Icons.person_add_rounded,
+                      label: 'Invite members',
+                      onTap: () => showInviteSheet(ctx, tripId: trip.id),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ),
+            );
+          }),
         ],
       ),
     );

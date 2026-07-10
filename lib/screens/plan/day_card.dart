@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../data/plan_data.dart';
 import '../../theme/app_colors.dart';
@@ -7,7 +7,7 @@ import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 import 'item_tile.dart';
 
-// ─── Trip day card ────────────────────────────────────────────────────────────
+// â”€â”€â”€ Trip day card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class TripDayCard extends StatefulWidget {
   const TripDayCard({
@@ -113,7 +113,7 @@ class _TripDayCardState extends State<TripDayCard> {
   }
 }
 
-// ─── Day header ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ Day header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _DayHeader extends StatelessWidget {
   const _DayHeader({
@@ -176,12 +176,12 @@ class _DayHeader extends StatelessWidget {
                               color: selected ? kColorPrimary : kColorInk,
                             )),
                         const SizedBox(width: kSpace2),
-                        Text('·',
+                        Text('Â·',
                             style:
                                 kStyleCaption.copyWith(color: kColorInkSoft)),
                         const SizedBox(width: kSpace2),
                         Text(
-                          fmtDayDate(day.date),
+                          fmtDate(day.date),
                           style: GoogleFonts.ibmPlexMono(
                             fontSize: kTextSm,
                             fontWeight: FontWeight.w500,
@@ -203,7 +203,7 @@ class _DayHeader extends StatelessWidget {
                         if (hasNotes && !expanded) ...[
                           Flexible(
                             child: Text(
-                              '  ·  ${day.notes}',
+                              '  Â·  ${day.notes}',
                               style: kStyleCaption.copyWith(
                                   fontSize: 11, color: kColorInkSoft),
                               maxLines: 1,
@@ -228,7 +228,7 @@ class _DayHeader extends StatelessWidget {
                 ),
               ),
 
-              // Completion badge — shows "X/Y done" when some are checked off,
+              // Completion badge â€” shows "X/Y done" when some are checked off,
               // plain count when none are done yet.
               if (day.items.isNotEmpty)
                 Builder(builder: (context) {
@@ -297,7 +297,7 @@ class _DayHeader extends StatelessWidget {
   }
 }
 
-// ─── Empty day body ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Empty day body â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _EmptyDayBody extends StatelessWidget {
   const _EmptyDayBody({required this.onAddItem});
@@ -328,7 +328,7 @@ class _EmptyDayBody extends StatelessWidget {
   }
 }
 
-// ─── Reorderable item list ────────────────────────────────────────────────────
+// â”€â”€â”€ Reorderable item list â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _ReorderableItemList extends StatefulWidget {
   const _ReorderableItemList({
@@ -436,7 +436,7 @@ class _ReorderableItemListState extends State<_ReorderableItemList> {
   }
 }
 
-// ─── Add item row ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ Add item row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _AddItemRow extends StatelessWidget {
   const _AddItemRow({required this.onTap});

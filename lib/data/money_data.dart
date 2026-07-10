@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'member_data.dart';
 export 'member_data.dart';
+export 'date_utils.dart' show fmtDate;
 
 // ─── Receipt ──────────────────────────────────────────────────────────────────
 
@@ -357,11 +358,6 @@ String _currencySymbol(String code) => switch (code) {
   'VND' => '₫',
   _     => code,
 };
-
-String fmtDate(DateTime d) {
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return '${months[d.month - 1]} ${d.day}';
-}
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 

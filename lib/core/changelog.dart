@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 98,
+    label: 'Clear packed items',
+    changes: [
+      'Packing list AppBar now shows a ⋮ menu when items are packed',
+      '"Clear packed items" bulk-removes all packed items after a confirmation dialog',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 97,
     label: 'Delete plan day',
     changes: [

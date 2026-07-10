@@ -181,6 +181,35 @@ class _PackingScreenState extends State<PackingScreen> {
     _load(silent: true);
   }
 
+  Future<void> _clearPacked() async {
+    final packed = _items.where((i) => i.isPacked).toList();
+    if (packed.isEmpty) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Clear packed items?'),
+        content: Text(
+          '${packed.length} packed ${packed.length == 1 ? 'item' : 'items'} will be permanently removed from the list.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final tripId = TripState.tripOf(context).id;
+    setState(() => _items.removeWhere((i) => i.isPacked));
+    PackingService.clearPackedItems(tripId).catchError((_) => _load(silent: true));
+  }
+
   void _reorder(int oldIndex, int newIndex, List<PackingItem> unpacked) {
     if (newIndex > oldIndex) newIndex -= 1;
     final moved = unpacked.removeAt(oldIndex);
@@ -310,6 +339,23 @@ class _PackingScreenState extends State<PackingScreen> {
             tooltip: 'Add item',
             onPressed: _addItem,
           ),
+          if (packed > 0)
+            PopupMenuButton<String>(
+              iconColor: kColorInkSoft,
+              onSelected: (v) {
+                if (v == 'clear_packed') _clearPacked();
+              },
+              itemBuilder: (_) => [
+                const PopupMenuItem(
+                  value: 'clear_packed',
+                  child: Row(children: [
+                    Icon(Icons.delete_sweep_rounded, size: 16, color: Colors.red),
+                    SizedBox(width: 10),
+                    Text('Clear packed items', style: TextStyle(color: Colors.red)),
+                  ]),
+                ),
+              ],
+            ),
           const SizedBox(width: 4),
         ],
       ),

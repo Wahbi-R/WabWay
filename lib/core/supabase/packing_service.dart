@@ -62,6 +62,14 @@ abstract final class PackingService {
     await supabase.from('packing_items').delete().eq('id', itemId);
   }
 
+  static Future<void> clearPackedItems(String tripId) async {
+    await supabase
+        .from('packing_items')
+        .delete()
+        .eq('trip_id', tripId)
+        .eq('is_packed', true);
+  }
+
   static Future<void> reorderItems(List<PackingItem> ordered) async {
     if (ordered.isEmpty) return;
     await supabase.from('packing_items').upsert(

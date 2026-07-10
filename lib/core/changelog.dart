@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 64,
+    label: 'Packing list',
+    changes: [
+      'Shared packing checklist for the group — tap to check items off, everyone sees updates in real time',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 63,
     label: 'Emergency info card',
     changes: [

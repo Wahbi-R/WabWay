@@ -14,6 +14,7 @@ import 'docs_screen.dart';
 import 'map_screen.dart';
 import 'travel_screen.dart';
 import 'links_screen.dart';
+import 'packing_screen.dart';
 import 'photos_screen.dart';
 import 'members/add_member_sheet.dart';
 import 'members/invite_sheet.dart';
@@ -247,6 +248,12 @@ class MoreScreen extends StatelessWidget {
               color: Colors.transparent,
               child: Column(
                 children: [
+                  _SettingsRow(
+                    icon: Icons.luggage_rounded,
+                    label: 'Packing List',
+                    onTap: () => _pushWithState(context, const PackingScreen()),
+                  ),
+                  const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
                   _SettingsRow(
                     icon: Icons.map_rounded,
                     label: 'Map',

@@ -16,6 +16,7 @@ import '../screens/travel_screen.dart';
 import '../screens/map_screen.dart';
 import '../screens/links_screen.dart';
 import '../screens/accommodations/accommodations_screen.dart';
+import '../screens/packing_screen.dart';
 import '../screens/placeholder_screen.dart';
 import '../screens/trips/trip_switcher_sheet.dart';
 import '../core/trip/trip_state.dart';
@@ -146,6 +147,13 @@ const _desktopDestinations = [
     builder: _buildDocs,
   ),
   _NavDest(
+    key: 'packing',
+    label: 'Packing',
+    icon: Icons.luggage_outlined,
+    selectedIcon: Icons.luggage_rounded,
+    builder: _buildPacking,
+  ),
+  _NavDest(
     key: 'members',
     label: 'Members',
     icon: Icons.group_outlined,
@@ -173,6 +181,7 @@ Widget _buildStays(BuildContext _)   => const AccommodationsScreen();
 Widget _buildMoney(BuildContext _)   => const MoneyScreen();
 Widget _buildDocs(BuildContext _)    => const DocsScreen();
 Widget _buildMembers(BuildContext _) => const MembersScreen();
+Widget _buildPacking(BuildContext _)  => const PackingScreen();
 Widget _buildMore(BuildContext _)    => const MoreScreen();
 Widget _buildSettings(BuildContext _) => const SettingsScreen();
 

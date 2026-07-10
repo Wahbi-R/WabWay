@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../core/auth/profile_state.dart';
 import '../core/supabase/auth_service.dart';
 import '../core/supabase/trip_service.dart';
@@ -455,6 +457,27 @@ class MoreScreen extends StatelessWidget {
           _AccountSection(),
 
           const SizedBox(height: kSpace4),
+
+          // Android app download (web only)
+          if (kIsWeb) ...[
+            const SizedBox(height: kSpace4),
+            const _SectionHeader(title: 'App'),
+            const SizedBox(height: kSpace3),
+            DecoratedBox(
+              decoration: kCardDecoration(),
+              child: Material(
+                color: Colors.transparent,
+                child: _SettingsRow(
+                  icon: Icons.android_rounded,
+                  label: 'Download Android app',
+                  onTap: () => launchUrl(
+                    Uri.parse('https://github.com/Wahbi-R/WabWay/releases'),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                ),
+              ),
+            ),
+          ],
 
           // What's new
           const SizedBox(height: kSpace5),

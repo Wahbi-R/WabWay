@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/debug/app_logger.dart';
 import '../../core/supabase/auth_service.dart';
 import '../../theme/app_colors.dart';
@@ -214,6 +216,10 @@ class _SignInScreenState extends State<SignInScreen> {
                     ),
                   ),
                 ),
+                if (kIsWeb) ...[
+                  const SizedBox(height: kSpace5),
+                  const _AndroidDownloadLink(),
+                ],
               ],
             ),
           ),
@@ -691,6 +697,37 @@ class _SentState extends StatelessWidget {
         const SizedBox(height: kSpace5),
         _SwitchLink(label: linkLabel, onTap: onLink),
       ],
+    );
+  }
+}
+
+// ─── Android download link ────────────────────────────────────────────────────
+
+class _AndroidDownloadLink extends StatelessWidget {
+  const _AndroidDownloadLink();
+
+  static const _releasesUrl = 'https://github.com/Wahbi-R/WabWay/releases';
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => launchUrl(Uri.parse(_releasesUrl), mode: LaunchMode.externalApplication),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.android_rounded, size: 16, color: kColorPrimary),
+          const SizedBox(width: 6),
+          Text(
+            'Get the Android app',
+            style: kStyleCaption.copyWith(
+              color: kColorPrimary,
+              fontWeight: FontWeight.w600,
+              decoration: TextDecoration.underline,
+              decorationColor: kColorPrimary,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

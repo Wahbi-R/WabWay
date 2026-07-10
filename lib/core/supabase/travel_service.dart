@@ -105,8 +105,8 @@ abstract final class TravelService {
       'type':       _typeToDb(type),
       'status':     status.toDb,
       'created_by': createdBy,
-      if (date != null) 'date': _fmtDate(date),
-      if (endDate != null) 'end_date': _fmtDate(endDate),
+      if (date != null) 'date': isoDate(date),
+      if (endDate != null) 'end_date': isoDate(endDate),
       if (time != null) 'time': time,
       if (endTime != null) 'end_time': endTime,
       if (location != null && location.trim().isNotEmpty)
@@ -148,8 +148,8 @@ abstract final class TravelService {
       'title':               item.title,
       'type':                _typeToDb(item.type),
       'status':              item.status.toDb,
-      'date':                item.date != null ? _fmtDate(item.date!) : null,
-      'end_date':            item.endDate != null ? _fmtDate(item.endDate!) : null,
+      'date':                item.date != null ? isoDate(item.date!) : null,
+      'end_date':            item.endDate != null ? isoDate(item.endDate!) : null,
       'time':                item.time,
       'end_time':            item.endTime,
       'location':            item.location,
@@ -194,7 +194,4 @@ abstract final class TravelService {
     await supabase.from('travel_items').delete().eq('id', itemId);
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────────
-
-  static String _fmtDate(DateTime d) => isoDate(d);
 }

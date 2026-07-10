@@ -149,7 +149,7 @@ abstract final class MoneyService {
       'transaction_fee_pct':  transactionFeePct,
       'paid_by':              paidBy,
       'category':             _catToDb(category),
-      'date':                 _fmtDate(date),
+      'date':                 isoDate(date),
       if (notes != null && notes.isNotEmpty) 'notes': notes,
     }).select().single();
 
@@ -189,7 +189,7 @@ abstract final class MoneyService {
       'amount':       amount,
       'currency':     currency,
       'atm_fee':      atmFee,
-      'date':         _fmtDate(date),
+      'date':         isoDate(date),
       if (notes != null && notes.isNotEmpty) 'notes': notes,
     }).select().single();
 
@@ -236,7 +236,7 @@ abstract final class MoneyService {
       'transaction_fee_pct': transactionFeePct,
       'paid_by':             paidBy,
       'category':            _catToDb(category),
-      'date':                _fmtDate(date),
+      'date':                isoDate(date),
       'notes':               (notes != null && notes.isNotEmpty) ? notes : null,
     }).eq('id', receiptId);
 
@@ -266,7 +266,4 @@ abstract final class MoneyService {
     await supabase.from('cash_withdrawals').delete().eq('id', withdrawalId);
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────────
-
-  static String _fmtDate(DateTime d) => isoDate(d);
 }

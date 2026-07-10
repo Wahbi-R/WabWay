@@ -122,7 +122,7 @@ abstract final class PlanService {
     final row = await supabase.from('itinerary_days').insert({
       'trip_id':    tripId,
       'day_number': dayNumber,
-      'date':       _fmtDate(date),
+      'date':       isoDate(date),
       'city':       city.trim(),
       'created_by': createdBy,
       if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
@@ -224,7 +224,7 @@ abstract final class PlanService {
   }) async {
     final updates = <String, dynamic>{
       if (city != null && city.trim().isNotEmpty) 'city': city.trim(),
-      if (date != null) 'date': _fmtDate(date),
+      if (date != null) 'date': isoDate(date),
       if (clearNotes) 'notes': null
       else if (notes != null) 'notes': notes.trim().isEmpty ? null : notes.trim(),
     };
@@ -304,7 +304,4 @@ abstract final class PlanService {
     await supabase.from('itinerary_item_comments').delete().eq('id', commentId);
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────────
-
-  static String _fmtDate(DateTime d) => isoDate(d);
 }

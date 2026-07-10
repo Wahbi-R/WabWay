@@ -24,6 +24,15 @@ class _PackingScreenState extends State<PackingScreen> {
   RealtimeChannel? _channel;
   Timer? _debounce;
 
+  String _search = '';
+  final _searchCtrl = TextEditingController();
+
+  List<PackingItem> get _filtered {
+    final q = _search.toLowerCase().trim();
+    if (q.isEmpty) return _items;
+    return _items.where((i) => i.title.toLowerCase().contains(q)).toList();
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -35,6 +44,7 @@ class _PackingScreenState extends State<PackingScreen> {
   void dispose() {
     _channel?.unsubscribe();
     _debounce?.cancel();
+    _searchCtrl.dispose();
     super.dispose();
   }
 
@@ -172,8 +182,9 @@ class _PackingScreenState extends State<PackingScreen> {
   }
 
   Widget _buildList() {
-    final unpacked = _items.where((i) => !i.isPacked).toList();
-    final packed   = _items.where((i) => i.isPacked).toList();
+    final visible  = _filtered;
+    final unpacked = visible.where((i) => !i.isPacked).toList();
+    final packed   = visible.where((i) => i.isPacked).toList();
 
     // Build a flat entry list: unpacked items, then an optional "Packed" header
     // + packed items. A null entry is used as the section header sentinel.
@@ -258,7 +269,26 @@ class _PackingScreenState extends State<PackingScreen> {
         onRefresh: () => _load(),
         child: total == 0
             ? _EmptyState(onAdd: _addItem)
-            : _buildList(),
+            : Column(
+                children: [
+                  WabwaySearchBar(
+                    controller: _searchCtrl,
+                    hint: 'Search items…',
+                    onChanged: (v) => setState(() => _search = v),
+                  ),
+                  Expanded(
+                    child: _filtered.isEmpty
+                        ? Center(
+                            child: WabwayEmptyState(
+                              icon: Icons.search_off_rounded,
+                              title: 'No results for "$_search"',
+                              description: 'Try a different search term.',
+                            ),
+                          )
+                        : _buildList(),
+                  ),
+                ],
+              ),
       ),
     );
   }

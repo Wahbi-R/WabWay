@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 89,
+    label: 'Packing list search',
+    changes: [
+      'Search the packing list by item name — useful when the list gets long',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 88,
     label: 'Packing item assignment',
     changes: [

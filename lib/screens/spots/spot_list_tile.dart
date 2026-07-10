@@ -22,7 +22,11 @@ class SpotListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return WabwayCard(
+    final isVisited = spot.status == SpotStatus.visited;
+    final isSkipped = spot.status == SpotStatus.skipped;
+    final isDone    = isVisited || isSkipped;
+
+    Widget card = WabwayCard(
       hoverable: true,
       selected: selected,
       onTap: onTap,
@@ -31,7 +35,14 @@ class SpotListTile extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _PhotoSlot(category: spot.category, imageUrl: spot.imageUrl),
+            _PhotoSlot(
+              category: spot.category,
+              imageUrl: spot.imageUrl,
+              overlayIcon:  isVisited ? Icons.check_circle_rounded
+                          : isSkipped ? Icons.cancel_rounded
+                          : null,
+              overlayColor: isVisited ? kColorSuccess : kColorInkSoft,
+            ),
             const SizedBox(width: kSpace4),
             Expanded(
               child: Column(
@@ -121,41 +132,79 @@ class SpotListTile extends StatelessWidget {
         ),
       ),
     );
+
+    if (isDone) {
+      card = Opacity(
+        opacity: isVisited ? 0.65 : 0.45,
+        child: card,
+      );
+    }
+
+    return card;
   }
 }
 
 class _PhotoSlot extends StatelessWidget {
-  const _PhotoSlot({required this.category, this.imageUrl});
+  const _PhotoSlot({
+    required this.category,
+    this.imageUrl,
+    this.overlayIcon,
+    this.overlayColor,
+  });
   final SpotCategory category;
   final String?      imageUrl;
+  final IconData?    overlayIcon;
+  final Color?       overlayColor;
 
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: kRadiusMd,
-      child: Container(
-        width: 76,
-        height: 76,
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [kColorPrimarySoft, kColorAccentSoft],
+      child: Stack(
+        children: [
+          Container(
+            width: 76,
+            height: 76,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [kColorPrimarySoft, kColorAccentSoft],
+              ),
+              border: Border.all(color: kColorBorder),
+            ),
+            child: imageUrl != null
+                ? Image.network(
+                    imageUrl!,
+                    fit: BoxFit.cover,
+                    width: 76,
+                    height: 76,
+                    cacheWidth: 152,
+                    errorBuilder: (_, __, ___) => _icon,
+                    loadingBuilder: (_, child, progress) =>
+                        progress == null ? child : _icon,
+                  )
+                : _icon,
           ),
-          border: Border.all(color: kColorBorder),
-        ),
-        child: imageUrl != null
-            ? Image.network(
-                imageUrl!,
-                fit: BoxFit.cover,
-                width: 76,
-                height: 76,
-                cacheWidth: 152, // 2× for density, kept small in memory
-                errorBuilder: (_, __, ___) => _icon,
-                loadingBuilder: (_, child, progress) =>
-                    progress == null ? child : _icon,
-              )
-            : _icon,
+          if (overlayIcon != null)
+            Positioned(
+              bottom: 4,
+              right: 4,
+              child: Container(
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: kColorPaper,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  overlayIcon,
+                  size: 16,
+                  color: overlayColor,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

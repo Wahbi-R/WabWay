@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 67,
+    label: 'Cover photo on home card',
+    changes: [
+      'Your trip cover photo now shows as a banner at the top of the home card — set it in Trip Settings',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 66,
     label: 'Trip budget tracking',
     changes: [

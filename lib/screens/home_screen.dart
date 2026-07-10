@@ -504,93 +504,146 @@ class _TripHero extends StatelessWidget {
     final memberLabel = memberCount == 1 ? '1 member' : '$memberCount members';
     final metaLine   = [if (dateLabel.isNotEmpty) dateLabel, memberLabel].join('  ·  ');
 
+    final hasCover = trip.coverImageUrl != null;
+
     return GestureDetector(
       onTap: onTap,
+      child: ClipRRect(
+      borderRadius: kRadiusLg,
       child: DecoratedBox(
       decoration: BoxDecoration(
         color: kColorSurfaceSunken,
         borderRadius: kRadiusLg,
         border: Border.all(color: kColorBorder),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(kSpace6),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'TRIP',
-                    style: kStyleOverline.copyWith(
-                      color: kColorPrimary,
-                      letterSpacing: kTextXs * kTrackingWide,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Cover image strip (shown when trip has a cover photo)
+          if (hasCover)
+            SizedBox(
+              height: 120,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.network(
+                    trip.coverImageUrl!,
+                    fit: BoxFit.cover,
+                    frameBuilder: (ctx, child, frame, _) => AnimatedOpacity(
+                      opacity: frame == null ? 0 : 1,
+                      duration: const Duration(milliseconds: 300),
+                      child: child,
+                    ),
+                    errorBuilder: (_, __, ___) => Container(color: kColorSurfaceSunken),
+                  ),
+                  // Gradient overlay so text below stays readable
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, Color(0x66000000)],
+                      ),
                     ),
                   ),
-                ),
-                // Subtle edit hint shown only to the trip owner
-                if (onTap != null)
-                  const Icon(Icons.edit_rounded, size: 14, color: kColorInkSoft),
-              ],
-            ),
-            const SizedBox(height: kSpace2),
-            Text(
-              trip.name,
-              style: GoogleFonts.lora(
-                fontSize: kText2xl,
-                fontWeight: FontWeight.w600,
-                color: kColorInk,
-                height: kLeadingSnug,
+                  if (onTap != null)
+                    Positioned(
+                      top: kSpace2,
+                      right: kSpace2,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.black45,
+                          borderRadius: kRadiusMd,
+                        ),
+                        child: const Icon(Icons.edit_rounded, size: 14, color: Colors.white),
+                      ),
+                    ),
+                ],
               ),
             ),
-            if (trip.destination != null) ...[
-              const SizedBox(height: kSpace1),
-              Text(trip.destination!, style: kStyleCaption),
-            ],
-            const SizedBox(height: kSpace2),
-            Text(metaLine, style: kStyleCaption),
-            if (countdown != null) ...[
-              const SizedBox(height: kSpace2),
-              // Pill chip showing days until departure, current day, or days since return
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: kSpace2, vertical: 2),
-                decoration: BoxDecoration(
-                  color: kColorPrimary.withValues(alpha: 0.12),
-                  borderRadius: kRadiusPill,
-                ),
-                child: Text(
-                  countdown,
-                  style: kStyleOverline.copyWith(color: kColorPrimaryDark),
-                ),
-              ),
-            ],
-            const SizedBox(height: kSpace5),
-            Row(
+          Padding(
+            padding: const EdgeInsets.all(kSpace6),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: _HeroStat(
-                    label: 'Spots saved',
-                    value: data != null ? '${data!.spotCount}' : '—',
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'TRIP',
+                        style: kStyleOverline.copyWith(
+                          color: kColorPrimary,
+                          letterSpacing: kTextXs * kTrackingWide,
+                        ),
+                      ),
+                    ),
+                    // Subtle edit hint shown only to the trip owner (when no cover image)
+                    if (onTap != null && !hasCover)
+                      const Icon(Icons.edit_rounded, size: 14, color: kColorInkSoft),
+                  ],
+                ),
+                const SizedBox(height: kSpace2),
+                Text(
+                  trip.name,
+                  style: GoogleFonts.lora(
+                    fontSize: kText2xl,
+                    fontWeight: FontWeight.w600,
+                    color: kColorInk,
+                    height: kLeadingSnug,
                   ),
                 ),
-                Expanded(
-                  child: _HeroStat(
-                    label: 'Days planned',
-                    value: data != null ? '${data!.days.length}' : '—',
+                if (trip.destination != null) ...[
+                  const SizedBox(height: kSpace1),
+                  Text(trip.destination!, style: kStyleCaption),
+                ],
+                const SizedBox(height: kSpace2),
+                Text(metaLine, style: kStyleCaption),
+                if (countdown != null) ...[
+                  const SizedBox(height: kSpace2),
+                  // Pill chip showing days until departure, current day, or days since return
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: kSpace2, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: kColorPrimary.withValues(alpha: 0.12),
+                      borderRadius: kRadiusPill,
+                    ),
+                    child: Text(
+                      countdown,
+                      style: kStyleOverline.copyWith(color: kColorPrimaryDark),
+                    ),
                   ),
-                ),
-                Expanded(
-                  child: _HeroStat(
-                    label: 'Total spent',
-                    value: data != null
-                        ? fmtAmount(data!.totalSpent, data!.homeCurrency)
-                        : '—',
-                  ),
+                ],
+                const SizedBox(height: kSpace5),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _HeroStat(
+                        label: 'Spots saved',
+                        value: data != null ? '${data!.spotCount}' : '—',
+                      ),
+                    ),
+                    Expanded(
+                      child: _HeroStat(
+                        label: 'Days planned',
+                        value: data != null ? '${data!.days.length}' : '—',
+                      ),
+                    ),
+                    Expanded(
+                      child: _HeroStat(
+                        label: 'Total spent',
+                        value: data != null
+                            ? fmtAmount(data!.totalSpent, data!.homeCurrency)
+                            : '—',
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
+      ),
       ),
     ), // GestureDetector
     );

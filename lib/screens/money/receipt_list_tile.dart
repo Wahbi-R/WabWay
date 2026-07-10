@@ -77,6 +77,15 @@ class ReceiptListTile extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
+                  if (receipt.notes != null && receipt.notes!.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      receipt.notes!,
+                      style: kStyleCaption.copyWith(color: kColorInkSoft),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ],
               ),
             ),

@@ -83,9 +83,23 @@ class SpotListTile extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
-                  if (spot.votes.total > 0) ...[
+                  if (spot.votes.total > 0 || spot.comments.isNotEmpty) ...[
                     const SizedBox(height: kSpace2),
-                    SpotVoteSummary(votes: spot.votes),
+                    Row(
+                      children: [
+                        if (spot.votes.total > 0) SpotVoteSummary(votes: spot.votes),
+                        if (spot.votes.total > 0 && spot.comments.isNotEmpty)
+                          const SizedBox(width: kSpace3),
+                        if (spot.comments.isNotEmpty) ...[
+                          Icon(Icons.chat_bubble_outline_rounded, size: 12, color: kColorInkSoft),
+                          const SizedBox(width: 3),
+                          Text(
+                            '${spot.comments.length}',
+                            style: kStyleCaption,
+                          ),
+                        ],
+                      ],
+                    ),
                   ],
                   if (myVote != null) ...[
                     const SizedBox(height: kSpace2),

@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 71,
+    label: 'UI polish — receipts & spots',
+    changes: [
+      'Receipt notes now show inline in the receipt list (1 line preview)',
+      'Spots with comments show a comment count next to the vote summary',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 70,
     label: 'Plan item comments',
     changes: [

@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 45,
+    label: 'Receipt date grouping',
+    changes: [
+      'Receipts are now grouped under date headers (Mon, Jul 7) when sorted by newest or oldest — makes it easy to scan daily spending at a glance',
+      'Date headers are skipped when sorted by amount, so the amount-sorted view stays clean',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 44,
     label: 'Code comments pass',
     changes: [

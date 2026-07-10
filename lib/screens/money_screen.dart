@@ -43,6 +43,12 @@ enum _ReceiptSort {
   };
 }
 
+// Mixed list entries for the receipt list — either a sticky date header or an
+// actual receipt row. Using a sealed class keeps the switch exhaustive.
+sealed class _ReceiptListEntry {}
+class _DateHeader  extends _ReceiptListEntry { final DateTime date; _DateHeader(this.date); }
+class _ReceiptItem extends _ReceiptListEntry { final Receipt receipt; _ReceiptItem(this.receipt); }
+
 class MoneyScreen extends StatefulWidget {
   const MoneyScreen({super.key});
 
@@ -234,6 +240,29 @@ class _MoneyScreenState extends State<MoneyScreen> {
     return base;
   }
 
+  // When the sort is date-based, inject date-header entries before the first
+  // receipt of each calendar day so the user can scan "what did we spend on
+  // Tuesday?". Amount-sorted lists skip headers because the date order
+  // would be meaningless there.
+  List<_ReceiptListEntry> get _receiptListItems {
+    final receipts = _filteredReceipts;
+    if (_receiptSort == _ReceiptSort.highestAmount ||
+        _receiptSort == _ReceiptSort.lowestAmount) {
+      return receipts.map<_ReceiptListEntry>(_ReceiptItem.new).toList();
+    }
+    final out = <_ReceiptListEntry>[];
+    DateTime? lastDay;
+    for (final r in receipts) {
+      final day = DateUtils.dateOnly(r.date);
+      if (lastDay == null || day != lastDay) {
+        out.add(_DateHeader(day));
+        lastDay = day;
+      }
+      out.add(_ReceiptItem(r));
+    }
+    return out;
+  }
+
   Map<String, List<MemberBalance>> get _balancesByCurrency =>
       calculateBalancesGrouped(_receipts, _withdrawals, myId: _userId, members: _members);
   Map<String, List<SettlementSuggestion>> get _suggestionsByCurrency {
@@ -399,7 +428,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
           label: 'No receipts yet',
         );
       }
-      final filtered = _filteredReceipts;
+      final listItems = _receiptListItems;
       return Column(
         children: [
           _SpendingSummaryCard(receipts: _receipts, homeCurrency: _homeCurrency),
@@ -425,7 +454,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
             ],
           ),
           Expanded(
-            child: filtered.isEmpty
+            child: listItems.isEmpty
                 ? Center(
                     child: WabwayEmptyState(
                       icon: Icons.filter_list_rounded,
@@ -433,18 +462,25 @@ class _MoneyScreenState extends State<MoneyScreen> {
                       description: 'Try a different category filter.',
                     ),
                   )
-                : ListView.separated(
+                : ListView.builder(
                     padding: const EdgeInsets.all(kSpace4),
-                    itemCount: filtered.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: kSpace2),
-                    itemBuilder: (_, i) => ReceiptListTile(
-                      receipt:      filtered[i],
-                      myId:         _userId,
-                      members:      _members,
-                      homeCurrency: _homeCurrency,
-                      selected:     _selectedReceiptId == filtered[i].id,
-                      onTap: () => setState(() => _selectedReceiptId = filtered[i].id),
-                    ),
+                    itemCount: listItems.length,
+                    itemBuilder: (_, i) {
+                      final entry = listItems[i];
+                      if (entry is _DateHeader) return _DateGroupHeader(date: entry.date);
+                      final r = (entry as _ReceiptItem).receipt;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: kSpace2),
+                        child: ReceiptListTile(
+                          receipt:      r,
+                          myId:         _userId,
+                          members:      _members,
+                          homeCurrency: _homeCurrency,
+                          selected:     _selectedReceiptId == r.id,
+                          onTap: () => setState(() => _selectedReceiptId = r.id),
+                        ),
+                      );
+                    },
                   ),
           ),
         ],
@@ -624,7 +660,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
                         }),
                       ),
                       Expanded(
-                        child: _filteredReceipts.isEmpty
+                        child: _receiptListItems.isEmpty
                             ? Center(
                                 child: WabwayEmptyState(
                                   icon: Icons.filter_list_rounded,
@@ -632,35 +668,40 @@ class _MoneyScreenState extends State<MoneyScreen> {
                                   description: 'Try a different category filter.',
                                 ),
                               )
-                            : ListView.separated(
+                            : ListView.builder(
                                 padding: const EdgeInsets.all(kSpace4),
-                                itemCount: _filteredReceipts.length,
-                                separatorBuilder: (_, __) =>
-                                    const SizedBox(height: kSpace2),
+                                itemCount: _receiptListItems.length,
                                 itemBuilder: (ctx, i) {
-                                  final r = _filteredReceipts[i];
-                                  return ReceiptListTile(
-                                    receipt:      r,
-                                    myId:         _userId,
-                                    members:      _members,
-                                    homeCurrency: _homeCurrency,
-                                    onTap: () => Navigator.push(
-                                      ctx,
-                                      MaterialPageRoute(
-                                        builder: (_) => ReceiptDetailScreen(
-                                          receipt:   r,
-                                          myId:      _userId,
-                                          members:   _members,
-                                          tripId:    _activeTripId!,
-                                          onDelete:  () => _deleteReceipt(r.id),
-                                          onUpdated: (updated) {
-                                            if (mounted) {
-                                              setState(() {
-                                                final idx = _receipts.indexWhere((x) => x.id == updated.id);
-                                                if (idx >= 0) _receipts[idx] = updated;
-                                              });
-                                            }
-                                          },
+                                  final entry = _receiptListItems[i];
+                                  if (entry is _DateHeader) {
+                                    return _DateGroupHeader(date: entry.date);
+                                  }
+                                  final r = (entry as _ReceiptItem).receipt;
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: kSpace2),
+                                    child: ReceiptListTile(
+                                      receipt:      r,
+                                      myId:         _userId,
+                                      members:      _members,
+                                      homeCurrency: _homeCurrency,
+                                      onTap: () => Navigator.push(
+                                        ctx,
+                                        MaterialPageRoute(
+                                          builder: (_) => ReceiptDetailScreen(
+                                            receipt:   r,
+                                            myId:      _userId,
+                                            members:   _members,
+                                            tripId:    _activeTripId!,
+                                            onDelete:  () => _deleteReceipt(r.id),
+                                            onUpdated: (updated) {
+                                              if (mounted) {
+                                                setState(() {
+                                                  final idx = _receipts.indexWhere((x) => x.id == updated.id);
+                                                  if (idx >= 0) _receipts[idx] = updated;
+                                                });
+                                              }
+                                            },
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -856,6 +897,30 @@ class _DesktopTabChip extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ─── Date group header ────────────────────────────────────────────────────────
+
+class _DateGroupHeader extends StatelessWidget {
+  const _DateGroupHeader({required this.date});
+  final DateTime date;
+
+  static const _days   = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  static const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                           'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  @override
+  Widget build(BuildContext context) {
+    final label = '${_days[date.weekday - 1]}, ${_months[date.month - 1]} ${date.day}';
+    return Padding(
+      padding: const EdgeInsets.only(top: kSpace3, bottom: kSpace2),
+      child: Text(label, style: kStyleCaption.copyWith(
+        color: kColorInkSoft,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.4,
+      )),
     );
   }
 }

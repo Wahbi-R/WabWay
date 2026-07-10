@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 88,
+    label: 'Packing item assignment',
+    changes: [
+      'Assign packing items to trip members — tap the menu and choose "Assign to..." to pick who\'s responsible for bringing an item',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 87,
     label: 'Packing item rename',
     changes: [

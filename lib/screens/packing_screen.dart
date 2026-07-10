@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show RealtimeChannel;
 import '../core/auth/profile_state.dart';
 import '../core/supabase/packing_service.dart';
+import '../core/trip/app_trip_member.dart';
 import '../core/trip/trip_state.dart';
 import '../data/packing_data.dart';
 import '../theme/app_colors.dart';
@@ -99,6 +100,37 @@ class _PackingScreenState extends State<PackingScreen> {
     await PackingService.setPackedState(item.id, !item.isPacked, userId);
   }
 
+  Future<void> _assign(PackingItem item) async {
+    final members = TripState.membersOf(context);
+    final myId    = ProfileState.of(context).id;
+    final result  = await showDialog<({String? userId})>(
+      context: context,
+      builder: (_) => _AssignDialog(
+        members:  members,
+        myId:     myId,
+        current:  item.assignedTo,
+      ),
+    );
+    if (result == null || !mounted) return;
+    final newAssignee = result.userId;
+    setState(() {
+      final idx = _items.indexWhere((i) => i.id == item.id);
+      if (idx >= 0) {
+        _items[idx] = PackingItem(
+          id:         item.id,
+          tripId:     item.tripId,
+          title:      item.title,
+          isPacked:   item.isPacked,
+          createdBy:  item.createdBy,
+          assignedTo: newAssignee,
+          packedBy:   item.packedBy,
+          sortOrder:  item.sortOrder,
+        );
+      }
+    });
+    await PackingService.assignItem(item.id, newAssignee);
+  }
+
   Future<void> _rename(PackingItem item) async {
     final ctrl = TextEditingController(text: item.title);
     final confirmed = await showDialog<bool>(
@@ -173,6 +205,7 @@ class _PackingScreenState extends State<PackingScreen> {
             _PackingTile(
               item: entry,
               onToggle: () => _toggle(entry),
+              onAssign: () => _assign(entry),
               onRename: () => _rename(entry),
               onDelete: () => _delete(entry),
             ),
@@ -263,38 +296,51 @@ class _EmptyState extends StatelessWidget {
 
 // ─── Packing tile ─────────────────────────────────────────────────────────────
 
-enum _TileAction { rename, delete }
+enum _TileAction { assign, rename, delete }
 
 class _PackingTile extends StatelessWidget {
   const _PackingTile({
     required this.item,
     required this.onToggle,
+    required this.onAssign,
     required this.onRename,
     required this.onDelete,
   });
 
   final PackingItem item;
   final VoidCallback onToggle;
+  final VoidCallback onAssign;
   final VoidCallback onRename;
   final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
-    // Resolve packedBy userId to a display name if available.
+    final myId   = ProfileState.maybeOf(context)?.id;
+    final members = TripState.membersOf(context);
+
+    // Resolve packedBy to a display name (shown when packed).
     String? packedByName;
     if (item.isPacked && item.packedBy != null) {
-      final myId = ProfileState.maybeOf(context)?.id;
-      if (item.packedBy == myId) {
-        packedByName = 'you';
-      } else {
-        final members = TripState.membersOf(context);
-        packedByName = members
-            .where((m) => m.userId == item.packedBy)
-            .firstOrNull
-            ?.profile
-            .displayName;
-      }
+      packedByName = item.packedBy == myId
+          ? 'you'
+          : members.where((m) => m.userId == item.packedBy).firstOrNull?.profile.displayName;
     }
+
+    // Resolve assignedTo to a display name (shown when not packed).
+    String? assignedToName;
+    if (!item.isPacked && item.assignedTo != null) {
+      assignedToName = item.assignedTo == myId
+          ? 'you'
+          : members.where((m) => m.userId == item.assignedTo).firstOrNull?.profile.displayName;
+    }
+
+    final subtitleText = packedByName != null
+        ? 'Packed by $packedByName'
+        : assignedToName != null
+            ? 'Assigned to $assignedToName'
+            : null;
+
+    final alreadyAssigned = item.assignedTo != null;
 
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: kSpace4, vertical: 2),
@@ -324,11 +370,11 @@ class _PackingTile extends StatelessWidget {
           color: item.isPacked ? kColorInkSoft : kColorInk,
         ),
       ),
-      subtitle: packedByName != null
+      subtitle: subtitleText != null
           ? Padding(
               padding: const EdgeInsets.only(top: 1),
               child: Text(
-                'Packed by $packedByName',
+                subtitleText,
                 style: kStyleCaption.copyWith(color: kColorInkSoft),
               ),
             )
@@ -337,6 +383,10 @@ class _PackingTile extends StatelessWidget {
         icon: const Icon(Icons.more_vert_rounded, size: 18, color: kColorInkSoft),
         padding: EdgeInsets.zero,
         itemBuilder: (_) => [
+          PopupMenuItem(
+            value: _TileAction.assign,
+            child: Text(alreadyAssigned ? 'Reassign' : 'Assign to...'),
+          ),
           const PopupMenuItem(value: _TileAction.rename, child: Text('Rename')),
           PopupMenuItem(
             value: _TileAction.delete,
@@ -345,12 +395,85 @@ class _PackingTile extends StatelessWidget {
         ],
         onSelected: (action) {
           switch (action) {
+            case _TileAction.assign: onAssign();
             case _TileAction.rename: onRename();
             case _TileAction.delete: onDelete();
           }
         },
       ),
       onTap: onToggle,
+    );
+  }
+}
+
+// ─── Assign dialog ────────────────────────────────────────────────────────────
+
+class _AssignDialog extends StatefulWidget {
+  const _AssignDialog({
+    required this.members,
+    required this.myId,
+    this.current,
+  });
+  final List<AppTripMember> members;
+  final String myId;
+  final String? current;
+
+  @override
+  State<_AssignDialog> createState() => _AssignDialogState();
+}
+
+class _AssignDialogState extends State<_AssignDialog> {
+  late String? _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = widget.current;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: kColorPaper,
+      shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
+      title: Text('Assign to', style: kStyleBodySemibold),
+      contentPadding: const EdgeInsets.symmetric(vertical: kSpace2),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RadioListTile<String?>(
+              title: Text('No one', style: kStyleBody),
+              value: null,
+              groupValue: _selected,
+              activeColor: kColorPrimary,
+              onChanged: (v) => setState(() => _selected = v),
+            ),
+            ...widget.members.map((m) {
+              final name = m.userId == widget.myId
+                  ? '${m.profile.displayName} (you)'
+                  : m.profile.displayName;
+              return RadioListTile<String?>(
+                title: Text(name, style: kStyleBody),
+                value: m.userId,
+                groupValue: _selected,
+                activeColor: kColorPrimary,
+                onChanged: (v) => setState(() => _selected = v),
+              );
+            }),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('Cancel', style: kStyleBody.copyWith(color: kColorInkSoft)),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, (userId: _selected)),
+          child: Text('Assign', style: kStyleBodyMedium.copyWith(color: kColorPrimary)),
+        ),
+      ],
     );
   }
 }

@@ -51,6 +51,13 @@ abstract final class PackingService {
         .eq('id', itemId);
   }
 
+  static Future<void> assignItem(String itemId, String? userId) async {
+    await supabase
+        .from('packing_items')
+        .update({'assigned_to': userId})
+        .eq('id', itemId);
+  }
+
   static Future<void> deleteItem(String itemId) async {
     await supabase.from('packing_items').delete().eq('id', itemId);
   }

@@ -240,6 +240,22 @@ class _PackingTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Resolve packedBy userId to a display name if available.
+    String? packedByName;
+    if (item.isPacked && item.packedBy != null) {
+      final myId = ProfileState.maybeOf(context)?.id;
+      if (item.packedBy == myId) {
+        packedByName = 'you';
+      } else {
+        final members = TripState.membersOf(context);
+        packedByName = members
+            .where((m) => m.userId == item.packedBy)
+            .firstOrNull
+            ?.profile
+            .displayName;
+      }
+    }
+
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: kSpace4, vertical: 2),
       leading: GestureDetector(
@@ -268,6 +284,15 @@ class _PackingTile extends StatelessWidget {
           color: item.isPacked ? kColorInkSoft : kColorInk,
         ),
       ),
+      subtitle: packedByName != null
+          ? Padding(
+              padding: const EdgeInsets.only(top: 1),
+              child: Text(
+                'Packed by $packedByName',
+                style: kStyleCaption.copyWith(color: kColorInkSoft),
+              ),
+            )
+          : null,
       trailing: IconButton(
         icon: const Icon(Icons.close_rounded, size: 18),
         color: kColorInkSoft,

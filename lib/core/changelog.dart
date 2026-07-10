@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 85,
+    label: 'Packing "packed by" credit',
+    changes: [
+      'Packed items now show who marked them as packed — "Packed by Alex" or "Packed by you"',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 84,
     label: 'Stay check-in countdown',
     changes: [

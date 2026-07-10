@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 41,
+    label: 'Links search',
+    changes: [
+      'Search saved links by title, domain, or notes — the search bar now appears at the top of the Links screen whenever links are loaded',
+      'Search and category filter work together so you can narrow down to, say, only food links that mention a specific restaurant',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 40,
     label: 'Spending by category',
     changes: [

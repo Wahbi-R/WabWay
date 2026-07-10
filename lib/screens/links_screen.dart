@@ -30,10 +30,24 @@ class _LinksScreenState extends State<LinksScreen> {
   RealtimeChannel? _channel;
   Timer? _debounce;
   LinkCategory? _filterCategory;
+  String _search = '';
 
-  List<TripLink> get _filteredLinks => _filterCategory == null
-      ? _links
-      : _links.where((l) => l.category == _filterCategory).toList();
+  final _searchCtrl = TextEditingController();
+
+  List<TripLink> get _filteredLinks {
+    var list = _filterCategory == null
+        ? _links
+        : _links.where((l) => l.category == _filterCategory).toList();
+    final q = _search.toLowerCase().trim();
+    if (q.isNotEmpty) {
+      list = list.where((l) =>
+        l.title.toLowerCase().contains(q) ||
+        l.domain.toLowerCase().contains(q) ||
+        (l.notes?.toLowerCase().contains(q) ?? false),
+      ).toList();
+    }
+    return list;
+  }
 
   @override
   void didChangeDependencies() {
@@ -49,6 +63,7 @@ class _LinksScreenState extends State<LinksScreen> {
   @override
   void dispose() {
     _debounce?.cancel();
+    _searchCtrl.dispose();
     _channel?.unsubscribe();
     super.dispose();
   }
@@ -178,6 +193,57 @@ class _LinksScreenState extends State<LinksScreen> {
                       onRefresh: _load,
                       child: CustomScrollView(
                         slivers: [
+                          // Search bar — always visible when links are loaded
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(
+                                  kSpace4, kSpace3, kSpace4, 0),
+                              child: TextField(
+                                controller: _searchCtrl,
+                                style: kStyleBody,
+                                decoration: InputDecoration(
+                                  hintText: 'Search links…',
+                                  hintStyle:
+                                      kStyleBody.copyWith(color: kColorInkSoft),
+                                  prefixIcon: const Icon(Icons.search_rounded,
+                                      size: 18, color: kColorInkSoft),
+                                  suffixIcon: _search.isNotEmpty
+                                      ? GestureDetector(
+                                          onTap: () {
+                                            _searchCtrl.clear();
+                                            setState(() => _search = '');
+                                          },
+                                          child: const Icon(
+                                              Icons.close_rounded,
+                                              size: 16,
+                                              color: kColorInkSoft),
+                                        )
+                                      : null,
+                                  filled: true,
+                                  fillColor: kColorBgRaised,
+                                  border: const OutlineInputBorder(
+                                    borderRadius: kRadiusMd,
+                                    borderSide: BorderSide(
+                                        color: kColorBorder),
+                                  ),
+                                  enabledBorder: const OutlineInputBorder(
+                                    borderRadius: kRadiusMd,
+                                    borderSide: BorderSide(
+                                        color: kColorBorder),
+                                  ),
+                                  focusedBorder: const OutlineInputBorder(
+                                    borderRadius: kRadiusMd,
+                                    borderSide: BorderSide(
+                                        color: kColorPrimary),
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: kSpace3, vertical: kSpace2),
+                                  isDense: true,
+                                ),
+                                onChanged: (v) => setState(() => _search = v),
+                              ),
+                            ),
+                          ),
                           SliverToBoxAdapter(
                             child: _LinkFilterStrip(
                               selected: _filterCategory,
@@ -196,9 +262,15 @@ class _LinksScreenState extends State<LinksScreen> {
                                 ? SliverToBoxAdapter(
                                     child: Center(
                                       child: WabwayEmptyState(
-                                        icon: _filterCategory!.icon,
-                                        title: 'No ${_filterCategory!.label} links',
-                                        description: 'Add some to see them here.',
+                                        icon: _filterCategory != null
+                                            ? _filterCategory!.icon
+                                            : Icons.search_off_rounded,
+                                        title: _search.isNotEmpty
+                                            ? 'No links match "$_search"'
+                                            : 'No ${_filterCategory!.label} links',
+                                        description: _search.isNotEmpty
+                                            ? 'Try a different search term.'
+                                            : 'Add some to see them here.',
                                       ),
                                     ),
                                   )

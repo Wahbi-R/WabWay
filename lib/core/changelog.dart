@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 56,
+    label: 'WabwayFilterStrip — shared filter chips',
+    changes: [
+      'Extracted a shared WabwayFilterStrip<T> widget — the Stays, Receipts, and Links filter chip rows are now all powered by the same component',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 55,
     label: 'Settings, offline stays, date cleanup',
     changes: [

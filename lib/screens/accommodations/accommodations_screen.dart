@@ -177,14 +177,15 @@ class _AccommodationsScreenState extends State<AccommodationsScreen> {
             ),
           ),
           SliverToBoxAdapter(
-            child: _FilterStrip(
+            child: WabwayFilterStrip<AccommodationStatus>(
               selected: _filterStatus,
-              counts: {
-                null:                              _count(null),
-                AccommodationStatus.brainstorming: _count(AccommodationStatus.brainstorming),
-                AccommodationStatus.shortlisted:   _count(AccommodationStatus.shortlisted),
-                AccommodationStatus.booked:        _count(AccommodationStatus.booked),
-              },
+              options: AccommodationStatus.values.map((s) => (
+                value: s,
+                label: s.label,
+                count: _count(s),
+              )).toList(),
+              allCount: _count(null),
+              autoHide: false,
               onChanged: (s) => setState(() => _filterStatus = s),
             ),
           ),
@@ -246,50 +247,6 @@ class _AccommodationsScreenState extends State<AccommodationsScreen> {
           child: OfflineBanner(onRetry: _load),
         ),
       ],
-    );
-  }
-}
-
-// â”€â”€â”€ Filter strip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-class _FilterStrip extends StatelessWidget {
-  const _FilterStrip({
-    required this.selected,
-    required this.counts,
-    required this.onChanged,
-  });
-
-  final AccommodationStatus? selected;
-  final Map<AccommodationStatus?, int> counts;
-  final ValueChanged<AccommodationStatus?> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final options = <(AccommodationStatus?, String)>[
-      (null, 'All'),
-      (AccommodationStatus.brainstorming, 'Brainstorming'),
-      (AccommodationStatus.shortlisted, 'Shortlisted'),
-      (AccommodationStatus.booked, 'Booked'),
-    ];
-    return SizedBox(
-      height: 52,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: kSpace4, vertical: kSpace3),
-        children: options.map((opt) {
-          final (status, label) = opt;
-          final count = counts[status] ?? 0;
-          final isSelected = selected == status;
-          return Padding(
-            padding: const EdgeInsets.only(right: kSpace2),
-            child: WabwayTag(
-              label: '$label ($count)',
-              selected: isSelected,
-              onTap: () => onChanged(isSelected ? null : status),
-            ),
-          );
-        }).toList(),
-      ),
     );
   }
 }

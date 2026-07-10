@@ -11,6 +11,7 @@ export 'wabway_select_field.dart';
 export 'wabway_tag.dart';
 export 'wabway_text_field.dart';
 export 'wabway_search_bar.dart';
+export 'wabway_filter_strip.dart';
 export 'wabway_loading_scaffold.dart';
 export 'destination_autocomplete.dart';
 export 'offline_banner.dart';

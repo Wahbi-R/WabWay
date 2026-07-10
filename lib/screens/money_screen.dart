@@ -114,6 +114,27 @@ class _MoneyScreenState extends State<MoneyScreen> {
     super.dispose();
   }
 
+  // ── Helpers ───────────────────────────────────────────────────────────────────
+
+  Widget _receiptFilterStrip() {
+    final present = ReceiptCategory.values
+        .where((c) => _receipts.any((r) => r.category == c))
+        .toList();
+    return WabwayFilterStrip<ReceiptCategory>(
+      selected: _filterCategory,
+      options: present.map((c) => (
+        value: c,
+        label: c.label,
+        count: _receipts.where((r) => r.category == c).length,
+      )).toList(),
+      allCount: _receipts.length,
+      onChanged: (c) => setState(() {
+        _filterCategory = c;
+        _selectedReceiptId = null;
+      }),
+    );
+  }
+
   // ── Data loading ──────────────────────────────────────────────────────────────
 
   Future<void> _loadAll({bool silent = false}) async {
@@ -421,14 +442,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
           Row(
             children: [
               Expanded(
-                child: _ReceiptFilterStrip(
-                  selected: _filterCategory,
-                  receipts: _receipts,
-                  onChanged: (c) => setState(() {
-                    _filterCategory = c;
-                    _selectedReceiptId = null;
-                  }),
-                ),
+                child: _receiptFilterStrip(),
               ),
               Padding(
                 padding: const EdgeInsets.only(right: kSpace3),
@@ -637,14 +651,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
                     children: [
                       _SpendingSummaryCard(
                           receipts: _receipts, homeCurrency: _homeCurrency),
-                      _ReceiptFilterStrip(
-                        selected: _filterCategory,
-                        receipts: _receipts,
-                        onChanged: (c) => setState(() {
-                          _filterCategory = c;
-                          _selectedReceiptId = null;
-                        }),
-                      ),
+                      _receiptFilterStrip(),
                       Expanded(
                         child: _receiptListItems.isEmpty
                             ? Center(
@@ -989,58 +996,6 @@ class _SpendingSummaryCard extends StatelessWidget {
             }),
           ],
         ),
-      ),
-    );
-  }
-}
-
-// ─── Receipt category filter strip ────────────────────────────────────────────
-
-class _ReceiptFilterStrip extends StatelessWidget {
-  const _ReceiptFilterStrip({
-    required this.selected,
-    required this.receipts,
-    required this.onChanged,
-  });
-
-  final ReceiptCategory? selected;
-  final List<Receipt> receipts;
-  final ValueChanged<ReceiptCategory?> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    // Only show categories that actually appear in the receipt list.
-    final present = ReceiptCategory.values
-        .where((c) => receipts.any((r) => r.category == c))
-        .toList();
-    if (present.length < 2) return const SizedBox.shrink();
-
-    final allCount = receipts.length;
-    return SizedBox(
-      height: 52,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: kSpace4, vertical: kSpace3),
-        children: [
-          // "All" chip
-          Padding(
-            padding: const EdgeInsets.only(right: kSpace2),
-            child: WabwayTag(
-              label: 'All ($allCount)',
-              selected: selected == null,
-              onTap: () => onChanged(null),
-            ),
-          ),
-          for (final cat in present)
-            Padding(
-              padding: const EdgeInsets.only(right: kSpace2),
-              child: WabwayTag(
-                label: '${cat.label} (${receipts.where((r) => r.category == cat).length})',
-                selected: selected == cat,
-                onTap: () => onChanged(selected == cat ? null : cat),
-              ),
-            ),
-        ],
       ),
     );
   }

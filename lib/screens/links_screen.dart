@@ -202,9 +202,17 @@ class _LinksScreenState extends State<LinksScreen> {
                             ),
                           ),
                           SliverToBoxAdapter(
-                            child: _LinkFilterStrip(
+                            child: WabwayFilterStrip<LinkCategory>(
                               selected: _filterCategory,
-                              links: _links,
+                              options: LinkCategory.values
+                                  .where((c) => _links.any((l) => l.category == c))
+                                  .map((c) => (
+                                        value: c,
+                                        label: c.label,
+                                        count: _links.where((l) => l.category == c).length,
+                                      ))
+                                  .toList(),
+                              allCount: _links.length,
                               onChanged: (cat) => setState(() => _filterCategory = cat),
                             ),
                           ),
@@ -260,56 +268,6 @@ class _LinksScreenState extends State<LinksScreen> {
           child: OfflineBanner(onRetry: _load),
         ),
       ],
-    );
-  }
-}
-
-// ─── Category filter strip ────────────────────────────────────────────────────
-
-class _LinkFilterStrip extends StatelessWidget {
-  const _LinkFilterStrip({
-    required this.selected,
-    required this.links,
-    required this.onChanged,
-  });
-
-  final LinkCategory? selected;
-  final List<TripLink> links;
-  final ValueChanged<LinkCategory?> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    // Only show when at least 2 different categories are present.
-    final present = LinkCategory.values
-        .where((c) => links.any((l) => l.category == c))
-        .toList();
-    if (present.length < 2) return const SizedBox.shrink();
-
-    return SizedBox(
-      height: 52,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: kSpace4, vertical: kSpace3),
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(right: kSpace2),
-            child: WabwayTag(
-              label: 'All (${links.length})',
-              selected: selected == null,
-              onTap: () => onChanged(null),
-            ),
-          ),
-          for (final cat in present)
-            Padding(
-              padding: const EdgeInsets.only(right: kSpace2),
-              child: WabwayTag(
-                label: '${cat.label} (${links.where((l) => l.category == cat).length})',
-                selected: selected == cat,
-                onTap: () => onChanged(selected == cat ? null : cat),
-              ),
-            ),
-        ],
-      ),
     );
   }
 }

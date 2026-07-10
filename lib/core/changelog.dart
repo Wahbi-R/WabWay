@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 93,
+    label: 'Receipt date range filter',
+    changes: [
+      'New date range chip on the receipts list — tap to pick a start and end date and see only those expenses',
+      'Works alongside the category filter and search; tap the X on the chip to clear',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 92,
     label: 'Visited spot styling',
     changes: [

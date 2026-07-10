@@ -69,6 +69,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
 
   _MoneyTab _tab = _MoneyTab.receipts;
   ReceiptCategory? _filterCategory;
+  DateTimeRange? _dateRange;
   _ReceiptSort _receiptSort = _ReceiptSort.newestFirst;
   String _receiptSearch = '';
   final _searchCtrl = TextEditingController();
@@ -138,6 +139,79 @@ class _MoneyScreenState extends State<MoneyScreen> {
         _filterCategory = c;
         _selectedReceiptId = null;
       }),
+    );
+  }
+
+  Future<void> _pickDateRange() async {
+    final first = _receipts.isEmpty ? DateTime.now() : _receipts.map((r) => r.date).reduce((a, b) => a.isBefore(b) ? a : b);
+    final last  = _receipts.isEmpty ? DateTime.now() : _receipts.map((r) => r.date).reduce((a, b) => a.isAfter(b)  ? a : b);
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: first,
+      lastDate:  last.isAfter(DateTime.now()) ? last : DateTime.now(),
+      initialDateRange: _dateRange,
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: ColorScheme.light(primary: kColorPrimary),
+        ),
+        child: child!,
+      ),
+    );
+    if (!mounted) return;
+    setState(() {
+      _dateRange = picked;
+      _selectedReceiptId = null;
+    });
+  }
+
+  Widget _dateRangeChip() {
+    final hasRange = _dateRange != null;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: kSpace2),
+      child: GestureDetector(
+        onTap: _pickDateRange,
+        child: AnimatedContainer(
+          duration: kDurationFast,
+          padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: 6),
+          decoration: BoxDecoration(
+            color: hasRange ? kColorPrimary.withValues(alpha: 0.08) : kColorPaper,
+            borderRadius: kRadiusPill,
+            border: Border.all(
+              color: hasRange ? kColorPrimary.withValues(alpha: 0.4) : kColorBorder,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.date_range_rounded,
+                size: 14,
+                color: hasRange ? kColorPrimary : kColorInkSoft,
+              ),
+              const SizedBox(width: 5),
+              Text(
+                hasRange
+                    ? '${fmtDate(_dateRange!.start)} – ${fmtDate(_dateRange!.end)}'
+                    : 'Date range',
+                style: kStyleCaption.copyWith(
+                  color: hasRange ? kColorPrimary : kColorInkSoft,
+                  fontWeight: hasRange ? FontWeight.w600 : FontWeight.w500,
+                ),
+              ),
+              if (hasRange) ...[
+                const SizedBox(width: 5),
+                GestureDetector(
+                  onTap: () => setState(() {
+                    _dateRange = null;
+                    _selectedReceiptId = null;
+                  }),
+                  child: Icon(Icons.close_rounded, size: 14, color: kColorPrimary),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -264,6 +338,10 @@ class _MoneyScreenState extends State<MoneyScreen> {
     }
     final base = _receipts.where((r) {
       if (_filterCategory != null && r.category != _filterCategory) return false;
+      if (_dateRange != null) {
+        final day = DateUtils.dateOnly(r.date);
+        if (day.isBefore(_dateRange!.start) || day.isAfter(_dateRange!.end)) return false;
+      }
       return matchesSearch(r);
     }).toList();
     base.sort((a, b) => switch (_receiptSort) {
@@ -497,9 +575,8 @@ class _MoneyScreenState extends State<MoneyScreen> {
           ),
           Row(
             children: [
-              Expanded(
-                child: _receiptFilterStrip(),
-              ),
+              Expanded(child: _receiptFilterStrip()),
+              _dateRangeChip(),
               Padding(
                 padding: const EdgeInsets.only(right: kSpace3),
                 child: _SortButton(
@@ -518,10 +595,14 @@ class _MoneyScreenState extends State<MoneyScreen> {
                           : Icons.filter_list_rounded,
                       title: _receiptSearch.isNotEmpty
                           ? 'No results for "$_receiptSearch"'
-                          : 'No ${_filterCategory?.label ?? ''} receipts',
+                          : _dateRange != null
+                              ? 'No receipts in that date range'
+                              : 'No ${_filterCategory?.label ?? ''} receipts',
                       description: _receiptSearch.isNotEmpty
                           ? 'Try a different search term.'
-                          : 'Try a different category filter.',
+                          : _dateRange != null
+                              ? 'Try a wider date range or clear the filter.'
+                              : 'Try a different category filter.',
                     ),
                   )
                 : ListView.builder(
@@ -740,7 +821,12 @@ class _MoneyScreenState extends State<MoneyScreen> {
                           _selectedReceiptId = null;
                         }),
                       ),
-                      _receiptFilterStrip(),
+                      Row(
+                        children: [
+                          Expanded(child: _receiptFilterStrip()),
+                          _dateRangeChip(),
+                        ],
+                      ),
                       Expanded(
                         child: _receiptListItems.isEmpty
                             ? Center(
@@ -750,10 +836,14 @@ class _MoneyScreenState extends State<MoneyScreen> {
                                       : Icons.filter_list_rounded,
                                   title: _receiptSearch.isNotEmpty
                                       ? 'No results for "$_receiptSearch"'
-                                      : 'No ${_filterCategory?.label ?? ''} receipts',
+                                      : _dateRange != null
+                                          ? 'No receipts in that date range'
+                                          : 'No ${_filterCategory?.label ?? ''} receipts',
                                   description: _receiptSearch.isNotEmpty
                                       ? 'Try a different search term.'
-                                      : 'Try a different category filter.',
+                                      : _dateRange != null
+                                          ? 'Try a wider date range or clear the filter.'
+                                          : 'Try a different category filter.',
                                 ),
                               )
                             : ListView.builder(

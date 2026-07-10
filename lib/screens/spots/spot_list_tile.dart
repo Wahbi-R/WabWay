@@ -74,6 +74,15 @@ class SpotListTile extends StatelessWidget {
                       ),
                     ],
                   ),
+                  if (spot.notes != null && spot.notes!.isNotEmpty) ...[
+                    const SizedBox(height: kSpace2),
+                    Text(
+                      spot.notes!,
+                      style: kStyleCaption.copyWith(color: kColorInkSoft),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                   if (spot.votes.total > 0) ...[
                     const SizedBox(height: kSpace2),
                     SpotVoteSummary(votes: spot.votes),

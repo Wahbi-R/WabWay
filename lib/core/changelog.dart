@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 35,
+    label: 'Spot notes in list',
+    changes: [
+      'Spot notes now show in the list view — up to 2 lines, so you can see your own reminders at a glance without opening the spot',
+      'Notes appear between the city/category line and the vote summary, hidden when empty so the card stays compact',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 34,
     label: 'Multi-currency balance',
     changes: [

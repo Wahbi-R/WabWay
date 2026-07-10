@@ -167,7 +167,7 @@ class _SpotDetailContentState extends State<SpotDetailContent> {
     widget.onVote?.call(type);
   }
 
-  Future<void> _markVisited() async {
+  Future<void> _setStatus(SpotStatus status) async {
     try {
       final updated = await SpotService.updateSpot(
         spotId: widget.spot.id,
@@ -175,7 +175,7 @@ class _SpotDetailContentState extends State<SpotDetailContent> {
         city: widget.spot.city,
         area: widget.spot.area,
         category: widget.spot.category,
-        status: SpotStatus.visited,
+        status: status,
         notes: widget.spot.notes,
         mapsUrl: widget.spot.mapsUrl,
         sourceUrl: widget.spot.sourceUrl,
@@ -190,6 +190,10 @@ class _SpotDetailContentState extends State<SpotDetailContent> {
       }
     }
   }
+
+  Future<void> _markVisited() => _setStatus(SpotStatus.visited);
+  Future<void> _markSkipped() => _setStatus(SpotStatus.skipped);
+  Future<void> _markConfirmed() => _setStatus(SpotStatus.confirmed);
 
   Future<void> _submitComment() async {
     final text = _commentCtrl.text.trim();
@@ -418,27 +422,64 @@ class _SpotDetailContentState extends State<SpotDetailContent> {
                 _GroupVotesSummary(votes: widget.spot.votes),
               ],
 
-              // ── Mark as visited quick action
-              if (widget.onEdit != null &&
-                  widget.spot.status != SpotStatus.visited &&
-                  widget.spot.status != SpotStatus.skipped) ...[
+              // ── Status quick actions
+              if (widget.onEdit != null) ...[
                 const SizedBox(height: kSpace4),
                 const Divider(height: 1),
                 const SizedBox(height: kSpace4),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: _markVisited,
-                    icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
-                    label: const Text('Mark as visited'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: kColorSuccess,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: kRadiusMd),
+                if (widget.spot.status == SpotStatus.visited ||
+                    widget.spot.status == SpotStatus.skipped) ...[
+                  // Visited / skipped — offer revert
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _markConfirmed,
+                      icon: const Icon(Icons.undo_rounded, size: 16),
+                      label: const Text('Mark as confirmed'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: kColorInkSoft,
+                        side: BorderSide(color: kColorBorder),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: kRadiusMd),
+                      ),
                     ),
                   ),
-                ),
+                ] else ...[
+                  // Active spot — offer visited + skipped
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: FilledButton.icon(
+                          onPressed: _markVisited,
+                          icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
+                          label: const Text('Mark as visited'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: kColorSuccess,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: kRadiusMd),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: kSpace2),
+                      Expanded(
+                        flex: 2,
+                        child: OutlinedButton.icon(
+                          onPressed: _markSkipped,
+                          icon: const Icon(Icons.cancel_outlined, size: 16),
+                          label: const Text('Skip'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: kColorInkSoft,
+                            side: BorderSide(color: kColorBorder),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: kRadiusMd),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
 
               const SizedBox(height: kSpace4),

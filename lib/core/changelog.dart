@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 94,
+    label: 'Spot status quick actions',
+    changes: [
+      'Spot detail now shows a "Skip" button alongside "Mark as visited" for active spots',
+      'Visited/skipped spots show an "Undo" button to revert to confirmed',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 93,
     label: 'Receipt date range filter',
     changes: [

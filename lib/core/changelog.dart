@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 59,
+    label: "Today's agenda on home",
+    changes: [
+      "When today is a planned day, the home screen now shows a full Today card with all your items, their times, and live done/total progress — replaces the single-item 'Coming up' card while travelling",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 58,
     label: 'Code cleanup — date utils, ISO formatting',
     changes: [

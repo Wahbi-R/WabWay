@@ -70,6 +70,17 @@ class _HomeData {
   // Sum of home-currency equivalents — consistent across multi-currency trips.
   double get totalSpent => receipts.fold(0.0, (s, r) => s + r.homeAmount);
 
+  // Today's plan day exactly, if one exists. Used for the "Today" agenda card.
+  TripDay? get todayDay {
+    final today = _today();
+    for (final d in days) {
+      if (d.date.year == today.year && d.date.month == today.month && d.date.day == today.day) {
+        return d;
+      }
+    }
+    return null;
+  }
+
   // First day from today (inclusive) that has at least one itinerary item.
   // Days are sorted chronologically by PlanService, so the first match is correct.
   TripDay? get nextDay {
@@ -299,7 +310,10 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: kSpace4),
             _QuickBalanceCard(data: data),
-            if (data != null &&
+            if (data != null && data.todayDay != null) ...[
+              const SizedBox(height: kSpace4),
+              _TodayAgendaCard(day: data.todayDay!),
+            ] else if (data != null &&
                 (data.nextDay != null || data.nextTravelItem != null)) ...[
               const SizedBox(height: kSpace4),
               _UpcomingCard(data: data),
@@ -739,6 +753,118 @@ class _UpcomingCard extends StatelessWidget {
                   )
                 : null,
             trailing: date != null ? Text(fmtDate(date), style: kStyleOverline) : null,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Today's agenda card (shown when today is a plan day) ────────────────────
+
+class _TodayAgendaCard extends StatelessWidget {
+  const _TodayAgendaCard({required this.day});
+  final TripDay day;
+
+  @override
+  Widget build(BuildContext context) {
+    final items     = day.sortedItems;
+    final doneCount = items.where((i) => i.isDone).length;
+    final total     = items.length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text('Today', style: kStyleOverline),
+            const Spacer(),
+            if (total > 0)
+              Text(
+                '$doneCount/$total done',
+                style: kStyleCaption.copyWith(
+                  color: doneCount == total ? kColorPrimary : kColorInkSoft,
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: kSpace3),
+        DecoratedBox(
+          decoration: kCardDecoration(),
+          child: Column(
+            children: [
+              // Day header row
+              Padding(
+                padding: const EdgeInsets.fromLTRB(kSpace4, kSpace3, kSpace4, kSpace2),
+                child: Row(
+                  children: [
+                    const Icon(Icons.calendar_month_rounded, size: 14, color: kColorInkSoft),
+                    const SizedBox(width: kSpace2),
+                    Text(
+                      'Day ${day.dayNumber}  ·  ${day.city}  ·  ${fmtDate(day.date)}',
+                      style: kStyleCaption.copyWith(color: kColorInkSoft),
+                    ),
+                  ],
+                ),
+              ),
+              if (items.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(kSpace4, 0, kSpace4, kSpace3),
+                  child: Text('Nothing planned for today yet.',
+                      style: kStyleCaption.copyWith(color: kColorInkSoft)),
+                )
+              else
+                ...items.asMap().entries.map((e) {
+                  final i    = e.key;
+                  final item = e.value;
+                  final isLast = i == items.length - 1;
+                  return Column(
+                    children: [
+                      if (i == 0)
+                        const Divider(height: 1, color: kColorBorder),
+                      ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: kSpace4, vertical: kSpace1),
+                        leading: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: item.isDone
+                                ? kColorPrimary.withValues(alpha: 0.12)
+                                : item.type.color.withValues(alpha: 0.12),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            item.isDone ? Icons.check_rounded : item.type.icon,
+                            size: 14,
+                            color: item.isDone ? kColorPrimary : item.type.color,
+                          ),
+                        ),
+                        title: Text(
+                          item.title,
+                          style: kStyleBodyMedium.copyWith(
+                            decoration: item.isDone ? TextDecoration.lineThrough : null,
+                            color: item.isDone ? kColorInkSoft : kColorInk,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: item.time != null || item.city != null
+                            ? Padding(
+                                padding: const EdgeInsets.only(top: 1),
+                                child: Text(
+                                  [if (item.time != null) item.time!, if (item.city != null) item.city!].join('  ·  '),
+                                  style: kStyleCaption,
+                                ),
+                              )
+                            : null,
+                      ),
+                      if (!isLast)
+                        const Divider(height: 1, indent: kSpace4 + 28 + kSpace3),
+                    ],
+                  );
+                }),
+            ],
           ),
         ),
       ],

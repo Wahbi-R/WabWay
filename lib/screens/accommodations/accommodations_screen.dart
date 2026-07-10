@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
@@ -251,7 +251,7 @@ class _AccommodationsScreenState extends State<AccommodationsScreen> {
   }
 }
 
-// â”€â”€â”€ Accommodation card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ Accommodation card â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 class _AccommodationCard extends StatelessWidget {
   const _AccommodationCard({required this.item, required this.onTap});
@@ -259,11 +259,28 @@ class _AccommodationCard extends StatelessWidget {
   final Accommodation item;
   final VoidCallback onTap;
 
+  // Returns a short countdown string based on today's date, or null if there
+  // are no dates or the stay is already over.
+  String? _countdownLabel() {
+    if (item.checkIn == null || item.checkOut == null) return null;
+    final now     = DateTime.now();
+    final today   = DateTime(now.year, now.month, now.day);
+    final checkIn = DateTime(item.checkIn!.year, item.checkIn!.month, item.checkIn!.day);
+    final checkOut = DateTime(item.checkOut!.year, item.checkOut!.month, item.checkOut!.day);
+    if (today.isAfter(checkOut)) return null;
+    if (!today.isBefore(checkIn)) return "Staying now";
+    final diff = checkIn.difference(today).inDays;
+    if (diff == 0) return "Check-in today!";
+    if (diff == 1) return "Check-in tomorrow";
+    return "Check-in in $diff days";
+  }
+
   @override
   Widget build(BuildContext context) {
     final hasImage = item.imageUrl != null && item.imageUrl!.isNotEmpty;
     final source   = item.detectedSource;
-    final nightStr = item.nights != null ? '${item.nights} night${item.nights == 1 ? '' : 's'}' : null;
+    final nightStr = item.nights != null ? "${item.nights} night${item.nights == 1 ? "" : "s"}" : null;
+    final countdown = _countdownLabel();
 
     String? priceStr;
     if (item.pricePerNight != null) {
@@ -276,7 +293,7 @@ class _AccommodationCard extends StatelessWidget {
 
     String? dateStr;
     if (item.checkIn != null && item.checkOut != null) {
-      dateStr = '${fmtDate(item.checkIn!)} â†’ ${fmtDate(item.checkOut!)}';
+      dateStr = '${fmtDate(item.checkIn!)} → ${fmtDate(item.checkOut!)}';
       if (nightStr != null) dateStr = '$dateStr ($nightStr)';
     }
 
@@ -357,6 +374,18 @@ class _AccommodationCard extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(dateStr, style: kStyleCaption),
                       ],
+                      if (countdown != null) ...[
+                        const SizedBox(height: kSpace2),
+                        Text(
+                          countdown,
+                          style: kStyleCaption.copyWith(
+                            color: countdown == 'Staying now'
+                                ? kColorSuccess
+                                : kColorPrimary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -394,7 +423,7 @@ class _ImagePlaceholder extends StatelessWidget {
   }
 }
 
-// â”€â”€â”€ Sheet result â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ Sheet result â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 class AccommodationSheetResult {
   const AccommodationSheetResult({this.accommodation, this.deleted = false});

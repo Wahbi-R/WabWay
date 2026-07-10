@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 84,
+    label: 'Stay check-in countdown',
+    changes: [
+      'Accommodation cards now show how many days until check-in, "Check-in today!", or "Staying now" when you\'re mid-stay',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 83,
     label: 'Tap links in activity feed',
     changes: [

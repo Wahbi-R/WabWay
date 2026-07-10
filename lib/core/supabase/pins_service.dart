@@ -1,3 +1,4 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/pins_data.dart';
 import 'client.dart';
 
@@ -40,5 +41,22 @@ abstract final class PinsService {
 
   static Future<void> delete(String pinId) async {
     await supabase.from('trip_pins').delete().eq('id', pinId);
+  }
+
+  static RealtimeChannel subscribe(String tripId, void Function() onChanged) {
+    return supabase
+        .channel('pins:$tripId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'trip_pins',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'trip_id',
+            value: tripId,
+          ),
+          callback: (_) => onChanged(),
+        )
+        .subscribe();
   }
 }

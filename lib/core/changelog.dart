@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 74,
+    label: 'Pinboard realtime',
+    changes: [
+      'Pinboard now updates live — new notes from other members appear instantly without refreshing',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 73,
     label: 'Receipt CSV export',
     changes: [

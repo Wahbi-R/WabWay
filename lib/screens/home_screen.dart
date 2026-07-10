@@ -36,6 +36,7 @@ import 'travel/travel_item_detail.dart';
 import 'pins_screen.dart';
 import '../core/supabase/pins_service.dart';
 import '../data/pins_data.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show RealtimeChannel;
 
 // ─── Loaded data ──────────────────────────────────────────────────────────────
 
@@ -849,11 +850,19 @@ class _PinboardCard extends StatefulWidget {
 class _PinboardCardState extends State<_PinboardCard> {
   List<TripPin> _pins = [];
   bool _loaded = false;
+  RealtimeChannel? _channel;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _channel = PinsService.subscribe(widget.tripId, () => _load());
+  }
+
+  @override
+  void dispose() {
+    _channel?.unsubscribe();
+    super.dispose();
   }
 
   Future<void> _load() async {

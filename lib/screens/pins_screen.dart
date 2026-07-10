@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show RealtimeChannel;
 import '../core/auth/profile_state.dart';
 import '../core/supabase/pins_service.dart';
 import '../core/trip/trip_state.dart';
@@ -20,6 +22,8 @@ class _PinsScreenState extends State<PinsScreen> {
   bool _loading = true;
   String _tripId = '';
   String _myId = '';
+  RealtimeChannel? _channel;
+  Timer? _debounce;
 
   @override
   void didChangeDependencies() {
@@ -27,6 +31,17 @@ class _PinsScreenState extends State<PinsScreen> {
     _tripId = TripState.tripOf(context).id;
     _myId   = ProfileState.of(context).id;
     _load();
+    _channel ??= PinsService.subscribe(_tripId, () {
+      _debounce?.cancel();
+      _debounce = Timer(const Duration(milliseconds: 400), () => _load(silent: true));
+    });
+  }
+
+  @override
+  void dispose() {
+    _channel?.unsubscribe();
+    _debounce?.cancel();
+    super.dispose();
   }
 
   Future<void> _load({bool silent = false}) async {

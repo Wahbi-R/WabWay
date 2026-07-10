@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 83,
+    label: 'Tap links in activity feed',
+    changes: [
+      'Activity feed entries for saved links are now tappable — tap to open the link in your browser',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 82,
     label: 'Packing list grouping',
     changes: [

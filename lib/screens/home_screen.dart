@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../core/auth/profile_state.dart';
 import '../core/supabase/activity_service.dart';
 import '../core/supabase/doc_service.dart';
+import '../core/supabase/links_service.dart';
 import '../core/supabase/money_service.dart';
 import '../core/supabase/plan_service.dart';
 import '../core/supabase/spot_service.dart';
@@ -17,6 +18,7 @@ import 'onboarding_screen.dart';
 import 'trips/trip_settings_sheet.dart';
 import '../data/activity_data.dart';
 import '../data/docs_data.dart';
+import '../data/links_data.dart';
 import '../data/money_data.dart';
 import '../data/plan_data.dart';
 import '../data/spot_data.dart';
@@ -47,6 +49,7 @@ class _HomeData {
     required this.days,
     required this.travelItems,
     required this.receipts,
+    required this.links,
     required this.balancesByCurrency,
     required this.homeCurrency,
     required this.memberMap,
@@ -59,6 +62,7 @@ class _HomeData {
   final List<TripDay> days;
   final List<TravelItem> travelItems;
   final List<Receipt> receipts;
+  final List<TripLink> links;
   // balancesByCurrency[currency] = per-member net balances in that currency.
   // Multi-currency trips will have multiple entries here.
   final Map<String, List<MemberBalance>> balancesByCurrency;
@@ -160,8 +164,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final myId = ProfileState.of(context).id;
 
     try {
-      // All seven sources in one round-trip so the home screen loads in parallel.
-      // results[0..6] must stay in sync with the list order below.
+      // All eight sources in one round-trip so the home screen loads in parallel.
+      // results[0..7] must stay in sync with the list order below.
       final results = await Future.wait([
         SpotService.loadSpots(trip.id),
         DocService.loadDocuments(trip.id),
@@ -170,6 +174,7 @@ class _HomeScreenState extends State<HomeScreen> {
         MoneyService.loadReceipts(trip.id),
         MoneyService.loadWithdrawals(trip.id),
         ActivityService.loadEvents(trip.id),
+        LinksService.loadLinks(trip.id),
       ]);
 
       final spots        = results[0] as List<Spot>;
@@ -179,6 +184,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final receipts     = results[4] as List<Receipt>;
       final withdrawals  = results[5] as List;
       final activities   = results[6] as List<ActivityEvent>;
+      final links        = results[7] as List<TripLink>;
 
       final memberMap = {for (final m in members) m.userId: m.profile.displayName};
       final tripMembers = members
@@ -201,6 +207,7 @@ class _HomeScreenState extends State<HomeScreen> {
           days: days,
           travelItems: travelItems,
           receipts: receipts,
+          links: links,
           balancesByCurrency: balancesByCurrency,
           homeCurrency: trip.homeCurrency,
           memberMap: memberMap,
@@ -1219,9 +1226,16 @@ class _ActivityFeed extends StatelessWidget {
           ),
         ));
 
-      // Member joined and link added have no detail screens to navigate to.
-      case ActivityEventType.withdrawalAdded:
       case ActivityEventType.linkAdded:
+        final link = d.links.where((l) => l.id == ev.entityId).firstOrNull;
+        if (link == null) return null;
+        return (_) => launchUrl(
+          Uri.parse(link.url),
+          mode: LaunchMode.externalApplication,
+        );
+
+      // Withdrawals and member joins have no navigable detail screen.
+      case ActivityEventType.withdrawalAdded:
       case ActivityEventType.memberJoined:
       case ActivityEventType.unknown:
         return null;

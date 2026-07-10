@@ -113,6 +113,22 @@ class _LinksScreenState extends State<LinksScreen> {
     }
   }
 
+  Future<void> _editLink(TripLink link) async {
+    final userId = ProfileState.of(context).id;
+    final updated = await showAddLinkSheet(
+      context,
+      tripId: _activeTripId!,
+      userId: userId,
+      existing: link,
+    );
+    if (updated != null && mounted) {
+      setState(() {
+        final idx = _links.indexWhere((l) => l.id == updated.id);
+        if (idx >= 0) _links[idx] = updated;
+      });
+    }
+  }
+
   Future<void> _deleteLink(TripLink link) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -244,6 +260,7 @@ class _LinksScreenState extends State<LinksScreen> {
                                     separatorBuilder: (_, __) => const SizedBox(height: kSpace3),
                                     itemBuilder: (_, i) => _LinkCard(
                                       link: _filteredLinks[i],
+                                      onEdit: () => _editLink(_filteredLinks[i]),
                                       onDelete: () => _deleteLink(_filteredLinks[i]),
                                     ),
                                   ),
@@ -274,9 +291,16 @@ class _LinksScreenState extends State<LinksScreen> {
 
 // ─── Link card ────────────────────────────────────────────────────────────────
 
+enum _LinkAction { open, edit, delete }
+
 class _LinkCard extends StatelessWidget {
-  const _LinkCard({required this.link, required this.onDelete});
+  const _LinkCard({
+    required this.link,
+    required this.onEdit,
+    required this.onDelete,
+  });
   final TripLink link;
+  final VoidCallback onEdit;
   final VoidCallback onDelete;
 
   Future<void> _open(BuildContext context) async {
@@ -331,20 +355,32 @@ class _LinkCard extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: kSpace2),
 
-          // Actions
-          Column(
-            children: [
-              const Icon(Icons.open_in_new_rounded,
-                  size: 16, color: kColorInkSoft),
-              const SizedBox(height: kSpace3),
-              GestureDetector(
-                onTap: onDelete,
-                child: const Icon(Icons.delete_outline_rounded,
-                    size: 16, color: kColorDanger),
+          // Kebab menu
+          PopupMenuButton<_LinkAction>(
+            icon: const Icon(Icons.more_vert_rounded, size: 18, color: kColorInkSoft),
+            padding: EdgeInsets.zero,
+            itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: _LinkAction.open,
+                child: Text('Open'),
+              ),
+              const PopupMenuItem(
+                value: _LinkAction.edit,
+                child: Text('Edit'),
+              ),
+              PopupMenuItem(
+                value: _LinkAction.delete,
+                child: Text('Delete', style: TextStyle(color: kColorDanger)),
               ),
             ],
+            onSelected: (action) {
+              switch (action) {
+                case _LinkAction.open:   _open(context);
+                case _LinkAction.edit:   onEdit();
+                case _LinkAction.delete: onDelete();
+              }
+            },
           ),
         ],
       ),

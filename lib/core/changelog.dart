@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 86,
+    label: 'Link editing',
+    changes: [
+      'Saved links can now be edited — tap the menu on any link card to update the title, URL, category, or notes',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 85,
     label: 'Packing "packed by" credit',
     changes: [

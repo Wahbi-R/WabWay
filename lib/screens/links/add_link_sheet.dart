@@ -13,6 +13,7 @@ Future<TripLink?> showAddLinkSheet(
   required String userId,
   String? prefillUrl,
   String? prefillTitle,
+  TripLink? existing,
 }) {
   return showModalBottomSheet<TripLink>(
     context: context,
@@ -24,6 +25,7 @@ Future<TripLink?> showAddLinkSheet(
       userId: userId,
       prefillUrl: prefillUrl,
       prefillTitle: prefillTitle,
+      existing: existing,
       onSubmit: (link) => Navigator.pop(ctx, link),
     ),
   );
@@ -36,12 +38,14 @@ class _AddLinkSheet extends StatelessWidget {
     required this.onSubmit,
     this.prefillUrl,
     this.prefillTitle,
+    this.existing,
   });
   final String tripId;
   final String userId;
   final ValueChanged<TripLink> onSubmit;
   final String? prefillUrl;
   final String? prefillTitle;
+  final TripLink? existing;
 
   @override
   Widget build(BuildContext context) {
@@ -60,6 +64,7 @@ class _AddLinkSheet extends StatelessWidget {
           scrollController: ctrl,
           prefillUrl: prefillUrl,
           prefillTitle: prefillTitle,
+          existing: existing,
           onSubmit: onSubmit,
         ),
       ),
@@ -75,6 +80,7 @@ class _AddLinkContent extends StatefulWidget {
     this.scrollController,
     this.prefillUrl,
     this.prefillTitle,
+    this.existing,
   });
   final String tripId;
   final String userId;
@@ -82,6 +88,7 @@ class _AddLinkContent extends StatefulWidget {
   final ScrollController? scrollController;
   final String? prefillUrl;
   final String? prefillTitle;
+  final TripLink? existing;
 
   @override
   State<_AddLinkContent> createState() => _AddLinkContentState();
@@ -91,19 +98,24 @@ class _AddLinkContentState extends State<_AddLinkContent> {
   final _formKey   = GlobalKey<FormState>();
   late final TextEditingController _titleCtrl;
   late final TextEditingController _urlCtrl;
-  final _notesCtrl = TextEditingController();
+  late final TextEditingController _notesCtrl;
 
-  LinkCategory _category = LinkCategory.general;
+  late LinkCategory _category;
   bool _loading = false;
   String? _error;
+
+  bool get _isEditing => widget.existing != null;
 
   @override
   void initState() {
     super.initState();
-    _urlCtrl   = TextEditingController(text: widget.prefillUrl ?? '');
-    _titleCtrl = TextEditingController(text: widget.prefillTitle ?? '');
+    final ex = widget.existing;
+    _urlCtrl   = TextEditingController(text: ex?.url   ?? widget.prefillUrl   ?? '');
+    _titleCtrl = TextEditingController(text: ex?.title ?? widget.prefillTitle ?? '');
+    _notesCtrl = TextEditingController(text: ex?.notes ?? '');
+    _category  = ex?.category ?? LinkCategory.general;
     _urlCtrl.addListener(_onUrlChanged);
-    if (widget.prefillUrl != null) _autoDetectCategory(widget.prefillUrl!);
+    if (ex == null && widget.prefillUrl != null) _autoDetectCategory(widget.prefillUrl!);
   }
 
   @override
@@ -163,14 +175,25 @@ class _AddLinkContentState extends State<_AddLinkContent> {
     if (!_formKey.currentState!.validate()) return;
     setState(() { _loading = true; _error = null; });
     try {
-      final link = await LinksService.createLink(
-        tripId:   widget.tripId,
-        addedBy:  widget.userId,
-        title:    _titleCtrl.text.trim(),
-        url:      _urlCtrl.text.trim(),
-        category: _category,
-        notes:    _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
-      );
+      final TripLink link;
+      if (_isEditing) {
+        link = await LinksService.updateLink(
+          widget.existing!.id,
+          title:    _titleCtrl.text.trim(),
+          url:      _urlCtrl.text.trim(),
+          category: _category,
+          notes:    _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
+        );
+      } else {
+        link = await LinksService.createLink(
+          tripId:   widget.tripId,
+          addedBy:  widget.userId,
+          title:    _titleCtrl.text.trim(),
+          url:      _urlCtrl.text.trim(),
+          category: _category,
+          notes:    _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
+        );
+      }
       widget.onSubmit(link);
     } catch (e) {
       if (mounted) setState(() { _loading = false; _error = e.toString(); });
@@ -188,7 +211,7 @@ class _AddLinkContentState extends State<_AddLinkContent> {
           padding: const EdgeInsets.fromLTRB(kSpace4, kSpace2, kSpace4, 0),
           child: Row(
             children: [
-              Text('Save a link', style: kStyleTitle),
+              Text(_isEditing ? 'Edit link' : 'Save a link', style: kStyleTitle),
               const Spacer(),
               WabwayIconButton(
                 icon: Icons.close_rounded,
@@ -294,8 +317,8 @@ class _AddLinkContentState extends State<_AddLinkContent> {
                   ],
                   const SizedBox(height: kSpace6),
                   WabwayButton(
-                    label: 'Save link',
-                    icon: Icons.bookmark_add_rounded,
+                    label: _isEditing ? 'Save changes' : 'Save link',
+                    icon: _isEditing ? Icons.check_rounded : Icons.bookmark_add_rounded,
                     fullWidth: true,
                     size: WabwayButtonSize.lg,
                     loading: _loading,

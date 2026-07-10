@@ -61,6 +61,27 @@ abstract final class LinksService {
     return _fromRow(row);
   }
 
+  static Future<TripLink> updateLink(
+    String linkId, {
+    required String title,
+    required String url,
+    required LinkCategory category,
+    String? notes,
+  }) async {
+    final row = await supabase
+        .from('trip_links')
+        .update({
+          'title':    title.trim(),
+          'url':      url.trim(),
+          'category': _catToDb(category),
+          'notes':    notes != null && notes.trim().isNotEmpty ? notes.trim() : null,
+        })
+        .eq('id', linkId)
+        .select()
+        .single();
+    return _fromRow(row);
+  }
+
   static Future<void> deleteLink(String linkId) async {
     await supabase.from('trip_links').delete().eq('id', linkId);
   }

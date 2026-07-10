@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 66,
+    label: 'Trip budget tracking',
+    changes: [
+      'Set a total trip budget in Trip Settings — home screen shows a live spent vs. budget bar that turns red if you go over',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 65,
     label: 'Tap to mark done from home',
     changes: [

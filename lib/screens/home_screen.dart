@@ -330,6 +330,14 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: kSpace4),
             _QuickBalanceCard(data: data),
+            if (data != null && trip.budget != null) ...[
+              const SizedBox(height: kSpace3),
+              _BudgetProgressBar(
+                spent: data.totalSpent,
+                budget: trip.budget!,
+                currency: trip.homeCurrency,
+              ),
+            ],
             if (data != null && data.todayDay != null) ...[
               const SizedBox(height: kSpace4),
               _TodayAgendaCard(day: data.todayDay!),
@@ -707,6 +715,63 @@ class _QuickBalanceCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: lines,
+    );
+  }
+}
+
+// ─── Budget progress bar ─────────────────────────────────────────────────────
+
+class _BudgetProgressBar extends StatelessWidget {
+  const _BudgetProgressBar({
+    required this.spent,
+    required this.budget,
+    required this.currency,
+  });
+
+  final double spent;
+  final double budget;
+  final String currency;
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = (spent / budget).clamp(0.0, 1.0);
+    final isOver = spent > budget;
+    final barColor = isOver ? kColorDanger : kColorPrimary;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text('Budget', style: kStyleCaption.copyWith(color: kColorInkSoft)),
+            const Spacer(),
+            Text(
+              '${fmtAmount(spent, currency)} / ${fmtAmount(budget, currency)}',
+              style: kStyleCaption.copyWith(
+                color: isOver ? kColorDanger : kColorInkSoft,
+                fontWeight: isOver ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: kRadiusPill,
+          child: LinearProgressIndicator(
+            value: progress,
+            backgroundColor: kColorBorder,
+            valueColor: AlwaysStoppedAnimation(barColor),
+            minHeight: 6,
+          ),
+        ),
+        if (isOver) ...[
+          const SizedBox(height: 4),
+          Text(
+            '${fmtAmount(spent - budget, currency)} over budget',
+            style: kStyleCaption.copyWith(color: kColorDanger),
+          ),
+        ],
+      ],
     );
   }
 }

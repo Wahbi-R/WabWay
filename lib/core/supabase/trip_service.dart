@@ -95,6 +95,8 @@ abstract final class TripService {
     bool clearStartDate    = false,
     bool clearEndDate      = false,
     bool clearCoverImage   = false,
+    double? budget,
+    bool clearBudget = false,
   }) async {
 
     final updates = <String, dynamic>{
@@ -110,6 +112,8 @@ abstract final class TripService {
       if (homeCurrency != null) 'home_currency': homeCurrency.toUpperCase(),
       if (clearCoverImage) 'cover_image_url': null
       else if (coverImageUrl != null) 'cover_image_url': coverImageUrl,
+      if (clearBudget) 'budget': null
+      else if (budget != null && budget > 0) 'budget': budget,
     };
     if (updates.isEmpty) return;
     await supabase.from('trips').update(updates).eq('id', tripId);

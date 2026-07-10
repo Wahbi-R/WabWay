@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/supabase/trip_service.dart';
 import '../../core/trip/app_trip.dart';
@@ -59,6 +60,7 @@ class _TripSettingsSheet extends StatefulWidget {
 class _TripSettingsSheetState extends State<_TripSettingsSheet> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _destinationCtrl;
+  late final TextEditingController _budgetCtrl;
   DateTime? _startDate;
   DateTime? _endDate;
   late String _currency;
@@ -75,6 +77,9 @@ class _TripSettingsSheetState extends State<_TripSettingsSheet> {
     super.initState();
     _nameCtrl        = TextEditingController(text: widget.trip.name);
     _destinationCtrl = TextEditingController(text: widget.trip.destination ?? '');
+    _budgetCtrl      = TextEditingController(
+      text: widget.trip.budget != null ? widget.trip.budget!.toStringAsFixed(2) : '',
+    );
     _startDate       = widget.trip.startDate;
     _endDate         = widget.trip.endDate;
     _currency        = widget.trip.defaultCurrency;
@@ -86,6 +91,7 @@ class _TripSettingsSheetState extends State<_TripSettingsSheet> {
   void dispose() {
     _nameCtrl.dispose();
     _destinationCtrl.dispose();
+    _budgetCtrl.dispose();
     super.dispose();
   }
 
@@ -168,6 +174,8 @@ class _TripSettingsSheetState extends State<_TripSettingsSheet> {
         homeCurrency:     _homeCurrency,
         coverImageUrl:    _clearCover ? null : _coverImageUrl,
         clearCoverImage:  _clearCover,
+        budget:          double.tryParse(_budgetCtrl.text.replaceAll(',', '.')),
+        clearBudget:     _budgetCtrl.text.trim().isEmpty && widget.trip.budget != null,
       );
       if (!mounted) return;
       widget.onSaved();
@@ -291,6 +299,34 @@ class _TripSettingsSheetState extends State<_TripSettingsSheet> {
                     _CurrencyDropdown(
                       value: _homeCurrency,
                       onChanged: (v) => setState(() => _homeCurrency = v),
+                    ),
+
+                    const SizedBox(height: kSpace4),
+                    // Optional trip budget
+                    Text('Total budget (optional)',
+                        style: kStyleCaptionMedium.copyWith(color: kColorInk)),
+                    const SizedBox(height: kSpace1),
+                    Text('Group spending is compared against this in ${_homeCurrency}.',
+                        style: kStyleCaption.copyWith(color: kColorInkSoft)),
+                    const SizedBox(height: kSpace2),
+                    TextField(
+                      controller: _budgetCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.,]'))],
+                      style: kStyleBodyMedium,
+                      decoration: InputDecoration(
+                        hintText: 'e.g. 3000.00',
+                        hintStyle: TextStyle(color: kColorInkSoft.withAlpha(120)),
+                        prefixText: '$_homeCurrency  ',
+                        prefixStyle: kStyleBodyMedium.copyWith(color: kColorInkSoft),
+                        filled: true,
+                        fillColor: kColorCream,
+                        border: OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorBorder)),
+                        enabledBorder: OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorBorder)),
+                        focusedBorder: OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorPrimary, width: 1.5)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        isDense: true,
+                      ),
                     ),
 
                     const SizedBox(height: kSpace4),

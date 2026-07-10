@@ -8,6 +8,7 @@ class AppTrip {
     this.startDate,
     this.endDate,
     this.coverImageUrl,
+    this.budget,
   });
 
   final String id;
@@ -19,6 +20,8 @@ class AppTrip {
   final DateTime? startDate;
   final DateTime? endDate;
   final String? coverImageUrl;
+  /// Optional trip-wide spending budget in home currency; null = no budget set.
+  final double? budget;
 
   factory AppTrip.fromMap(Map<String, dynamic> map) => AppTrip(
         id:              map['id'] as String,
@@ -33,6 +36,7 @@ class AppTrip {
             ? DateTime.parse(map['end_date'] as String)
             : null,
         coverImageUrl:   map['cover_image_url'] as String?,
+        budget:          (map['budget'] as num?)?.toDouble(),
       );
 
   String get subtitle => destination ?? '';

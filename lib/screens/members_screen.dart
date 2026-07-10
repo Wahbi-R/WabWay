@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../core/auth/profile_state.dart';
 import '../core/supabase/trip_service.dart';
 import '../core/trip/app_trip_member.dart';
@@ -25,6 +26,16 @@ class MembersScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text('Members', style: kStyleTitle),
         actions: [
+          if (trip.groupChatUrl != null && trip.groupChatUrl!.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.chat_bubble_outline_rounded),
+              color: kColorPrimary,
+              tooltip: 'Open group chat',
+              onPressed: () => launchUrl(
+                Uri.parse(trip.groupChatUrl!),
+                mode: LaunchMode.externalApplication,
+              ),
+            ),
           if (isOwner) ...[
             WabwayButton(
               label: 'Add member',

@@ -113,6 +113,8 @@ abstract final class TripService {
     bool clearCoverImage   = false,
     double? budget,
     bool clearBudget = false,
+    String? groupChatUrl,
+    bool clearGroupChatUrl = false,
   }) async {
 
     final updates = <String, dynamic>{
@@ -130,6 +132,9 @@ abstract final class TripService {
       else if (coverImageUrl != null) 'cover_image_url': coverImageUrl,
       if (clearBudget) 'budget': null
       else if (budget != null && budget > 0) 'budget': budget,
+      if (clearGroupChatUrl) 'group_chat_url': null
+      else if (groupChatUrl != null && groupChatUrl.trim().isNotEmpty)
+        'group_chat_url': groupChatUrl.trim(),
     };
     if (updates.isEmpty) return;
     await supabase.from('trips').update(updates).eq('id', tripId);

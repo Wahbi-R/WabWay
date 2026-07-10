@@ -9,6 +9,7 @@ class AppTrip {
     this.endDate,
     this.coverImageUrl,
     this.budget,
+    this.groupChatUrl,
   });
 
   final String id;
@@ -22,6 +23,8 @@ class AppTrip {
   final String? coverImageUrl;
   /// Optional trip-wide spending budget in home currency; null = no budget set.
   final double? budget;
+  /// Optional link to the group's WhatsApp / Telegram / Signal chat.
+  final String? groupChatUrl;
 
   factory AppTrip.fromMap(Map<String, dynamic> map) => AppTrip(
         id:              map['id'] as String,
@@ -37,6 +40,7 @@ class AppTrip {
             : null,
         coverImageUrl:   map['cover_image_url'] as String?,
         budget:          (map['budget'] as num?)?.toDouble(),
+        groupChatUrl:    map['group_chat_url'] as String?,
       );
 
   String get subtitle => destination ?? '';

@@ -61,6 +61,7 @@ class _TripSettingsSheetState extends State<_TripSettingsSheet> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _destinationCtrl;
   late final TextEditingController _budgetCtrl;
+  late final TextEditingController _chatUrlCtrl;
   DateTime? _startDate;
   DateTime? _endDate;
   late String _currency;
@@ -80,6 +81,7 @@ class _TripSettingsSheetState extends State<_TripSettingsSheet> {
     _budgetCtrl      = TextEditingController(
       text: widget.trip.budget != null ? widget.trip.budget!.toStringAsFixed(2) : '',
     );
+    _chatUrlCtrl     = TextEditingController(text: widget.trip.groupChatUrl ?? '');
     _startDate       = widget.trip.startDate;
     _endDate         = widget.trip.endDate;
     _currency        = widget.trip.defaultCurrency;
@@ -92,6 +94,7 @@ class _TripSettingsSheetState extends State<_TripSettingsSheet> {
     _nameCtrl.dispose();
     _destinationCtrl.dispose();
     _budgetCtrl.dispose();
+    _chatUrlCtrl.dispose();
     super.dispose();
   }
 
@@ -174,8 +177,10 @@ class _TripSettingsSheetState extends State<_TripSettingsSheet> {
         homeCurrency:     _homeCurrency,
         coverImageUrl:    _clearCover ? null : _coverImageUrl,
         clearCoverImage:  _clearCover,
-        budget:          double.tryParse(_budgetCtrl.text.replaceAll(',', '.')),
-        clearBudget:     _budgetCtrl.text.trim().isEmpty && widget.trip.budget != null,
+        budget:             double.tryParse(_budgetCtrl.text.replaceAll(',', '.')),
+        clearBudget:        _budgetCtrl.text.trim().isEmpty && widget.trip.budget != null,
+        groupChatUrl:       _chatUrlCtrl.text.trim().isEmpty ? null : _chatUrlCtrl.text.trim(),
+        clearGroupChatUrl:  _chatUrlCtrl.text.trim().isEmpty && widget.trip.groupChatUrl != null,
       );
       if (!mounted) return;
       widget.onSaved();
@@ -326,6 +331,37 @@ class _TripSettingsSheetState extends State<_TripSettingsSheet> {
                         focusedBorder: OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorPrimary, width: 1.5)),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                         isDense: true,
+                      ),
+                    ),
+
+                    const SizedBox(height: kSpace4),
+                    // Group chat link
+                    Text('Group chat link (optional)',
+                        style: kStyleCaptionMedium.copyWith(color: kColorInk)),
+                    const SizedBox(height: kSpace1),
+                    Text('WhatsApp, Telegram, Signal, or any chat link. Visible to all members.',
+                        style: kStyleCaption.copyWith(color: kColorInkSoft)),
+                    const SizedBox(height: kSpace2),
+                    TextField(
+                      controller: _chatUrlCtrl,
+                      keyboardType: TextInputType.url,
+                      autocorrect: false,
+                      style: kStyleBodyMedium,
+                      decoration: InputDecoration(
+                        hintText: 'https://chat.whatsapp.com/…',
+                        hintStyle: TextStyle(color: kColorInkSoft.withAlpha(120)),
+                        filled: true,
+                        fillColor: kColorCream,
+                        border: OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorBorder)),
+                        enabledBorder: OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorBorder)),
+                        focusedBorder: OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorPrimary, width: 1.5)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        isDense: true,
+                        prefixIcon: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 10),
+                          child: Icon(Icons.chat_bubble_outline_rounded, size: 18, color: kColorInkSoft),
+                        ),
+                        prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
                       ),
                     ),
 

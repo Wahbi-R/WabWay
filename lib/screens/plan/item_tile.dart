@@ -162,6 +162,10 @@ class ItineraryItemTile extends StatelessWidget {
                           ),
                           if (item.hasLinks && !item.isDone)
                             _LinkBadges(item: item),
+                          if (item.plannedCost != null && !item.isDone) ...[
+                            const SizedBox(width: kSpace1),
+                            _CostChip(cost: item.plannedCost!, currency: item.currency ?? ''),
+                          ],
                         ],
                       ),
                       if ((item.city != null || item.location != null) &&
@@ -232,6 +236,40 @@ class _LinkBadges extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+class _CostChip extends StatelessWidget {
+  const _CostChip({required this.cost, required this.currency});
+  final double cost;
+  final String currency;
+
+  String get _label {
+    final isWhole = cost == cost.truncateToDouble();
+    final amount = isWhole ? cost.toInt().toString() : cost.toStringAsFixed(2);
+    return '$currency $amount';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const color = Color(0xFF4A7AB5);
+    const soft  = Color(0xFFE8EEF6);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      decoration: BoxDecoration(
+        color: soft,
+        borderRadius: kRadiusPill,
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Text(
+        _label,
+        style: const TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.w700,
+          color: color,
+        ),
+      ),
     );
   }
 }

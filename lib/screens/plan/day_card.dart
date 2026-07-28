@@ -109,6 +109,7 @@ class _TripDayCardState extends State<TripDayCard> {
                     ),
                 ],
                 const Divider(height: 1, color: kColorBorder),
+                _DayCostFooter(items: items),
                 _AddItemRow(onTap: widget.onAddItem),
               ],
             ),
@@ -466,13 +467,52 @@ class _ReorderableItemListState extends State<_ReorderableItemList> {
           },
         ),
         const Divider(height: 1, color: kColorBorder),
+        _DayCostFooter(items: widget.items),
         _AddItemRow(onTap: widget.onAddItem),
       ],
     );
   }
 }
 
-// ─── Add item row ─────────────────────────────────────────────────────────────
+// ─── Day cost footer ──────────────────────────────────────────────────────────
+
+class _DayCostFooter extends StatelessWidget {
+  const _DayCostFooter({required this.items});
+  final List<ItineraryItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final Map<String, double> totals = {};
+    for (final item in items) {
+      if (item.plannedCost != null && item.plannedCost! > 0) {
+        final c = item.currency ?? '?';
+        totals[c] = (totals[c] ?? 0) + item.plannedCost!;
+      }
+    }
+    if (totals.isEmpty) return const SizedBox.shrink();
+
+    final parts = totals.entries.map((e) {
+      final isWhole = e.value == e.value.truncateToDouble();
+      final amt = isWhole ? e.value.toInt().toString() : e.value.toStringAsFixed(0);
+      return '${e.key} $amt';
+    }).join(' + ');
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(kSpace4, kSpace2, kSpace4, 0),
+      child: Row(
+        children: [
+          Icon(Icons.account_balance_wallet_outlined,
+              size: 12, color: kColorInkSoft.withValues(alpha: 0.6)),
+          const SizedBox(width: 5),
+          Text(
+            'Est. $parts',
+            style: kStyleCaption.copyWith(fontSize: 11, color: kColorInkSoft),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 // ─── Member presence row ──────────────────────────────────────────────────────
 

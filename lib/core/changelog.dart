@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 99,
+    label: 'Planned cost on itinerary items',
+    changes: [
+      'Add an estimated cost (amount + currency) to any plan item — shown as a chip on the timeline',
+      'Day card footer shows a running total for all costed items; currency auto-groups if you mix currencies',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 98,
     label: 'Clear packed items',
     changes: [

@@ -47,6 +47,8 @@ abstract final class PlanService {
       linkedDocIds:    docIds,
       sortOrder:       (row['sort_order'] as num?)?.toInt() ?? 0,
       isDone:          (row['is_done'] as bool?) ?? false,
+      plannedCost:     (row['planned_cost'] as num?)?.toDouble(),
+      currency:        row['currency'] as String?,
     );
   }
 
@@ -146,6 +148,8 @@ abstract final class PlanService {
     String? linkedSpotId,
     List<String> linkedDocIds = const [],
     int sortOrder = 0,
+    double? plannedCost,
+    String? currency,
   }) async {
     final row = await supabase.from('itinerary_items').insert({
       'trip_id':    tripId,
@@ -163,6 +167,8 @@ abstract final class PlanService {
         'confirmation_url': confirmationUrl.trim(),
       if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
       if (linkedSpotId != null) 'linked_spot_id': linkedSpotId,
+      if (plannedCost != null) 'planned_cost': plannedCost,
+      if (currency != null) 'currency': currency,
     }).select().single();
 
     final itemId = row['id'] as String;
@@ -196,6 +202,8 @@ abstract final class PlanService {
       'notes':            item.notes,
       'linked_spot_id':   item.linkedSpotId,
       'is_done':          item.isDone,
+      'planned_cost':     item.plannedCost,
+      'currency':         item.currency,
     }).eq('id', item.id);
   }
 

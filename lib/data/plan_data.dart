@@ -72,6 +72,8 @@ class ItineraryItem {
     this.linkedDocIds = const [],
     this.sortOrder = 0,
     this.isDone = false,
+    this.plannedCost,
+    this.currency,
   });
 
   final String id;
@@ -91,11 +93,14 @@ class ItineraryItem {
   final List<String> linkedDocIds;
   final int sortOrder;
   final bool isDone;
+  final double? plannedCost;
+  final String? currency;
 
   bool get hasTime => time != null;
   bool get hasLinks => linkedSpotId != null || linkedDocIds.isNotEmpty;
 
-  ItineraryItem copyWith({bool? isDone}) => ItineraryItem(
+  ItineraryItem copyWith({bool? isDone, double? plannedCost, String? currency}) =>
+      ItineraryItem(
         id:              id,
         dayId:           dayId,
         title:           title,
@@ -111,6 +116,8 @@ class ItineraryItem {
         linkedDocIds:    linkedDocIds,
         sortOrder:       sortOrder,
         isDone:          isDone ?? this.isDone,
+        plannedCost:     plannedCost ?? this.plannedCost,
+        currency:        currency ?? this.currency,
       );
 }
 

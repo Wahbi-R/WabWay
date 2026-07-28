@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../../core/trip/trip_state.dart';
 import '../../data/plan_data.dart';
 import '../../data/docs_data.dart';
 import '../../data/spot_data.dart';
@@ -27,6 +29,7 @@ Future<ItineraryItem?> showAddItemSheet(
   ItineraryItem? initialItem,
 }) {
   final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
+  final defaultCurrency = TripState.tripOf(context).defaultCurrency;
 
   if (isDesktop) {
     return showDialog<ItineraryItem>(
@@ -44,6 +47,7 @@ Future<ItineraryItem?> showAddItemSheet(
             spots: spots,
             docs: docs,
             initialItem: initialItem,
+            defaultCurrency: defaultCurrency,
             onSubmit: (item) => Navigator.pop(ctx, item),
           ),
         ),
@@ -61,6 +65,7 @@ Future<ItineraryItem?> showAddItemSheet(
       spots: spots,
       docs: docs,
       initialItem: initialItem,
+      defaultCurrency: defaultCurrency,
       onSubmit: (item) => Navigator.pop(ctx, item),
     ),
   );
@@ -72,12 +77,14 @@ class _AddItemSheet extends StatelessWidget {
     required this.spots,
     required this.docs,
     required this.onSubmit,
+    required this.defaultCurrency,
     this.initialItem,
   });
   final String dayId;
   final List<Spot> spots;
   final List<TripDocument> docs;
   final ValueChanged<ItineraryItem> onSubmit;
+  final String defaultCurrency;
   final ItineraryItem? initialItem;
 
   @override
@@ -96,6 +103,7 @@ class _AddItemSheet extends StatelessWidget {
           spots: spots,
           docs: docs,
           initialItem: initialItem,
+          defaultCurrency: defaultCurrency,
           scrollController: ctrl,
           onSubmit: onSubmit,
           showDragHandle: true,
@@ -113,6 +121,7 @@ class _AddItemContent extends StatefulWidget {
     required this.spots,
     required this.docs,
     required this.onSubmit,
+    required this.defaultCurrency,
     this.scrollController,
     this.showDragHandle = false,
     this.initialItem,
@@ -122,6 +131,7 @@ class _AddItemContent extends StatefulWidget {
   final List<Spot> spots;
   final List<TripDocument> docs;
   final ValueChanged<ItineraryItem> onSubmit;
+  final String defaultCurrency;
   final ScrollController? scrollController;
   final bool showDragHandle;
   final ItineraryItem? initialItem;
@@ -139,16 +149,19 @@ class _AddItemContentState extends State<_AddItemContent> {
   final _mapsCtrl      = TextEditingController();
   final _confirmCtrl   = TextEditingController();
   final _notesCtrl     = TextEditingController();
+  final _costCtrl      = TextEditingController();
 
   ItineraryItemType _type = ItineraryItemType.activity;
   TimeOfDay? _time;
   String? _linkedSpotId;
   final Set<String> _linkedDocIds = {};
   bool _showAdvanced = false;
+  late String _currency;
 
   @override
   void initState() {
     super.initState();
+    _currency = widget.defaultCurrency;
     final item = widget.initialItem;
     if (item != null) {
       _titleCtrl.text    = item.title;
@@ -161,6 +174,12 @@ class _AddItemContentState extends State<_AddItemContent> {
       _type              = item.type;
       _linkedSpotId      = item.linkedSpotId;
       _linkedDocIds.addAll(item.linkedDocIds);
+      if (item.plannedCost != null) {
+        _costCtrl.text = item.plannedCost!.toStringAsFixed(
+          item.plannedCost! == item.plannedCost!.truncateToDouble() ? 0 : 2,
+        );
+      }
+      if (item.currency != null) _currency = item.currency!;
       if (item.time != null) {
         final parts = item.time!.split(':');
         if (parts.length == 2) {
@@ -185,6 +204,7 @@ class _AddItemContentState extends State<_AddItemContent> {
     _mapsCtrl.dispose();
     _confirmCtrl.dispose();
     _notesCtrl.dispose();
+    _costCtrl.dispose();
     super.dispose();
   }
 
@@ -225,6 +245,8 @@ class _AddItemContentState extends State<_AddItemContent> {
       notes:           _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
       linkedSpotId:    _linkedSpotId,
       linkedDocIds:    _linkedDocIds.toList(),
+      plannedCost:     double.tryParse(_costCtrl.text.trim()),
+      currency:        _costCtrl.text.trim().isNotEmpty ? _currency : null,
     ));
   }
 
@@ -380,6 +402,14 @@ class _AddItemContentState extends State<_AddItemContent> {
                     maxLines: 3,
                     textInputAction: TextInputAction.newline,
                   ),
+                  const SizedBox(height: kSpace4),
+
+                  // ── Estimated cost ────────────────────────────────────────
+                  _CostField(
+                    controller: _costCtrl,
+                    currency: _currency,
+                    onCurrencyChanged: (c) => setState(() => _currency = c),
+                  ),
                   const SizedBox(height: kSpace3),
 
                   // ── Advanced (links) ──────────────────────────────────────
@@ -431,6 +461,96 @@ class _AddItemContentState extends State<_AddItemContent> {
               ),
             ),
           ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Estimated cost field ─────────────────────────────────────────────────────
+
+const _kCurrencies = ['JPY', 'USD', 'EUR', 'CAD', 'GBP', 'AUD', 'KRW', 'THB', 'SGD', 'HKD', 'CNY'];
+
+class _CostField extends StatelessWidget {
+  const _CostField({
+    required this.controller,
+    required this.currency,
+    required this.onCurrencyChanged,
+  });
+  final TextEditingController controller;
+  final String currency;
+  final ValueChanged<String> onCurrencyChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Estimated cost', style: kStyleCaptionMedium),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            // Currency selector
+            GestureDetector(
+              onTap: () async {
+                final picked = await showDialog<String>(
+                  context: context,
+                  builder: (ctx) => SimpleDialog(
+                    backgroundColor: kColorPaper,
+                    shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
+                    title: Text('Currency', style: kStyleBodySemibold),
+                    children: _kCurrencies
+                        .map((c) => SimpleDialogOption(
+                              onPressed: () => Navigator.pop(ctx, c),
+                              child: Text(c,
+                                  style: kStyleBody.copyWith(
+                                    fontWeight: c == currency
+                                        ? FontWeight.w700
+                                        : FontWeight.normal,
+                                    color: c == currency ? kColorPrimary : null,
+                                  )),
+                            ))
+                        .toList(),
+                  ),
+                );
+                if (picked != null) onCurrencyChanged(picked);
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: kColorSurfaceSunken,
+                  borderRadius: kRadiusMd,
+                  border: Border.all(color: kColorBorder),
+                ),
+                child: Text(currency,
+                    style: kStyleBodyMedium.copyWith(color: kColorInkSoft)),
+              ),
+            ),
+            const SizedBox(width: kSpace2),
+            // Amount field
+            Expanded(
+              child: TextField(
+                controller: controller,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                ],
+                style: kStyleBody,
+                decoration: InputDecoration(
+                  hintText: '0',
+                  hintStyle: TextStyle(color: kColorInkSoft.withAlpha(120)),
+                  border: OutlineInputBorder(
+                      borderRadius: kRadiusMd,
+                      borderSide: BorderSide(color: kColorBorder)),
+                  focusedBorder: OutlineInputBorder(
+                      borderRadius: kRadiusMd,
+                      borderSide: BorderSide(color: kColorPrimary, width: 1.5)),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );

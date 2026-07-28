@@ -26,6 +26,7 @@ dependencies:
   google_mlkit_text_recognition: ^0.13.0
   syncfusion_flutter_pdf: ^27.1.48
   webview_flutter: ^4.10.0
+  geolocator: ^13.0.0
 
 dev_dependencies:
   flutter_test:

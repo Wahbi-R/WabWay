@@ -1,0 +1,123 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../data/crew_data.dart';
+import 'client.dart';
+
+abstract final class CrewService {
+  static Future<List<TripMessage>> fetchMessages(String tripId) async {
+    final rows = await supabase
+        .from('trip_messages')
+        .select()
+        .eq('trip_id', tripId)
+        .order('created_at', ascending: false)
+        .limit(100);
+    return rows.map(TripMessage.fromMap).toList().reversed.toList();
+  }
+
+  static Future<void> sendMessage({
+    required String tripId,
+    required String authorId,
+    required String body,
+  }) async {
+    await supabase.from('trip_messages').insert({
+      'trip_id': tripId,
+      'author_id': authorId,
+      'body': body.trim(),
+      'message_type': 'text',
+    });
+  }
+
+  static Future<void> sendLocationPing({
+    required String tripId,
+    required String authorId,
+    required double lat,
+    required double lng,
+  }) async {
+    await supabase.from('trip_messages').insert({
+      'trip_id': tripId,
+      'author_id': authorId,
+      'body': 'Shared their location',
+      'message_type': 'location_ping',
+      'lat': lat,
+      'lng': lng,
+    });
+  }
+
+  static Future<void> upsertLocationShare({
+    required String tripId,
+    required String userId,
+    required double lat,
+    required double lng,
+  }) async {
+    await supabase.from('location_shares').upsert(
+      {
+        'trip_id': tripId,
+        'user_id': userId,
+        'lat': lat,
+        'lng': lng,
+        'is_active': true,
+        'last_updated_at': DateTime.now().toUtc().toIso8601String(),
+      },
+      onConflict: 'trip_id,user_id',
+    );
+  }
+
+  static Future<void> deactivateLocationShare({
+    required String tripId,
+    required String userId,
+  }) async {
+    await supabase
+        .from('location_shares')
+        .update({'is_active': false})
+        .eq('trip_id', tripId)
+        .eq('user_id', userId);
+  }
+
+  static Future<List<LocationShare>> fetchActiveLocations(String tripId) async {
+    final rows = await supabase
+        .from('location_shares')
+        .select()
+        .eq('trip_id', tripId)
+        .eq('is_active', true);
+    return rows.map(LocationShare.fromMap).toList();
+  }
+
+  static RealtimeChannel subscribeMessages(
+    String tripId,
+    void Function() onChanged,
+  ) {
+    return supabase
+        .channel('crew_messages:$tripId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'trip_messages',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'trip_id',
+            value: tripId,
+          ),
+          callback: (_) => onChanged(),
+        )
+        .subscribe();
+  }
+
+  static RealtimeChannel subscribeLocations(
+    String tripId,
+    void Function() onChanged,
+  ) {
+    return supabase
+        .channel('crew_locations:$tripId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'location_shares',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'trip_id',
+            value: tripId,
+          ),
+          callback: (_) => onChanged(),
+        )
+        .subscribe();
+  }
+}

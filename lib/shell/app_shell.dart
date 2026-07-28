@@ -17,6 +17,7 @@ import '../screens/map_screen.dart';
 import '../screens/links_screen.dart';
 import '../screens/accommodations/accommodations_screen.dart';
 import '../screens/packing_screen.dart';
+import '../screens/crew_screen.dart';
 import '../screens/placeholder_screen.dart';
 import '../screens/trips/trip_switcher_sheet.dart';
 import '../core/trip/trip_state.dart';
@@ -89,6 +90,13 @@ const _desktopDestinations = [
     icon: Icons.home_outlined,
     selectedIcon: Icons.home_rounded,
     builder: _buildHome,
+  ),
+  _NavDest(
+    key: 'crew',
+    label: 'Crew',
+    icon: Icons.group_outlined,
+    selectedIcon: Icons.group_rounded,
+    builder: _buildCrew,
   ),
   _NavDest(
     key: 'spots',
@@ -172,6 +180,7 @@ const _desktopDestinations = [
 // ─── Screen builder functions ─────────────────────────────────────────────────
 
 Widget _buildHome(BuildContext _)    => const HomeScreen();
+Widget _buildCrew(BuildContext _)    => const CrewScreen();
 Widget _buildSpots(BuildContext _)   => const SpotsScreen();
 Widget _buildLinks(BuildContext _)   => const LinksScreen();
 Widget _buildMap(BuildContext _)     => const MapScreen();

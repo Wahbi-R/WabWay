@@ -10,6 +10,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_text_theme.dart';
 import '../theme/app_decorations.dart';
 import 'accommodations/accommodations_screen.dart';
+import 'crew_screen.dart';
 import 'docs_screen.dart';
 import 'map_screen.dart';
 import 'travel_screen.dart';
@@ -248,6 +249,12 @@ class MoreScreen extends StatelessWidget {
               color: Colors.transparent,
               child: Column(
                 children: [
+                  _SettingsRow(
+                    icon: Icons.group_rounded,
+                    label: 'Crew',
+                    onTap: () => _pushWithState(context, const CrewScreen()),
+                  ),
+                  const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
                   _SettingsRow(
                     icon: Icons.luggage_rounded,
                     label: 'Packing List',

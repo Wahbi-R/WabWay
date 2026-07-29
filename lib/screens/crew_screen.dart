@@ -817,39 +817,26 @@ class _MapTab extends StatelessWidget {
 
             return Marker(
               point: LatLng(loc.lat, loc.lng),
-              width: 48,
-              height: 58,
-              child: Column(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: color,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2.5),
-                      boxShadow: kShadowMd,
-                    ),
-                    child: Center(
-                      child: Text(
-                        initials,
-                        style: kStyleBodySemibold.copyWith(
-                          color: Colors.white,
-                          fontSize: 13,
-                        ),
-                      ),
+              width: 44,
+              height: 44,
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2.5),
+                  boxShadow: kShadowMd,
+                ),
+                child: Center(
+                  child: Text(
+                    initials,
+                    style: kStyleBodySemibold.copyWith(
+                      color: Colors.white,
+                      fontSize: 13,
                     ),
                   ),
-                  // Pointer spike
-                  ClipPath(
-                    clipper: _TriangleClipper(),
-                    child: Container(
-                      width: 10,
-                      height: 8,
-                      color: color,
-                    ),
-                  ),
-                ],
+                ),
               ),
             );
           }).toList(),
@@ -857,16 +844,4 @@ class _MapTab extends StatelessWidget {
       ],
     );
   }
-}
-
-class _TriangleClipper extends CustomClipper<Path> {
-  @override
-  Path getClip(Size size) => Path()
-    ..moveTo(0, 0)
-    ..lineTo(size.width, 0)
-    ..lineTo(size.width / 2, size.height)
-    ..close();
-
-  @override
-  bool shouldReclip(_TriangleClipper old) => false;
 }

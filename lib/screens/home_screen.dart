@@ -332,12 +332,14 @@ class _HomeScreenState extends State<HomeScreen> {
               _UpdateBanner(info: _updateInfo!, onDismiss: () => setState(() => _updateInfo = null)),
               const SizedBox(height: kSpace3),
             ],
-            _TripHero(
-              trip: trip,
-              memberCount: members.length,
-              data: data,
-              // Owners can tap the hero to edit trip details inline
-              onTap: isOwner ? () => showTripSettingsSheet(context, trip: trip) : null,
+            RepaintBoundary(
+              child: _TripHero(
+                trip: trip,
+                memberCount: members.length,
+                data: data,
+                // Owners can tap the hero to edit trip details inline
+                onTap: isOwner ? () => showTripSettingsSheet(context, trip: trip) : null,
+              ),
             ),
             const SizedBox(height: kSpace4),
             _QuickBalanceCard(data: data),
@@ -362,7 +364,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: kSpace4),
             Text('Recent activity', style: kStyleOverline),
             const SizedBox(height: kSpace3),
-            _ActivityFeed(data: data, trip: trip, myId: myId),
+            RepaintBoundary(child: _ActivityFeed(data: data, trip: trip, myId: myId)),
             const SizedBox(height: kSpace16),
           ],
         ),
@@ -597,15 +599,7 @@ class _TripHero extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: kSpace2),
-                Text(
-                  trip.name,
-                  style: GoogleFonts.lora(
-                    fontSize: kText2xl,
-                    fontWeight: FontWeight.w600,
-                    color: kColorInk,
-                    height: kLeadingSnug,
-                  ),
-                ),
+                Text(trip.name, style: kStyleHeadingMd),
                 if (trip.destination != null) ...[
                   const SizedBox(height: kSpace1),
                   Text(trip.destination!, style: kStyleCaption),
@@ -675,11 +669,7 @@ class _HeroStat extends StatelessWidget {
       children: [
         Text(
           value,
-          style: GoogleFonts.ibmPlexMono(
-            fontSize: kTextLg,
-            fontWeight: FontWeight.w600,
-            color: kColorInk,
-          ),
+          style: kStyleMono.copyWith(fontSize: kTextLg, fontWeight: FontWeight.w600),
           overflow: TextOverflow.ellipsis,
           maxLines: 1,
         ),
@@ -1153,95 +1143,6 @@ class _ActivityFeed extends StatelessWidget {
   final AppTrip trip;
   final String myId;
 
-  // Returns a navigation closure if the event type maps to a navigable detail
-  // screen and the entity can be found in the already-loaded data. Returns null
-  // for events that don't have a detail screen (member joined, links, etc.).
-  void Function(BuildContext)? _onTapFor(ActivityEvent ev) {
-    final d = data!;
-
-    switch (ev.type) {
-      case ActivityEventType.spotAdded:
-        final spot = d.spots.where((s) => s.id == ev.entityId).firstOrNull;
-        if (spot == null) return null;
-        return (ctx) => Navigator.push(ctx, MaterialPageRoute(
-          builder: (_) => SpotDetailScreen(spot: spot, docs: d.docs),
-        ));
-
-      case ActivityEventType.documentAdded:
-        final doc = d.docs.where((doc) => doc.id == ev.entityId).firstOrNull;
-        if (doc == null) return null;
-        return (ctx) => Navigator.push(ctx, MaterialPageRoute(
-          builder: (_) => DocDetailScreen(
-            doc:            doc,
-            tripId:         trip.id,
-            tripName:       trip.name,
-            availableSpots: d.spots,
-          ),
-        ));
-
-      case ActivityEventType.travelItemAdded:
-        final item = d.travelItems.where((t) => t.id == ev.entityId).firstOrNull;
-        if (item == null) return null;
-        return (ctx) => Navigator.push(ctx, MaterialPageRoute(
-          builder: (_) => TravelItemDetailScreen(
-            item: item,
-            docs: d.docs,
-            days: d.days,
-          ),
-        ));
-
-      case ActivityEventType.receiptAdded:
-        final receipt = d.receipts.where((r) => r.id == ev.entityId).firstOrNull;
-        if (receipt == null) return null;
-        // Convert AppTripMember → TripMember for the receipt detail screen.
-        final moneyMembers = d.members.isEmpty
-            ? [TripMember(id: myId.isEmpty ? 'you' : myId, name: 'You')]
-            : d.members.map((m) => TripMember(
-                  id:   m.userId,
-                  name: m.userId == myId ? 'You' : m.profile.displayName,
-                )).toList();
-        return (ctx) => Navigator.push(ctx, MaterialPageRoute(
-          builder: (_) => ReceiptDetailScreen(
-            receipt: receipt,
-            myId:    myId,
-            members: moneyMembers,
-            tripId:  trip.id,
-          ),
-        ));
-
-      case ActivityEventType.planItemAdded:
-        final day = d.days.where(
-          (day) => day.items.any((i) => i.id == ev.entityId),
-        ).firstOrNull;
-        if (day == null) return null;
-        final item = day.items.where((i) => i.id == ev.entityId).firstOrNull;
-        if (item == null) return null;
-        return (ctx) => Navigator.push(ctx, MaterialPageRoute(
-          builder: (_) => ItemDetailScreen(
-            item:  item,
-            day:   day,
-            docs:  d.docs,
-            spots: d.spots,
-            days:  d.days,
-          ),
-        ));
-
-      case ActivityEventType.linkAdded:
-        final link = d.links.where((l) => l.id == ev.entityId).firstOrNull;
-        if (link == null) return null;
-        return (_) => launchUrl(
-          Uri.parse(link.url),
-          mode: LaunchMode.externalApplication,
-        );
-
-      // Withdrawals and member joins have no navigable detail screen.
-      case ActivityEventType.withdrawalAdded:
-      case ActivityEventType.memberJoined:
-      case ActivityEventType.unknown:
-        return null;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     if (data == null) {
@@ -1275,6 +1176,101 @@ class _ActivityFeed extends StatelessWidget {
       );
     }
 
+    final d = data!;
+
+    // Precompute O(1) lookup maps so each event row doesn't do a linear scan.
+    final spotById    = { for (final s in d.spots)       s.id: s };
+    final docById     = { for (final x in d.docs)        x.id: x };
+    final travelById  = { for (final t in d.travelItems) t.id: t };
+    final receiptById = { for (final r in d.receipts)    r.id: r };
+    final linkById    = { for (final l in d.links)       l.id: l };
+    final Map<String, ({TripDay day, ItineraryItem item})> planById = {};
+    for (final day in d.days) {
+      for (final it in day.items) {
+        planById[it.id] = (day: day, item: it);
+      }
+    }
+
+    // Convert members once for receipt detail.
+    final moneyMembers = d.members.isEmpty
+        ? [TripMember(id: myId.isEmpty ? 'you' : myId, name: 'You')]
+        : d.members.map((m) => TripMember(
+              id:   m.userId,
+              name: m.userId == myId ? 'You' : m.profile.displayName,
+            )).toList();
+
+    void Function(BuildContext)? onTapFor(ActivityEvent ev) {
+      switch (ev.type) {
+        case ActivityEventType.spotAdded:
+          final spot = spotById[ev.entityId];
+          if (spot == null) return null;
+          return (ctx) => Navigator.push(ctx, MaterialPageRoute(
+            builder: (_) => SpotDetailScreen(spot: spot, docs: d.docs),
+          ));
+
+        case ActivityEventType.documentAdded:
+          final doc = docById[ev.entityId];
+          if (doc == null) return null;
+          return (ctx) => Navigator.push(ctx, MaterialPageRoute(
+            builder: (_) => DocDetailScreen(
+              doc:            doc,
+              tripId:         trip.id,
+              tripName:       trip.name,
+              availableSpots: d.spots,
+            ),
+          ));
+
+        case ActivityEventType.travelItemAdded:
+          final item = travelById[ev.entityId];
+          if (item == null) return null;
+          return (ctx) => Navigator.push(ctx, MaterialPageRoute(
+            builder: (_) => TravelItemDetailScreen(
+              item: item,
+              docs: d.docs,
+              days: d.days,
+            ),
+          ));
+
+        case ActivityEventType.receiptAdded:
+          final receipt = receiptById[ev.entityId];
+          if (receipt == null) return null;
+          return (ctx) => Navigator.push(ctx, MaterialPageRoute(
+            builder: (_) => ReceiptDetailScreen(
+              receipt: receipt,
+              myId:    myId,
+              members: moneyMembers,
+              tripId:  trip.id,
+            ),
+          ));
+
+        case ActivityEventType.planItemAdded:
+          final entry = planById[ev.entityId];
+          if (entry == null) return null;
+          return (ctx) => Navigator.push(ctx, MaterialPageRoute(
+            builder: (_) => ItemDetailScreen(
+              item:  entry.item,
+              day:   entry.day,
+              docs:  d.docs,
+              spots: d.spots,
+              days:  d.days,
+            ),
+          ));
+
+        case ActivityEventType.linkAdded:
+          final link = linkById[ev.entityId];
+          if (link == null) return null;
+          return (_) => launchUrl(
+            Uri.parse(link.url),
+            mode: LaunchMode.externalApplication,
+          );
+
+        case ActivityEventType.withdrawalAdded:
+        case ActivityEventType.memberJoined:
+        case ActivityEventType.unknown:
+          return null;
+      }
+    }
+
     return DecoratedBox(
       decoration: kCardDecoration(),
       child: Column(
@@ -1284,49 +1280,51 @@ class _ActivityFeed extends StatelessWidget {
           final isLast = i == events.length - 1;
 
           final actorLabel = ev.actorId == myId ? 'You' : ev.actorName;
-          final onTap      = _onTapFor(ev);
+          final onTap      = onTapFor(ev);
 
-          return Column(
-            children: [
-              ListTile(
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: kSpace4,
-                  vertical: kSpace2,
-                ),
-                leading: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: ev.type.softColor,
-                    shape: BoxShape.circle,
+          return RepaintBoundary(
+            child: Column(
+              children: [
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: kSpace4,
+                    vertical: kSpace2,
                   ),
-                  child: Icon(ev.type.icon, size: 18, color: ev.type.color),
-                ),
-                title: Text('$actorLabel ${ev.type.verb}', style: kStyleBodyMedium),
-                subtitle: ev.entityTitle != null && ev.entityTitle!.isNotEmpty
-                    ? Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Text(ev.entityTitle!, style: kStyleCaption),
-                      )
-                    : null,
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(_relativeTime(ev.createdAt), style: kStyleOverline),
-                    if (onTap != null) ...[
-                      const SizedBox(width: kSpace1),
-                      const Icon(
-                        Icons.chevron_right_rounded,
-                        size: 16,
-                        color: kColorInkSoft,
-                      ),
+                  leading: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: ev.type.softColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(ev.type.icon, size: 18, color: ev.type.color),
+                  ),
+                  title: Text('$actorLabel ${ev.type.verb}', style: kStyleBodyMedium),
+                  subtitle: ev.entityTitle != null && ev.entityTitle!.isNotEmpty
+                      ? Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(ev.entityTitle!, style: kStyleCaption),
+                        )
+                      : null,
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(_relativeTime(ev.createdAt), style: kStyleOverline),
+                      if (onTap != null) ...[
+                        const SizedBox(width: kSpace1),
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          size: 16,
+                          color: kColorInkSoft,
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
+                  onTap: onTap != null ? () => onTap(context) : null,
                 ),
-                onTap: onTap != null ? () => onTap(context) : null,
-              ),
-              if (!isLast) const Divider(height: 1, indent: kSpace4 + 36 + kSpace3),
-            ],
+                if (!isLast) const Divider(height: 1, indent: kSpace4 + 36 + kSpace3),
+              ],
+            ),
           );
         }).toList(),
       ),

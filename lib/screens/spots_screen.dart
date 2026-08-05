@@ -174,7 +174,9 @@ class _SpotsScreenState extends State<SpotsScreen> {
   // Fired after every successful load. Kicks off background Wikipedia lookups
   // for spots that have no image yet. Each lookup is fire-and-forget — results
   // stream in over ~1-2 seconds and update the list row by row.
+  // Skipped on web: Wikipedia's API blocks cross-origin requests from browsers.
   void _fetchMissingThumbnails(List<Spot> spots) {
+    if (kIsWeb) return;
     final missing = spots
         .where((s) => s.imageUrl == null && !_thumbnailAttempted.contains(s.id))
         .toList();

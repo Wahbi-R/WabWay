@@ -37,7 +37,7 @@ const double kTrackingWide   = 0.04;
 // Use these directly in widgets for semantic clarity.
 
 // Display — Lora, used for trip names / hero headings
-TextStyle get kStyleDisplay => GoogleFonts.lora(
+final TextStyle kStyleDisplay = GoogleFonts.lora(
   fontSize: kText4xl,
   fontWeight: FontWeight.w700,
   height: kLeadingTight,
@@ -45,14 +45,14 @@ TextStyle get kStyleDisplay => GoogleFonts.lora(
   color: kColorInk,
 );
 
-TextStyle get kStyleHeadingLg => GoogleFonts.lora(
+final TextStyle kStyleHeadingLg = GoogleFonts.lora(
   fontSize: kText3xl,
   fontWeight: FontWeight.w600,
   height: kLeadingSnug,
   color: kColorInk,
 );
 
-TextStyle get kStyleHeadingMd => GoogleFonts.lora(
+final TextStyle kStyleHeadingMd = GoogleFonts.lora(
   fontSize: kText2xl,
   fontWeight: FontWeight.w600,
   height: kLeadingSnug,
@@ -60,63 +60,63 @@ TextStyle get kStyleHeadingMd => GoogleFonts.lora(
 );
 
 // Section headings — Plus Jakarta Sans
-TextStyle get kStyleHeadingSm => GoogleFonts.plusJakartaSans(
+final TextStyle kStyleHeadingSm = GoogleFonts.plusJakartaSans(
   fontSize: kTextXl,
   fontWeight: FontWeight.w700,
   height: kLeadingSnug,
   color: kColorInk,
 );
 
-TextStyle get kStyleTitle => GoogleFonts.plusJakartaSans(
+final TextStyle kStyleTitle = GoogleFonts.plusJakartaSans(
   fontSize: kTextLg,
   fontWeight: FontWeight.w600,
   height: kLeadingSnug,
   color: kColorInk,
 );
 
-TextStyle get kStyleBody => GoogleFonts.plusJakartaSans(
+final TextStyle kStyleBody = GoogleFonts.plusJakartaSans(
   fontSize: kTextBase,
   fontWeight: FontWeight.w400,
   height: kLeadingNormal,
   color: kColorInk,
 );
 
-TextStyle get kStyleBodyMedium => GoogleFonts.plusJakartaSans(
+final TextStyle kStyleBodyMedium = GoogleFonts.plusJakartaSans(
   fontSize: kTextBase,
   fontWeight: FontWeight.w500,
   height: kLeadingNormal,
   color: kColorInk,
 );
 
-TextStyle get kStyleBodySemibold => GoogleFonts.plusJakartaSans(
+final TextStyle kStyleBodySemibold = GoogleFonts.plusJakartaSans(
   fontSize: kTextBase,
   fontWeight: FontWeight.w600,
   height: kLeadingNormal,
   color: kColorInk,
 );
 
-TextStyle get kStyleBodyBold => GoogleFonts.plusJakartaSans(
+final TextStyle kStyleBodyBold = GoogleFonts.plusJakartaSans(
   fontSize: kTextBase,
   fontWeight: FontWeight.w700,
   height: kLeadingNormal,
   color: kColorInk,
 );
 
-TextStyle get kStyleCaption => GoogleFonts.plusJakartaSans(
+final TextStyle kStyleCaption = GoogleFonts.plusJakartaSans(
   fontSize: kTextSm,
   fontWeight: FontWeight.w400,
   height: kLeadingNormal,
   color: kColorInkSoft,
 );
 
-TextStyle get kStyleCaptionMedium => GoogleFonts.plusJakartaSans(
+final TextStyle kStyleCaptionMedium = GoogleFonts.plusJakartaSans(
   fontSize: kTextSm,
   fontWeight: FontWeight.w500,
   height: kLeadingNormal,
   color: kColorInkSoft,
 );
 
-TextStyle get kStyleOverline => GoogleFonts.plusJakartaSans(
+final TextStyle kStyleOverline = GoogleFonts.plusJakartaSans(
   fontSize: kTextXs,
   fontWeight: FontWeight.w600,
   height: kLeadingNormal,
@@ -125,21 +125,21 @@ TextStyle get kStyleOverline => GoogleFonts.plusJakartaSans(
 );
 
 // Button labels
-TextStyle get kStyleButtonSm => GoogleFonts.plusJakartaSans(
+final TextStyle kStyleButtonSm = GoogleFonts.plusJakartaSans(
   fontSize: kTextSm,
   fontWeight: FontWeight.w600,
   height: 1.0,
   color: kColorTextOnPrimary,
 );
 
-TextStyle get kStyleButtonMd => GoogleFonts.plusJakartaSans(
+final TextStyle kStyleButtonMd = GoogleFonts.plusJakartaSans(
   fontSize: kTextBase,
   fontWeight: FontWeight.w600,
   height: 1.0,
   color: kColorTextOnPrimary,
 );
 
-TextStyle get kStyleButtonLg => GoogleFonts.plusJakartaSans(
+final TextStyle kStyleButtonLg = GoogleFonts.plusJakartaSans(
   fontSize: kTextMd,
   fontWeight: FontWeight.w600,
   height: 1.0,
@@ -147,27 +147,27 @@ TextStyle get kStyleButtonLg => GoogleFonts.plusJakartaSans(
 );
 
 // Nav label (bottom bar)
-TextStyle get kStyleNavLabel => GoogleFonts.plusJakartaSans(
+final TextStyle kStyleNavLabel = GoogleFonts.plusJakartaSans(
   fontSize: 11,
   fontWeight: FontWeight.w500,
   height: 1.0,
 );
 
-TextStyle get kStyleNavLabelActive => GoogleFonts.plusJakartaSans(
+final TextStyle kStyleNavLabelActive = GoogleFonts.plusJakartaSans(
   fontSize: 11,
   fontWeight: FontWeight.w700,
   height: 1.0,
 );
 
 // Monospaced — amounts in tables, invite codes, confirmation numbers
-TextStyle get kStyleMono => GoogleFonts.ibmPlexMono(
+final TextStyle kStyleMono = GoogleFonts.ibmPlexMono(
   fontSize: kTextBase,
   fontWeight: FontWeight.w400,
   height: kLeadingNormal,
   color: kColorInk,
 );
 
-TextStyle get kStyleMonoSm => GoogleFonts.ibmPlexMono(
+final TextStyle kStyleMonoSm = GoogleFonts.ibmPlexMono(
   fontSize: kTextSm,
   fontWeight: FontWeight.w400,
   height: kLeadingNormal,

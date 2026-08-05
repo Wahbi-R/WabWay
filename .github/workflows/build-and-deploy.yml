@@ -63,6 +63,25 @@ jobs:
           echo "name=WabWay v${BASE}" >> $GITHUB_OUTPUT
           echo "build=${BUILD}" >> $GITHUB_OUTPUT
 
+      # ── Web → GitHub Pages (built first so APK issues don't block the deploy) ──
+
+      # --wasm generates a dual build: Skwasm (WebAssembly) for modern browsers
+      # with WasmGC support, and CanvasKit (JS) as an automatic fallback.
+      - name: Build web
+        run: flutter build web --wasm --build-number=${{ steps.version.outputs.build }} --dart-define-from-file=.env
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: build/web
+
+      - name: Deploy to GitHub Pages
+        id: deploy-pages
+        uses: actions/deploy-pages@v4
+
       # ── Android APK ──────────────────────────────────────────────────────────
 
       - name: Set up signing
@@ -97,20 +116,3 @@ jobs:
             Enable "Install from unknown sources" if prompted.
           files: build/app/outputs/flutter-apk/wabway-${{ steps.version.outputs.tag }}.apk
           make_latest: true
-
-      # ── Web → GitHub Pages ───────────────────────────────────────────────────
-
-      - name: Build web
-        run: flutter build web --web-renderer html --build-number=${{ steps.version.outputs.build }} --dart-define-from-file=.env
-
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: build/web
-
-      - name: Deploy to GitHub Pages
-        id: deploy-pages
-        uses: actions/deploy-pages@v4

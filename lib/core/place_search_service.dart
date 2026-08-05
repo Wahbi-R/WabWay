@@ -26,6 +26,23 @@ abstract final class PlaceSearchService {
     return searchPhoton(query, limit: limit);
   }
 
+  /// Fetch a CDN photo URL for a Google Places place_id via wabway-server.
+  /// Returns null when the server is unavailable or has no photo for the place.
+  static Future<String?> fetchPhotoUrl(String placeId) async {
+    if (_kServerUrl.isEmpty || placeId.isEmpty) return null;
+    try {
+      final response = await http.get(
+        Uri.parse('$_kServerUrl/places/photo?place_id=${Uri.encodeComponent(placeId)}'),
+      ).timeout(_kTimeout);
+      if (response.statusCode != 200) return null;
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      final url = json['photo_url'] as String?;
+      return (url != null && url.isNotEmpty) ? url : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   static Future<List<PlaceSuggestion>?> _searchViaServer(
     String query, {
     double? lat,
@@ -61,6 +78,7 @@ abstract final class PlaceSearchService {
           latitude:  lat,
           longitude: lng,
           mapsUrl:   lat != 0 ? 'https://www.google.com/maps/search/?api=1&query=$lat,$lng' : '',
+          placeId:   (m['place_id'] as String?)?.trim(),
         );
       }).toList();
     } catch (_) {

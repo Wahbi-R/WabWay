@@ -151,6 +151,7 @@ class _AddSpotContentState extends State<_AddSpotContent> {
   double? _latitude;
   double? _longitude;
   String? _placeSource;
+  String? _placeId;
 
 
   @override
@@ -252,6 +253,7 @@ class _AddSpotContentState extends State<_AddSpotContent> {
       _latitude    = place.latitude;
       _longitude   = place.longitude;
       _placeSource = 'place_search';
+      _placeId     = place.placeId;
     });
   }
 
@@ -280,6 +282,12 @@ class _AddSpotContentState extends State<_AddSpotContent> {
         );
       } else {
         final addrInput = _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim();
+        // Fetch Google Places photo in parallel with nothing — fire before the
+        // DB write so we can pass it directly and avoid a second round-trip.
+        final imageUrlFuture = _placeId != null
+            ? PlaceSearchService.fetchPhotoUrl(_placeId!)
+            : Future<String?>.value(null);
+        final imageUrl = await imageUrlFuture;
         spot = await SpotService.createSpot(
           tripId:      widget.tripId,
           name:        _nameCtrl.text.trim(),
@@ -296,6 +304,7 @@ class _AddSpotContentState extends State<_AddSpotContent> {
           latitude:    _latitude,
           longitude:   _longitude,
           placeSource: _placeSource,
+          imageUrl:    imageUrl,
         );
       }
       widget.onSubmit(spot);

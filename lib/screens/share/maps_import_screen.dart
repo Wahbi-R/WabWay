@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../../core/images/wikipedia_image_service.dart';
 import '../../core/places/google_maps_parser.dart';
@@ -185,10 +186,10 @@ class _MapsImportScreenState extends State<MapsImportScreen> {
       for (int i = 0; i < _places.length; i++) {
         if (!_selected[i]) continue;
         final p = _places[i];
-        // Fetch Wikipedia thumbnail in parallel with the DB write
-        final imageUrlFuture =
-            WikipediaImageService.fetchThumbnailUrl(p.name);
-        final imageUrl = await imageUrlFuture;
+        // Wikipedia thumbnails as a best-effort fallback; skipped on web (CORS).
+        final imageUrl = kIsWeb
+            ? null
+            : await WikipediaImageService.fetchThumbnailUrl(p.name);
         await SpotService.createSpot(
           tripId:      widget.tripId,
           name:        p.name,

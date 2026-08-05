@@ -170,6 +170,7 @@ class PlaceSuggestion {
     required this.longitude,
     required this.mapsUrl,
     this.country = '',
+    this.placeId,
   });
 
   final String name;
@@ -181,6 +182,7 @@ class PlaceSuggestion {
   final double longitude;
   final String mapsUrl;
   final String country;
+  final String? placeId;
 }
 
 // ─── Spot ─────────────────────────────────────────────────────────────────────

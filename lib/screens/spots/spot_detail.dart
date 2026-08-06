@@ -4,14 +4,17 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/auth/profile_state.dart';
 import '../../core/supabase/client.dart';
 import '../../core/supabase/doc_service.dart';
+import '../../core/supabase/plan_service.dart';
 import '../../core/supabase/spot_service.dart';
 import '../../core/trip/trip_state.dart';
 import '../../data/docs_data.dart';
+import '../../data/plan_data.dart';
 import '../../data/spot_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
+import '../plan/day_picker_sheet.dart';
 import 'add_spot_sheet.dart';
 import 'spot_vote_chip.dart';
 
@@ -422,6 +425,12 @@ class _SpotDetailContentState extends State<SpotDetailContent> {
                 _GroupVotesSummary(votes: widget.spot.votes),
               ],
 
+              // ── Add to Plan
+              const SizedBox(height: kSpace4),
+              const Divider(height: 1),
+              const SizedBox(height: kSpace4),
+              _AddToPlanButton(spot: widget.spot),
+
               // ── Status quick actions
               if (widget.onEdit != null) ...[
                 const SizedBox(height: kSpace4),
@@ -527,6 +536,125 @@ class _SpotDetailContentState extends State<SpotDetailContent> {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ─── Add to Plan button ────────────────────────────────────────────────────────
+
+class _AddToPlanButton extends StatefulWidget {
+  const _AddToPlanButton({required this.spot});
+  final Spot spot;
+
+  @override
+  State<_AddToPlanButton> createState() => _AddToPlanButtonState();
+}
+
+class _AddToPlanButtonState extends State<_AddToPlanButton> {
+  bool _loading = false;
+
+  ItineraryItemType get _itemType => switch (widget.spot.category) {
+    SpotCategory.food      => ItineraryItemType.food,
+    SpotCategory.nightlife => ItineraryItemType.activity,
+    _                      => ItineraryItemType.spot,
+  };
+
+  Future<void> _tap() async {
+    if (_loading) return;
+    final tripId = TripState.tripOf(context).id;
+    final userId = supabase.auth.currentUser?.id ?? '';
+
+    setState(() => _loading = true);
+    List<TripDay> days;
+    try {
+      days = await PlanService.loadAll(tripId);
+    } catch (_) {
+      days = [];
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+
+    if (!mounted) return;
+
+    if (days.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Add trip days in Plan first.',
+            style: kStyleBody.copyWith(color: Colors.white)),
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
+
+    final result = await showDayPickerSheet(context, days: days);
+    if (result == null || !mounted) return;
+
+    final (dayId, timeOfDay) = result;
+    final day = days.where((d) => d.id == dayId).firstOrNull;
+    if (day == null) return;
+
+    final timeStr = timeOfDay != null
+        ? '${timeOfDay.hour.toString().padLeft(2, '0')}:${timeOfDay.minute.toString().padLeft(2, '0')}'
+        : null;
+
+    setState(() => _loading = true);
+    try {
+      await PlanService.createItem(
+        tripId:       tripId,
+        dayId:        dayId,
+        title:        widget.spot.name,
+        type:         _itemType,
+        createdBy:    userId,
+        time:         timeStr,
+        city:         widget.spot.city.isNotEmpty ? widget.spot.city : widget.spot.area,
+        location:     widget.spot.address?.isNotEmpty == true
+                          ? widget.spot.address
+                          : widget.spot.name,
+        mapsUrl:      widget.spot.mapsUrl,
+        linkedSpotId: widget.spot.id,
+        sortOrder:    day.items.length,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(
+          'Added to Day ${day.dayNumber} · ${day.city}',
+          style: kStyleBody.copyWith(color: Colors.white),
+        ),
+        backgroundColor: kColorSuccess,
+        behavior: SnackBarBehavior.floating,
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Could not add to plan: $e',
+            style: kStyleBody.copyWith(color: Colors.white)),
+        backgroundColor: kColorDanger,
+        behavior: SnackBarBehavior.floating,
+      ));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: _loading ? null : _tap,
+        icon: _loading
+            ? const SizedBox(
+                width: 14, height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(kColorPrimary)),
+              )
+            : const Icon(Icons.event_note_rounded, size: 16),
+        label: const Text('Add to Plan'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: kColorPrimary,
+          side: BorderSide(color: kColorPrimary.withValues(alpha: 0.5)),
+          padding: const EdgeInsets.symmetric(vertical: 11),
+          shape: RoundedRectangleBorder(borderRadius: kRadiusMd),
+        ),
+      ),
     );
   }
 }

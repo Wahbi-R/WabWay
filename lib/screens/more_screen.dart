@@ -98,6 +98,41 @@ class MoreScreen extends StatelessWidget {
 
           const SizedBox(height: kSpace4),
 
+          // Crew / Chat — prominent card for quick access
+          DecoratedBox(
+            decoration: kCardDecoration(),
+            child: Material(
+              color: Colors.transparent,
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: kSpace4,
+                  vertical: kSpace1,
+                ),
+                leading: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: const BoxDecoration(
+                    color: kColorPrimarySoft,
+                    borderRadius: kRadiusMd,
+                  ),
+                  child: const Icon(Icons.chat_rounded,
+                      size: 20, color: kColorPrimary),
+                ),
+                title: Text('Crew Chat', style: kStyleBodyMedium),
+                subtitle: Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text('Message your trip crew & share location',
+                      style: kStyleCaption),
+                ),
+                trailing: Icon(Icons.chevron_right_rounded,
+                    color: kColorTextTertiary(), size: 18),
+                onTap: () => _pushWithState(context, const CrewScreen()),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: kSpace4),
+
           // Members section
           Text('Members', style: kStyleOverline),
           const SizedBox(height: kSpace3),
@@ -249,12 +284,6 @@ class MoreScreen extends StatelessWidget {
               color: Colors.transparent,
               child: Column(
                 children: [
-                  _SettingsRow(
-                    icon: Icons.group_rounded,
-                    label: 'Crew',
-                    onTap: () => _pushWithState(context, const CrewScreen()),
-                  ),
-                  const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
                   _SettingsRow(
                     icon: Icons.luggage_rounded,
                     label: 'Packing List',

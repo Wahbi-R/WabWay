@@ -26,6 +26,7 @@ import '../data/travel_data.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
+import 'crew_screen.dart';
 import 'share/incoming_share_screen.dart';
 import 'notification_settings_screen.dart';
 import 'global_search_screen.dart';
@@ -231,7 +232,32 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Shared AppBar actions — import, global search, notification settings.
   // Defined once here so the error-state and success-state scaffolds stay in sync.
+  void _openCrewScreen(BuildContext context) {
+    final trip    = TripState.tripOf(context);
+    final members = TripState.membersOf(context);
+    final profile = ProfileState.of(context);
+    Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProfileState(
+          profile: profile,
+          child: TripState(
+            trip: trip,
+            members: members,
+            child: const CrewScreen(),
+          ),
+        ),
+      ),
+    );
+  }
+
   List<Widget> _appBarActions(BuildContext context) => [
+    IconButton(
+      icon: const Icon(Icons.chat_rounded),
+      color: kColorInkSoft,
+      tooltip: 'Crew chat',
+      onPressed: () => _openCrewScreen(context),
+    ),
     IconButton(
       icon: const Icon(Icons.download_rounded),
       color: kColorInkSoft,

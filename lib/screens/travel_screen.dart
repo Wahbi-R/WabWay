@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
+import '../core/notifications/push_notifier.dart';
 import '../core/supabase/client.dart';
 import '../core/supabase/accommodation_service.dart';
 import '../core/supabase/travel_service.dart';
@@ -9,6 +10,7 @@ import '../core/supabase/doc_service.dart';
 import '../core/supabase/plan_service.dart';
 import '../data/accommodation_data.dart';
 import '../core/trip/trip_state.dart';
+import 'notification_settings_screen.dart';
 import '../data/travel_data.dart';
 import '../data/docs_data.dart';
 import '../data/plan_data.dart';
@@ -207,6 +209,15 @@ class _TravelScreenState extends State<TravelScreen> {
         _items.add(created);
         _selectedId = created.id;
       });
+
+      pushNotify(
+        tripId: _activeTripId,
+        title: 'New travel item added',
+        body: created.title,
+        excludeUserId: _userId,
+        data: {'screen': 'travel', 'trip_id': _activeTripId},
+        prefKey: kPrefNotifItinerary,
+      );
 
       // Prompt to also save a Hotel to Stays.
       if (created.type == TravelItemType.hotel && mounted) {

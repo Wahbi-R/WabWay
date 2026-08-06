@@ -5,6 +5,7 @@ import '../../core/place_search_service.dart';
 import '../../core/supabase/spot_service.dart';
 import '../../data/spot_data.dart';
 import '../../core/notifications/push_notifier.dart';
+import '../notification_settings_screen.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
@@ -310,13 +311,13 @@ class _AddSpotContentState extends State<_AddSpotContent> {
       }
       widget.onSubmit(spot);
       if (!widget.isEditing) {
-        // Only notify on new spots, not edits
         pushNotify(
           tripId: widget.tripId,
           title: 'New spot added',
           body: spot.name,
           excludeUserId: widget.userId,
           data: {'screen': 'spots', 'trip_id': widget.tripId},
+          prefKey: kPrefNotifActivity,
         );
       }
     } catch (e) {

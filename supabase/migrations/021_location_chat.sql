@@ -1,5 +1,5 @@
 -- location_shares: live GPS broadcasts per user per trip
-create table location_shares (
+create table if not exists location_shares (
   id              uuid             primary key default gen_random_uuid(),
   trip_id         uuid             not null references trips(id)    on delete cascade,
   user_id         uuid             not null references profiles(id) on delete cascade,
@@ -29,7 +29,7 @@ create policy "users manage own location share"
 
 
 -- trip_messages: group chat within a trip (text + location pings)
-create table trip_messages (
+create table if not exists trip_messages (
   id           uuid primary key default gen_random_uuid(),
   trip_id      uuid not null references trips(id)    on delete cascade,
   author_id    uuid not null references profiles(id) on delete cascade,

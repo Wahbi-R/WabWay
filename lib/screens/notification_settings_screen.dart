@@ -3,12 +3,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
-import '../widgets/widgets.dart';
 
-const _kPrefActivity  = 'notif_activity';
-const _kPrefMoney     = 'notif_money';
-const _kPrefDocuments = 'notif_documents';
-const _kPrefItinerary = 'notif_itinerary';
+// Keys used by push_notifier.dart to gate notification sends.
+const kPrefNotifCrew      = 'notif_crew';
+const kPrefNotifActivity  = 'notif_activity';
+const kPrefNotifMoney     = 'notif_money';
+const kPrefNotifDocuments = 'notif_documents';
+const kPrefNotifItinerary = 'notif_itinerary';
 
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({super.key});
@@ -20,6 +21,7 @@ class NotificationSettingsScreen extends StatefulWidget {
 
 class _NotificationSettingsScreenState
     extends State<NotificationSettingsScreen> {
+  bool _crew      = true;
   bool _activity  = true;
   bool _money     = true;
   bool _documents = true;
@@ -36,20 +38,22 @@ class _NotificationSettingsScreenState
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
     setState(() {
-      _activity  = prefs.getBool(_kPrefActivity)  ?? true;
-      _money     = prefs.getBool(_kPrefMoney)     ?? true;
-      _documents = prefs.getBool(_kPrefDocuments) ?? true;
-      _itinerary = prefs.getBool(_kPrefItinerary) ?? true;
+      _crew      = prefs.getBool(kPrefNotifCrew)      ?? true;
+      _activity  = prefs.getBool(kPrefNotifActivity)  ?? true;
+      _money     = prefs.getBool(kPrefNotifMoney)     ?? true;
+      _documents = prefs.getBool(kPrefNotifDocuments) ?? true;
+      _itinerary = prefs.getBool(kPrefNotifItinerary) ?? true;
       _loaded    = true;
     });
   }
 
   Future<void> _save() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_kPrefActivity,  _activity);
-    await prefs.setBool(_kPrefMoney,     _money);
-    await prefs.setBool(_kPrefDocuments, _documents);
-    await prefs.setBool(_kPrefItinerary, _itinerary);
+    await prefs.setBool(kPrefNotifCrew,      _crew);
+    await prefs.setBool(kPrefNotifActivity,  _activity);
+    await prefs.setBool(kPrefNotifMoney,     _money);
+    await prefs.setBool(kPrefNotifDocuments, _documents);
+    await prefs.setBool(kPrefNotifItinerary, _itinerary);
   }
 
   @override
@@ -72,16 +76,24 @@ class _NotificationSettingsScreenState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Choose which activity generates a notification. Push delivery will be available in a future update.',
+              'Choose which activity sends you a push notification.',
               style: kStyleCaption,
             ),
             const SizedBox(height: kSpace5),
             _SectionCard(
               children: [
                 _NotifRow(
-                  icon: Icons.timeline_rounded,
-                  label: 'Activity feed',
-                  description: 'New events in the trip activity feed',
+                  icon: Icons.chat_rounded,
+                  label: 'Crew chat',
+                  description: 'New messages from your trip crew',
+                  value: _crew,
+                  onChanged: (v) { setState(() => _crew = v); _save(); },
+                ),
+                const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
+                _NotifRow(
+                  icon: Icons.place_rounded,
+                  label: 'Spots',
+                  description: 'New spots added by crew members',
                   value: _activity,
                   onChanged: (v) { setState(() => _activity = v); _save(); },
                 ),
@@ -89,9 +101,17 @@ class _NotificationSettingsScreenState
                 _NotifRow(
                   icon: Icons.receipt_long_rounded,
                   label: 'Money',
-                  description: 'New receipts, withdrawals, and settlements',
+                  description: 'New receipts and withdrawals',
                   value: _money,
                   onChanged: (v) { setState(() => _money = v); _save(); },
+                ),
+                const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
+                _NotifRow(
+                  icon: Icons.flight_rounded,
+                  label: 'Travel',
+                  description: 'New flights, hotels, and bookings',
+                  value: _itinerary,
+                  onChanged: (v) { setState(() => _itinerary = v); _save(); },
                 ),
                 const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
                 _NotifRow(
@@ -101,22 +121,7 @@ class _NotificationSettingsScreenState
                   value: _documents,
                   onChanged: (v) { setState(() => _documents = v); _save(); },
                 ),
-                const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
-                _NotifRow(
-                  icon: Icons.map_rounded,
-                  label: 'Itinerary',
-                  description: 'Plan changes and new travel bookings',
-                  value: _itinerary,
-                  onChanged: (v) { setState(() => _itinerary = v); _save(); },
-                ),
               ],
-            ),
-            const SizedBox(height: kSpace5),
-            WabwayEmptyState(
-              icon: Icons.notifications_off_rounded,
-              title: 'Push notifications coming soon',
-              description:
-                  'These settings will control which push notifications you receive. Push delivery is not yet active.',
             ),
           ],
         ),

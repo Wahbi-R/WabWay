@@ -2,11 +2,13 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../core/notifications/push_notifier.dart';
 import '../../core/supabase/client.dart';
 import '../../core/supabase/doc_service.dart';
 import '../../core/supabase/exchange_rate_service.dart';
 import '../../core/supabase/money_service.dart';
 import '../../data/docs_data.dart';
+import '../notification_settings_screen.dart';
 import '../../data/money_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
@@ -425,6 +427,16 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
         }
       }
       if (mounted) widget.onSubmit(receipt);
+      if (!_isEditing && widget.tripId != null) {
+        pushNotify(
+          tripId: widget.tripId!,
+          title: 'New receipt added',
+          body: '$title · ${_currency} ${total.toStringAsFixed(2)}',
+          excludeUserId: supabase.auth.currentUser?.id,
+          data: {'screen': 'money', 'trip_id': widget.tripId!},
+          prefKey: kPrefNotifMoney,
+        );
+      }
     } catch (_) {
       if (mounted) setState(() { _loading = false; _error = 'Could not save receipt.'; });
     }

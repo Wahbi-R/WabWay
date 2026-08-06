@@ -23,6 +23,7 @@ import '../screens/placeholder_screen.dart';
 import '../screens/trips/trip_switcher_sheet.dart';
 import '../core/trip/trip_state.dart';
 import '../core/changelog.dart';
+import '../core/notifications/notification_service.dart';
 
 // ─── Navigation destination models ───────────────────────────────────────────
 
@@ -212,6 +213,7 @@ class _AppShellState extends State<AppShell> {
   void initState() {
     super.initState();
     ShareHandler.instance.addListener(_onSharePending);
+    NotificationService.instance.setTabSwitcher(_switchTab);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _onSharePending();
       ChangelogService.maybeShowOnLaunch(context);
@@ -222,6 +224,29 @@ class _AppShellState extends State<AppShell> {
   void dispose() {
     ShareHandler.instance.removeListener(_onSharePending);
     super.dispose();
+  }
+
+  // Maps notification screen key → mobile tab index (desktop uses key directly).
+  static const _mobileKeyToIndex = {
+    'home': 0, 'spots': 1, 'plan': 2, 'money': 3, 'more': 4,
+    // crew/travel/docs/links live under More on mobile — open More tab.
+    'crew': 4, 'travel': 4, 'docs': 4,
+  };
+  static const _desktopKeyToIndex = {
+    'home': 0, 'crew': 1, 'spots': 2, 'links': 3, 'plan': 5,
+    'travel': 6, 'money': 8, 'docs': 9,
+  };
+
+  void _switchTab(String screenKey) {
+    if (!mounted) return;
+    final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
+    if (isDesktop) {
+      final idx = _desktopKeyToIndex[screenKey];
+      if (idx != null) setState(() => _desktopIndex = idx);
+    } else {
+      final idx = _mobileKeyToIndex[screenKey];
+      if (idx != null) setState(() => _mobileIndex = idx);
+    }
   }
 
   void _onSharePending() {

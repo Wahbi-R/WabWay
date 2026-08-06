@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "571318277516",
+    "project_id": "wabway-wabble",
+    "storage_bucket": "wabway-wabble.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:571318277516:android:237d0e48031ce05106f2a9",
+        "android_client_info": {
+          "package_name": "ca.wabble.wabway"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBHvVUm2Ee_xBpdkH7qxJsqsCcy6dE0bDw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

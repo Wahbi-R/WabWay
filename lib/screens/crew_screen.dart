@@ -9,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart' show RealtimeChannel;
 import '../core/auth/profile_state.dart';
 import '../core/supabase/crew_service.dart';
 import '../core/trip/app_trip_member.dart';
+import '../core/notifications/push_notifier.dart';
 import '../core/trip/trip_state.dart';
 import '../data/crew_data.dart';
 import '../theme/app_colors.dart';
@@ -202,6 +203,13 @@ class _CrewScreenState extends State<CrewScreen>
         tripId: _tripId!,
         authorId: _userId!,
         body: text,
+      );
+      pushNotify(
+        tripId: _tripId!,
+        title: 'New crew message',
+        body: text.length > 80 ? '${text.substring(0, 80)}…' : text,
+        excludeUserId: _userId,
+        data: {'screen': 'crew', 'trip_id': _tripId!},
       );
     } catch (_) {
       _showError('Failed to send');

@@ -1,6 +1,8 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'core/notifications/notification_service.dart';
 import 'core/share/share_handler.dart';
 import 'screens/auth/auth_gate.dart';
 import 'theme/wabway_theme.dart';
@@ -12,6 +14,8 @@ const _supabasePublishableKey = String.fromEnvironment('SUPABASE_ANON_KEY');
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  if (!kIsWeb) await Firebase.initializeApp();
 
   assert(
     _supabaseUrl.isNotEmpty && _supabasePublishableKey.isNotEmpty,
@@ -30,6 +34,7 @@ Future<void> main() async {
   }
 
   await ShareHandler.instance.init();
+  if (!kIsWeb) await NotificationService.instance.init();
 
   runApp(const WabwayApp());
 }

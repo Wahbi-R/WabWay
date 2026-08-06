@@ -5,6 +5,14 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
+      build_web:
+        description: "Build web and deploy to GitHub Pages?"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
       build_apk:
         description: "Build Android APK and release?"
         required: true
@@ -19,6 +27,7 @@ jobs:
   # Runs independently of the APK job (no Java needed for web builds).
   build-web:
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event.inputs.build_web == 'true'
     permissions:
       pages: write
       id-token: write

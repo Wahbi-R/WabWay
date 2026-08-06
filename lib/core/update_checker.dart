@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
@@ -28,7 +29,7 @@ class UpdateInfo {
 
 abstract final class UpdateChecker {
   static Future<UpdateInfo?> check() async {
-    if (kIsWeb) return null;
+    if (kIsWeb || !Platform.isAndroid) return null;
     try {
       final info = await PackageInfo.fromPlatform();
       final currentBuild = int.tryParse(info.buildNumber) ?? 0;

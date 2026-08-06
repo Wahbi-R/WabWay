@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- App cache dir — used for downloaded APK before install -->
+    <cache-path name="cache" path="." />
+</paths>

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../core/updater/apk_installer.dart';
 import '../core/auth/profile_state.dart';
 import '../core/supabase/activity_service.dart';
 import '../core/supabase/doc_service.dart';
@@ -455,13 +456,42 @@ String _relativeTime(DateTime date) {
 
 // ─── Update banner ────────────────────────────────────────────────────────────
 
-class _UpdateBanner extends StatelessWidget {
+class _UpdateBanner extends StatefulWidget {
   const _UpdateBanner({required this.info, required this.onDismiss});
   final UpdateInfo info;
   final VoidCallback onDismiss;
 
   @override
+  State<_UpdateBanner> createState() => _UpdateBannerState();
+}
+
+class _UpdateBannerState extends State<_UpdateBanner> {
+  // null = idle, 0..1 = downloading
+  double? _progress;
+  String? _error;
+
+  void _startDownload() {
+    if (_progress != null) return;
+    if (widget.info.downloadUrl.isEmpty) return;
+    setState(() { _progress = 0; _error = null; });
+
+    ApkInstaller.install(
+      url: widget.info.downloadUrl,
+      onProgress: (p) { if (mounted) setState(() => _progress = p); },
+      onComplete: (err) {
+        if (!mounted) return;
+        if (err != null) {
+          setState(() { _progress = null; _error = err; });
+        }
+        // On success the system install dialog appears; nothing more to do here.
+      },
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final downloading = _progress != null;
+
     return DecoratedBox(
       decoration: BoxDecoration(
         color: kColorPrimarySoft,
@@ -480,43 +510,60 @@ class _UpdateBanner extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Update available — ${info.latestTag}',
+                    'Update available — ${widget.info.latestTag}',
                     style: kStyleBodyMedium.copyWith(color: kColorPrimaryDark),
                   ),
-                  if (info.releaseNotes.isNotEmpty) ...[
+                  if (widget.info.releaseNotes.isNotEmpty) ...[
                     const SizedBox(height: 2),
                     Text(
-                      info.releaseNotes.length > 120
-                          ? '${info.releaseNotes.substring(0, 120)}…'
-                          : info.releaseNotes,
+                      widget.info.releaseNotes.length > 120
+                          ? '${widget.info.releaseNotes.substring(0, 120)}…'
+                          : widget.info.releaseNotes,
                       style: kStyleCaption.copyWith(color: kColorPrimaryDark),
                     ),
                   ],
                   const SizedBox(height: kSpace2),
-                  GestureDetector(
-                    onTap: info.releasePageUrl.isEmpty
-                        ? null
-                        : () => launchUrl(
-                              Uri.parse(info.releasePageUrl),
-                              mode: LaunchMode.externalApplication,
-                            ),
-                    child: Text(
-                      'Download update →',
-                      style: kStyleCaptionMedium.copyWith(
-                          color: kColorPrimary,
-                          decoration: TextDecoration.underline),
+                  if (downloading) ...[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(2),
+                      child: LinearProgressIndicator(
+                        value: _progress,
+                        backgroundColor: kColorPrimary.withValues(alpha: 0.15),
+                        color: kColorPrimary,
+                        minHeight: 4,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Tap the .apk file, then open it from your notification bar to install.',
-                    style: kStyleCaption.copyWith(color: kColorInkSoft),
-                  ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _progress! >= 1.0
+                          ? 'Installing…'
+                          : 'Downloading ${(_progress! * 100).toStringAsFixed(0)}%',
+                      style: kStyleCaption.copyWith(color: kColorPrimaryDark),
+                    ),
+                  ] else ...[
+                    GestureDetector(
+                      onTap: _startDownload,
+                      child: Text(
+                        'Download & install →',
+                        style: kStyleCaptionMedium.copyWith(
+                          color: kColorPrimary,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                    if (_error != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Failed — tap to retry',
+                        style: kStyleCaption.copyWith(color: Colors.red),
+                      ),
+                    ],
+                  ],
                 ],
               ),
             ),
             GestureDetector(
-              onTap: onDismiss,
+              onTap: widget.onDismiss,
               child: const Icon(Icons.close_rounded, size: 16, color: kColorInkSoft),
             ),
           ],

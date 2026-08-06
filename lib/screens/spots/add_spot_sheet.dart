@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/maps_import_service.dart';
 import '../../core/place_search_service.dart';
 import '../../core/supabase/spot_service.dart';
+import '../../core/trip/trip_state.dart';
 import '../../data/spot_data.dart';
 import '../../core/notifications/push_notifier.dart';
 import '../notification_settings_screen.dart';
@@ -352,20 +353,14 @@ class _AddSpotContentState extends State<_AddSpotContent> {
         // ── Place search ─────────────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.fromLTRB(kSpace4, kSpace3, kSpace4, 0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              PlaceSearchField(
-                label: 'Search a place',
-                hint: 'Senso-ji, Hinoya Curry Tokyo…',
-                onSelected: _applySuggestion,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Include a city or country for better results — e.g. "GU Japan"',
-                style: kStyleCaption.copyWith(color: kColorInkSoft),
-              ),
-            ],
+          child: PlaceSearchField(
+            label: 'Search a place',
+            hint: 'Senso-ji, Hinoya Curry Tokyo…',
+            onSelected: _applySuggestion,
+            locationBias: () {
+              final d = TripState.maybeOf(context)?.trip.destination ?? '';
+              return d.isNotEmpty ? d : null;
+            }(),
           ),
         ),
 

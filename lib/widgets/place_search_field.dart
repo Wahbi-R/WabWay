@@ -13,6 +13,8 @@ import 'wabway_text_field.dart';
 /// [label] is shown as the floating label. [hint] is the placeholder text.
 /// [onSelected] is called when the user picks a result from the dropdown.
 /// [limit] controls the maximum number of results returned.
+/// [locationBias] is a destination name (e.g. "Japan") that gets appended to
+/// queries that don't already include a location, so results are geo-relevant.
 class PlaceSearchField extends StatefulWidget {
   const PlaceSearchField({
     super.key,
@@ -25,6 +27,7 @@ class PlaceSearchField extends StatefulWidget {
     this.limit = 6,
     this.autofocus = false,
     this.textInputAction = TextInputAction.search,
+    this.locationBias,
   });
 
   final ValueChanged<PlaceSuggestion> onSelected;
@@ -36,6 +39,10 @@ class PlaceSearchField extends StatefulWidget {
   final int limit;
   final bool autofocus;
   final TextInputAction textInputAction;
+  /// Trip destination name used as a location hint (e.g. "Japan").
+  /// Automatically appended to the search query when the user hasn't typed
+  /// a location word already. Shown in the helper text below the field.
+  final String? locationBias;
 
   @override
   State<PlaceSearchField> createState() => _PlaceSearchFieldState();
@@ -79,12 +86,31 @@ class _PlaceSearchFieldState extends State<PlaceSearchField> {
     }
   }
 
+  /// Returns true when [query] already contains a location word from [bias],
+  /// so we don't double-append the destination.
+  bool _queryHasBias(String query, String bias) {
+    final words = bias.toLowerCase().split(RegExp(r'[\s,&/]+'))
+        .where((w) => w.length > 2);
+    final q = query.toLowerCase();
+    return words.any(q.contains);
+  }
+
   Future<void> _search() async {
-    final query = _ctrl.text.trim();
-    if (query.isEmpty) return;
+    final userQuery = _ctrl.text.trim();
+    if (userQuery.isEmpty) return;
+
+    // Append the trip destination when it adds location context the user
+    // hasn't already provided — keeps results geo-relevant without changing
+    // what appears in the text field.
+    final bias = widget.locationBias;
+    final effectiveQuery = (bias != null && bias.isNotEmpty &&
+            !_queryHasBias(userQuery, bias))
+        ? '$userQuery $bias'
+        : userQuery;
+
     setState(() { _loading = true; _results = []; _showResults = true; });
     final results = await PlaceSearchService.search(
-      query,
+      effectiveQuery,
       latitude: widget.latitude,
       longitude: widget.longitude,
       limit: widget.limit,
@@ -117,6 +143,9 @@ class _PlaceSearchFieldState extends State<PlaceSearchField> {
               ? Icons.hourglass_top_rounded
               : Icons.search_rounded,
           onSuffixTap: _search,
+          helpText: widget.locationBias != null && widget.locationBias!.isNotEmpty
+              ? 'Tap 🔍 or press Search  ·  Searching in ${widget.locationBias}'
+              : 'Tap 🔍 or press Search to find places',
         ),
         if (_showResults)
           _ResultsDropdown(

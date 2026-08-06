@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../core/auth/profile_state.dart';
 import '../core/share/share_handler.dart';
 import '../screens/share/incoming_share_screen.dart';
@@ -474,12 +475,26 @@ class _WabwaySidebar extends StatelessWidget {
             // Footer
             Padding(
               padding: const EdgeInsets.fromLTRB(kSpace3, 0, kSpace3, kSpace3),
-              child: _SidebarRow(
-                icon: Icons.new_releases_outlined,
-                selectedIcon: Icons.new_releases_rounded,
-                label: "What's new",
-                isActive: false,
-                onTap: () => ChangelogService.show(context),
+              child: Column(
+                children: [
+                  _SidebarRow(
+                    icon: Icons.android_rounded,
+                    selectedIcon: Icons.android_rounded,
+                    label: 'Download Android app',
+                    isActive: false,
+                    onTap: () => launchUrl(
+                      Uri.parse('https://github.com/Wahbi-R/WabWay/releases/latest'),
+                      mode: LaunchMode.externalApplication,
+                    ),
+                  ),
+                  _SidebarRow(
+                    icon: Icons.new_releases_outlined,
+                    selectedIcon: Icons.new_releases_rounded,
+                    label: "What's new",
+                    isActive: false,
+                    onTap: () => ChangelogService.show(context),
+                  ),
+                ],
               ),
             ),
           ],

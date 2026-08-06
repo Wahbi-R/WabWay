@@ -494,10 +494,10 @@ class _UpdateBanner extends StatelessWidget {
                   ],
                   const SizedBox(height: kSpace2),
                   GestureDetector(
-                    onTap: info.downloadUrl.isEmpty
+                    onTap: info.releasePageUrl.isEmpty
                         ? null
                         : () => launchUrl(
-                              Uri.parse(info.downloadUrl),
+                              Uri.parse(info.releasePageUrl),
                               mode: LaunchMode.externalApplication,
                             ),
                     child: Text(
@@ -506,6 +506,11 @@ class _UpdateBanner extends StatelessWidget {
                           color: kColorPrimary,
                           decoration: TextDecoration.underline),
                     ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Tap the .apk file, then open it from your notification bar to install.',
+                    style: kStyleCaption.copyWith(color: kColorInkSoft),
                   ),
                 ],
               ),

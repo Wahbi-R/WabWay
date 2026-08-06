@@ -12,6 +12,7 @@ class UpdateInfo {
     required this.currentBuild,
     required this.latestBuild,
     required this.downloadUrl,
+    required this.releasePageUrl,
     required this.releaseNotes,
   });
 
@@ -19,6 +20,7 @@ class UpdateInfo {
   final int    currentBuild;
   final int    latestBuild;
   final String downloadUrl;
+  final String releasePageUrl;
   final String releaseNotes;
 
   bool get hasUpdate => latestBuild > currentBuild;
@@ -43,6 +45,7 @@ abstract final class UpdateChecker {
       final tag     = json['tag_name'] as String? ?? '';
       final body    = json['body'] as String? ?? '';
       final assets  = (json['assets'] as List? ?? []).cast<Map<String, dynamic>>();
+      final pageUrl = json['html_url'] as String? ?? '';
 
       // tag format: v1.0.0+3 → build number is after '+'
       final buildStr = tag.contains('+') ? tag.split('+').last : '0';
@@ -56,11 +59,12 @@ abstract final class UpdateChecker {
       final downloadUrl = apk['browser_download_url'] as String? ?? '';
 
       return UpdateInfo(
-        latestTag:    tag,
-        currentBuild: currentBuild,
-        latestBuild:  latestBuild,
-        downloadUrl:  downloadUrl,
-        releaseNotes: body.trim(),
+        latestTag:      tag,
+        currentBuild:   currentBuild,
+        latestBuild:    latestBuild,
+        downloadUrl:    downloadUrl,
+        releasePageUrl: pageUrl,
+        releaseNotes:   body.trim(),
       );
     } catch (_) {
       return null;

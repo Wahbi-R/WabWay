@@ -14,14 +14,14 @@ on:
           - "false"
           - "true"
 
-permissions:
-  contents: write   # create GitHub releases
-  pages: write      # deploy to GitHub Pages
-  id-token: write   # Pages OIDC token
-
 jobs:
-  build-and-deploy:
+  # ── Web → GitHub Pages ────────────────────────────────────────────────────────
+  # Runs independently of the APK job (no Java needed for web builds).
+  build-web:
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deploy-pages.outputs.page_url }}
@@ -29,17 +29,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
-        with:
-          distribution: zulu
-          java-version: '17'
-
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
 
-      # Write secrets to .env so --dart-define-from-file=.env works in CI
+      - name: Cache pub packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.lock') }}
+          restore-keys: ${{ runner.os }}-pub-
+
       - name: Create .env
         run: |
           echo "SUPABASE_URL=${{ vars.SUPABASE_URL }}" > .env
@@ -51,22 +52,10 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
-      # Build number comes from the CI run number (auto-increments on every push).
-      # The base semver is still read from pubspec.yaml; only the +build part is overridden.
-      - name: Extract version
+      - name: Extract build number
         id: version
-        run: |
-          BASE=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d'+' -f1)
-          BUILD=${{ github.run_number }}
-          echo "full=${BASE}+${BUILD}" >> $GITHUB_OUTPUT
-          echo "tag=v${BASE}+${BUILD}" >> $GITHUB_OUTPUT
-          echo "name=WabWay v${BASE}" >> $GITHUB_OUTPUT
-          echo "build=${BUILD}" >> $GITHUB_OUTPUT
+        run: echo "build=${{ github.run_number }}" >> $GITHUB_OUTPUT
 
-      # ── Web → GitHub Pages (built first so APK issues don't block the deploy) ──
-
-      # dart2js + CanvasKit: proven path; --wasm fallback is CanvasKit anyway
-      # for browsers without WasmGC, so skip the extra overhead.
       - name: Build web
         run: flutter build web --build-number=${{ steps.version.outputs.build }} --dart-define-from-file=.env
 
@@ -82,10 +71,66 @@ jobs:
         id: deploy-pages
         uses: actions/deploy-pages@v4
 
-      # ── Android APK ──────────────────────────────────────────────────────────
+  # ── Android APK ───────────────────────────────────────────────────────────────
+  # Runs in parallel with build-web. Only executes on push or when manually
+  # triggered with build_apk=true.
+  build-apk:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event.inputs.build_apk == 'true'
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Cache pub packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.lock') }}
+          restore-keys: ${{ runner.os }}-pub-
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: ${{ runner.os }}-gradle-
+
+      - name: Create .env
+        run: |
+          echo "SUPABASE_URL=${{ vars.SUPABASE_URL }}" > .env
+          echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
+          echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
+          echo "AUDIO_SERVER_URL=${{ vars.AUDIO_SERVER_URL }}" >> .env
+          echo "GOOGLE_PLACES_API_KEY=${{ secrets.GOOGLE_PLACES_API_KEY }}" >> .env
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Extract version
+        id: version
+        run: |
+          BASE=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d'+' -f1)
+          BUILD=${{ github.run_number }}
+          echo "full=${BASE}+${BUILD}" >> $GITHUB_OUTPUT
+          echo "tag=v${BASE}+${BUILD}" >> $GITHUB_OUTPUT
+          echo "name=WabWay v${BASE}" >> $GITHUB_OUTPUT
+          echo "build=${BUILD}" >> $GITHUB_OUTPUT
 
       - name: Set up signing
-        if: github.event_name == 'push' || github.event.inputs.build_apk == 'true'
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/wabway-release.jks
           cat > android/key.properties <<EOF
@@ -96,17 +141,14 @@ jobs:
           EOF
 
       - name: Build APK
-        if: github.event_name == 'push' || github.event.inputs.build_apk == 'true'
         run: flutter build apk --release --build-number=${{ steps.version.outputs.build }} --dart-define-from-file=.env
 
       - name: Rename APK
-        if: github.event_name == 'push' || github.event.inputs.build_apk == 'true'
         run: |
           cp build/app/outputs/flutter-apk/app-release.apk \
              build/app/outputs/flutter-apk/wabway-${{ steps.version.outputs.tag }}.apk
 
       - name: Create / update GitHub Release
-        if: github.event_name == 'push' || github.event.inputs.build_apk == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}

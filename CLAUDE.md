@@ -1,0 +1,26 @@
+# WabWay — Claude instructions
+
+## After every feature commit
+
+1. **Update `docs/TODO.md`** — add a checked `[x]` item with date and build number.
+2. **Update `lib/core/changelog.dart`** — add a new `_Release(...)` entry at the **very top** of `_kChangelog` (newest first). Match the label and build number to the TODO entry. Write the bullet points from a user's perspective (what they can now do), not an implementation perspective.
+3. **Write a feature doc** in `docs/features/phase 3/<slug>.md` for non-trivial features.
+4. **Run `supabase db push`** (or apply via SQL Editor) for any new migrations.
+
+## Build numbering
+
+Build numbers in TODO.md, changelog.dart, and commit messages are sequential human-assigned labels (100, 101, 102 …), **not** the pubspec `version` build number or the GitHub run number. Always check the highest existing build in TODO.md and increment by 1.
+
+## Migration rule
+
+Use `supabase db push` for migrations. If there is a duplicate migration prefix conflict, apply via the Supabase SQL Editor and rename the file to avoid the duplicate.
+
+## Git
+
+- **Never push to remote** after committing — only push when the user explicitly asks.
+- **Push to wabway-server** immediately after every commit to the `wabway-server/` sub-repo, no need to ask.
+- Build command: `flutter build apk --debug --dart-define-from-file=.env` (omitting `.env` causes a black screen on launch).
+
+## TripState / ProfileState in routes
+
+These InheritedWidgets are not available inside a pushed `MaterialPageRoute`. Pass required data as explicit constructor parameters instead.

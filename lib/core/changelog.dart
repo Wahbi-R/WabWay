@@ -11,6 +11,76 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 106,
+    label: 'Smarter spot search',
+    changes: [
+      'Searches in Add Spot are now biased toward your trip destination — short queries like "GU" return results in Japan when you\'re travelling there',
+      'The search field now shows a "Tap 🔍 or press Search" hint so the submit trigger is always visible',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 105,
+    label: 'Import & spot search fixes',
+    changes: [
+      'Fixed garbled characters (Japanese, Korean, and other CJK text) in Google Takeout CSV imports',
+      'Import now shows a "Searching…" spinner per spot while looking up locations — no more premature "No location found" messages',
+      'Saving a batch shows progress ("Adding 3 of 12…"), saves in parallel, and closes automatically when done',
+      'Spots imported from a Maps link with no city now get reverse-geocoded — "Unknown" is no longer stored',
+      'Keyboard Search key in Add Spot now triggers the search correctly',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 104,
+    label: 'Notification polish + deep linking',
+    changes: [
+      'Tapping a push notification now takes you directly to the right section — crew message goes to Chat, spot to Spots, receipt to Money, travel item to Travel',
+      'Notification preferences are now respected — disabling a category stops those push alerts',
+      'New push events: receipt added and travel item added',
+      'Notification settings: new Crew Chat toggle, removed the old "coming soon" placeholder',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 103,
+    label: 'Push notifications',
+    changes: [
+      'Push notifications are live — get alerted when crewmates add spots, log receipts, add travel items, or send a crew message',
+      'Notification Settings now has real toggles for Crew, Spots, Money, and Travel — turn off any category you don\'t need',
+      'Tapping a notification opens WabWay directly to the relevant screen',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 102,
+    label: 'Spot → Plan, crew chat shortcut, and more',
+    changes: [
+      'Add any spot to your itinerary in one tap — "Add to Plan" appears inside every spot detail; pick the day and an optional time and you\'re done',
+      'Crew Chat is now one tap from the Home screen — chat icon in the AppBar so you don\'t have to open More',
+      'Saved a hotel in Travel? A prompt offers to copy it to Stays automatically — check-in/out dates pre-filled',
+      'Plan screen now shows an offline banner when a sync fails, consistent with all other screens',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 101,
+    label: 'Performance fix — background tickers',
+    changes: [
+      'Fixed jank caused by the map and live location screens running at 60 fps even while you were on a different tab — navigation and scrolling should feel noticeably smoother',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 100,
+    label: 'Google Places photos + speed improvements',
+    changes: [
+      'Spot photos now come from Google Places — sharper and more accurate than the previous Wikipedia images',
+      'App startup and screen transitions are faster: text styles initialised once, activity feed uses constant-time lookups, heavy widgets isolated to avoid unnecessary redraws',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 99,
     label: 'Planned cost on itinerary items',
     changes: [

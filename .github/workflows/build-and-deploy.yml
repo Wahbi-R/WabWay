@@ -141,7 +141,7 @@ jobs:
           EOF
 
       - name: Build APK
-        run: flutter build apk --release --build-number=${{ steps.version.outputs.build }} --dart-define-from-file=.env
+        run: flutter build apk --release --target-platform android-arm64 --build-number=${{ steps.version.outputs.build }} --dart-define-from-file=.env
 
       - name: Rename APK
         run: |

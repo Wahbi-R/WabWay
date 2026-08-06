@@ -13,7 +13,7 @@ abstract final class AuthService {
         shouldCreateUser: true,
         emailRedirectTo: kIsWeb
             ? 'https://wabway.wabble.ca/'
-            : 'com.example.wabway://login-callback',
+            : 'ca.wabble.wabway://login-callback',
       );
       AppLogger.instance.log('sendMagicLink ✓ (OTP queued)', tag: 'AUTH');
     } catch (e) {

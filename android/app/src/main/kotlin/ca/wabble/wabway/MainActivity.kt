@@ -1,4 +1,4 @@
-package com.example.wabway
+package ca.wabble.wabway
 
 import io.flutter.embedding.android.FlutterActivity
 

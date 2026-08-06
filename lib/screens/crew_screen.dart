@@ -806,7 +806,7 @@ class _MapTab extends StatelessWidget {
       children: [
         TileLayer(
           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.example.wabway',
+          userAgentPackageName: 'ca.wabble.wabway',
         ),
         MarkerLayer(
           markers: locations.map((loc) {

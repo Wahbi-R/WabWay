@@ -34,7 +34,7 @@
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
-                <data android:scheme="com.example.wabway" android:host="login-callback"/>
+                <data android:scheme="ca.wabble.wabway" android:host="login-callback"/>
             </intent-filter>
             <!-- Android App Links — intercepts https://wabway.wabble.ca magic links -->
             <!-- Requires .well-known/assetlinks.json at https://wabway.wabble.ca -->

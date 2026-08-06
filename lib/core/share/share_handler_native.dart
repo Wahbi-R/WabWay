@@ -95,7 +95,7 @@ class ShareHandler extends ChangeNotifier {
   }
 
   static bool _isAuthCallback(SharedMediaFile f) =>
-      f.path.startsWith('com.example.wabway://');
+      f.path.startsWith('ca.wabble.wabway://');
 
   static ShareContentType _fileContentType(SharedMediaFile f) {
     if (f.type == SharedMediaType.image) return ShareContentType.screenshot;

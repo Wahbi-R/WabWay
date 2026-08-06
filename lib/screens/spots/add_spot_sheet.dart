@@ -352,10 +352,20 @@ class _AddSpotContentState extends State<_AddSpotContent> {
         // ── Place search ─────────────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.fromLTRB(kSpace4, kSpace3, kSpace4, 0),
-          child: PlaceSearchField(
-            label: 'Search a place',
-            hint: 'Senso-ji, Hinoya Curry Tokyo…',
-            onSelected: _applySuggestion,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              PlaceSearchField(
+                label: 'Search a place',
+                hint: 'Senso-ji, Hinoya Curry Tokyo…',
+                onSelected: _applySuggestion,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Include a city or country for better results — e.g. "GU Japan"',
+                style: kStyleCaption.copyWith(color: kColorInkSoft),
+              ),
+            ],
           ),
         ),
 

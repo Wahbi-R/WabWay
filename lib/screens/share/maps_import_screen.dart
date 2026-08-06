@@ -41,6 +41,8 @@ class _MapsImportScreenState extends State<MapsImportScreen> {
   late List<SpotCategory>  _categories;
   late List<MapsPlace>     _places;
   bool _saving          = false;
+  int  _savingCount     = 0;
+  int  _savingTotal     = 0;
   bool _loadingTakeout  = false;
   bool _scrapedWebView  = false;
   bool _geocoding       = false;
@@ -180,38 +182,49 @@ class _MapsImportScreenState extends State<MapsImportScreen> {
 
 
   Future<void> _save() async {
-    setState(() => _saving = true);
+    final selectedIndices = [
+      for (int i = 0; i < _places.length; i++)
+        if (_selected[i]) i,
+    ];
+    setState(() {
+      _saving       = true;
+      _savingCount  = 0;
+      _savingTotal  = selectedIndices.length;
+    });
     try {
-      int count = 0;
-      for (int i = 0; i < _places.length; i++) {
-        if (!_selected[i]) continue;
-        final p = _places[i];
-        // Wikipedia thumbnails as a best-effort fallback; skipped on web (CORS).
-        final imageUrl = kIsWeb
-            ? null
-            : await WikipediaImageService.fetchThumbnailUrl(p.name);
-        await SpotService.createSpot(
-          tripId:      widget.tripId,
-          name:        p.name,
-          city:        p.city.isNotEmpty ? p.city : 'Unknown',
-          area:        '',
-          category:    _categories[i],
-          status:      SpotStatus.wantToGo,
-          addedBy:     widget.userId,
-          mapsUrl:     p.mapsUrl ?? widget.result.finalUrl,
-          notes:       p.notes,
-          address:     p.address,
-          latitude:    p.hasCoords ? p.lat : null,
-          longitude:   p.hasCoords ? p.lon : null,
-          placeSource: _listName,
-          imageUrl:    imageUrl,
-        );
-        count++;
+      // Process in batches of 5 to reduce wall-clock time vs. pure sequential.
+      const batchSize = 5;
+      for (int b = 0; b < selectedIndices.length; b += batchSize) {
+        if (!mounted) return;
+        final batch = selectedIndices.skip(b).take(batchSize).toList();
+        await Future.wait(batch.map((i) async {
+          final p        = _places[i];
+          final imageUrl = kIsWeb
+              ? null
+              : await WikipediaImageService.fetchThumbnailUrl(p.name);
+          await SpotService.createSpot(
+            tripId:      widget.tripId,
+            name:        p.name,
+            city:        p.city.isNotEmpty ? p.city : 'Unknown',
+            area:        '',
+            category:    _categories[i],
+            status:      SpotStatus.wantToGo,
+            addedBy:     widget.userId,
+            mapsUrl:     p.mapsUrl ?? widget.result.finalUrl,
+            notes:       p.notes,
+            address:     p.address,
+            latitude:    p.hasCoords ? p.lat : null,
+            longitude:   p.hasCoords ? p.lon : null,
+            placeSource: _listName,
+            imageUrl:    imageUrl,
+          );
+          if (mounted) setState(() => _savingCount++);
+        }));
       }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(
-          'Added $count spot${count == 1 ? '' : 's'}',
+          'Added $_savingTotal spot${_savingTotal == 1 ? '' : 's'}',
           style: kStyleBodyMedium.copyWith(color: kColorTextOnPrimary),
         ),
         backgroundColor: kColorPrimary,
@@ -220,6 +233,7 @@ class _MapsImportScreenState extends State<MapsImportScreen> {
         margin: const EdgeInsets.all(kSpace4),
       ));
       widget.onDone?.call();
+      if (mounted) Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -479,17 +493,21 @@ class _MapsImportScreenState extends State<MapsImportScreen> {
             ),
             const SizedBox(height: kSpace3),
             Expanded(
-              child: ListView.separated(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: kSpace4, vertical: kSpace2),
-                itemCount: places.length,
-                separatorBuilder: (_, __) => const SizedBox(height: kSpace3),
-                itemBuilder: (_, i) => _MapsPlaceCard(
-                  place:      places[i],
-                  selected:   _selected[i],
-                  category:   _categories[i],
-                  onToggle:   (v) => setState(() => _selected[i] = v),
-                  onCategory: (c) => setState(() => _categories[i] = c),
+              child: AbsorbPointer(
+                absorbing: _saving,
+                child: ListView.separated(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: kSpace4, vertical: kSpace2),
+                  itemCount: places.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: kSpace3),
+                  itemBuilder: (_, i) => _MapsPlaceCard(
+                    place:       places[i],
+                    selected:    _selected[i],
+                    category:    _categories[i],
+                    isSearching: _geocoding && !places[i].hasCoords,
+                    onToggle:    (v) => setState(() => _selected[i] = v),
+                    onCategory:  (c) => setState(() => _categories[i] = c),
+                  ),
                 ),
               ),
             ),
@@ -505,11 +523,21 @@ class _MapsImportScreenState extends State<MapsImportScreen> {
                         borderRadius: kRadiusMd),
                   ),
                   child: _saving
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
+                      ? Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const SizedBox(
+                              width: 16, height: 16,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white),
+                            ),
+                            const SizedBox(width: kSpace2),
+                            Text(
+                              'Adding $_savingCount of $_savingTotal…',
+                              style: kStyleBodyMedium.copyWith(
+                                  color: kColorTextOnPrimary),
+                            ),
+                          ],
                         )
                       : Text(
                           'Add $selectedCount spot${selectedCount == 1 ? '' : 's'}',
@@ -609,6 +637,7 @@ class _MapsPlaceCard extends StatelessWidget {
     required this.place,
     required this.selected,
     required this.category,
+    required this.isSearching,
     required this.onToggle,
     required this.onCategory,
   });
@@ -616,6 +645,7 @@ class _MapsPlaceCard extends StatelessWidget {
   final MapsPlace                  place;
   final bool                       selected;
   final SpotCategory               category;
+  final bool                       isSearching;
   final ValueChanged<bool>         onToggle;
   final ValueChanged<SpotCategory> onCategory;
 
@@ -662,6 +692,18 @@ class _MapsPlaceCard extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         )
+                      else if (isSearching)
+                        Row(children: [
+                          const SizedBox(
+                            width: 11, height: 11,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 1.5, color: kColorInkSoft),
+                          ),
+                          const SizedBox(width: 4),
+                          Text('Searching…',
+                              style: kStyleCaption.copyWith(
+                                  color: kColorInkSoft)),
+                        ])
                       else
                         Row(children: [
                           Icon(Icons.location_off_rounded,

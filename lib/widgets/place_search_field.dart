@@ -72,7 +72,9 @@ class _PlaceSearchFieldState extends State<PlaceSearchField> {
   }
 
   void _onFocusChange() {
-    if (!_focus.hasFocus) {
+    // Don't hide while a search is in-flight — the keyboard action button
+    // unfocuses the field before results arrive, which would swallow them.
+    if (!_focus.hasFocus && !_loading) {
       setState(() => _showResults = false);
     }
   }
@@ -88,7 +90,7 @@ class _PlaceSearchFieldState extends State<PlaceSearchField> {
       limit: widget.limit,
     );
     if (!mounted) return;
-    setState(() { _results = results; _loading = false; });
+    setState(() { _results = results; _loading = false; _showResults = true; });
   }
 
   void _select(PlaceSuggestion place) {

@@ -26,6 +26,33 @@ abstract final class NominatimService {
   static const _ua      = 'WabWay/1.1 (wahbi@portalprints.com)';
   static const _baseUrl = 'https://nominatim.openstreetmap.org/search';
 
+  static const _reverseUrl = 'https://nominatim.openstreetmap.org/reverse';
+
+  /// Returns the city name for a lat/lon pair using Nominatim reverse geocoding.
+  /// Returns an empty string if the lookup fails or no city is found.
+  static Future<String> reverseGeocodeCity(double lat, double lon) async {
+    try {
+      final uri = Uri.parse(_reverseUrl).replace(queryParameters: {
+        'lat':            lat.toString(),
+        'lon':            lon.toString(),
+        'format':         'json',
+        'addressdetails': '1',
+      });
+      final res = await http
+          .get(uri, headers: {'User-Agent': _ua, 'Accept-Language': 'en'})
+          .timeout(const Duration(seconds: 8));
+      if (res.statusCode != 200) return '';
+      final j    = jsonDecode(res.body) as Map<String, dynamic>;
+      final addr = j['address'] as Map<String, dynamic>? ?? {};
+      return addr['city']         as String? ??
+             addr['town']         as String? ??
+             addr['village']      as String? ??
+             addr['municipality'] as String? ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
+
   /// Searches for a place by name. Returns up to 3 candidates.
   /// Call with a 1-second delay between queries per Nominatim ToS.
   static Future<List<NominatimPlace>> search(String query) async {

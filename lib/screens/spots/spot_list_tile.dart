@@ -77,7 +77,11 @@ class SpotListTile extends StatelessWidget {
                       const SizedBox(width: 3),
                       Expanded(
                         child: Text(
-                          '${spot.city} · ${spot.area} · ${spot.category.label}',
+                          [
+                            if (spot.city.isNotEmpty && spot.city != 'Unknown') spot.city,
+                            if (spot.area.isNotEmpty) spot.area,
+                            spot.category.label,
+                          ].join(' · '),
                           style: kStyleCaption,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,

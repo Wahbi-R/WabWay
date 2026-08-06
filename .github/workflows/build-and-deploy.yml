@@ -65,10 +65,10 @@ jobs:
 
       # ── Web → GitHub Pages (built first so APK issues don't block the deploy) ──
 
-      # --wasm generates a dual build: Skwasm (WebAssembly) for modern browsers
-      # with WasmGC support, and CanvasKit (JS) as an automatic fallback.
+      # dart2js + CanvasKit: proven path; --wasm fallback is CanvasKit anyway
+      # for browsers without WasmGC, so skip the extra overhead.
       - name: Build web
-        run: flutter build web --wasm --build-number=${{ steps.version.outputs.build }} --dart-define-from-file=.env
+        run: flutter build web --build-number=${{ steps.version.outputs.build }} --dart-define-from-file=.env
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

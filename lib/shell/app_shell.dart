@@ -278,7 +278,12 @@ class _MobileShell extends StatelessWidget {
       body: IndexedStack(
         index: selectedIndex,
         children: destinations
-            .map((d) => d.builder(context))
+            .asMap()
+            .entries
+            .map((e) => TickerMode(
+                  enabled: e.key == selectedIndex,
+                  child: e.value.builder(context),
+                ))
             .toList(),
       ),
       bottomNavigationBar: _WabwayBottomNav(
@@ -409,7 +414,12 @@ class _DesktopShell extends StatelessWidget {
             child: IndexedStack(
               index: selectedIndex,
               children: destinations
-                  .map((d) => d.builder(context))
+                  .asMap()
+                  .entries
+                  .map((e) => TickerMode(
+                        enabled: e.key == selectedIndex,
+                        child: e.value.builder(context),
+                      ))
                   .toList(),
             ),
           ),

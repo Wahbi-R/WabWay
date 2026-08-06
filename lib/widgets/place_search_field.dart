@@ -55,6 +55,10 @@ class _PlaceSearchFieldState extends State<PlaceSearchField> {
   List<PlaceSuggestion> _results = [];
   bool _showResults = false;
   bool _loading = false;
+  // Prevents _onFocusChange from hiding results when a search was just triggered.
+  // Set synchronously at the start of _search() so it's true before the
+  // focus-loss event fires (keyboard closes on mobile).
+  bool _suppressHide = false;
 
   final _focus = FocusNode();
 
@@ -79,9 +83,7 @@ class _PlaceSearchFieldState extends State<PlaceSearchField> {
   }
 
   void _onFocusChange() {
-    // Don't hide while a search is in-flight — the keyboard action button
-    // unfocuses the field before results arrive, which would swallow them.
-    if (!_focus.hasFocus && !_loading) {
+    if (!_focus.hasFocus && !_loading && !_suppressHide) {
       setState(() => _showResults = false);
     }
   }
@@ -98,6 +100,7 @@ class _PlaceSearchFieldState extends State<PlaceSearchField> {
   Future<void> _search() async {
     final userQuery = _ctrl.text.trim();
     if (userQuery.isEmpty) return;
+    _suppressHide = true;
 
     // Append the trip destination when it adds location context the user
     // hasn't already provided — keeps results geo-relevant without changing
@@ -116,6 +119,7 @@ class _PlaceSearchFieldState extends State<PlaceSearchField> {
       limit: widget.limit,
     );
     if (!mounted) return;
+    _suppressHide = false;
     setState(() { _results = results; _loading = false; _showResults = true; });
   }
 
@@ -145,7 +149,7 @@ class _PlaceSearchFieldState extends State<PlaceSearchField> {
           onSuffixTap: _search,
           helpText: widget.locationBias != null && widget.locationBias!.isNotEmpty
               ? 'Tap 🔍 or press Search  ·  Searching in ${widget.locationBias}'
-              : 'Tap 🔍 or press Search to find places',
+              : 'Tap 🔍 or press Search  ·  Add a trip destination for local results',
         ),
         if (_showResults)
           _ResultsDropdown(

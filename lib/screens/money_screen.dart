@@ -168,6 +168,78 @@ class _MoneyScreenState extends State<MoneyScreen> {
     );
   }
 
+  String? get _activeDatePreset {
+    if (_dateRange == null) return null;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    if (_dateRange!.start == today && _dateRange!.end == today) return 'today';
+    final weekStart = today.subtract(Duration(days: today.weekday - 1));
+    if (_dateRange!.start == weekStart && _dateRange!.end == today) return 'week';
+    final monthStart = DateTime(now.year, now.month, 1);
+    if (_dateRange!.start == monthStart && _dateRange!.end == today) return 'month';
+    return null;
+  }
+
+  void _setDatePreset(String key) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final DateTimeRange range;
+    switch (key) {
+      case 'today':
+        range = DateTimeRange(start: today, end: today);
+      case 'week':
+        final weekStart = today.subtract(Duration(days: today.weekday - 1));
+        range = DateTimeRange(start: weekStart, end: today);
+      case 'month':
+        final monthStart = DateTime(now.year, now.month, 1);
+        range = DateTimeRange(start: monthStart, end: today);
+      default:
+        return;
+    }
+    if (_activeDatePreset == key) {
+      setState(() { _dateRange = null; _selectedReceiptId = null; });
+    } else {
+      setState(() { _dateRange = range; _selectedReceiptId = null; });
+    }
+  }
+
+  Widget _quickDatePresets() {
+    final active = _activeDatePreset;
+    const presets = [('today', 'Today'), ('week', 'This week'), ('month', 'This month')];
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: kSpace1),
+      child: Row(
+        children: presets.map((p) {
+          final (key, label) = p;
+          final sel = active == key;
+          return Padding(
+            padding: const EdgeInsets.only(right: kSpace2),
+            child: GestureDetector(
+              onTap: () => _setDatePreset(key),
+              child: AnimatedContainer(
+                duration: kDurationFast,
+                padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: 5),
+                decoration: BoxDecoration(
+                  color: sel ? kColorPrimary : kColorSurfaceSunken,
+                  borderRadius: kRadiusPill,
+                  border: Border.all(color: sel ? kColorPrimary : kColorBorder),
+                ),
+                child: Text(
+                  label,
+                  style: kStyleCaption.copyWith(
+                    color: sel ? Colors.white : kColorInkSoft,
+                    fontWeight: sel ? FontWeight.w600 : FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
   Future<void> _pickDateRange() async {
     final first = _receipts.isEmpty ? DateTime.now() : _receipts.map((r) => r.date).reduce((a, b) => a.isBefore(b) ? a : b);
     final last  = _receipts.isEmpty ? DateTime.now() : _receipts.map((r) => r.date).reduce((a, b) => a.isAfter(b)  ? a : b);
@@ -614,6 +686,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
             ],
           ),
           _payerFilterStrip(),
+          _quickDatePresets(),
           Expanded(
             child: listItems.isEmpty
                 ? Center(
@@ -860,6 +933,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
                                 _dateRangeChip(),
                               ],
                             ),
+                            _quickDatePresets(),
                           ],
                         ),
                       ),

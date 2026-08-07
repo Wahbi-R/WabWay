@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 148,
+    label: 'Money: quick date filter presets',
+    changes: [
+      '"Today", "This week", and "This month" chips now appear under the receipt filters — tap one to instantly narrow the list to that time window, tap again to clear',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 147,
     label: 'Spots: visited progress bar',
     changes: [

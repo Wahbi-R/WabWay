@@ -798,7 +798,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
         body: TabBarView(
           physics: const NeverScrollableScrollPhysics(),
           children: [
-            // Receipts tab — filter strip + list
+            // Receipts tab — summary cards + search + filter + list all scroll together
             _receipts.isEmpty
                 ? const Center(
                     child: WabwayEmptyState(
@@ -807,86 +807,98 @@ class _MoneyScreenState extends State<MoneyScreen> {
                       description: 'Tap + to add the first expense.',
                     ),
                   )
-                : Column(
-                    children: [
-                      _SpendingSummaryCard(
-                          receipts: _receipts, homeCurrency: _homeCurrency),
-                      _SpendingByMemberCard(
-                          receipts: _receipts, homeCurrency: _homeCurrency, members: _members),
-                      WabwaySearchBar(
-                        controller: _searchCtrl,
-                        hint: 'Search receipts…',
-                        onChanged: (v) => setState(() {
-                          _receiptSearch = v;
-                          _selectedReceiptId = null;
-                        }),
+                : CustomScrollView(
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: Column(
+                          children: [
+                            _SpendingSummaryCard(
+                                receipts: _receipts, homeCurrency: _homeCurrency),
+                            _SpendingByMemberCard(
+                                receipts: _receipts, homeCurrency: _homeCurrency, members: _members),
+                            WabwaySearchBar(
+                              controller: _searchCtrl,
+                              hint: 'Search receipts…',
+                              onChanged: (v) => setState(() {
+                                _receiptSearch = v;
+                                _selectedReceiptId = null;
+                              }),
+                            ),
+                            Row(
+                              children: [
+                                Expanded(child: _receiptFilterStrip()),
+                                _dateRangeChip(),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                      Row(
-                        children: [
-                          Expanded(child: _receiptFilterStrip()),
-                          _dateRangeChip(),
-                        ],
-                      ),
-                      Expanded(
-                        child: _receiptListItems.isEmpty
-                            ? Center(
-                                child: WabwayEmptyState(
-                                  icon: _receiptSearch.isNotEmpty
-                                      ? Icons.search_off_rounded
-                                      : Icons.filter_list_rounded,
-                                  title: _receiptSearch.isNotEmpty
-                                      ? 'No results for "$_receiptSearch"'
-                                      : _dateRange != null
-                                          ? 'No receipts in that date range'
-                                          : 'No ${_filterCategory?.label ?? ''} receipts',
-                                  description: _receiptSearch.isNotEmpty
-                                      ? 'Try a different search term.'
-                                      : _dateRange != null
-                                          ? 'Try a wider date range or clear the filter.'
-                                          : 'Try a different category filter.',
-                                ),
-                              )
-                            : ListView.builder(
-                                padding: const EdgeInsets.all(kSpace4),
-                                itemCount: _receiptListItems.length,
-                                itemBuilder: (ctx, i) {
-                                  final entry = _receiptListItems[i];
-                                  if (entry is _DateHeader) {
-                                    return _DateGroupHeader(date: entry.date);
-                                  }
-                                  final r = (entry as _ReceiptItem).receipt;
-                                  return Padding(
-                                    padding: const EdgeInsets.only(bottom: kSpace2),
-                                    child: ReceiptListTile(
-                                      receipt:      r,
-                                      myId:         _userId,
-                                      members:      _members,
-                                      homeCurrency: _homeCurrency,
-                                      onTap: () => Navigator.push(
-                                        ctx,
-                                        MaterialPageRoute(
-                                          builder: (_) => ReceiptDetailScreen(
-                                            receipt:   r,
-                                            myId:      _userId,
-                                            members:   _members,
-                                            tripId:    _activeTripId!,
-                                            onDelete:  () => _deleteReceipt(r.id),
-                                            onUpdated: (updated) {
-                                              if (mounted) {
-                                                setState(() {
-                                                  final idx = _receipts.indexWhere((x) => x.id == updated.id);
-                                                  if (idx >= 0) _receipts[idx] = updated;
-                                                });
-                                              }
-                                            },
-                                          ),
+                      if (_receiptListItems.isEmpty)
+                        SliverFillRemaining(
+                          child: Center(
+                            child: WabwayEmptyState(
+                              icon: _receiptSearch.isNotEmpty
+                                  ? Icons.search_off_rounded
+                                  : Icons.filter_list_rounded,
+                              title: _receiptSearch.isNotEmpty
+                                  ? 'No results for "$_receiptSearch"'
+                                  : _dateRange != null
+                                      ? 'No receipts in that date range'
+                                      : 'No ${_filterCategory?.label ?? ''} receipts',
+                              description: _receiptSearch.isNotEmpty
+                                  ? 'Try a different search term.'
+                                  : _dateRange != null
+                                      ? 'Try a wider date range or clear the filter.'
+                                      : 'Try a different category filter.',
+                            ),
+                          ),
+                        )
+                      else
+                        SliverPadding(
+                          padding: const EdgeInsets.all(kSpace4),
+                          sliver: SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (ctx, i) {
+                                final entry = _receiptListItems[i];
+                                if (entry is _DateHeader) {
+                                  return _DateGroupHeader(date: entry.date);
+                                }
+                                final r = (entry as _ReceiptItem).receipt;
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: kSpace2),
+                                  child: ReceiptListTile(
+                                    receipt:      r,
+                                    myId:         _userId,
+                                    members:      _members,
+                                    homeCurrency: _homeCurrency,
+                                    onTap: () => Navigator.push(
+                                      ctx,
+                                      MaterialPageRoute(
+                                        builder: (_) => ReceiptDetailScreen(
+                                          receipt:   r,
+                                          myId:      _userId,
+                                          members:   _members,
+                                          tripId:    _activeTripId!,
+                                          onDelete:  () => _deleteReceipt(r.id),
+                                          onUpdated: (updated) {
+                                            if (mounted) {
+                                              setState(() {
+                                                final idx = _receipts.indexWhere((x) => x.id == updated.id);
+                                                if (idx >= 0) _receipts[idx] = updated;
+                                              });
+                                            }
+                                          },
                                         ),
                                       ),
                                     ),
-                                  );
-                                },
-                              ),
-                      ),
+                                  ),
+                                );
+                              },
+                              childCount: _receiptListItems.length,
+                            ),
+                          ),
+                        ),
+                      const SliverToBoxAdapter(child: SizedBox(height: kSpace12)),
                     ],
                   ),
 

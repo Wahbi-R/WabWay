@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 141,
+    label: 'Plan: hide completed items',
+    changes: [
+      'Tap the eye icon in the Plan screen to hide all checked-off items — useful on active trip days when you just want to see what\'s still ahead',
+      'Tap again to reveal completed items; the button turns teal to remind you that some items are hidden',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 140,
     label: 'Money: daily average spend',
     changes: [

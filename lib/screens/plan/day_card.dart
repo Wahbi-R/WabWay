@@ -26,6 +26,7 @@ class TripDayCard extends StatefulWidget {
     this.onDeleteDay,
     this.onReorder,
     this.onToggleDone,
+    this.hideCompleted = false,
   });
 
   final TripDay day;
@@ -38,8 +39,8 @@ class TripDayCard extends StatefulWidget {
   final VoidCallback? onEditDay;
   final VoidCallback? onDeleteDay;
   final ValueChanged<List<ItineraryItem>>? onReorder;
-  // Called with an item id when the user taps the timeline dot to check/uncheck.
   final ValueChanged<String>? onToggleDone;
+  final bool hideCompleted;
 
   @override
   State<TripDayCard> createState() => _TripDayCardState();
@@ -58,7 +59,10 @@ class _TripDayCardState extends State<TripDayCard> {
 
   @override
   Widget build(BuildContext context) {
-    final items = widget.day.sortedItems;
+    final allItems = widget.day.sortedItems;
+    final items = widget.hideCompleted
+        ? allItems.where((i) => !i.isDone).toList()
+        : allItems;
     final hasNotes = widget.day.notes != null && widget.day.notes!.isNotEmpty;
     final headerTappable =
         hasNotes || (widget.isDesktop && widget.onDayTap != null);

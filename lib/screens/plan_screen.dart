@@ -50,6 +50,7 @@ class _PlanScreenState extends State<PlanScreen> {
   bool _unplannedExpanded = true;
 
   String _search = '';
+  bool _hideCompleted = false;
   final _searchCtrl = TextEditingController();
   final _mobileListCtrl = ScrollController();
 
@@ -106,6 +107,9 @@ class _PlanScreenState extends State<PlanScreen> {
       curve: Curves.easeInOut,
     );
   }
+
+  int get _completedCount =>
+      _days.fold(0, (sum, d) => sum + d.items.where((i) => i.isDone).length);
 
   List<Spot> get _unplannedSpots {
     final linkedIds = {
@@ -649,6 +653,10 @@ class _PlanScreenState extends State<PlanScreen> {
             onAddDay: () => _addDay(context),
             onExport: _days.isNotEmpty ? _exportPlan : null,
             onExportCalendar: (_days.isNotEmpty && !kIsWeb) ? _exportToCalendar : null,
+            hideCompleted: _hideCompleted,
+            onToggleHideCompleted: (_hideCompleted || _completedCount > 0)
+                ? () => setState(() => _hideCompleted = !_hideCompleted)
+                : null,
           ),
           Expanded(
             child: _loading
@@ -716,6 +724,7 @@ class _PlanScreenState extends State<PlanScreen> {
                                                       onReorder: (newOrder) =>
                                                           _onReorderItems(_days[di].id, newOrder),
                                                       onToggleDone: _toggleItemDone,
+                                                      hideCompleted: _hideCompleted,
                                                     ),
                                                   );
                                                 },
@@ -815,6 +824,18 @@ class _PlanScreenState extends State<PlanScreen> {
               tooltip: 'Jump to today',
               color: kColorPrimary,
               onPressed: _scrollToToday,
+            ),
+          if ((_hideCompleted || _completedCount > 0) && _search.isEmpty)
+            IconButton(
+              icon: Icon(
+                _hideCompleted
+                    ? Icons.visibility_off_rounded
+                    : Icons.visibility_rounded,
+                size: 20,
+              ),
+              tooltip: _hideCompleted ? 'Show completed' : 'Hide completed',
+              color: _hideCompleted ? kColorPrimary : kColorInkSoft,
+              onPressed: () => setState(() => _hideCompleted = !_hideCompleted),
             ),
           if (_days.isNotEmpty) ...[
             IconButton(
@@ -939,6 +960,7 @@ class _PlanScreenState extends State<PlanScreen> {
                                         onReorder: (newOrder) =>
                                             _onReorderItems(_days[di].id, newOrder),
                                         onToggleDone: _toggleItemDone,
+                                        hideCompleted: _hideCompleted,
                                       ),
                                     );
                                   },
@@ -1426,12 +1448,16 @@ class _DesktopPlanBar extends StatelessWidget {
     required this.onAddDay,
     this.onExport,
     this.onExportCalendar,
+    this.hideCompleted = false,
+    this.onToggleHideCompleted,
   });
 
   final int dayCount;
   final VoidCallback onAddDay;
   final VoidCallback? onExport;
   final VoidCallback? onExportCalendar;
+  final bool hideCompleted;
+  final VoidCallback? onToggleHideCompleted;
 
   @override
   Widget build(BuildContext context) {
@@ -1481,6 +1507,20 @@ class _DesktopPlanBar extends StatelessWidget {
               size: WabwayButtonSize.sm,
               variant: WabwayButtonVariant.ghost,
               onPressed: onExportCalendar,
+            ),
+            const SizedBox(width: kSpace2),
+          ],
+          if (onToggleHideCompleted != null) ...[
+            WabwayButton(
+              label: hideCompleted ? 'Show done' : 'Hide done',
+              icon: hideCompleted
+                  ? Icons.visibility_off_rounded
+                  : Icons.visibility_rounded,
+              size: WabwayButtonSize.sm,
+              variant: hideCompleted
+                  ? WabwayButtonVariant.primary
+                  : WabwayButtonVariant.ghost,
+              onPressed: onToggleHideCompleted,
             ),
             const SizedBox(width: kSpace2),
           ],

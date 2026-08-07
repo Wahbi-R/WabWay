@@ -140,6 +140,28 @@ class _LinksScreenState extends State<LinksScreen> {
     }
   }
 
+  Future<void> _deleteLinkDirect(BuildContext context, TripLink link) async {
+    setState(() => _links = _links.where((l) => l.id != link.id).toList());
+    try {
+      await LinksService.deleteLink(link.id);
+    } catch (_) {
+      if (!mounted) return;
+      if (mounted) _load();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Could not delete "${link.title}". Try again.',
+            style: kStyleBody.copyWith(color: Colors.white)),
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('"${link.title}" removed.',
+          style: kStyleBody.copyWith(color: Colors.white)),
+      behavior: SnackBarBehavior.floating,
+    ));
+  }
+
   Future<void> _deleteLink(TripLink link) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -283,11 +305,32 @@ class _LinksScreenState extends State<LinksScreen> {
                                 : SliverList.separated(
                                     itemCount: _filteredLinks.length,
                                     separatorBuilder: (_, __) => const SizedBox(height: kSpace3),
-                                    itemBuilder: (_, i) => _LinkCard(
-                                      link: _filteredLinks[i],
-                                      onEdit: () => _editLink(_filteredLinks[i]),
-                                      onDelete: () => _deleteLink(_filteredLinks[i]),
-                                    ),
+                                    itemBuilder: (ctx, i) {
+                                      final link = _filteredLinks[i];
+                                      return Dismissible(
+                                        key: ValueKey('link_${link.id}'),
+                                        direction: DismissDirection.endToStart,
+                                        confirmDismiss: (_) async {
+                                          await _deleteLinkDirect(ctx, link);
+                                          return false;
+                                        },
+                                        background: Container(
+                                          alignment: Alignment.centerRight,
+                                          padding: const EdgeInsets.only(right: kSpace5),
+                                          decoration: BoxDecoration(
+                                            color: Colors.red.shade50,
+                                            borderRadius: kRadiusMd,
+                                          ),
+                                          child: const Icon(Icons.delete_rounded,
+                                              color: Colors.red, size: 22),
+                                        ),
+                                        child: _LinkCard(
+                                          link: link,
+                                          onEdit: () => _editLink(link),
+                                          onDelete: () => _deleteLink(link),
+                                        ),
+                                      );
+                                    },
                                   ),
                           ),
                         ],

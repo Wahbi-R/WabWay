@@ -10,6 +10,7 @@ import '../core/supabase/spot_service.dart';
 import '../core/supabase/travel_service.dart';
 import '../core/trip/app_trip_member.dart';
 import '../data/accommodation_data.dart';
+import '../data/date_utils.dart';
 import '../data/docs_data.dart';
 import '../data/links_data.dart';
 import '../data/money_data.dart';
@@ -23,6 +24,7 @@ import '../theme/app_text_theme.dart';
 import '../widgets/widgets.dart';
 import 'accommodations/add_accommodation_sheet.dart';
 import 'docs/doc_detail.dart';
+import 'money/cash_detail.dart';
 import 'money/receipt_detail.dart';
 import 'plan/item_detail.dart';
 import 'spots/spot_detail.dart';
@@ -53,7 +55,7 @@ Future<void> showGlobalSearch(
 
 // ─── Result model ─────────────────────────────────────────────────────────────
 
-enum _ResultKind { spot, doc, travel, receipt, plan, stay, packing, link }
+enum _ResultKind { spot, doc, travel, receipt, cash, plan, stay, packing, link }
 
 class _Result {
   const _Result({
@@ -98,6 +100,7 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
   List<TripDocument> _docs = [];
   List<TravelItem> _travel = [];
   List<Receipt> _receipts = [];
+  List<CashWithdrawal> _withdrawals = [];
   List<Accommodation> _stays = [];
   List<PackingItem> _packingItems = [];
   List<TripLink> _links = [];
@@ -126,23 +129,25 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
         DocService.loadDocuments(widget.tripId),
         TravelService.loadItems(widget.tripId),
         MoneyService.loadReceipts(widget.tripId),
+        MoneyService.loadWithdrawals(widget.tripId),
         PlanService.loadAll(widget.tripId),
         AccommodationService.loadAll(widget.tripId),
         PackingService.fetchAll(widget.tripId),
         LinksService.loadLinks(widget.tripId),
       ]);
       if (!mounted) return;
-      final days = results[4] as List<TripDay>;
+      final days = results[5] as List<TripDay>;
       setState(() {
         _spots        = results[0] as List<Spot>;
         _docs         = results[1] as List<TripDocument>;
         _travel       = results[2] as List<TravelItem>;
         _receipts     = results[3] as List<Receipt>;
+        _withdrawals  = results[4] as List<CashWithdrawal>;
         _planDays     = days;
         _planItems    = days.expand((d) => d.items).toList();
-        _stays        = results[5] as List<Accommodation>;
-        _packingItems = results[6] as List<PackingItem>;
-        _links        = results[7] as List<TripLink>;
+        _stays        = results[6] as List<Accommodation>;
+        _packingItems = results[7] as List<PackingItem>;
+        _links        = results[8] as List<TripLink>;
         _loading      = false;
       });
     } catch (_) {
@@ -263,6 +268,32 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
       }
     }
 
+    for (final w in _withdrawals) {
+      if (m(w.currency) || m(w.notes) || m(fmtAmount(w.amount, w.currency))) {
+        final withdrawal = w;
+        out.add(_Result(
+          kind:     _ResultKind.cash,
+          title:    fmtAmount(w.amount, w.currency),
+          subtitle: [
+            if (w.notes != null && w.notes!.isNotEmpty) w.notes!,
+            fmtDate(w.date),
+          ].join(' · '),
+          icon:     Icons.atm_rounded,
+          onTap: (ctx) => Navigator.push(
+            ctx,
+            MaterialPageRoute(
+              builder: (_) => CashDetailScreen(
+                withdrawal: withdrawal,
+                myId:       widget.userId,
+                members:    moneyMembers,
+                tripId:     widget.tripId,
+              ),
+            ),
+          ),
+        ));
+      }
+    }
+
     for (final p in _planItems) {
       if (m(p.title) || m(p.location) || m(p.notes) || m(p.city)) {
         final planItem = p;
@@ -354,6 +385,7 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
     _ResultKind.doc:     'Documents',
     _ResultKind.travel:  'Travel',
     _ResultKind.receipt: 'Receipts',
+    _ResultKind.cash:    'Cash',
     _ResultKind.plan:    'Itinerary',
     _ResultKind.stay:    'Stays',
     _ResultKind.packing: 'Packing list',
@@ -382,7 +414,7 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
           autofocus: true,
           style: kStyleBody,
           decoration: InputDecoration(
-            hintText: 'Search spots, stays, travel, docs, receipts…',
+            hintText: 'Search spots, travel, money, docs, links…',
             hintStyle: kStyleBody.copyWith(color: kColorInkSoft),
             border: InputBorder.none,
           ),

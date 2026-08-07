@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 157,
+    label: 'Search: cash withdrawals included',
+    changes: [
+      'Global search now includes cash withdrawals — search by currency, amount, or ATM notes to find any withdrawal instantly',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 156,
     label: 'Stays: sort by date, name, or newest',
     changes: [

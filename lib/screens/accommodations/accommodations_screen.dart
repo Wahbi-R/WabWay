@@ -15,6 +15,8 @@ import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 import 'add_accommodation_sheet.dart';
 
+enum _StaySort { checkIn, alphabetical, newest }
+
 class AccommodationsScreen extends StatefulWidget {
   const AccommodationsScreen({super.key});
 
@@ -30,6 +32,7 @@ class _AccommodationsScreenState extends State<AccommodationsScreen> {
 
   String? _activeTripId;
   AccommodationStatus? _filterStatus;
+  _StaySort _sort = _StaySort.checkIn;
   String _search = '';
   RealtimeChannel? _channel;
   Timer? _debounce;
@@ -95,12 +98,25 @@ class _AccommodationsScreenState extends State<AccommodationsScreen> {
 
   List<Accommodation> get _filtered {
     var list = _filterStatus == null
-        ? _items
+        ? List<Accommodation>.from(_items)
         : _items.where((a) => a.status == _filterStatus).toList();
     final q = _search.toLowerCase().trim();
     if (q.isNotEmpty) {
       bool m(String? s) => s != null && s.toLowerCase().contains(q);
       list = list.where((a) => m(a.name) || m(a.city) || m(a.address) || m(a.notes)).toList();
+    }
+    switch (_sort) {
+      case _StaySort.checkIn:
+        list.sort((a, b) {
+          if (a.checkIn == null && b.checkIn == null) return 0;
+          if (a.checkIn == null) return 1;
+          if (b.checkIn == null) return -1;
+          return a.checkIn!.compareTo(b.checkIn!);
+        });
+      case _StaySort.alphabetical:
+        list.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      case _StaySort.newest:
+        list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     }
     return list;
   }
@@ -170,6 +186,24 @@ class _AccommodationsScreenState extends State<AccommodationsScreen> {
           SliverAppBar(
             title: Text('Stay', style: kStyleTitle),
             pinned: true,
+            actions: [
+              if (_items.isNotEmpty)
+                PopupMenuButton<_StaySort>(
+                  icon: Icon(
+                    Icons.sort_rounded,
+                    color: _sort != _StaySort.checkIn ? kColorPrimary : kColorInkSoft,
+                  ),
+                  tooltip: 'Sort stays',
+                  initialValue: _sort,
+                  onSelected: (s) => setState(() => _sort = s),
+                  itemBuilder: (_) => [
+                    _staySortItem(_StaySort.checkIn,     'By check-in date', _sort),
+                    _staySortItem(_StaySort.alphabetical, 'A – Z',            _sort),
+                    _staySortItem(_StaySort.newest,       'Newest added',     _sort),
+                  ],
+                ),
+              const SizedBox(width: kSpace2),
+            ],
           ),
           SliverToBoxAdapter(
             child: WabwaySearchBar(
@@ -469,7 +503,28 @@ class _ImagePlaceholder extends StatelessWidget {
   }
 }
 
-// â"€â"€â"€ Sheet result â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// ─── Sort helper ──────────────────────────────────────────────────────────────
+
+PopupMenuItem<_StaySort> _staySortItem(
+    _StaySort value, String label, _StaySort current) {
+  return PopupMenuItem(
+    value: value,
+    child: Row(
+      children: [
+        SizedBox(
+          width: 20,
+          child: current == value
+              ? const Icon(Icons.check_rounded, size: 16, color: kColorPrimary)
+              : null,
+        ),
+        const SizedBox(width: kSpace2),
+        Text(label),
+      ],
+    ),
+  );
+}
+
+// ─── Sheet result ─────────────────────────────────────────────────────────────
 
 class AccommodationSheetResult {
   const AccommodationSheetResult({this.accommodation, this.deleted = false});

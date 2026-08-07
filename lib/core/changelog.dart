@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 156,
+    label: 'Stays: sort by date, name, or newest',
+    changes: [
+      'A sort button now appears on the Stays screen — sort by check-in date (default), A – Z, or newest added',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 155,
     label: 'Home: spot progress + richer upcoming',
     changes: [

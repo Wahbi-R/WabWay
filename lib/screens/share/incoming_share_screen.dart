@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/images/wikipedia_image_service.dart';
 import '../../core/ocr/gemini_parser.dart';
 import '../../core/ocr/itinerary_scanner.dart';
 import '../../core/places/google_maps_parser.dart';
@@ -641,6 +642,9 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
     switch (dest) {
       case ShareDestination.spot:
         final isMaps = _activeShare!.contentType == ShareContentType.googleMapsLink;
+        final imageUrl = kIsWeb
+            ? null
+            : await WikipediaImageService.fetchThumbnailUrl(data.title);
         await SpotService.createSpot(
           tripId: tripId,
           name: data.title,
@@ -656,6 +660,7 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
           latitude: data.latitude,
           longitude: data.longitude,
           placeSource: data.placeSource,
+          imageUrl: imageUrl,
         );
 
       case ShareDestination.document:

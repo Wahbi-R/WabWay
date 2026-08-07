@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 111,
+    label: 'Import photo fix',
+    changes: [
+      'Spots saved from the Import screen (Google Maps link, social media captions) now get a photo automatically, just like spots added from the Maps import list',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 110,
     label: 'Web login fix',
     changes: [

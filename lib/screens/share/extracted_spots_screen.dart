@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import '../../core/images/wikipedia_image_service.dart';
 import '../../core/places/nominatim_service.dart';
 import '../../core/supabase/spot_service.dart';
 import '../../data/spot_data.dart';
@@ -48,6 +50,9 @@ class _ExtractedSpotsScreenState extends State<ExtractedSpotsScreen> {
       for (int i = 0; i < widget.places.length; i++) {
         if (!_selected[i]) continue;
         final p = widget.places[i];
+        final imageUrl = kIsWeb
+            ? null
+            : await WikipediaImageService.fetchThumbnailUrl(p.name);
         await SpotService.createSpot(
           tripId:      widget.tripId,
           name:        p.name,
@@ -59,6 +64,7 @@ class _ExtractedSpotsScreenState extends State<ExtractedSpotsScreen> {
           sourceUrl:   widget.sourceUrl,
           latitude:    p.lat,
           longitude:   p.lon,
+          imageUrl:    imageUrl,
         );
         count++;
       }

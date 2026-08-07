@@ -17,7 +17,10 @@ Future<Spot?> showAddSpotSheet(
   BuildContext context, {
   required String tripId,
   required String userId,
-}) => _showSpotSheet(context, tripId: tripId, userId: userId);
+  double? initialLatitude,
+  double? initialLongitude,
+}) => _showSpotSheet(context, tripId: tripId, userId: userId,
+      initialLatitude: initialLatitude, initialLongitude: initialLongitude);
 
 Future<Spot?> showEditSpotSheet(
   BuildContext context, {
@@ -31,6 +34,8 @@ Future<Spot?> _showSpotSheet(
   required String tripId,
   required String userId,
   Spot? initialSpot,
+  double? initialLatitude,
+  double? initialLongitude,
 }) {
   final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
 
@@ -49,6 +54,8 @@ Future<Spot?> _showSpotSheet(
             tripId: tripId,
             userId: userId,
             initialSpot: initialSpot,
+            initialLatitude: initialLatitude,
+            initialLongitude: initialLongitude,
             onSubmit: (spot) => Navigator.pop(dialogCtx, spot),
           ),
         ),
@@ -65,6 +72,8 @@ Future<Spot?> _showSpotSheet(
       tripId: tripId,
       userId: userId,
       initialSpot: initialSpot,
+      initialLatitude: initialLatitude,
+      initialLongitude: initialLongitude,
       onSubmit: (spot) => Navigator.pop(ctx, spot),
     ),
   );
@@ -78,11 +87,15 @@ class _AddSpotSheet extends StatelessWidget {
     required this.userId,
     required this.onSubmit,
     this.initialSpot,
+    this.initialLatitude,
+    this.initialLongitude,
   });
   final String tripId;
   final String userId;
   final ValueChanged<Spot> onSubmit;
   final Spot? initialSpot;
+  final double? initialLatitude;
+  final double? initialLongitude;
 
   @override
   Widget build(BuildContext context) {
@@ -99,6 +112,8 @@ class _AddSpotSheet extends StatelessWidget {
           tripId: tripId,
           userId: userId,
           initialSpot: initialSpot,
+          initialLatitude: initialLatitude,
+          initialLongitude: initialLongitude,
           scrollController: scrollCtrl,
           onSubmit: onSubmit,
           showDragHandle: true,
@@ -116,6 +131,8 @@ class _AddSpotContent extends StatefulWidget {
     required this.userId,
     required this.onSubmit,
     this.initialSpot,
+    this.initialLatitude,
+    this.initialLongitude,
     this.scrollController,
     this.showDragHandle = false,
   });
@@ -124,6 +141,8 @@ class _AddSpotContent extends StatefulWidget {
   final String userId;
   final ValueChanged<Spot> onSubmit;
   final Spot? initialSpot;
+  final double? initialLatitude;
+  final double? initialLongitude;
   final ScrollController? scrollController;
   final bool showDragHandle;
 
@@ -176,6 +195,9 @@ class _AddSpotContentState extends State<_AddSpotContent> {
       _longitude        = s.longitude;
 
       _placeSource      = s.placeSource;
+    } else if (widget.initialLatitude != null && widget.initialLongitude != null) {
+      _latitude  = widget.initialLatitude;
+      _longitude = widget.initialLongitude;
     }
     _mapsCtrl.addListener(_onMapsUrlChanged);
   }

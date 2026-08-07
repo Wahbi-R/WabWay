@@ -15,6 +15,7 @@ import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
 import '../widgets/widgets.dart';
 import 'spots/spot_detail.dart';
+import 'spots/add_spot_sheet.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -160,6 +161,21 @@ class _MapScreenState extends State<MapScreen> {
     if (spot.votes.maybe.contains(userId)) return VoteType.maybe;
     if (spot.votes.skip.contains(userId)) return VoteType.skip;
     return null;
+  }
+
+  Future<void> _addSpotAtLatLng(LatLng point) async {
+    final tripId = TripState.tripOf(context).id;
+    final userId = supabase.auth.currentUser?.id ?? '';
+    final spot = await showAddSpotSheet(
+      context,
+      tripId: tripId,
+      userId: userId,
+      initialLatitude:  point.latitude,
+      initialLongitude: point.longitude,
+    );
+    if (spot != null && mounted) {
+      setState(() => _spots.insert(0, spot));
+    }
   }
 
   void _openDetail(Spot spot) {
@@ -344,6 +360,7 @@ class _MapScreenState extends State<MapScreen> {
             interactionOptions: const InteractionOptions(
               flags: InteractiveFlag.all,
             ),
+            onLongPress: (_, point) => _addSpotAtLatLng(point),
           ),
           children: [
             TileLayer(

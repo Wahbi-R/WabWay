@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 125,
+    label: 'Map: long-press to add a spot',
+    changes: [
+      'Long-press anywhere on the Map to open the Add Spot form — the tapped coordinates are pre-filled',
+      'The "Map ready" indicator appears immediately so you know exactly where the pin will land',
+      'Save the spot and it drops onto the map right away',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 124,
     label: 'Travel: past booking labels',
     changes: [

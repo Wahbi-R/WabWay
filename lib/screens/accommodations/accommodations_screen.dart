@@ -126,6 +126,30 @@ class _AccommodationsScreenState extends State<AccommodationsScreen> {
     return _items.where((a) => a.status == status).length;
   }
 
+  Future<void> _deleteItem(BuildContext context, Accommodation item) async {
+    setState(() => _items.removeWhere((a) => a.id == item.id));
+    try {
+      await AccommodationService.delete(item.id);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _items.insert(0, item));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Could not delete "${item.name}". Try again.',
+            style: kStyleBody.copyWith(color: Colors.white)),
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('"${item.name}" deleted.',
+            style: kStyleBody.copyWith(color: Colors.white)),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   Future<void> _openAdd(BuildContext context, {Accommodation? editing}) async {
     final tripId = TripState.tripOf(context).id;
     final userId = supabase.auth.currentUser?.id ?? '';
@@ -255,10 +279,31 @@ class _AccommodationsScreenState extends State<AccommodationsScreen> {
                   sliver: SliverList.separated(
                     itemCount: filtered.length,
                     separatorBuilder: (_, __) => const SizedBox(height: kSpace3),
-                    itemBuilder: (_, i) => _AccommodationCard(
-                      item: filtered[i],
-                      onTap: () => _openAdd(context, editing: filtered[i]),
-                    ),
+                    itemBuilder: (ctx, i) {
+                      final item = filtered[i];
+                      return Dismissible(
+                        key: ValueKey('stay_${item.id}'),
+                        direction: DismissDirection.endToStart,
+                        confirmDismiss: (_) async {
+                          await _deleteItem(ctx, item);
+                          return false;
+                        },
+                        background: Container(
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.only(right: kSpace5),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade50,
+                            borderRadius: kRadiusMd,
+                          ),
+                          child: const Icon(Icons.delete_rounded,
+                              color: Colors.red, size: 22),
+                        ),
+                        child: _AccommodationCard(
+                          item: item,
+                          onTap: () => _openAdd(context, editing: item),
+                        ),
+                      );
+                    },
                   ),
                 ),
           const SliverToBoxAdapter(child: SizedBox(height: kSpace16)),

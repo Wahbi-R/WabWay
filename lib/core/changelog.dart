@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 164,
+    label: 'Stays: swipe left to delete',
+    changes: [
+      'Swipe a stay card left to delete it — no need to open the detail sheet just to remove a booking',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 163,
     label: 'Spots: visited progress bar on desktop',
     changes: [

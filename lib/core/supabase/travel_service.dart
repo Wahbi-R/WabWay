@@ -195,6 +195,17 @@ abstract final class TravelService {
     }
   }
 
+  static Future<void> linkToDay(
+    String itemId, {
+    required String dayId,
+    required String itineraryItemId,
+  }) async {
+    await supabase.from('travel_items').update({
+      'linked_day_id':            dayId,
+      'linked_itinerary_item_id': itineraryItemId,
+    }).eq('id', itemId);
+  }
+
   static Future<void> deleteItem(String itemId) async {
     await supabase.from('travel_items').delete().eq('id', itemId);
   }

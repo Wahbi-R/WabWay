@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 135,
+    label: 'Travel: smarter itinerary link',
+    changes: [
+      'Adding a travel item to the itinerary now also saves the link back to the booking — the "In plan" badge appears on the card right away without needing a refresh',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 134,
     label: 'Travel: plan + doc badges',
     changes: [

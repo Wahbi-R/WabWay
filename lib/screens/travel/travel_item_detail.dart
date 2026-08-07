@@ -658,7 +658,7 @@ class _ActionsSectionState extends State<_ActionsSection> {
 
     setState(() => _itineraryLoading = true);
     try {
-      await PlanService.createItem(
+      final planItem = await PlanService.createItem(
         tripId:    tripId,
         dayId:     dayId,
         title:     widget.item.title,
@@ -668,7 +668,24 @@ class _ActionsSectionState extends State<_ActionsSection> {
         location:  widget.item.location ?? widget.item.destination,
         sortOrder: day.items.length,
       );
+      await TravelService.linkToDay(
+        widget.item.id,
+        dayId: dayId,
+        itineraryItemId: planItem.id,
+      );
       if (!mounted) return;
+      final updated = TravelItem(
+        id: widget.item.id, title: widget.item.title, type: widget.item.type,
+        status: widget.item.status, date: widget.item.date, endDate: widget.item.endDate,
+        time: widget.item.time, endTime: widget.item.endTime,
+        location: widget.item.location, destination: widget.item.destination,
+        confirmationNumber: widget.item.confirmationNumber, url: widget.item.url,
+        address: widget.item.address, notes: widget.item.notes,
+        linkedDocIds: widget.item.linkedDocIds,
+        linkedItineraryItemId: planItem.id,
+        linkedDayId: dayId,
+      );
+      widget.onUpdated?.call(updated);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(
           'Added to Day ${day.dayNumber} · ${day.city}',

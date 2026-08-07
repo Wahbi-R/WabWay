@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 152,
+    label: 'Links: sort by date or title',
+    changes: [
+      'A sort button now appears in the Links screen — choose "Newest first", "Oldest first", or "A – Z"',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 151,
     label: 'Docs: sort by newest, A–Z, or type',
     changes: [

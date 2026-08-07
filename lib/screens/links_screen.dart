@@ -14,6 +14,8 @@ import '../theme/app_text_theme.dart';
 import '../widgets/widgets.dart';
 import 'links/add_link_sheet.dart';
 
+enum _LinkSort { newest, oldest, alphabetical }
+
 class LinksScreen extends StatefulWidget {
   const LinksScreen({super.key});
 
@@ -30,13 +32,14 @@ class _LinksScreenState extends State<LinksScreen> {
   RealtimeChannel? _channel;
   Timer? _debounce;
   LinkCategory? _filterCategory;
+  _LinkSort _sort = _LinkSort.newest;
   String _search = '';
 
   final _searchCtrl = TextEditingController();
 
   List<TripLink> get _filteredLinks {
     var list = _filterCategory == null
-        ? _links
+        ? List<TripLink>.from(_links)
         : _links.where((l) => l.category == _filterCategory).toList();
     final q = _search.toLowerCase().trim();
     if (q.isNotEmpty) {
@@ -45,6 +48,14 @@ class _LinksScreenState extends State<LinksScreen> {
         l.domain.toLowerCase().contains(q) ||
         (l.notes?.toLowerCase().contains(q) ?? false),
       ).toList();
+    }
+    switch (_sort) {
+      case _LinkSort.newest:
+        list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      case _LinkSort.oldest:
+        list.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      case _LinkSort.alphabetical:
+        list.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
     }
     return list;
   }
@@ -168,6 +179,20 @@ class _LinksScreenState extends State<LinksScreen> {
       appBar: AppBar(
         title: Text('Links', style: kStyleTitle),
         actions: [
+          if (_links.isNotEmpty)
+            PopupMenuButton<_LinkSort>(
+              icon: Icon(
+                Icons.sort_rounded,
+                color: _sort != _LinkSort.newest ? kColorPrimary : kColorInkSoft,
+              ),
+              tooltip: 'Sort',
+              onSelected: (s) => setState(() => _sort = s),
+              itemBuilder: (_) => [
+                _linkSortItem(_LinkSort.newest,       'Newest first', _sort),
+                _linkSortItem(_LinkSort.oldest,       'Oldest first', _sort),
+                _linkSortItem(_LinkSort.alphabetical, 'A – Z',        _sort),
+              ],
+            ),
           IconButton(
             icon: const Icon(Icons.add_rounded),
             color: kColorPrimary,
@@ -386,4 +411,23 @@ class _LinkCard extends StatelessWidget {
       ),
     );
   }
+}
+
+PopupMenuItem<_LinkSort> _linkSortItem(
+    _LinkSort value, String label, _LinkSort current) {
+  return PopupMenuItem(
+    value: value,
+    child: Row(
+      children: [
+        SizedBox(
+          width: 20,
+          child: current == value
+              ? const Icon(Icons.check_rounded, size: 16, color: kColorPrimary)
+              : null,
+        ),
+        const SizedBox(width: kSpace2),
+        Text(label),
+      ],
+    ),
+  );
 }

@@ -627,25 +627,47 @@ class _TravelScreenState extends State<TravelScreen> {
         final docsSnapshot = List<TripDocument>.unmodifiable(_docs);
         final daysSnapshot = List<TripDay>.unmodifiable(_days);
         final isLast = i == mixed.length - 1 || mixed[i + 1] is! TravelItem;
-        return Padding(
-          padding: EdgeInsets.only(bottom: isLast ? 0 : kSpace3),
-          child: TravelItemCard(
-            item: item,
-            isSelected: desktop && _selectedId == item.id,
-            onTap: desktop
-                ? () => _select(item.id)
-                : () => Navigator.push(
-                      ctx,
-                      MaterialPageRoute(
-                        builder: (_) => TravelItemDetailScreen(
-                          item: item,
-                          docs: docsSnapshot,
-                          days: daysSnapshot,
-                          onDelete: () => _delete(item.id),
-                          onUpdated: _updateItem,
+        return Dismissible(
+          key: ValueKey('travel_${item.id}'),
+          direction: DismissDirection.endToStart,
+          confirmDismiss: (_) async {
+            _delete(item.id);
+            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+              content: Text('"${item.title}" removed.',
+                  style: kStyleBody.copyWith(color: Colors.white)),
+              behavior: SnackBarBehavior.floating,
+            ));
+            return false;
+          },
+          background: Container(
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.only(right: kSpace5),
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              borderRadius: kRadiusMd,
+            ),
+            child: const Icon(Icons.delete_rounded, color: Colors.red, size: 22),
+          ),
+          child: Padding(
+            padding: EdgeInsets.only(bottom: isLast ? 0 : kSpace3),
+            child: TravelItemCard(
+              item: item,
+              isSelected: desktop && _selectedId == item.id,
+              onTap: desktop
+                  ? () => _select(item.id)
+                  : () => Navigator.push(
+                        ctx,
+                        MaterialPageRoute(
+                          builder: (_) => TravelItemDetailScreen(
+                            item: item,
+                            docs: docsSnapshot,
+                            days: daysSnapshot,
+                            onDelete: () => _delete(item.id),
+                            onUpdated: _updateItem,
+                          ),
                         ),
                       ),
-                    ),
+            ),
           ),
         );
       },

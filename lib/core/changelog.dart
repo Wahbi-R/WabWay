@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 166,
+    label: 'Travel: swipe left to delete',
+    changes: [
+      'Swipe any travel card left to remove it instantly — no need to open the detail screen to delete a booking',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 165,
     label: 'Links: swipe left to delete',
     changes: [

@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 158,
+    label: 'Packing: swipe to pack',
+    changes: [
+      'Swipe right on any packing item to instantly toggle it packed or unpacked — a check icon confirms packing, undo confirms unpacking',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 157,
     label: 'Search: cash withdrawals included',
     changes: [

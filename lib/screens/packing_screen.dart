@@ -783,7 +783,7 @@ class _PackingTile extends StatelessWidget {
 
     final alreadyAssigned = item.assignedTo != null;
 
-    return ListTile(
+    final tile = ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: kSpace4, vertical: 2),
       leading: GestureDetector(
         onTap: onToggle,
@@ -856,6 +856,29 @@ class _PackingTile extends StatelessWidget {
         ],
       ),
       onTap: onToggle,
+    );
+
+    return Dismissible(
+      key: ValueKey('swipe_${item.id}'),
+      direction: DismissDirection.startToEnd,
+      confirmDismiss: (_) async {
+        onToggle();
+        return false;
+      },
+      background: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.only(left: kSpace5),
+        color: item.isPacked
+            ? kColorSurfaceSunken
+            : kColorPrimary.withValues(alpha: 0.1),
+        child: Icon(
+          item.isPacked ? Icons.undo_rounded : Icons.check_rounded,
+          color: item.isPacked ? kColorInkSoft : kColorPrimary,
+          size: 20,
+        ),
+      ),
+      child: tile,
     );
   }
 }

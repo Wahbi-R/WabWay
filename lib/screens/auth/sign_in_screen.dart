@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../widgets/android_download_banner.dart';
+import '../../widgets/update_checker_banner.dart';
 import '../../core/debug/app_logger.dart';
 import '../../core/supabase/auth_service.dart';
 import '../../theme/app_colors.dart';
@@ -164,6 +165,7 @@ class _SignInScreenState extends State<SignInScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                const UpdateCheckerBanner(),
                 _Logo(),
                 const SizedBox(height: kSpace8),
                 DecoratedBox(

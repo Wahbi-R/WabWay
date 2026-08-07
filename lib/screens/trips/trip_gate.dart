@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/invite/invite_link_handler.dart';
+import '../../widgets/update_checker_banner.dart';
 import '../../core/trip/app_trip.dart';
 import '../../core/trip/app_trip_member.dart';
 import '../../core/trip/trip_state.dart';
@@ -146,6 +147,8 @@ class _NoTripsScreen extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  const UpdateCheckerBanner(),
+                  const SizedBox(height: kSpace3),
                   // Logo
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,

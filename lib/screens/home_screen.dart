@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../widgets/android_download_banner.dart';
+import '../widgets/update_checker_banner.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../core/updater/apk_installer.dart';
 import '../core/auth/profile_state.dart';
 import '../core/supabase/activity_service.dart';
 import '../core/supabase/doc_service.dart';
@@ -14,7 +14,6 @@ import '../core/supabase/travel_service.dart';
 import '../core/trip/app_trip.dart';
 import '../core/trip/app_trip_member.dart';
 import '../core/trip/trip_state.dart';
-import '../core/update_checker.dart';
 import 'onboarding_screen.dart';
 import 'trips/trip_settings_sheet.dart';
 import '../data/activity_data.dart';
@@ -133,22 +132,13 @@ class _HomeScreenState extends State<HomeScreen> {
   _HomeData? _data;
   Object? _error;
   bool _loaded = false;
-  UpdateInfo? _updateInfo;
 
   @override
   void initState() {
     super.initState();
-    if (!kIsWeb) _checkForUpdate();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) showOnboardingIfNeeded(context);
     });
-  }
-
-  Future<void> _checkForUpdate() async {
-    final info = await UpdateChecker.check();
-    if (mounted && info != null && info.hasUpdate) {
-      setState(() => _updateInfo = info);
-    }
   }
 
   @override
@@ -356,10 +346,8 @@ class _HomeScreenState extends State<HomeScreen> {
         child: ListView(
           padding: const EdgeInsets.all(kSpace4),
           children: [
-            if (_updateInfo != null) ...[
-              _UpdateBanner(info: _updateInfo!, onDismiss: () => setState(() => _updateInfo = null)),
-              const SizedBox(height: kSpace3),
-            ],
+            const UpdateCheckerBanner(),
+            const SizedBox(height: kSpace3),
             RepaintBoundary(
               child: _TripHero(
                 trip: trip,
@@ -457,123 +445,6 @@ String _relativeTime(DateTime date) {
 }
 
 // ─── Update banner ────────────────────────────────────────────────────────────
-
-class _UpdateBanner extends StatefulWidget {
-  const _UpdateBanner({required this.info, required this.onDismiss});
-  final UpdateInfo info;
-  final VoidCallback onDismiss;
-
-  @override
-  State<_UpdateBanner> createState() => _UpdateBannerState();
-}
-
-class _UpdateBannerState extends State<_UpdateBanner> {
-  // null = idle, 0..1 = downloading
-  double? _progress;
-  String? _error;
-
-  void _startDownload() {
-    if (_progress != null) return;
-    if (widget.info.downloadUrl.isEmpty) return;
-    setState(() { _progress = 0; _error = null; });
-
-    ApkInstaller.install(
-      url: widget.info.downloadUrl,
-      onProgress: (p) { if (mounted) setState(() => _progress = p); },
-      onComplete: (err) {
-        if (!mounted) return;
-        if (err != null) {
-          setState(() { _progress = null; _error = err; });
-        }
-        // On success the system install dialog appears; nothing more to do here.
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final downloading = _progress != null;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: kColorPrimarySoft,
-        borderRadius: kRadiusMd,
-        border: Border.all(color: kColorPrimary.withValues(alpha: 0.3)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: kSpace3),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Icon(Icons.system_update_rounded, size: 20, color: kColorPrimary),
-            const SizedBox(width: kSpace2),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Update available — ${widget.info.latestTag}',
-                    style: kStyleBodyMedium.copyWith(color: kColorPrimaryDark),
-                  ),
-                  if (widget.info.releaseNotes.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      widget.info.releaseNotes.length > 120
-                          ? '${widget.info.releaseNotes.substring(0, 120)}…'
-                          : widget.info.releaseNotes,
-                      style: kStyleCaption.copyWith(color: kColorPrimaryDark),
-                    ),
-                  ],
-                  const SizedBox(height: kSpace2),
-                  if (downloading) ...[
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(2),
-                      child: LinearProgressIndicator(
-                        value: _progress,
-                        backgroundColor: kColorPrimary.withValues(alpha: 0.15),
-                        color: kColorPrimary,
-                        minHeight: 4,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _progress! >= 1.0
-                          ? 'Installing…'
-                          : 'Downloading ${(_progress! * 100).toStringAsFixed(0)}%',
-                      style: kStyleCaption.copyWith(color: kColorPrimaryDark),
-                    ),
-                  ] else ...[
-                    GestureDetector(
-                      onTap: _startDownload,
-                      child: Text(
-                        'Download & install →',
-                        style: kStyleCaptionMedium.copyWith(
-                          color: kColorPrimary,
-                          decoration: TextDecoration.underline,
-                        ),
-                      ),
-                    ),
-                    if (_error != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        'Failed — tap to retry',
-                        style: kStyleCaption.copyWith(color: Colors.red),
-                      ),
-                    ],
-                  ],
-                ],
-              ),
-            ),
-            GestureDetector(
-              onTap: widget.onDismiss,
-              child: const Icon(Icons.close_rounded, size: 16, color: kColorInkSoft),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 // ─── Trip hero ────────────────────────────────────────────────────────────────
 

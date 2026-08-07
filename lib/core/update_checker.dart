@@ -28,8 +28,12 @@ class UpdateInfo {
 }
 
 abstract final class UpdateChecker {
+  static bool _checked = false;
+  static UpdateInfo? _cached;
+
   static Future<UpdateInfo?> check() async {
-    if (kIsWeb || !Platform.isAndroid) return null;
+    if (_checked) return _cached;
+    if (kIsWeb || !Platform.isAndroid) { _checked = true; return null; }
     try {
       final info = await PackageInfo.fromPlatform();
       final currentBuild = int.tryParse(info.buildNumber) ?? 0;
@@ -59,7 +63,8 @@ abstract final class UpdateChecker {
       );
       final downloadUrl = apk['browser_download_url'] as String? ?? '';
 
-      return UpdateInfo(
+      _checked = true;
+      _cached = UpdateInfo(
         latestTag:      tag,
         currentBuild:   currentBuild,
         latestBuild:    latestBuild,
@@ -67,6 +72,7 @@ abstract final class UpdateChecker {
         releasePageUrl: pageUrl,
         releaseNotes:   body.trim(),
       );
+      return _cached;
     } catch (_) {
       return null;
     }

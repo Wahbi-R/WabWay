@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/auth/profile_state.dart';
@@ -213,7 +214,7 @@ class _AppShellState extends State<AppShell> {
   void initState() {
     super.initState();
     ShareHandler.instance.addListener(_onSharePending);
-    NotificationService.instance.setTabSwitcher(_switchTab);
+    if (!kIsWeb) NotificationService.instance.setTabSwitcher(_switchTab);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _onSharePending();
       ChangelogService.maybeShowOnLaunch(context);

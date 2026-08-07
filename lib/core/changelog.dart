@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 110,
+    label: 'Web login fix',
+    changes: [
+      'Fixed a crash that showed a grey screen after logging in on web — the app now loads correctly on wabway.wabble.ca',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 109,
     label: 'Find Me + meetup points',
     changes: [

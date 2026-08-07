@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 175,
+    label: 'Stays: export to CSV',
+    changes: [
+      'Tap the share icon in the Stays screen to export all your accommodation details (check-in/out, price, confirmation number, and more) as a CSV file',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 174,
     label: 'Spots: sort by city',
     changes: [

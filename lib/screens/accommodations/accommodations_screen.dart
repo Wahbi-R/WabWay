@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
@@ -126,6 +128,35 @@ class _AccommodationsScreenState extends State<AccommodationsScreen> {
     return _items.where((a) => a.status == status).length;
   }
 
+  void _exportCsv() {
+    final list = _filtered;
+    if (list.isEmpty || kIsWeb) return;
+    final tripName = TripState.tripOf(context).name;
+    final buf = StringBuffer();
+    buf.writeln('Name,City,Check-in,Check-out,Nights,Price/night,Currency,Total,Status,Source,Confirmation,URL,Notes');
+    for (final a in list) {
+      final row = [
+        _c(a.name),
+        _c(a.city),
+        _c(a.checkIn != null ? fmtDate(a.checkIn!) : ''),
+        _c(a.checkOut != null ? fmtDate(a.checkOut!) : ''),
+        _c(a.nights?.toString() ?? ''),
+        _c(a.pricePerNight?.toStringAsFixed(2) ?? ''),
+        _c(a.currency),
+        _c(a.totalPrice?.toStringAsFixed(2) ?? ''),
+        _c(a.status.label),
+        _c(a.detectedSource.label),
+        _c(a.confirmationNumber ?? ''),
+        _c(a.url ?? ''),
+        _c(a.notes ?? ''),
+      ].join(',');
+      buf.writeln(row);
+    }
+    Share.share(buf.toString().trim(), subject: '$tripName — Stays');
+  }
+
+  static String _c(String v) => '"${v.replaceAll('"', '""')}"';
+
   Future<void> _deleteItem(BuildContext context, Accommodation item) async {
     setState(() => _items.removeWhere((a) => a.id == item.id));
     try {
@@ -211,7 +242,14 @@ class _AccommodationsScreenState extends State<AccommodationsScreen> {
             title: Text('Stay', style: kStyleTitle),
             pinned: true,
             actions: [
-              if (_items.isNotEmpty)
+              if (_items.isNotEmpty) ...[
+                if (!kIsWeb)
+                  IconButton(
+                    icon: const Icon(Icons.ios_share_rounded),
+                    color: kColorInkSoft,
+                    tooltip: 'Export stays as CSV',
+                    onPressed: _exportCsv,
+                  ),
                 PopupMenuButton<_StaySort>(
                   icon: Icon(
                     Icons.sort_rounded,
@@ -226,6 +264,7 @@ class _AccommodationsScreenState extends State<AccommodationsScreen> {
                     _staySortItem(_StaySort.newest,       'Newest added',     _sort),
                   ],
                 ),
+              ],
               const SizedBox(width: kSpace2),
             ],
           ),

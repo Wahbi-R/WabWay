@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/invite/invite_link_handler.dart';
 import '../../core/trip/app_trip.dart';
 import '../../core/trip/app_trip_member.dart';
 import '../../core/trip/trip_state.dart';
@@ -39,6 +40,8 @@ class _TripGateState extends State<TripGate> {
       if (!mounted) return;
       if (trips.isEmpty) {
         setState(() { _trips = []; _loading = false; });
+        // If there's a pending invite, auto-show the join sheet.
+        _maybeShowPendingInvite(fromNoTrips: true);
         return;
       }
       // Keep selection index valid after refresh
@@ -51,9 +54,21 @@ class _TripGateState extends State<TripGate> {
         _selectedIndex = idx;
         _loading = false;
       });
+      // Existing member arrived via an invite link → show join sheet.
+      _maybeShowPendingInvite(fromNoTrips: false);
     } catch (_) {
       if (mounted) setState(() { _loading = false; _error = true; });
     }
+  }
+
+  void _maybeShowPendingInvite({required bool fromNoTrips}) {
+    final code = InviteLinkHandler.instance.pendingCode.value;
+    if (code == null) return;
+    // Delay one frame so the widget tree is built before showing the sheet.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _openJoinSheet(context, initialCode: code);
+    });
   }
 
   Future<void> _switchTrip(AppTrip trip) async {
@@ -72,6 +87,17 @@ class _TripGateState extends State<TripGate> {
   Future<void> _onTripCreated(String tripId) async => _load();
   Future<void> _onTripJoined(String tripId) async => _load();
 
+  Future<void> _openJoinSheet(BuildContext ctx, {String? initialCode}) async {
+    final tripId = await showModalBottomSheet<String?>(
+      context: ctx,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => JoinWithCodeSheet(initialCode: initialCode),
+    );
+    if (tripId != null) await _onTripJoined(tripId);
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) return const _TripLoadingScreen();
@@ -80,7 +106,7 @@ class _TripGateState extends State<TripGate> {
     if (_trips.isEmpty) {
       return _NoTripsScreen(
         onTripCreated: _onTripCreated,
-        onTripJoined: _onTripJoined,
+        onOpenJoinSheet: (ctx) => _openJoinSheet(ctx),
       );
     }
 
@@ -100,24 +126,11 @@ class _TripGateState extends State<TripGate> {
 class _NoTripsScreen extends StatelessWidget {
   const _NoTripsScreen({
     required this.onTripCreated,
-    required this.onTripJoined,
+    required this.onOpenJoinSheet,
   });
 
   final Future<void> Function(String tripId) onTripCreated;
-  final Future<void> Function(String tripId) onTripJoined;
-
-  Future<void> _openJoinSheet(BuildContext context) async {
-    final tripId = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const JoinWithCodeSheet(),
-    );
-    if (tripId != null) {
-      await onTripJoined(tripId);
-    }
-  }
+  final Future<void> Function(BuildContext) onOpenJoinSheet;
 
   @override
   Widget build(BuildContext context) {
@@ -186,7 +199,7 @@ class _NoTripsScreen extends StatelessWidget {
                   WabwayButton(
                     label: 'Join with an invite code',
                     variant: WabwayButtonVariant.secondary,
-                    onPressed: () => _openJoinSheet(context),
+                    onPressed: () => onOpenJoinSheet(context),
                     fullWidth: true,
                     size: WabwayButtonSize.lg,
                     icon: Icons.group_add_rounded,
@@ -212,7 +225,8 @@ class _NoTripsScreen extends StatelessWidget {
 // ─── Join-with-code sheet ─────────────────────────────────────────────────────
 
 class JoinWithCodeSheet extends StatefulWidget {
-  const JoinWithCodeSheet();
+  const JoinWithCodeSheet({this.initialCode});
+  final String? initialCode;
 
   @override
   State<JoinWithCodeSheet> createState() => _JoinWithCodeSheetState();
@@ -222,6 +236,14 @@ class _JoinWithCodeSheetState extends State<JoinWithCodeSheet> {
   final _codeCtrl = TextEditingController();
   bool _loading = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialCode != null) {
+      _codeCtrl.text = widget.initialCode!;
+    }
+  }
 
   @override
   void dispose() {
@@ -237,6 +259,8 @@ class _JoinWithCodeSheetState extends State<JoinWithCodeSheet> {
 
     try {
       final tripId = await InviteService.redeemInvite(code);
+      // Clear any persisted invite link so it doesn't re-trigger next session.
+      await InviteLinkHandler.instance.clearCode();
       if (!mounted) return;
       Navigator.pop(context, tripId);
     } on PostgrestException catch (e) {

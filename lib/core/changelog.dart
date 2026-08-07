@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 116,
+    label: 'Invite links + Android banner',
+    changes: [
+      'You can now share a direct invite link from the Invite Codes sheet — anyone who taps it gets taken straight to the join screen with the code pre-filled',
+      'New members who sign up via an invite link are automatically shown the join sheet after creating their account — no need to re-enter the code',
+      'If you open WabWay in a browser on Android, a small banner now appears recommending the Android app for a better experience',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 115,
     label: 'Invite code fix + email invites',
     changes: [

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:share_plus/share_plus.dart';
+import '../../core/invite/invite_link_handler.dart';
 import '../../core/supabase/invite_service.dart';
 import '../../data/invite_data.dart';
 import '../../theme/app_colors.dart';
@@ -108,6 +110,13 @@ class _InviteSheetState extends State<_InviteSheet> {
     if (mounted) setState(() => _copied.remove(code.id));
   }
 
+  Future<void> _shareLink(InviteCode code) async {
+    final link = InviteLinkHandler.linkFor(code.code);
+    await Share.share(
+      'Join my trip on WabWay! Tap the link or enter code ${code.displayCode} in the app:\n$link',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
@@ -176,6 +185,7 @@ class _InviteSheetState extends State<_InviteSheet> {
                       codes: _codes,
                       copied: _copied,
                       onCopy: _copy,
+                      onShareLink: _shareLink,
                       onRevoke: _revoke,
                     ),
 
@@ -203,12 +213,14 @@ class _CodesSection extends StatelessWidget {
     required this.codes,
     required this.copied,
     required this.onCopy,
+    required this.onShareLink,
     required this.onRevoke,
   });
 
   final List<InviteCode> codes;
   final Set<String> copied;
   final Future<void> Function(InviteCode) onCopy;
+  final Future<void> Function(InviteCode) onShareLink;
   final Future<void> Function(InviteCode) onRevoke;
 
   @override
@@ -228,6 +240,7 @@ class _CodesSection extends StatelessWidget {
                   code: c,
                   copied: copied.contains(c.id),
                   onCopy: () => onCopy(c),
+                  onShareLink: () => onShareLink(c),
                   onRevoke: () => onRevoke(c),
                 ),
               )),
@@ -242,6 +255,7 @@ class _CodesSection extends StatelessWidget {
                   code: c,
                   copied: false,
                   onCopy: null,
+                  onShareLink: null,
                   onRevoke: null,
                 ),
               )),
@@ -266,12 +280,14 @@ class _CodeCard extends StatelessWidget {
     required this.code,
     required this.copied,
     required this.onCopy,
+    required this.onShareLink,
     required this.onRevoke,
   });
 
   final InviteCode code;
   final bool copied;
   final VoidCallback? onCopy;
+  final VoidCallback? onShareLink;
   final VoidCallback? onRevoke;
 
   String _fmtDate(DateTime? d) {
@@ -330,7 +346,7 @@ class _CodeCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: WabwayButton(
-                      label: copied ? 'Copied!' : 'Copy',
+                      label: copied ? 'Copied!' : 'Copy code',
                       icon: copied
                           ? Icons.check_rounded
                           : Icons.copy_rounded,
@@ -339,6 +355,20 @@ class _CodeCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: kSpace2),
+                  Expanded(
+                    child: WabwayButton(
+                      label: 'Share link',
+                      icon: Icons.link_rounded,
+                      size: WabwayButtonSize.sm,
+                      variant: WabwayButtonVariant.secondary,
+                      onPressed: onShareLink,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: kSpace2),
+              Row(
+                children: [
                   WabwayButton(
                     label: 'Revoke',
                     icon: Icons.block_rounded,

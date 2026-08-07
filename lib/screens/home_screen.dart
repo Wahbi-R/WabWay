@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../widgets/android_download_banner.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/updater/apk_installer.dart';
 import '../core/auth/profile_state.dart';
@@ -330,6 +331,7 @@ class _HomeScreenState extends State<HomeScreen> {
         title: Text('Home', style: kStyleTitle),
         actions: _appBarActions(context),
       ),
+      bottomNavigationBar: const AndroidDownloadBanner(),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           final tripMembers = members

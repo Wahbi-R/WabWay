@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../widgets/android_download_banner.dart';
 import '../../core/debug/app_logger.dart';
 import '../../core/supabase/auth_service.dart';
 import '../../theme/app_colors.dart';
@@ -154,6 +155,7 @@ class _SignInScreenState extends State<SignInScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kColorCream,
+      bottomNavigationBar: const AndroidDownloadBanner(),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(kSpace6),

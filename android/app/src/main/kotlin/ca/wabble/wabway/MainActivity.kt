@@ -16,6 +16,7 @@ class MainActivity : FlutterActivity() {
 
     companion object {
         var locationSharingChannel: MethodChannel? = null
+        private var linksChannel: MethodChannel? = null
 
         // Geolocator internal constants (GeolocatorLocationService.java)
         private const val GEO_NOTIFICATION_ID = 75415
@@ -62,6 +63,18 @@ class MainActivity : FlutterActivity() {
                 }
             }
 
+        // ── Deep links channel ───────────────────────────────────────────────
+        linksChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "ca.wabble.wabway/links",
+        )
+        linksChannel!!.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "getInitialLink" -> result.success(intent?.dataString)
+                else -> result.notImplemented()
+            }
+        }
+
         // ── Location sharing channel ─────────────────────────────────────────
         locationSharingChannel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
@@ -102,8 +115,17 @@ class MainActivity : FlutterActivity() {
         NotificationManagerCompat.from(this).notify(GEO_NOTIFICATION_ID, notification)
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        val url = intent.dataString
+        if (url != null) {
+            linksChannel?.invokeMethod("onNewLink", url)
+        }
+    }
+
     override fun onDestroy() {
         locationSharingChannel = null
+        linksChannel = null
         super.onDestroy()
     }
 }

@@ -34,6 +34,7 @@ class _CrewScreenState extends State<CrewScreen>
   bool _loadingMessages = true;
   bool _sharing = false;
   bool _sendingPing = false;
+  bool _sendingFindMe = false;
   bool _sending = false;
 
   RealtimeChannel? _messageChannel;
@@ -133,6 +134,17 @@ class _CrewScreenState extends State<CrewScreen>
     });
   }
 
+  String get _myDisplayName {
+    try {
+      return TripState.membersOf(context)
+          .firstWhere((m) => m.userId == _userId)
+          .profile
+          .displayName;
+    } catch (_) {
+      return 'Someone';
+    }
+  }
+
   Future<void> _toggleLocationSharing() async {
     if (_sharing) {
       _positionStream?.cancel();
@@ -149,6 +161,14 @@ class _CrewScreenState extends State<CrewScreen>
     if (!granted || !mounted) return;
 
     setState(() => _sharing = true);
+
+    pushNotify(
+      tripId: _tripId!,
+      title: '\u{1F4CD} $_myDisplayName started sharing location',
+      body: 'Check the Live Map in crew',
+      excludeUserId: _userId,
+      data: {'screen': 'crew', 'trip_id': _tripId!},
+    );
 
     final settings = _buildLocationSettings();
     _positionStream = Geolocator.getPositionStream(locationSettings: settings)
@@ -266,6 +286,80 @@ class _CrewScreenState extends State<CrewScreen>
     }
   }
 
+  Future<void> _sendFindMe() async {
+    if (_sendingFindMe) return;
+    final granted = await _ensureLocationPermission();
+    if (!granted || !mounted) return;
+
+    setState(() => _sendingFindMe = true);
+    try {
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings:
+            const LocationSettings(accuracy: LocationAccuracy.high),
+      );
+      await CrewService.sendFindMe(
+        tripId: _tripId!,
+        authorId: _userId!,
+        lat: pos.latitude,
+        lng: pos.longitude,
+      );
+      pushNotify(
+        tripId: _tripId!,
+        title: '\u{1F6A8} $_myDisplayName needs the crew!',
+        body: 'Tap to navigate to them',
+        excludeUserId: _userId,
+        data: {'screen': 'crew', 'trip_id': _tripId!},
+      );
+    } catch (_) {
+      _showError('Could not get location');
+    } finally {
+      if (mounted) setState(() => _sendingFindMe = false);
+    }
+  }
+
+  Future<void> _onSetMeetupPoint(LatLng point) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: kColorPaper,
+        title: const Text('Set meetup point?'),
+        content: const Text(
+          "Share this location with your crew as a meeting spot. They'll get a notification and can navigate here.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: kColorSecondary),
+            child: const Text('Share'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+
+    try {
+      await CrewService.sendMeetupPoint(
+        tripId: _tripId!,
+        authorId: _userId!,
+        lat: point.latitude,
+        lng: point.longitude,
+      );
+      pushNotify(
+        tripId: _tripId!,
+        title: '\u{1F4CD} $_myDisplayName set a meetup point',
+        body: 'Open crew chat to navigate there',
+        excludeUserId: _userId,
+        data: {'screen': 'crew', 'trip_id': _tripId!},
+      );
+    } catch (_) {
+      _showError('Could not set meetup point');
+    }
+  }
+
   void _showError(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -322,13 +416,16 @@ class _CrewScreenState extends State<CrewScreen>
             textController: _textController,
             sending: _sending,
             sendingPing: _sendingPing,
+            sendingFindMe: _sendingFindMe,
             onSend: _sendMessage,
             onLinkUp: _sendLocationPing,
+            onFindMe: _sendFindMe,
           ),
           _MapTab(
             locations: _locations,
             members: members,
             currentUserId: _userId ?? '',
+            onSetMeetupPoint: _onSetMeetupPoint,
           ),
         ],
       ),
@@ -393,8 +490,10 @@ class _ChatTab extends StatelessWidget {
     required this.textController,
     required this.sending,
     required this.sendingPing,
+    required this.sendingFindMe,
     required this.onSend,
     required this.onLinkUp,
+    required this.onFindMe,
   });
 
   final List<TripMessage> messages;
@@ -405,8 +504,10 @@ class _ChatTab extends StatelessWidget {
   final TextEditingController textController;
   final bool sending;
   final bool sendingPing;
+  final bool sendingFindMe;
   final VoidCallback onSend;
   final VoidCallback onLinkUp;
+  final VoidCallback onFindMe;
 
   AppTripMember? _memberById(String userId) {
     try {
@@ -463,6 +564,14 @@ class _ChatTab extends StatelessWidget {
             return _LocationPingCard(
                 message: msg, member: member, isMe: isMe);
           }
+          if (msg.type == MessageType.findMe) {
+            return _FindMeCard(
+                message: msg, member: member, isMe: isMe);
+          }
+          if (msg.type == MessageType.meetupPoint) {
+            return _MeetupPointCard(
+                message: msg, member: member, isMe: isMe);
+          }
           return _MessageBubble(
             message: msg,
             member: member,
@@ -480,8 +589,10 @@ class _ChatTab extends StatelessWidget {
           textController: textController,
           sending: sending,
           sendingPing: sendingPing,
+          sendingFindMe: sendingFindMe,
           onSend: onSend,
           onLinkUp: onLinkUp,
+          onFindMe: onFindMe,
         ),
       ],
     );
@@ -640,6 +751,195 @@ class _LocationPingCard extends StatelessWidget {
   }
 }
 
+// ─── Find Me card ────────────────────────────────────────────────────────────
+
+class _FindMeCard extends StatelessWidget {
+  const _FindMeCard({
+    required this.message,
+    required this.member,
+    required this.isMe,
+  });
+
+  final TripMessage message;
+  final AppTripMember? member;
+  final bool isMe;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = isMe ? 'You' : (member?.profile.displayName ?? 'Someone');
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: kSpace6, vertical: kSpace3),
+      child: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 280),
+          decoration: BoxDecoration(
+            color: kColorPaper,
+            borderRadius: kRadiusLg,
+            border: Border.all(color: kColorDangerBorder),
+            boxShadow: kShadowSm,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(kSpace3),
+                decoration: const BoxDecoration(
+                  color: kColorDangerSoft,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.sos_rounded,
+                        color: kColorDanger, size: 18),
+                    const SizedBox(width: kSpace2),
+                    Expanded(
+                      child: Text(
+                        '$name needs the crew!',
+                        style: kStyleBodySemibold.copyWith(color: kColorDanger),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (message.lat != null && message.lng != null)
+                Padding(
+                  padding: const EdgeInsets.all(kSpace3),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        final geoUri = Uri.parse(
+                          'geo:${message.lat},${message.lng}?q=${message.lat},${message.lng}($name)',
+                        );
+                        if (await canLaunchUrl(geoUri)) {
+                          await launchUrl(geoUri,
+                              mode: LaunchMode.externalApplication);
+                        } else {
+                          final mapsUri = Uri.parse(
+                            'https://maps.google.com/?q=${message.lat},${message.lng}',
+                          );
+                          await launchUrl(mapsUri,
+                              mode: LaunchMode.externalApplication);
+                        }
+                      },
+                      icon: const Icon(Icons.navigation_rounded, size: 16),
+                      label: Text('Go to $name'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: kColorDanger,
+                        side: const BorderSide(color: kColorDangerBorder),
+                        shape: const RoundedRectangleBorder(
+                            borderRadius: kRadiusSm),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Meetup point card ───────────────────────────────────────────────────────
+
+class _MeetupPointCard extends StatelessWidget {
+  const _MeetupPointCard({
+    required this.message,
+    required this.member,
+    required this.isMe,
+  });
+
+  final TripMessage message;
+  final AppTripMember? member;
+  final bool isMe;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = isMe ? 'You' : (member?.profile.displayName ?? 'Someone');
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: kSpace6, vertical: kSpace3),
+      child: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 280),
+          decoration: BoxDecoration(
+            color: kColorPaper,
+            borderRadius: kRadiusLg,
+            border: Border.all(color: kColorSecondarySoftBorder),
+            boxShadow: kShadowSm,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(kSpace3),
+                decoration: const BoxDecoration(
+                  color: kColorSecondarySoft,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.location_on_rounded,
+                        color: kColorSecondary, size: 18),
+                    const SizedBox(width: kSpace2),
+                    Expanded(
+                      child: Text(
+                        '$name set a meetup point',
+                        style:
+                            kStyleBodySemibold.copyWith(color: kColorSecondary),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (message.lat != null && message.lng != null)
+                Padding(
+                  padding: const EdgeInsets.all(kSpace3),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        final geoUri = Uri.parse(
+                          'geo:${message.lat},${message.lng}?q=${message.lat},${message.lng}(Meetup)',
+                        );
+                        if (await canLaunchUrl(geoUri)) {
+                          await launchUrl(geoUri,
+                              mode: LaunchMode.externalApplication);
+                        } else {
+                          final mapsUri = Uri.parse(
+                            'https://maps.google.com/?q=${message.lat},${message.lng}',
+                          );
+                          await launchUrl(mapsUri,
+                              mode: LaunchMode.externalApplication);
+                        }
+                      },
+                      icon: const Icon(Icons.navigation_rounded, size: 16),
+                      label: const Text('Navigate to meetup'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: kColorSecondary,
+                        side: const BorderSide(color: kColorSecondarySoftBorder),
+                        shape: const RoundedRectangleBorder(
+                            borderRadius: kRadiusSm),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ─── Input bar ────────────────────────────────────────────────────────────────
 
 class _InputBar extends StatelessWidget {
@@ -647,15 +947,19 @@ class _InputBar extends StatelessWidget {
     required this.textController,
     required this.sending,
     required this.sendingPing,
+    required this.sendingFindMe,
     required this.onSend,
     required this.onLinkUp,
+    required this.onFindMe,
   });
 
   final TextEditingController textController;
   final bool sending;
   final bool sendingPing;
+  final bool sendingFindMe;
   final VoidCallback onSend;
   final VoidCallback onLinkUp;
+  final VoidCallback onFindMe;
 
   @override
   Widget build(BuildContext context) {
@@ -673,12 +977,21 @@ class _InputBar extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               _CircleIconButton(
-                tooltip: 'Link Up — share your location',
+                tooltip: 'Link Up — share your location in chat',
                 icon: Icons.location_on_rounded,
                 color: kColorPrimarySoft,
                 iconColor: kColorPrimary,
                 loading: sendingPing,
                 onTap: onLinkUp,
+              ),
+              const SizedBox(width: kSpace1),
+              _CircleIconButton(
+                tooltip: 'Find Me — alert crew to come to you',
+                icon: Icons.sos_rounded,
+                color: kColorDangerSoft,
+                iconColor: kColorDanger,
+                loading: sendingFindMe,
+                onTap: onFindMe,
               ),
               const SizedBox(width: kSpace2),
               Expanded(
@@ -783,11 +1096,13 @@ class _MapTab extends StatelessWidget {
     required this.locations,
     required this.members,
     required this.currentUserId,
+    required this.onSetMeetupPoint,
   });
 
   final List<LocationShare> locations;
   final List<AppTripMember> members;
   final String currentUserId;
+  final void Function(LatLng) onSetMeetupPoint;
 
   AppTripMember? _memberById(String userId) {
     try {
@@ -901,54 +1216,123 @@ class _MapTab extends StatelessWidget {
     final avgLng =
         locations.map((l) => l.lng).reduce((a, b) => a + b) / locations.length;
 
-    return FlutterMap(
-      options: MapOptions(
-        initialCenter: LatLng(avgLat, avgLng),
-        initialZoom: 15,
-      ),
+    return Stack(
       children: [
-        TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'ca.wabble.wabway',
-        ),
-        MarkerLayer(
-          markers: locations.map((loc) {
-            final member = _memberById(loc.userId);
-            final isMe = loc.userId == currentUserId;
-            final initials = member?.profile.initials ?? '?';
-            final color = isMe ? kColorPrimary : kColorSecondary;
+        FlutterMap(
+          options: MapOptions(
+            initialCenter: LatLng(avgLat, avgLng),
+            initialZoom: 15,
+            onLongPress: (_, point) => onSetMeetupPoint(point),
+          ),
+          children: [
+            TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'ca.wabble.wabway',
+            ),
+            MarkerLayer(
+              markers: locations.map((loc) {
+                final member = _memberById(loc.userId);
+                final isMe = loc.userId == currentUserId;
+                final initials = member?.profile.initials ?? '?';
+                final color = isMe ? kColorPrimary : kColorSecondary;
 
-            return Marker(
-              point: LatLng(loc.lat, loc.lng),
-              width: 44,
-              height: 44,
-              child: GestureDetector(
-                onTap: isMe
-                    ? null
-                    : () => _showMemberSheet(context, loc, member),
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: color,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2.5),
-                    boxShadow: kShadowMd,
-                  ),
-                  child: Center(
-                    child: Text(
-                      initials,
-                      style: kStyleBodySemibold.copyWith(
-                        color: Colors.white,
-                        fontSize: 13,
+                return Marker(
+                  point: LatLng(loc.lat, loc.lng),
+                  width: 44,
+                  height: 44,
+                  child: GestureDetector(
+                    onTap: isMe
+                        ? null
+                        : () => _showMemberSheet(context, loc, member),
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2.5),
+                        boxShadow: kShadowMd,
+                      ),
+                      child: Center(
+                        child: Text(
+                          initials,
+                          style: kStyleBodySemibold.copyWith(
+                            color: Colors.white,
+                            fontSize: 13,
+                          ),
+                        ),
                       ),
                     ),
                   ),
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+        // Hint pill
+        Positioned(
+          top: 10,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: kSpace3, vertical: kSpace1 + 1),
+              decoration: BoxDecoration(
+                color: kColorPaper.withValues(alpha: 0.88),
+                borderRadius: kRadiusPill,
+                boxShadow: kShadowXs,
+              ),
+              child: Text(
+                'Long-press to set a meetup point',
+                style: kStyleCaption.copyWith(color: kColorInkSoft),
+              ),
+            ),
+          ),
+        ),
+        // Meet in the middle button (only when 2+ crew are sharing)
+        if (locations.length >= 2)
+          Positioned(
+            bottom: 16,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: GestureDetector(
+                onTap: () {
+                  final mLat = locations
+                          .map((l) => l.lat)
+                          .reduce((a, b) => a + b) /
+                      locations.length;
+                  final mLng = locations
+                          .map((l) => l.lng)
+                          .reduce((a, b) => a + b) /
+                      locations.length;
+                  onSetMeetupPoint(LatLng(mLat, mLng));
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: kSpace4, vertical: kSpace2 + 2),
+                  decoration: const BoxDecoration(
+                    color: kColorSecondary,
+                    borderRadius: kRadiusPill,
+                    boxShadow: kShadowMd,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.group_rounded,
+                          size: 16, color: Colors.white),
+                      const SizedBox(width: kSpace2),
+                      Text(
+                        'Meet in the middle',
+                        style: kStyleBodySemibold.copyWith(color: Colors.white),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            );
-          }).toList(),
-        ),
+            ),
+          ),
       ],
     );
   }

@@ -42,6 +42,38 @@ abstract final class CrewService {
     });
   }
 
+  static Future<void> sendFindMe({
+    required String tripId,
+    required String authorId,
+    required double lat,
+    required double lng,
+  }) async {
+    await supabase.from('trip_messages').insert({
+      'trip_id': tripId,
+      'author_id': authorId,
+      'body': 'Find me!',
+      'message_type': 'find_me',
+      'lat': lat,
+      'lng': lng,
+    });
+  }
+
+  static Future<void> sendMeetupPoint({
+    required String tripId,
+    required String authorId,
+    required double lat,
+    required double lng,
+  }) async {
+    await supabase.from('trip_messages').insert({
+      'trip_id': tripId,
+      'author_id': authorId,
+      'body': 'Set a meetup point',
+      'message_type': 'meetup_point',
+      'lat': lat,
+      'lng': lng,
+    });
+  }
+
   static Future<void> upsertLocationShare({
     required String tripId,
     required String userId,

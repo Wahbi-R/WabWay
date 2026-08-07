@@ -11,6 +11,17 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 109,
+    label: 'Find Me + meetup points',
+    changes: [
+      'New 🆘 Find Me button in crew chat — sends your location to the crew with a push alert so they can navigate straight to you',
+      'Long-press anywhere on the Live Map to set a meetup point — crew get a notification and a Navigate button in chat',
+      '"Meet in the middle" button on the Live Map (when 2+ people are sharing) auto-calculates the midpoint between everyone',
+      'Crew gets a notification when someone starts sharing their location',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 108,
     label: 'Background location sharing + navigate to crew',
     changes: [

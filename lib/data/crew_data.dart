@@ -1,4 +1,4 @@
-enum MessageType { text, locationPing }
+enum MessageType { text, locationPing, findMe, meetupPoint }
 
 class LocationShare {
   const LocationShare({
@@ -56,9 +56,12 @@ class TripMessage {
         tripId: m['trip_id'] as String,
         authorId: m['author_id'] as String,
         body: m['body'] as String,
-        type: (m['message_type'] as String?) == 'location_ping'
-            ? MessageType.locationPing
-            : MessageType.text,
+        type: switch (m['message_type'] as String?) {
+          'location_ping' => MessageType.locationPing,
+          'find_me'       => MessageType.findMe,
+          'meetup_point'  => MessageType.meetupPoint,
+          _               => MessageType.text,
+        },
         lat: (m['lat'] as num?)?.toDouble(),
         lng: (m['lng'] as num?)?.toDouble(),
         createdAt: DateTime.parse(m['created_at'] as String),

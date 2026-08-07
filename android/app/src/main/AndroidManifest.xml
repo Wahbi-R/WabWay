@@ -4,6 +4,8 @@
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
     <application
         android:label="WabWay"
@@ -96,6 +98,11 @@
                 <data android:mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"/>
             </intent-filter>
         </activity>
+        <!-- Geolocator foreground service for background location sharing -->
+        <service
+            android:name="com.baseflow.geolocator.GeolocatorForegroundService"
+            android:foregroundServiceType="location"
+            android:exported="false"/>
         <!-- FileProvider for sharing downloaded APK URI with the installer -->
         <provider
             android:name="androidx.core.content.FileProvider"

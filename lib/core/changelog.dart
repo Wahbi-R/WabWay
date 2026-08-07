@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 108,
+    label: 'Background location sharing + navigate to crew',
+    changes: [
+      'Location sharing now keeps running in the background — a notification appears when active so you always know it\'s on',
+      'Tap any crew member\'s dot on the Live Map to get directions straight to them',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 107,
     label: 'Mobile web fixes',
     changes: [

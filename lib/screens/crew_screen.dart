@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
@@ -37,7 +38,7 @@ class _CrewScreenState extends State<CrewScreen>
 
   RealtimeChannel? _messageChannel;
   RealtimeChannel? _locationChannel;
-  Timer? _locationTimer;
+  StreamSubscription<Position>? _positionStream;
 
   final _scrollController = ScrollController();
   final _textController = TextEditingController();
@@ -68,7 +69,7 @@ class _CrewScreenState extends State<CrewScreen>
     if (_sharing && _tripId != null && _userId != null) {
       CrewService.deactivateLocationShare(tripId: _tripId!, userId: _userId!);
     }
-    _locationTimer?.cancel();
+    _positionStream?.cancel();
     _messageChannel?.unsubscribe();
     _locationChannel?.unsubscribe();
     _tabs.dispose();
@@ -134,8 +135,8 @@ class _CrewScreenState extends State<CrewScreen>
 
   Future<void> _toggleLocationSharing() async {
     if (_sharing) {
-      _locationTimer?.cancel();
-      _locationTimer = null;
+      _positionStream?.cancel();
+      _positionStream = null;
       try {
         await CrewService.deactivateLocationShare(
             tripId: _tripId!, userId: _userId!);
@@ -148,9 +149,46 @@ class _CrewScreenState extends State<CrewScreen>
     if (!granted || !mounted) return;
 
     setState(() => _sharing = true);
-    await _pushLocation();
-    _locationTimer =
-        Timer.periodic(const Duration(seconds: 10), (_) => _pushLocation());
+
+    final settings = _buildLocationSettings();
+    _positionStream = Geolocator.getPositionStream(locationSettings: settings)
+        .listen((pos) async {
+      if (!_sharing || _tripId == null || _userId == null) return;
+      try {
+        await CrewService.upsertLocationShare(
+          tripId: _tripId!,
+          userId: _userId!,
+          lat: pos.latitude,
+          lng: pos.longitude,
+        );
+      } catch (_) {}
+    });
+  }
+
+  LocationSettings _buildLocationSettings() {
+    if (kIsWeb) {
+      return const LocationSettings(accuracy: LocationAccuracy.high);
+    }
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return AndroidSettings(
+        accuracy: LocationAccuracy.high,
+        intervalDuration: const Duration(seconds: 10),
+        foregroundNotificationConfig: const ForegroundNotificationConfig(
+          notificationTitle: 'WabWay location sharing',
+          notificationText: 'Sharing your location with your crew',
+          enableWakeLock: true,
+        ),
+      );
+    }
+    if (defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.macOS) {
+      return AppleSettings(
+        accuracy: LocationAccuracy.high,
+        activityType: ActivityType.other,
+        pauseLocationUpdatesAutomatically: false,
+      );
+    }
+    return const LocationSettings(accuracy: LocationAccuracy.high);
   }
 
   Future<bool> _ensureLocationPermission() async {
@@ -176,22 +214,6 @@ class _CrewScreenState extends State<CrewScreen>
       if (mounted) _showError('Could not access location');
       return false;
     }
-  }
-
-  Future<void> _pushLocation() async {
-    if (!_sharing || _tripId == null || _userId == null) return;
-    try {
-      final pos = await Geolocator.getCurrentPosition(
-        locationSettings:
-            const LocationSettings(accuracy: LocationAccuracy.high),
-      );
-      await CrewService.upsertLocationShare(
-        tripId: _tripId!,
-        userId: _userId!,
-        lat: pos.latitude,
-        lng: pos.longitude,
-      );
-    } catch (_) {}
   }
 
   Future<void> _sendMessage() async {
@@ -604,7 +626,7 @@ class _LocationPingCard extends StatelessWidget {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: kColorPrimary,
                         side: const BorderSide(color: kColorPrimarySoftBorder),
-                        shape: RoundedRectangleBorder(
+                        shape: const RoundedRectangleBorder(
                             borderRadius: kRadiusSm),
                       ),
                     ),
@@ -638,7 +660,7 @@ class _InputBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: kColorPaper,
         border: Border(top: BorderSide(color: kColorBorder)),
       ),
@@ -673,17 +695,17 @@ class _InputBar extends StatelessWidget {
                         .copyWith(color: kColorInkSoft.withValues(alpha: 0.5)),
                     filled: true,
                     fillColor: kColorSurfaceSunken,
-                    border: OutlineInputBorder(
+                    border: const OutlineInputBorder(
                       borderRadius: kRadiusPill,
                       borderSide: BorderSide.none,
                     ),
-                    enabledBorder: OutlineInputBorder(
+                    enabledBorder: const OutlineInputBorder(
                       borderRadius: kRadiusPill,
                       borderSide: BorderSide.none,
                     ),
-                    focusedBorder: OutlineInputBorder(
+                    focusedBorder: const OutlineInputBorder(
                       borderRadius: kRadiusPill,
-                      borderSide: const BorderSide(
+                      borderSide: BorderSide(
                           color: kColorPrimary, width: 1.5),
                     ),
                     contentPadding: const EdgeInsets.symmetric(
@@ -775,6 +797,77 @@ class _MapTab extends StatelessWidget {
     }
   }
 
+  void _showMemberSheet(
+    BuildContext context,
+    LocationShare loc,
+    AppTripMember? member,
+  ) {
+    final name = member?.profile.displayName ?? 'Crew member';
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: kColorPaper,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(kSpace4, kSpace4, kSpace4, kSpace6),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(name, style: kStyleTitle),
+              const SizedBox(height: kSpace1),
+              Text(
+                'Last updated ${_formatRelative(loc.lastUpdatedAt)}',
+                style: kStyleCaption.copyWith(color: kColorInkSoft),
+              ),
+              const SizedBox(height: kSpace4),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.navigation_rounded, size: 18),
+                  label: Text('Navigate to $name'),
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    final geoUri = Uri.parse(
+                      'geo:${loc.lat},${loc.lng}?q=${loc.lat},${loc.lng}($name)',
+                    );
+                    if (await canLaunchUrl(geoUri)) {
+                      await launchUrl(geoUri,
+                          mode: LaunchMode.externalApplication);
+                    } else {
+                      final mapsUri = Uri.parse(
+                        'https://maps.google.com/?q=${loc.lat},${loc.lng}',
+                      );
+                      await launchUrl(mapsUri,
+                          mode: LaunchMode.externalApplication);
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kColorPrimary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: const RoundedRectangleBorder(borderRadius: kRadiusMd),
+                    padding: const EdgeInsets.symmetric(vertical: kSpace3),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatRelative(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inSeconds < 30) return 'just now';
+    if (diff.inMinutes < 1) return '${diff.inSeconds}s ago';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    return '${diff.inHours}h ago';
+  }
+
   @override
   Widget build(BuildContext context) {
     if (locations.isEmpty) {
@@ -829,21 +922,26 @@ class _MapTab extends StatelessWidget {
               point: LatLng(loc.lat, loc.lng),
               width: 44,
               height: 44,
-              child: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2.5),
-                  boxShadow: kShadowMd,
-                ),
-                child: Center(
-                  child: Text(
-                    initials,
-                    style: kStyleBodySemibold.copyWith(
-                      color: Colors.white,
-                      fontSize: 13,
+              child: GestureDetector(
+                onTap: isMe
+                    ? null
+                    : () => _showMemberSheet(context, loc, member),
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2.5),
+                    boxShadow: kShadowMd,
+                  ),
+                  child: Center(
+                    child: Text(
+                      initials,
+                      style: kStyleBodySemibold.copyWith(
+                        color: Colors.white,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
                 ),

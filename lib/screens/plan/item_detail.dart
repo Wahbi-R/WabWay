@@ -6,6 +6,7 @@ import '../../core/supabase/client.dart';
 import '../../core/supabase/doc_service.dart';
 import '../../core/supabase/plan_service.dart';
 import '../../core/trip/trip_state.dart';
+import '../../data/money_data.dart' show fmtAmount;
 import '../../data/plan_data.dart';
 import '../../data/docs_data.dart';
 import '../../data/spot_data.dart' show Spot, fmtCommentTime;
@@ -352,10 +353,14 @@ class _MetaCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasCost = item.plannedCost != null && item.plannedCost! > 0;
     final staticRows = <(IconData, String, String?)>[
-      if (item.hasTime)     (Icons.schedule_rounded,       'Time',     item.time),
-      if (item.city != null)    (Icons.location_city_rounded,  'City',     item.city),
-      if (item.location != null)(Icons.place_rounded,           'Location', item.location),
+      if (item.hasTime)         (Icons.schedule_rounded,        'Time',     item.time),
+      if (item.city != null)    (Icons.location_city_rounded,   'City',     item.city),
+      if (item.location != null)(Icons.place_rounded,            'Location', item.location),
+      if (hasCost)              (Icons.account_balance_wallet_rounded,
+                                                                 'Est. cost',
+                                                                 fmtAmount(item.plannedCost!, item.currency ?? '')),
     ];
 
     final hasMaps   = item.mapsUrl != null;

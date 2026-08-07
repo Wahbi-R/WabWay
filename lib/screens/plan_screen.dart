@@ -11,6 +11,7 @@ import '../core/supabase/plan_service.dart';
 import '../core/supabase/spot_service.dart';
 import '../core/supabase/doc_service.dart';
 import '../core/trip/trip_state.dart';
+import '../data/money_data.dart' show fmtAmount;
 import '../data/plan_data.dart';
 import '../data/spot_data.dart';
 import '../data/docs_data.dart';
@@ -54,6 +55,22 @@ class _PlanScreenState extends State<PlanScreen> {
   ItineraryItem? get _selectedItem => itemById(_days, _selectedItemId ?? '');
   TripDay? get _selectedDay =>
       _selectedItem == null ? null : dayForItem(_days, _selectedItemId ?? '');
+
+  // Returns a human-readable budget summary like "¥85,500 + $1,200" across all
+  // plan items with a planned cost. Returns null if no costs are set.
+  String? get _budgetSummary {
+    final Map<String, double> totals = {};
+    for (final day in _days) {
+      for (final item in day.items) {
+        if (item.plannedCost != null && item.plannedCost! > 0) {
+          final c = item.currency ?? '';
+          totals[c] = (totals[c] ?? 0) + item.plannedCost!;
+        }
+      }
+    }
+    if (totals.isEmpty) return null;
+    return totals.entries.map((e) => fmtAmount(e.value, e.key)).join(' + ');
+  }
 
   List<Spot> get _unplannedSpots {
     final linkedIds = {
@@ -622,6 +639,8 @@ class _PlanScreenState extends State<PlanScreen> {
                                         hint: 'Search plan items…',
                                         onChanged: (v) => setState(() => _search = v),
                                       ),
+                                      if (_search.isEmpty && _budgetSummary != null)
+                                        _PlanBudgetBar(summary: _budgetSummary!),
                                       Expanded(
                                         child: _search.isNotEmpty
                                             ? _buildDesktopSearchResults()
@@ -815,6 +834,8 @@ class _PlanScreenState extends State<PlanScreen> {
                           hint: 'Search plan items…',
                           onChanged: (v) => setState(() => _search = v),
                         ),
+                        if (_search.isEmpty && _budgetSummary != null)
+                          _PlanBudgetBar(summary: _budgetSummary!),
                         Expanded(
                           child: _search.isNotEmpty
                               ? _buildMobileSearchResults(context)
@@ -966,6 +987,34 @@ class _PlanScreenState extends State<PlanScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+// ─── Budget bar ───────────────────────────────────────────────────────────────
+
+class _PlanBudgetBar extends StatelessWidget {
+  const _PlanBudgetBar({required this.summary});
+  final String summary;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: kSpace4, vertical: kSpace2),
+      padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: kSpace2),
+      decoration: BoxDecoration(
+        color: kColorPrimary.withValues(alpha: 0.08),
+        borderRadius: kRadiusMd,
+        border: Border.all(color: kColorPrimary.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.account_balance_wallet_rounded, size: 16, color: kColorPrimary),
+          const SizedBox(width: kSpace2),
+          Text('Planned · $summary',
+              style: kStyleCaption.copyWith(color: kColorPrimary, fontWeight: FontWeight.w600)),
+        ],
+      ),
     );
   }
 }

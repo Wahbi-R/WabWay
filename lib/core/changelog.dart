@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 136,
+    label: 'Plan: budget summary',
+    changes: [
+      'The plan screen now shows a "Planned" total at the top — costs are summed per currency across every day so you can see your budget at a glance',
+      'Opening a plan item now shows its estimated cost in the details card',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 135,
     label: 'Travel: smarter itinerary link',
     changes: [

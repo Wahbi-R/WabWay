@@ -40,6 +40,7 @@ class TripMessage {
     required this.createdAt,
     this.lat,
     this.lng,
+    this.reactions = const {},
   });
 
   final String id;
@@ -50,20 +51,39 @@ class TripMessage {
   final double? lat;
   final double? lng;
   final DateTime createdAt;
+  // emoji → list of userIds who reacted with that emoji
+  final Map<String, List<String>> reactions;
 
-  factory TripMessage.fromMap(Map<String, dynamic> m) => TripMessage(
-        id: m['id'] as String,
-        tripId: m['trip_id'] as String,
-        authorId: m['author_id'] as String,
-        body: m['body'] as String,
-        type: switch (m['message_type'] as String?) {
-          'location_ping' => MessageType.locationPing,
-          'find_me'       => MessageType.findMe,
-          'meetup_point'  => MessageType.meetupPoint,
-          _               => MessageType.text,
-        },
-        lat: (m['lat'] as num?)?.toDouble(),
-        lng: (m['lng'] as num?)?.toDouble(),
-        createdAt: DateTime.parse(m['created_at'] as String),
+  factory TripMessage.fromMap(Map<String, dynamic> m) {
+    final reactionRows = m['message_reactions'] as List? ?? [];
+    final reactions = <String, List<String>>{};
+    for (final r in reactionRows) {
+      final emoji  = r['emoji'] as String;
+      final userId = r['user_id'] as String;
+      reactions.putIfAbsent(emoji, () => []).add(userId);
+    }
+    return TripMessage(
+      id:        m['id'] as String,
+      tripId:    m['trip_id'] as String,
+      authorId:  m['author_id'] as String,
+      body:      m['body'] as String,
+      type: switch (m['message_type'] as String?) {
+        'location_ping' => MessageType.locationPing,
+        'find_me'       => MessageType.findMe,
+        'meetup_point'  => MessageType.meetupPoint,
+        _               => MessageType.text,
+      },
+      lat:       (m['lat'] as num?)?.toDouble(),
+      lng:       (m['lng'] as num?)?.toDouble(),
+      createdAt: DateTime.parse(m['created_at'] as String),
+      reactions: reactions,
+    );
+  }
+
+  TripMessage copyWithReactions(Map<String, List<String>> reactions) =>
+      TripMessage(
+        id: id, tripId: tripId, authorId: authorId, body: body,
+        type: type, createdAt: createdAt, lat: lat, lng: lng,
+        reactions: reactions,
       );
 }

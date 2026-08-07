@@ -122,6 +122,21 @@ class _CrewScreenState extends State<CrewScreen>
     setState(() => _locations = locations);
   }
 
+  Future<void> _onReact(String messageId, String emoji) async {
+    final userId = _userId;
+    if (userId == null) return;
+    final idx = _messages.indexWhere((m) => m.id == messageId);
+    if (idx == -1) return;
+    final msg = _messages[idx];
+    final myReacted = (msg.reactions[emoji] ?? []).contains(userId);
+    if (myReacted) {
+      await CrewService.removeReaction(messageId: messageId, userId: userId, emoji: emoji);
+    } else {
+      await CrewService.addReaction(messageId: messageId, userId: userId, emoji: emoji);
+    }
+    // Reactions refresh via the realtime subscription; no extra setState needed.
+  }
+
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
@@ -432,6 +447,7 @@ class _CrewScreenState extends State<CrewScreen>
             onSend: _sendMessage,
             onLinkUp: _sendLocationPing,
             onFindMe: _sendFindMe,
+            onReact: _onReact,
           ),
           _MapTab(
             locations: _locations,
@@ -507,6 +523,7 @@ class _ChatTab extends StatelessWidget {
     required this.onSend,
     required this.onLinkUp,
     required this.onFindMe,
+    required this.onReact,
   });
 
   final List<TripMessage> messages;
@@ -521,6 +538,7 @@ class _ChatTab extends StatelessWidget {
   final VoidCallback onSend;
   final VoidCallback onLinkUp;
   final VoidCallback onFindMe;
+  final Future<void> Function(String messageId, String emoji) onReact;
 
   AppTripMember? _memberById(String userId) {
     try {
@@ -590,6 +608,8 @@ class _ChatTab extends StatelessWidget {
             member: member,
             isMe: isMe,
             showSender: showSender && !isMe,
+            currentUserId: currentUserId,
+            onReact: (emoji) => onReact(msg.id, emoji),
           );
         },
       );
@@ -620,17 +640,34 @@ class _MessageBubble extends StatelessWidget {
     required this.member,
     required this.isMe,
     required this.showSender,
+    required this.currentUserId,
+    required this.onReact,
   });
 
   final TripMessage message;
   final AppTripMember? member;
   final bool isMe;
   final bool showSender;
+  final String currentUserId;
+  final ValueChanged<String> onReact;
+
+  void _showEmojiPicker(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _EmojiPickerSheet(
+        reactions: message.reactions,
+        currentUserId: currentUserId,
+        onReact: onReact,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final bubbleColor = isMe ? kColorPrimary : kColorPaper;
     final textColor = isMe ? Colors.white : kColorInk;
+    final hasReactions = message.reactions.isNotEmpty;
 
     return Padding(
       padding: EdgeInsets.only(
@@ -652,26 +689,140 @@ class _MessageBubble extends StatelessWidget {
                     fontWeight: FontWeight.w600, color: kColorInkSoft),
               ),
             ),
-          Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: kSpace3, vertical: kSpace2 + 2),
-            decoration: BoxDecoration(
-              color: bubbleColor,
-              borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(16),
-                topRight: const Radius.circular(16),
-                bottomLeft: Radius.circular(isMe ? 16 : 4),
-                bottomRight: Radius.circular(isMe ? 4 : 16),
+          GestureDetector(
+            onLongPress: () => _showEmojiPicker(context),
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: kSpace3, vertical: kSpace2 + 2),
+              decoration: BoxDecoration(
+                color: bubbleColor,
+                borderRadius: BorderRadius.only(
+                  topLeft: const Radius.circular(16),
+                  topRight: const Radius.circular(16),
+                  bottomLeft: Radius.circular(isMe ? 16 : 4),
+                  bottomRight: Radius.circular(isMe ? 4 : 16),
+                ),
+                border: isMe ? null : Border.all(color: kColorBorder),
+                boxShadow: kShadowXs,
               ),
-              border: isMe ? null : Border.all(color: kColorBorder),
-              boxShadow: kShadowXs,
-            ),
-            child: Text(
-              message.body,
-              style: kStyleBody.copyWith(color: textColor),
+              child: Text(
+                message.body,
+                style: kStyleBody.copyWith(color: textColor),
+              ),
             ),
           ),
+          if (hasReactions) ...[
+            const SizedBox(height: 4),
+            _ReactionRow(
+              reactions: message.reactions,
+              currentUserId: currentUserId,
+              onReact: onReact,
+            ),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+// ─── Reaction row ─────────────────────────────────────────────────────────────
+
+class _ReactionRow extends StatelessWidget {
+  const _ReactionRow({
+    required this.reactions,
+    required this.currentUserId,
+    required this.onReact,
+  });
+
+  final Map<String, List<String>> reactions;
+  final String currentUserId;
+  final ValueChanged<String> onReact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 4,
+      runSpacing: 4,
+      children: reactions.entries.map((e) {
+        final emoji = e.key;
+        final users = e.value;
+        final iMine = users.contains(currentUserId);
+        return GestureDetector(
+          onTap: () => onReact(emoji),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: iMine ? kColorPrimarySoft : kColorSurfaceSunken,
+              borderRadius: kRadiusPill,
+              border: Border.all(
+                color: iMine ? kColorPrimaryDark : kColorBorder,
+                width: 1,
+              ),
+            ),
+            child: Text(
+              '$emoji ${users.length}',
+              style: const TextStyle(fontSize: 12, height: 1.2),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
+
+// ─── Emoji picker sheet ───────────────────────────────────────────────────────
+
+const _kReactionEmojis = ['❤️', '👍', '😂', '😮', '😢', '🔥'];
+
+class _EmojiPickerSheet extends StatelessWidget {
+  const _EmojiPickerSheet({
+    required this.reactions,
+    required this.currentUserId,
+    required this.onReact,
+  });
+
+  final Map<String, List<String>> reactions;
+  final String currentUserId;
+  final ValueChanged<String> onReact;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(kSpace4, kSpace3, kSpace4, kSpace4),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: kColorPaper,
+            borderRadius: kRadiusXl,
+            boxShadow: kShadowMd,
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: kSpace4, vertical: kSpace3),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: _kReactionEmojis.map((emoji) {
+              final iMine = (reactions[emoji] ?? []).contains(currentUserId);
+              return GestureDetector(
+                onTap: () {
+                  Navigator.pop(context);
+                  onReact(emoji);
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: iMine ? kColorPrimarySoft : Colors.transparent,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Center(
+                    child: Text(emoji, style: const TextStyle(fontSize: 26)),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
       ),
     );
   }

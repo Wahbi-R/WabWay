@@ -6,11 +6,35 @@ abstract final class CrewService {
   static Future<List<TripMessage>> fetchMessages(String tripId) async {
     final rows = await supabase
         .from('trip_messages')
-        .select()
+        .select('*, message_reactions(*)')
         .eq('trip_id', tripId)
         .order('created_at', ascending: false)
         .limit(100);
     return rows.map(TripMessage.fromMap).toList().reversed.toList();
+  }
+
+  static Future<void> addReaction({
+    required String messageId,
+    required String userId,
+    required String emoji,
+  }) async {
+    await supabase.from('message_reactions').upsert(
+      {'message_id': messageId, 'user_id': userId, 'emoji': emoji},
+      onConflict: 'message_id,user_id,emoji',
+    );
+  }
+
+  static Future<void> removeReaction({
+    required String messageId,
+    required String userId,
+    required String emoji,
+  }) async {
+    await supabase
+        .from('message_reactions')
+        .delete()
+        .eq('message_id', messageId)
+        .eq('user_id', userId)
+        .eq('emoji', emoji);
   }
 
   static Future<void> sendMessage({
@@ -128,6 +152,12 @@ abstract final class CrewService {
             column: 'trip_id',
             value: tripId,
           ),
+          callback: (_) => onChanged(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'message_reactions',
           callback: (_) => onChanged(),
         )
         .subscribe();

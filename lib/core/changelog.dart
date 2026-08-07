@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 121,
+    label: 'Crew chat reactions',
+    changes: [
+      'Long-press any crew message to react with an emoji (❤️ 👍 😂 😮 😢 🔥)',
+      'Reaction counts appear below the bubble — tap one to add or remove your own reaction',
+      'Reactions are synced in real time, so the whole crew sees them instantly',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 120,
     label: 'Packing list progress & templates',
     changes: [

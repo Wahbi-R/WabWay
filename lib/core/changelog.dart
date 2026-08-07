@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 143,
+    label: 'Packing: add multiple items at once',
+    changes: [
+      'The packing list "Add item" dialog now accepts comma-separated input — type "Passport, charger, adapter" and all three are added in one step',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 142,
     label: 'Travel: jump to today',
     changes: [

@@ -78,19 +78,30 @@ class _PackingScreenState extends State<PackingScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: kColorPaper,
         shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
-        title: Text('Add item', style: kStyleBodySemibold),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          style: kStyleBody,
-          decoration: InputDecoration(
-            hintText: 'e.g. Passport, charger…',
-            hintStyle: TextStyle(color: kColorInkSoft.withAlpha(120)),
-            border: OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorBorder)),
-            focusedBorder: OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorPrimary, width: 1.5)),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          ),
-          onSubmitted: (_) => Navigator.pop(ctx, true),
+        title: Text('Add items', style: kStyleBodySemibold),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: ctrl,
+              autofocus: true,
+              style: kStyleBody,
+              decoration: InputDecoration(
+                hintText: 'Passport, charger, adapter…',
+                hintStyle: TextStyle(color: kColorInkSoft.withAlpha(120)),
+                border: OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorBorder)),
+                focusedBorder: OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorPrimary, width: 1.5)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+              onSubmitted: (_) => Navigator.pop(ctx, true),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Separate multiple items with commas',
+              style: kStyleCaption.copyWith(color: kColorInkSoft, fontSize: 11),
+            ),
+          ],
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
@@ -101,7 +112,22 @@ class _PackingScreenState extends State<PackingScreen> {
     if (confirmed != true || !mounted || ctrl.text.trim().isEmpty) return;
     final tripId = TripState.tripOf(context).id;
     final userId = ProfileState.of(context).id;
-    await PackingService.addItem(tripId, ctrl.text.trim(), userId);
+    final titles = ctrl.text
+        .split(',')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+    for (final title in titles) {
+      await PackingService.addItem(tripId, title, userId);
+    }
+    if (mounted && titles.length > 1) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Added ${titles.length} items',
+            style: kStyleBody.copyWith(color: Colors.white)),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ));
+    }
     _load(silent: true);
   }
 

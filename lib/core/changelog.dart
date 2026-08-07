@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 149,
+    label: 'Plan: swipe to check off items',
+    changes: [
+      'Swipe right on any plan item to mark it done — a tick icon slides in from the left',
+      'Swipe right again on a completed item to uncheck it',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 148,
     label: 'Money: quick date filter presets',
     changes: [

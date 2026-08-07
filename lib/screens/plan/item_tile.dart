@@ -31,7 +31,7 @@ class ItineraryItemTile extends StatelessWidget {
         ? kColorInkSoft
         : (selected ? item.type.color : kColorInk);
 
-    return InkWell(
+    final tile = InkWell(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
@@ -200,6 +200,31 @@ class ItineraryItemTile extends StatelessWidget {
           ),
         ),
       ),
+    );
+
+    if (onToggleDone == null) return tile;
+
+    return Dismissible(
+      key: ValueKey('swipe_${item.id}'),
+      direction: DismissDirection.startToEnd,
+      confirmDismiss: (_) async {
+        onToggleDone!();
+        return false;
+      },
+      background: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.only(left: kSpace5),
+        color: item.isDone
+            ? kColorSurfaceSunken
+            : kColorPrimary.withValues(alpha: 0.1),
+        child: Icon(
+          item.isDone ? Icons.undo_rounded : Icons.check_rounded,
+          color: item.isDone ? kColorInkSoft : kColorPrimary,
+          size: 20,
+        ),
+      ),
+      child: tile,
     );
   }
 }

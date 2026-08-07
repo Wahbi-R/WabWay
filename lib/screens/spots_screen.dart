@@ -686,6 +686,13 @@ class _MobileLayout extends StatelessWidget {
               spots: spots,
             ),
           ),
+          SliverToBoxAdapter(
+            child: Builder(builder: (context) {
+              final visited = spots.where((s) => s.status == SpotStatus.visited).length;
+              if (visited == 0) return const SizedBox.shrink();
+              return _SpotsProgressBar(visited: visited, total: spots.length);
+            }),
+          ),
           spots.isEmpty
               ? SliverFillRemaining(
                   child: Center(
@@ -1269,6 +1276,64 @@ class _SpotFilterSheetState extends State<_SpotFilterSheet> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ─── Visited progress bar ─────────────────────────────────────────────────────
+
+class _SpotsProgressBar extends StatelessWidget {
+  const _SpotsProgressBar({required this.visited, required this.total});
+
+  final int visited;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    final pct = total > 0 ? visited / total : 0.0;
+    final allVisited = visited == total && total > 0;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: kSpace4, vertical: kSpace2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                allVisited ? Icons.check_circle_rounded : Icons.place_rounded,
+                size: 14,
+                color: allVisited ? kColorSuccess : kColorInkSoft,
+              ),
+              const SizedBox(width: kSpace2),
+              Text(
+                allVisited ? 'All spots visited!' : '$visited of $total visited',
+                style: kStyleCaption.copyWith(
+                  color: allVisited ? kColorSuccess : kColorInkSoft,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '${(pct * 100).round()}%',
+                style: kStyleCaption.copyWith(
+                  color: allVisited ? kColorSuccess : kColorInkSoft,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: kRadiusPill,
+            child: LinearProgressIndicator(
+              value: pct,
+              minHeight: 4,
+              backgroundColor: kColorSurfaceSunken,
+              color: allVisited ? kColorSuccess : kColorPrimary,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 147,
+    label: 'Spots: visited progress bar',
+    changes: [
+      'A slim progress bar now appears below the category chips on the Spots screen showing how many spots you\'ve visited out of the ones shown',
+      'The bar and label turn green when every spot in the current view has been visited',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 146,
     label: 'Home: today\'s bookings in agenda',
     changes: [

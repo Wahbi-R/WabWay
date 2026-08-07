@@ -19,6 +19,8 @@ import 'docs/doc_card.dart';
 import 'docs/doc_detail.dart';
 import 'docs/add_doc_sheet.dart';
 
+enum _DocSort { newest, alphabetical, type }
+
 class DocsScreen extends StatefulWidget {
   const DocsScreen({super.key});
 
@@ -43,6 +45,7 @@ class _DocsScreenState extends State<DocsScreen> {
 
   String? _selectedDocId;
   DocType? _filterType;
+  _DocSort _sort = _DocSort.newest;
   String _search = '';
 
   final _searchCtrl = TextEditingController();
@@ -208,7 +211,7 @@ class _DocsScreenState extends State<DocsScreen> {
 
   List<TripDocument> get _filtered {
     final q = _search.toLowerCase().trim();
-    return _docs.where((d) {
+    final results = _docs.where((d) {
       final matchType = _filterType == null || d.type == _filterType;
       final matchSearch = q.isEmpty ||
           d.title.toLowerCase().contains(q) ||
@@ -216,6 +219,18 @@ class _DocsScreenState extends State<DocsScreen> {
           _memberName(d.uploadedById).toLowerCase().contains(q);
       return matchType && matchSearch;
     }).toList();
+    switch (_sort) {
+      case _DocSort.newest:
+        results.sort((a, b) => b.uploadedAt.compareTo(a.uploadedAt));
+      case _DocSort.alphabetical:
+        results.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+      case _DocSort.type:
+        results.sort((a, b) {
+          final c = a.type.label.compareTo(b.type.label);
+          return c != 0 ? c : a.title.toLowerCase().compareTo(b.title.toLowerCase());
+        });
+    }
+    return results;
   }
 
   // ── Build ────────────────────────────────────────────────────────────────────
@@ -266,6 +281,8 @@ class _DocsScreenState extends State<DocsScreen> {
           _DesktopDocsBar(
             onSearchChanged: (v) => setState(() => _search = v),
             onAdd: () => _addDoc(context),
+            sort: _sort,
+            onSortChange: (s) => setState(() => _sort = s),
           ),
           Expanded(
             child: Row(
@@ -358,6 +375,19 @@ class _DocsScreenState extends State<DocsScreen> {
       appBar: AppBar(
         title: Text('Documents', style: kStyleTitle),
         actions: [
+          PopupMenuButton<_DocSort>(
+            icon: Icon(
+              Icons.sort_rounded,
+              color: _sort != _DocSort.newest ? kColorPrimary : kColorInkSoft,
+            ),
+            tooltip: 'Sort',
+            onSelected: (s) => setState(() => _sort = s),
+            itemBuilder: (_) => [
+              _docSortItem(_DocSort.newest,       'Newest first', _sort),
+              _docSortItem(_DocSort.alphabetical, 'A – Z',        _sort),
+              _docSortItem(_DocSort.type,         'By type',      _sort),
+            ],
+          ),
           IconButton(
             icon: const Icon(Icons.add_rounded),
             color: kColorInkSoft,
@@ -451,10 +481,17 @@ class _DocsScreenState extends State<DocsScreen> {
 // ── Desktop top bar ───────────────────────────────────────────────────────────
 
 class _DesktopDocsBar extends StatelessWidget {
-  const _DesktopDocsBar({required this.onSearchChanged, required this.onAdd});
+  const _DesktopDocsBar({
+    required this.onSearchChanged,
+    required this.onAdd,
+    required this.sort,
+    required this.onSortChange,
+  });
 
   final ValueChanged<String> onSearchChanged;
   final VoidCallback onAdd;
+  final _DocSort sort;
+  final ValueChanged<_DocSort> onSortChange;
 
   @override
   Widget build(BuildContext context) {
@@ -478,6 +515,20 @@ class _DesktopDocsBar extends StatelessWidget {
             ),
           ),
           const Spacer(),
+          PopupMenuButton<_DocSort>(
+            icon: Icon(
+              Icons.sort_rounded,
+              color: sort != _DocSort.newest ? kColorPrimary : kColorInkSoft,
+            ),
+            tooltip: 'Sort',
+            onSelected: onSortChange,
+            itemBuilder: (_) => [
+              _docSortItem(_DocSort.newest,       'Newest first', sort),
+              _docSortItem(_DocSort.alphabetical, 'A – Z',        sort),
+              _docSortItem(_DocSort.type,         'By type',      sort),
+            ],
+          ),
+          const SizedBox(width: kSpace2),
           WabwayButton(
             label: 'Add document',
             icon: Icons.upload_file_rounded,
@@ -588,4 +639,23 @@ class _FilterChip extends StatelessWidget {
       ),
     );
   }
+}
+
+PopupMenuItem<_DocSort> _docSortItem(
+    _DocSort value, String label, _DocSort current) {
+  return PopupMenuItem(
+    value: value,
+    child: Row(
+      children: [
+        SizedBox(
+          width: 20,
+          child: current == value
+              ? const Icon(Icons.check_rounded, size: 16, color: kColorPrimary)
+              : null,
+        ),
+        const SizedBox(width: kSpace2),
+        Text(label),
+      ],
+    ),
+  );
 }

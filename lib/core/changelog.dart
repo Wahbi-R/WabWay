@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 151,
+    label: 'Docs: sort by newest, A–Z, or type',
+    changes: [
+      'A sort button now appears in the Documents screen — choose "Newest first", "A – Z", or "By type"',
+      'The icon turns blue when a non-default sort is active so you always know what\'s applied',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 150,
     label: 'Travel: filter by booking status',
     changes: [

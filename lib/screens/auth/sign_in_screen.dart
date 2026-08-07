@@ -698,7 +698,27 @@ class _SentState extends StatelessWidget {
         Text(title, style: kStyleTitle, textAlign: TextAlign.center),
         const SizedBox(height: kSpace2),
         Text(body, style: kStyleCaption, textAlign: TextAlign.center),
-        const SizedBox(height: kSpace5),
+        if (!kIsWeb) ...[
+          const SizedBox(height: kSpace4),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () => launchUrl(
+                Uri(scheme: 'mailto'),
+                mode: LaunchMode.externalApplication,
+              ),
+              icon: const Icon(Icons.mail_outline_rounded, size: 18),
+              label: const Text('Open email app'),
+              style: FilledButton.styleFrom(
+                backgroundColor: kColorPrimary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: kSpace3),
+                shape: const RoundedRectangleBorder(borderRadius: kRadiusMd),
+              ),
+            ),
+          ),
+        ],
+        const SizedBox(height: kSpace4),
         _SwitchLink(label: linkLabel, onTap: onLink),
       ],
     );

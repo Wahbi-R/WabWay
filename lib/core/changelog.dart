@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 119,
+    label: 'Open email app from sign-in',
+    changes: [
+      'After sending a magic link or password-reset email, an "Open email app" button now appears so you can jump straight to your inbox without leaving WabWay',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 118,
     label: 'Bigger SOS button + high-priority alert',
     changes: [

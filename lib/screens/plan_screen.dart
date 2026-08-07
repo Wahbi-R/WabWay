@@ -52,6 +52,7 @@ class _PlanScreenState extends State<PlanScreen> {
 
   String _search = '';
   bool _hideCompleted = false;
+  bool? _forceCollapsed;
   final _searchCtrl = TextEditingController();
   final _mobileListCtrl = ScrollController();
 
@@ -867,6 +868,19 @@ class _PlanScreenState extends State<PlanScreen> {
               color: _hideCompleted ? kColorPrimary : kColorInkSoft,
               onPressed: () => setState(() => _hideCompleted = !_hideCompleted),
             ),
+          if (_days.length >= 2 && _search.isEmpty)
+            IconButton(
+              icon: Icon(
+                _forceCollapsed == true
+                    ? Icons.unfold_more_rounded
+                    : Icons.unfold_less_rounded,
+                size: 20,
+              ),
+              tooltip: _forceCollapsed == true ? 'Expand all days' : 'Collapse all days',
+              color: _forceCollapsed == true ? kColorPrimary : kColorInkSoft,
+              onPressed: () => setState(() =>
+                  _forceCollapsed = _forceCollapsed == true ? false : true),
+            ),
           if (_days.isNotEmpty) ...[
             IconButton(
               icon: const Icon(Icons.ios_share_rounded, size: 20),
@@ -997,6 +1011,7 @@ class _PlanScreenState extends State<PlanScreen> {
                                             _onReorderItems(_days[di].id, newOrder),
                                         onToggleDone: _toggleItemDone,
                                         hideCompleted: _hideCompleted,
+                                        forceCollapsed: _forceCollapsed,
                                       ),
                                     );
                                   },

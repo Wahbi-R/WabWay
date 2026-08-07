@@ -28,6 +28,7 @@ class TripDayCard extends StatefulWidget {
     this.onReorder,
     this.onToggleDone,
     this.hideCompleted = false,
+    this.forceCollapsed,
   });
 
   final TripDay day;
@@ -43,6 +44,7 @@ class TripDayCard extends StatefulWidget {
   final ValueChanged<List<ItineraryItem>>? onReorder;
   final ValueChanged<String>? onToggleDone;
   final bool hideCompleted;
+  final bool? forceCollapsed;
 
   @override
   State<TripDayCard> createState() => _TripDayCardState();
@@ -51,6 +53,14 @@ class TripDayCard extends StatefulWidget {
 class _TripDayCardState extends State<TripDayCard> {
   bool _notesExpanded = false;
   bool _itemsCollapsed = false;
+
+  @override
+  void didUpdateWidget(TripDayCard old) {
+    super.didUpdateWidget(old);
+    if (widget.forceCollapsed != null && widget.forceCollapsed != old.forceCollapsed) {
+      _itemsCollapsed = widget.forceCollapsed!;
+    }
+  }
 
   void _handleHeaderTap() {
     if (widget.isDesktop) {

@@ -11,6 +11,7 @@ import '../core/supabase/plan_service.dart';
 import '../data/accommodation_data.dart';
 import '../core/trip/trip_state.dart';
 import 'notification_settings_screen.dart';
+import '../data/date_utils.dart';
 import '../data/travel_data.dart';
 import '../data/docs_data.dart';
 import '../data/plan_data.dart';
@@ -419,6 +420,29 @@ class _TravelScreenState extends State<TravelScreen> {
 
   // ─── Shared list ──────────────────────────────────────────────────────────────
 
+  // Builds a mixed list of date-label strings and TravelItem objects so the
+  // ListView can insert sticky date separators between date groups.
+  List<Object> _buildMixedList(List<TravelItem> items) {
+    final result = <Object>[];
+    DateTime? lastDate;
+    for (final item in items) {
+      final d = item.date;
+      if (d != null) {
+        final key = DateTime(d.year, d.month, d.day);
+        if (lastDate == null || key != lastDate) {
+          lastDate = key;
+          result.add(key);
+        }
+      } else if (lastDate != null || result.isEmpty) {
+        if (!result.any((e) => e is String && e == 'No date')) {
+          result.add('No date');
+        }
+      }
+      result.add(item);
+    }
+    return result;
+  }
+
   Widget _buildList({required bool desktop}) {
     final items = _filtered;
 
@@ -459,41 +483,80 @@ class _TravelScreenState extends State<TravelScreen> {
       );
     }
 
-    return ListView.separated(
+    final mixed = _buildMixedList(items);
+
+    return ListView.builder(
       padding: EdgeInsets.fromLTRB(
         kSpace4,
         kSpace3,
         kSpace4,
         desktop ? kSpace4 : kSpace20,
       ),
-      itemCount: items.length,
-      separatorBuilder: (_, __) => const SizedBox(height: kSpace3),
+      itemCount: mixed.length,
       itemBuilder: (ctx, i) {
-        final item = items[i];
-        // Capture docs/days at build time so they're available in the pushed route.
+        final entry = mixed[i];
+
+        // Date separator
+        if (entry is DateTime) {
+          final label = _travelDateLabel(entry);
+          return Padding(
+            padding: EdgeInsets.only(
+              top: i == 0 ? 0 : kSpace4,
+              bottom: kSpace2,
+            ),
+            child: Text(label, style: kStyleOverline),
+          );
+        }
+        if (entry is String) {
+          return Padding(
+            padding: EdgeInsets.only(
+              top: i == 0 ? 0 : kSpace4,
+              bottom: kSpace2,
+            ),
+            child: Text(entry, style: kStyleOverline),
+          );
+        }
+
+        // Travel item card
+        final item = entry as TravelItem;
         final docsSnapshot = List<TripDocument>.unmodifiable(_docs);
         final daysSnapshot = List<TripDay>.unmodifiable(_days);
-        return TravelItemCard(
-          item: item,
-          isSelected: desktop && _selectedId == item.id,
-          onTap: desktop
-              ? () => _select(item.id)
-              : () => Navigator.push(
-                    ctx,
-                    MaterialPageRoute(
-                      builder: (_) => TravelItemDetailScreen(
-                        item: item,
-                        docs: docsSnapshot,
-                        days: daysSnapshot,
-                        onDelete: () => _delete(item.id),
-                        onUpdated: _updateItem,
+        final isLast = i == mixed.length - 1 || mixed[i + 1] is! TravelItem;
+        return Padding(
+          padding: EdgeInsets.only(bottom: isLast ? 0 : kSpace3),
+          child: TravelItemCard(
+            item: item,
+            isSelected: desktop && _selectedId == item.id,
+            onTap: desktop
+                ? () => _select(item.id)
+                : () => Navigator.push(
+                      ctx,
+                      MaterialPageRoute(
+                        builder: (_) => TravelItemDetailScreen(
+                          item: item,
+                          docs: docsSnapshot,
+                          days: daysSnapshot,
+                          onDelete: () => _delete(item.id),
+                          onUpdated: _updateItem,
+                        ),
                       ),
                     ),
-                  ),
+          ),
         );
       },
     );
   }
+}
+
+String _travelDateLabel(DateTime d) {
+  final today = DateTime.now();
+  final todayKey = DateTime(today.year, today.month, today.day);
+  final tomorrow = todayKey.add(const Duration(days: 1));
+  final yesterday = todayKey.subtract(const Duration(days: 1));
+  if (d == todayKey)   return 'Today · ${fmtDate(d)}';
+  if (d == tomorrow)   return 'Tomorrow · ${fmtDate(d)}';
+  if (d == yesterday)  return 'Yesterday · ${fmtDate(d)}';
+  return fmtDate(d);
 }
 
 // ─── Desktop top bar ──────────────────────────────────────────────────────────

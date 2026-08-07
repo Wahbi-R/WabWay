@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 137,
+    label: 'Travel: date-grouped timeline',
+    changes: [
+      'Travel items are now grouped by date with a clear header for each day — the list reads like a trip timeline instead of a flat pile',
+      '"Today" and "Tomorrow" labels highlight the most relevant bookings at a glance',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 136,
     label: 'Plan: budget summary',
     changes: [

@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../core/supabase/client.dart';
 import '../../core/supabase/doc_service.dart';
+import '../../core/supabase/plan_service.dart';
+import '../../core/trip/trip_state.dart';
 import '../../data/travel_data.dart';
 import '../../data/docs_data.dart';
 import '../../data/plan_data.dart';
@@ -11,6 +14,7 @@ import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 import 'add_travel_sheet.dart';
+import '../plan/day_picker_sheet.dart';
 
 // ─── Mobile screen ────────────────────────────────────────────────────────────
 
@@ -124,7 +128,7 @@ class TravelItemDetailContent extends StatelessWidget {
               ],
 
               const SizedBox(height: kSpace4),
-              _ActionsSection(item: item, docs: docs, onDelete: onDelete, onUpdated: onUpdated),
+              _ActionsSection(item: item, docs: docs, days: days, onDelete: onDelete, onUpdated: onUpdated),
               const SizedBox(height: kSpace8),
             ],
           ),
@@ -601,22 +605,93 @@ class _NotesSection extends StatelessWidget {
 
 // ─── Actions section ──────────────────────────────────────────────────────────
 
-class _ActionsSection extends StatelessWidget {
+class _ActionsSection extends StatefulWidget {
   const _ActionsSection({
     required this.item,
     this.docs = const [],
+    this.days = const [],
     this.onDelete,
     this.onUpdated,
   });
   final TravelItem item;
   final List<TripDocument> docs;
+  final List<TripDay> days;
   final VoidCallback? onDelete;
   final ValueChanged<TravelItem>? onUpdated;
 
   @override
+  State<_ActionsSection> createState() => _ActionsSectionState();
+}
+
+class _ActionsSectionState extends State<_ActionsSection> {
+  bool _itineraryLoading = false;
+
+  ItineraryItemType get _planItemType => switch (widget.item.type) {
+    TravelItemType.flight      => ItineraryItemType.travel,
+    TravelItemType.train       => ItineraryItemType.transport,
+    TravelItemType.ticket      => ItineraryItemType.activity,
+    _                          => ItineraryItemType.other,
+  };
+
+  Future<void> _addToItinerary() async {
+    if (_itineraryLoading) return;
+    if (widget.days.isEmpty) {
+      _snack(context, 'Add trip days in Plan first.');
+      return;
+    }
+
+    final result = await showDayPickerSheet(context, days: widget.days);
+    if (result == null || !mounted) return;
+
+    final (dayId, timeOfDay) = result;
+    final day = widget.days.where((d) => d.id == dayId).firstOrNull;
+    if (day == null) return;
+
+    final timeStr = timeOfDay != null
+        ? '${timeOfDay.hour.toString().padLeft(2, '0')}:${timeOfDay.minute.toString().padLeft(2, '0')}'
+        : widget.item.time;
+
+    final tripId = TripState.tripOf(context).id;
+    final userId = supabase.auth.currentUser?.id ?? '';
+
+    setState(() => _itineraryLoading = true);
+    try {
+      await PlanService.createItem(
+        tripId:    tripId,
+        dayId:     dayId,
+        title:     widget.item.title,
+        type:      _planItemType,
+        createdBy: userId,
+        time:      timeStr,
+        location:  widget.item.location ?? widget.item.destination,
+        sortOrder: day.items.length,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(
+          'Added to Day ${day.dayNumber} · ${day.city}',
+          style: kStyleBody.copyWith(color: Colors.white),
+        ),
+        backgroundColor: kColorSuccess,
+        behavior: SnackBarBehavior.floating,
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Could not add to plan: $e',
+            style: kStyleBody.copyWith(color: Colors.white)),
+        backgroundColor: kColorDanger,
+        behavior: SnackBarBehavior.floating,
+      ));
+    } finally {
+      if (mounted) setState(() => _itineraryLoading = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final linkedDocs = item.linkedDocIds
-        .map((id) => docs.where((d) => d.id == id).firstOrNull)
+    final linkedDocs = widget.item.linkedDocIds
+        .map((id) => widget.docs.where((d) => d.id == id).firstOrNull)
         .whereType<TripDocument>()
         .toList();
 
@@ -629,13 +704,13 @@ class _ActionsSection extends StatelessWidget {
           spacing: kSpace2,
           runSpacing: kSpace2,
           children: [
-            if (item.url != null)
+            if (widget.item.url != null)
               WabwayButton(
                 label: 'Open booking',
                 icon: Icons.open_in_new_rounded,
                 size: WabwayButtonSize.sm,
                 onPressed: () async {
-                  final uri = Uri.tryParse(item.url!);
+                  final uri = Uri.tryParse(widget.item.url!);
                   if (uri != null && await canLaunchUrl(uri)) {
                     await launchUrl(uri, mode: LaunchMode.externalApplication);
                   }
@@ -656,11 +731,11 @@ class _ActionsSection extends StatelessWidget {
               onPressed: () => _snack(context, 'Attach a document to this item'),
             ),
             WabwayButton(
-              label: 'Add to itinerary',
+              label: _itineraryLoading ? 'Adding…' : 'Add to itinerary',
               icon: Icons.event_note_rounded,
               variant: WabwayButtonVariant.ghost,
               size: WabwayButtonSize.sm,
-              onPressed: () => _snack(context, 'Link to an itinerary item'),
+              onPressed: _itineraryLoading ? null : _addToItinerary,
             ),
             WabwayButton(
               label: 'Edit',
@@ -685,11 +760,11 @@ class _ActionsSection extends StatelessWidget {
   Future<void> _editItem(BuildContext context) async {
     final updated = await showAddTravelSheet(
       context,
-      docs: docs,
-      initialItem: item,
+      docs: widget.docs,
+      initialItem: widget.item,
     );
     if (updated != null && context.mounted) {
-      onUpdated?.call(updated);
+      widget.onUpdated?.call(updated);
       Navigator.maybePop(context);
     }
   }
@@ -710,7 +785,7 @@ class _ActionsSection extends StatelessWidget {
         shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
         title: Text('Delete travel item?', style: kStyleBodySemibold),
         content: Text(
-          'Remove "${item.title}" from your travel list?',
+          'Remove "${widget.item.title}" from your travel list?',
           style: kStyleBody,
         ),
         actions: [
@@ -722,7 +797,7 @@ class _ActionsSection extends StatelessWidget {
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
-              onDelete?.call();
+              widget.onDelete?.call();
               if (context.mounted) Navigator.maybePop(context);
             },
             child: Text('Delete',

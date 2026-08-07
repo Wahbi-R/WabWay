@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 131,
+    label: 'Travel: add to itinerary',
+    changes: [
+      'Tap "Add to itinerary" on any travel item to drop it straight into a plan day — pick the day and time from the same sheet used everywhere else',
+      'Flights and trains land as Travel / Transport items; tickets become Activities — types are mapped automatically so your itinerary stays organised',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 130,
     label: 'Travel: booking URL',
     changes: [

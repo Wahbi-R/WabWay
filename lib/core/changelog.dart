@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 169,
+    label: 'Plan: collapse individual day cards',
+    changes: [
+      'Tap the chevron on any day card to collapse its items — great for scanning all days at once on a long trip',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 168,
     label: 'Money: swipe receipt left to delete',
     changes: [

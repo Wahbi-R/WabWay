@@ -50,6 +50,7 @@ class TripDayCard extends StatefulWidget {
 
 class _TripDayCardState extends State<TripDayCard> {
   bool _notesExpanded = false;
+  bool _itemsCollapsed = false;
 
   void _handleHeaderTap() {
     if (widget.isDesktop) {
@@ -79,48 +80,54 @@ class _TripDayCardState extends State<TripDayCard> {
             hasNotes: hasNotes,
             isDesktop: widget.isDesktop,
             selected: widget.daySelected,
+            isCollapsed: _itemsCollapsed,
+            onCollapseToggle: items.isNotEmpty
+                ? () => setState(() => _itemsCollapsed = !_itemsCollapsed)
+                : null,
             onTap: headerTappable ? _handleHeaderTap : null,
             onEdit: widget.onEditDay,
             onCopy: widget.onCopyDay,
             onDelete: widget.onDeleteDay,
           ),
-          const Divider(height: 1, color: kColorBorder),
-          if (items.isEmpty)
-            _EmptyDayBody(onAddItem: widget.onAddItem)
-          else if (widget.onReorder != null)
-            _ReorderableItemList(
-              items: items,
-              selectedItemId: widget.selectedItemId,
-              onItemTap: widget.onItemTap,
-              onAddItem: widget.onAddItem,
-              onReorder: widget.onReorder!,
-              onToggleDone: widget.onToggleDone,
-            )
-          else
-            Column(
-              children: [
-                for (int i = 0; i < items.length; i++) ...[
-                  ItineraryItemTile(
-                    item: items[i],
-                    isLast: i == items.length - 1,
-                    selected: items[i].id == widget.selectedItemId,
-                    onTap: () => widget.onItemTap(items[i].id),
-                    onToggleDone: widget.onToggleDone != null
-                        ? () => widget.onToggleDone!(items[i].id)
-                        : null,
-                  ),
-                  if (i < items.length - 1)
-                    const Divider(
-                      height: 1,
-                      indent: kSpace4 + 50 + kSpace3 + 10 + kSpace3,
-                      color: kColorBorder,
+          if (!_itemsCollapsed) ...[
+            const Divider(height: 1, color: kColorBorder),
+            if (items.isEmpty)
+              _EmptyDayBody(onAddItem: widget.onAddItem)
+            else if (widget.onReorder != null)
+              _ReorderableItemList(
+                items: items,
+                selectedItemId: widget.selectedItemId,
+                onItemTap: widget.onItemTap,
+                onAddItem: widget.onAddItem,
+                onReorder: widget.onReorder!,
+                onToggleDone: widget.onToggleDone,
+              )
+            else
+              Column(
+                children: [
+                  for (int i = 0; i < items.length; i++) ...[
+                    ItineraryItemTile(
+                      item: items[i],
+                      isLast: i == items.length - 1,
+                      selected: items[i].id == widget.selectedItemId,
+                      onTap: () => widget.onItemTap(items[i].id),
+                      onToggleDone: widget.onToggleDone != null
+                          ? () => widget.onToggleDone!(items[i].id)
+                          : null,
                     ),
+                    if (i < items.length - 1)
+                      const Divider(
+                        height: 1,
+                        indent: kSpace4 + 50 + kSpace3 + 10 + kSpace3,
+                        color: kColorBorder,
+                      ),
+                  ],
+                  const Divider(height: 1, color: kColorBorder),
+                  _DayCostFooter(items: items),
+                  _AddItemRow(onTap: widget.onAddItem),
                 ],
-                const Divider(height: 1, color: kColorBorder),
-                _DayCostFooter(items: items),
-                _AddItemRow(onTap: widget.onAddItem),
-              ],
-            ),
+              ),
+          ],
         ],
       ),
     );
@@ -138,6 +145,8 @@ class _DayHeader extends StatelessWidget {
     required this.hasNotes,
     required this.isDesktop,
     required this.selected,
+    required this.isCollapsed,
+    this.onCollapseToggle,
     this.onTap,
     this.onEdit,
     this.onCopy,
@@ -149,6 +158,8 @@ class _DayHeader extends StatelessWidget {
   final bool hasNotes;
   final bool isDesktop;
   final bool selected;
+  final bool isCollapsed;
+  final VoidCallback? onCollapseToggle;
   final VoidCallback? onTap;
   final VoidCallback? onEdit;
   final VoidCallback? onCopy;
@@ -330,6 +341,22 @@ class _DayHeader extends StatelessWidget {
                     ),
                   );
                 }),
+              if (onCollapseToggle != null) ...[
+                const SizedBox(width: kSpace1),
+                GestureDetector(
+                  onTap: onCollapseToggle,
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Icon(
+                      isCollapsed
+                          ? Icons.expand_more_rounded
+                          : Icons.expand_less_rounded,
+                      size: 18,
+                      color: kColorInkSoft,
+                    ),
+                  ),
+                ),
+              ],
               if (onEdit != null || onCopy != null || onDelete != null) ...[
                 const SizedBox(width: kSpace2),
                 PopupMenuButton<_DayMenuAction>(

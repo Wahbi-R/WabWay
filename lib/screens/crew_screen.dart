@@ -2,13 +2,13 @@ import 'dart:async';
 import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show RealtimeChannel;
 import '../core/auth/profile_state.dart';
+import '../core/location/location_sharing_manager.dart';
 import '../core/supabase/crew_service.dart';
 import '../core/trip/app_trip_member.dart';
 import '../core/notifications/push_notifier.dart';
@@ -28,22 +28,17 @@ class CrewScreen extends StatefulWidget {
 
 class _CrewScreenState extends State<CrewScreen>
     with SingleTickerProviderStateMixin {
-  static const _kNativeChannel = MethodChannel('ca.wabble.wabway/location_sharing');
-
   late final TabController _tabs;
 
   List<TripMessage> _messages = [];
   List<LocationShare> _locations = [];
   bool _loadingMessages = true;
-  bool _sharing = false;
   bool _sendingPing = false;
   bool _sendingFindMe = false;
   bool _sending = false;
-  bool _stopActionAdded = false;
 
   RealtimeChannel? _messageChannel;
   RealtimeChannel? _locationChannel;
-  StreamSubscription<Position>? _positionStream;
 
   final _scrollController = ScrollController();
   final _textController = TextEditingController();
@@ -55,23 +50,11 @@ class _CrewScreenState extends State<CrewScreen>
   void initState() {
     super.initState();
     _tabs = TabController(length: 2, vsync: this);
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      _kNativeChannel.setMethodCallHandler(_handleNativeCall);
-    }
+    LocationSharingManager.instance.isSharing.addListener(_onSharingChanged);
   }
 
-  Future<void> _handleNativeCall(MethodCall call) async {
-    if (call.method == 'onStopRequested') _stopSharing();
-  }
-
-  void _stopSharing() {
-    _positionStream?.cancel();
-    _positionStream = null;
-    _stopActionAdded = false;
-    if (_tripId != null && _userId != null) {
-      CrewService.deactivateLocationShare(tripId: _tripId!, userId: _userId!);
-    }
-    if (mounted) setState(() => _sharing = false);
+  void _onSharingChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -87,14 +70,7 @@ class _CrewScreenState extends State<CrewScreen>
 
   @override
   void dispose() {
-    // Stop sharing on exit without awaiting — fire and forget
-    if (_sharing && _tripId != null && _userId != null) {
-      CrewService.deactivateLocationShare(tripId: _tripId!, userId: _userId!);
-    }
-    _positionStream?.cancel();
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      _kNativeChannel.setMethodCallHandler(null);
-    }
+    LocationSharingManager.instance.isSharing.removeListener(_onSharingChanged);
     _messageChannel?.unsubscribe();
     _locationChannel?.unsubscribe();
     _tabs.dispose();
@@ -170,15 +146,14 @@ class _CrewScreenState extends State<CrewScreen>
   }
 
   Future<void> _toggleLocationSharing() async {
-    if (_sharing) {
-      _stopSharing();
+    final mgr = LocationSharingManager.instance;
+    if (mgr.isSharing.value) {
+      await mgr.stop();
       return;
     }
 
     final granted = await _ensureLocationPermission();
     if (!granted || !mounted) return;
-
-    setState(() => _sharing = true);
 
     pushNotify(
       tripId: _tripId!,
@@ -188,27 +163,11 @@ class _CrewScreenState extends State<CrewScreen>
       data: {'screen': 'crew', 'trip_id': _tripId!},
     );
 
-    final settings = _buildLocationSettings();
-    _positionStream = Geolocator.getPositionStream(locationSettings: settings)
-        .listen((pos) async {
-      if (!_sharing || _tripId == null || _userId == null) return;
-      // On the first position received the foreground service is live —
-      // update its notification with a "Stop sharing" action button.
-      if (!_stopActionAdded && !kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-        _stopActionAdded = true;
-        try {
-          await _kNativeChannel.invokeMethod('addStopAction');
-        } catch (_) {}
-      }
-      try {
-        await CrewService.upsertLocationShare(
-          tripId: _tripId!,
-          userId: _userId!,
-          lat: pos.latitude,
-          lng: pos.longitude,
-        );
-      } catch (_) {}
-    });
+    await mgr.start(
+      tripId: _tripId!,
+      userId: _userId!,
+      settings: _buildLocationSettings(),
+    );
   }
 
   LocationSettings _buildLocationSettings() {
@@ -412,7 +371,7 @@ class _CrewScreenState extends State<CrewScreen>
           Padding(
             padding: const EdgeInsets.only(right: kSpace4),
             child: _LocationToggle(
-              sharing: _sharing,
+              sharing: LocationSharingManager.instance.isSharing.value,
               onTap: _toggleLocationSharing,
             ),
           ),

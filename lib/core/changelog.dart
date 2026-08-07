@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 114,
+    label: 'Location sharing improvements',
+    changes: [
+      'Location sharing now keeps running when you navigate away from the Crew screen — it only stops when you tap the toggle or the "Stop sharing" notification button',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 113,
     label: 'Location sharing notification',
     changes: [

@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'core/location/location_sharing_manager.dart';
 import 'core/notifications/notification_service.dart';
 import 'core/share/share_handler.dart';
 import 'screens/auth/auth_gate.dart';
@@ -35,6 +36,7 @@ Future<void> main() async {
 
   await ShareHandler.instance.init();
   if (!kIsWeb) await NotificationService.instance.init();
+  if (!kIsWeb) LocationSharingManager.instance.init();
 
   runApp(const WabwayApp());
 }

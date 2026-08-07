@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 171,
+    label: 'Packing: share your list with the crew',
+    changes: [
+      'Tap the menu on the Packing screen and choose Share list to send your full packing checklist — unpacked items show □, packed items show ✓',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 170,
     label: 'Plan: collapse or expand all days at once',
     changes: [

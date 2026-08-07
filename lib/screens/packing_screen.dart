@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show RealtimeChannel;
 import '../core/auth/profile_state.dart';
 import '../core/supabase/packing_service.dart';
@@ -264,6 +266,23 @@ class _PackingScreenState extends State<PackingScreen> {
     _load(silent: true);
   }
 
+  void _shareList() {
+    if (_items.isEmpty) return;
+    final tripName = TripState.tripOf(context).name;
+    final buf = StringBuffer();
+    buf.writeln('$tripName — Packing List');
+    buf.writeln();
+    final unpacked = _items.where((i) => !i.isPacked).toList();
+    final packed   = _items.where((i) => i.isPacked).toList();
+    for (final item in unpacked) buf.writeln('□ ${item.title}');
+    if (packed.isNotEmpty) {
+      buf.writeln();
+      buf.writeln('Packed (${packed.length})');
+      for (final item in packed) buf.writeln('✓ ${item.title}');
+    }
+    Share.share(buf.toString().trim(), subject: '$tripName — Packing List');
+  }
+
   void _reorder(int oldIndex, int newIndex, List<PackingItem> unpacked) {
     if (newIndex > oldIndex) newIndex -= 1;
     final moved = unpacked.removeAt(oldIndex);
@@ -400,6 +419,7 @@ class _PackingScreenState extends State<PackingScreen> {
             onSelected: (v) {
               if (v == 'template') _addFromTemplate();
               if (v == 'clear_packed') _clearPacked();
+              if (v == 'share') _shareList();
             },
             itemBuilder: (_) => [
               const PopupMenuItem(
@@ -410,6 +430,15 @@ class _PackingScreenState extends State<PackingScreen> {
                   Text('Add from template'),
                 ]),
               ),
+              if (!kIsWeb && total > 0)
+                const PopupMenuItem(
+                  value: 'share',
+                  child: Row(children: [
+                    Icon(Icons.ios_share_rounded, size: 16),
+                    SizedBox(width: 10),
+                    Text('Share list'),
+                  ]),
+                ),
               if (packed > 0)
                 const PopupMenuItem(
                   value: 'clear_packed',

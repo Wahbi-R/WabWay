@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 122,
+    label: 'Stays improvements',
+    changes: [
+      'Stays are now fully connected to your shared trip — everything you save is visible to the whole crew in real time',
+      'Add a confirmation number when booking a stay — it appears on the card and you can copy it with one tap',
+      'Tap "Open booking →" on any card that has a URL to jump straight to the listing',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 121,
     label: 'Crew chat reactions',
     changes: [

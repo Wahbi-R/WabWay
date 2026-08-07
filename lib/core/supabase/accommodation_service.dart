@@ -65,28 +65,29 @@ abstract final class AccommodationService {
   // ─── Row → model ────────────────────────────────────────────────────────────
 
   static Accommodation _fromRow(Map<String, dynamic> row) => Accommodation(
-        id:            row['id'] as String,
-        tripId:        row['trip_id'] as String,
-        name:          row['name'] as String,
-        url:           row['url'] as String?,
-        city:          row['city'] as String? ?? '',
-        address:       row['address'] as String?,
-        latitude:      (row['latitude'] as num?)?.toDouble(),
-        longitude:     (row['longitude'] as num?)?.toDouble(),
-        pricePerNight: (row['price_per_night'] as num?)?.toDouble(),
-        currency:      row['currency'] as String? ?? 'USD',
-        checkIn:       row['check_in'] != null
+        id:                 row['id'] as String,
+        tripId:             row['trip_id'] as String,
+        name:               row['name'] as String,
+        url:                row['url'] as String?,
+        city:               row['city'] as String? ?? '',
+        address:            row['address'] as String?,
+        latitude:           (row['latitude'] as num?)?.toDouble(),
+        longitude:          (row['longitude'] as num?)?.toDouble(),
+        pricePerNight:      (row['price_per_night'] as num?)?.toDouble(),
+        currency:           row['currency'] as String? ?? 'USD',
+        checkIn:            row['check_in'] != null
             ? DateTime.tryParse(row['check_in'] as String)
             : null,
-        checkOut:      row['check_out'] != null
+        checkOut:           row['check_out'] != null
             ? DateTime.tryParse(row['check_out'] as String)
             : null,
-        status:        _statusFrom(row['status'] as String? ?? 'brainstorming'),
-        source:        _sourceFrom(row['source'] as String?),
-        notes:         row['notes'] as String?,
-        imageUrl:      row['image_url'] as String?,
-        createdBy:     row['created_by'] as String? ?? '',
-        createdAt:     DateTime.parse(row['created_at'] as String),
+        status:             _statusFrom(row['status'] as String? ?? 'brainstorming'),
+        source:             _sourceFrom(row['source'] as String?),
+        notes:              row['notes'] as String?,
+        imageUrl:           row['image_url'] as String?,
+        confirmationNumber: row['confirmation_number'] as String?,
+        createdBy:          row['created_by'] as String? ?? '',
+        createdAt:          DateTime.parse(row['created_at'] as String),
       );
 
   // ─── Queries ────────────────────────────────────────────────────────────────
@@ -123,6 +124,7 @@ abstract final class AccommodationService {
     AccommodationSource? source,
     String? notes,
     String? imageUrl,
+    String? confirmationNumber,
   }) async {
     final inserted = await supabase.from('accommodations').insert({
       'trip_id':         tripId,
@@ -131,18 +133,40 @@ abstract final class AccommodationService {
       'currency':        currency,
       'status':          _statusToDb(status),
       'created_by':      userId,
-      if (url           != null && url.trim().isNotEmpty)     'url':             url.trim(),
-      if (address       != null && address.trim().isNotEmpty) 'address':         address.trim(),
-      if (lat           != null)                              'latitude':        lat,
-      if (lon           != null)                              'longitude':       lon,
-      if (pricePerNight != null)                              'price_per_night': pricePerNight,
-      if (checkIn       != null)                              'check_in':        checkIn.toIso8601String().substring(0, 10),
-      if (checkOut      != null)                              'check_out':       checkOut.toIso8601String().substring(0, 10),
-      if (source        != null)                              'source':          _sourceToDb(source),
-      if (notes         != null && notes.trim().isNotEmpty)   'notes':           notes.trim(),
-      if (imageUrl      != null && imageUrl.trim().isNotEmpty)'image_url':       imageUrl.trim(),
+      if (url                != null && url.trim().isNotEmpty)                 'url':                 url.trim(),
+      if (address            != null && address.trim().isNotEmpty)             'address':             address.trim(),
+      if (lat                != null)                                          'latitude':            lat,
+      if (lon                != null)                                          'longitude':           lon,
+      if (pricePerNight      != null)                                          'price_per_night':     pricePerNight,
+      if (checkIn            != null)                                          'check_in':            checkIn.toIso8601String().substring(0, 10),
+      if (checkOut           != null)                                          'check_out':           checkOut.toIso8601String().substring(0, 10),
+      if (source             != null)                                          'source':              _sourceToDb(source),
+      if (notes              != null && notes.trim().isNotEmpty)               'notes':               notes.trim(),
+      if (imageUrl           != null && imageUrl.trim().isNotEmpty)            'image_url':           imageUrl.trim(),
+      if (confirmationNumber != null && confirmationNumber.trim().isNotEmpty)  'confirmation_number': confirmationNumber.trim(),
     }).select('*').single();
     return _fromRow(inserted);
+  }
+
+  static Future<Accommodation> update(Accommodation item) async {
+    final updated = await supabase.from('accommodations').update({
+      'name':                item.name.trim(),
+      'city':                item.city.trim(),
+      'currency':            item.currency,
+      'status':              _statusToDb(item.status),
+      'url':                 item.url?.trim(),
+      'address':             item.address?.trim(),
+      'latitude':            item.latitude,
+      'longitude':           item.longitude,
+      'price_per_night':     item.pricePerNight,
+      'check_in':            item.checkIn?.toIso8601String().substring(0, 10),
+      'check_out':           item.checkOut?.toIso8601String().substring(0, 10),
+      'source':              item.source != null ? _sourceToDb(item.source!) : null,
+      'notes':               item.notes?.trim(),
+      'image_url':           item.imageUrl?.trim(),
+      'confirmation_number': item.confirmationNumber?.trim(),
+    }).eq('id', item.id).select('*').single();
+    return _fromRow(updated);
   }
 
   static Future<void> updateStatus(String id, AccommodationStatus status) async {

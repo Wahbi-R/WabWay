@@ -89,6 +89,7 @@ class Accommodation {
     this.source,
     this.notes,
     this.imageUrl,
+    this.confirmationNumber,
     required this.createdBy,
     required this.createdAt,
   });
@@ -109,6 +110,7 @@ class Accommodation {
   final AccommodationSource? source;
   final String? notes;
   final String? imageUrl;
+  final String? confirmationNumber;
   final String createdBy;
   final DateTime createdAt;
 
@@ -144,25 +146,27 @@ class Accommodation {
     AccommodationSource? source,
     String? notes,
     String? imageUrl,
+    String? confirmationNumber,
   }) => Accommodation(
-    id:            id,
-    tripId:        tripId,
-    name:          name ?? this.name,
-    url:           url ?? this.url,
-    city:          city ?? this.city,
-    address:       address ?? this.address,
-    latitude:      latitude ?? this.latitude,
-    longitude:     longitude ?? this.longitude,
-    pricePerNight: pricePerNight ?? this.pricePerNight,
-    currency:      currency ?? this.currency,
-    checkIn:       checkIn ?? this.checkIn,
-    checkOut:      checkOut ?? this.checkOut,
-    status:        status ?? this.status,
-    source:        source ?? this.source,
-    notes:         notes ?? this.notes,
-    imageUrl:      imageUrl ?? this.imageUrl,
-    createdBy:     createdBy,
-    createdAt:     createdAt,
+    id:                 id,
+    tripId:             tripId,
+    name:               name ?? this.name,
+    url:                url ?? this.url,
+    city:               city ?? this.city,
+    address:            address ?? this.address,
+    latitude:           latitude ?? this.latitude,
+    longitude:          longitude ?? this.longitude,
+    pricePerNight:      pricePerNight ?? this.pricePerNight,
+    currency:           currency ?? this.currency,
+    checkIn:            checkIn ?? this.checkIn,
+    checkOut:           checkOut ?? this.checkOut,
+    status:             status ?? this.status,
+    source:             source ?? this.source,
+    notes:              notes ?? this.notes,
+    imageUrl:           imageUrl ?? this.imageUrl,
+    confirmationNumber: confirmationNumber ?? this.confirmationNumber,
+    createdBy:          createdBy,
+    createdAt:          createdAt,
   );
 }
 

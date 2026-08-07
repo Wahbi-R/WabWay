@@ -31,11 +31,12 @@ class AddAccommodationSheet extends StatefulWidget {
 class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
   int _step = 0;
 
-  final _urlCtrl    = TextEditingController();
-  final _nameCtrl   = TextEditingController();
-  final _cityCtrl   = TextEditingController();
-  final _priceCtrl  = TextEditingController();
-  final _notesCtrl  = TextEditingController();
+  final _urlCtrl     = TextEditingController();
+  final _nameCtrl    = TextEditingController();
+  final _cityCtrl    = TextEditingController();
+  final _priceCtrl   = TextEditingController();
+  final _notesCtrl   = TextEditingController();
+  final _confirmCtrl = TextEditingController();
 
   bool   _parsing   = false;
   bool   _saving    = false;
@@ -63,7 +64,8 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
             ? '${e.pricePerNight!.toInt()}'
             : e.pricePerNight!.toStringAsFixed(2);
       }
-      _notesCtrl.text = e.notes ?? '';
+      _notesCtrl.text    = e.notes ?? '';
+      _confirmCtrl.text  = e.confirmationNumber ?? '';
       _currency   = e.currency;
       _status     = e.status;
       _source     = e.source;
@@ -99,6 +101,7 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
     _cityCtrl.dispose();
     _priceCtrl.dispose();
     _notesCtrl.dispose();
+    _confirmCtrl.dispose();
     super.dispose();
   }
 
@@ -130,46 +133,49 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
   }
 
   Future<void> _save() async {
-    final name = _nameCtrl.text.trim();
+    final name   = _nameCtrl.text.trim();
     if (name.isEmpty) return;
     setState(() => _saving = true);
     try {
-      final price = double.tryParse(_priceCtrl.text.trim());
-      final url   = _urlCtrl.text.trim();
-      final city  = _cityCtrl.text.trim();
-      final notes = _notesCtrl.text.trim();
+      final price   = double.tryParse(_priceCtrl.text.trim());
+      final url     = _urlCtrl.text.trim();
+      final city    = _cityCtrl.text.trim();
+      final notes   = _notesCtrl.text.trim();
+      final confirm = _confirmCtrl.text.trim();
 
       Accommodation result;
       if (widget.editing != null) {
-        await AccommodationService.updateStatus(widget.editing!.id, _status);
-        result = widget.editing!.copyWith(
-          name:          name,
-          url:           url.isEmpty ? null : url,
-          city:          city,
-          pricePerNight: price,
-          currency:      _currency,
-          checkIn:       _checkIn,
-          checkOut:      _checkOut,
-          status:        _status,
-          source:        _source,
-          notes:         notes.isEmpty ? null : notes,
-          imageUrl:      _imageUrl,
+        final updated = widget.editing!.copyWith(
+          name:               name,
+          url:                url.isEmpty ? null : url,
+          city:               city,
+          pricePerNight:      price,
+          currency:           _currency,
+          checkIn:            _checkIn,
+          checkOut:           _checkOut,
+          status:             _status,
+          source:             _source,
+          notes:              notes.isEmpty ? null : notes,
+          imageUrl:           _imageUrl,
+          confirmationNumber: confirm.isEmpty ? null : confirm,
         );
+        result = await AccommodationService.update(updated);
       } else {
         result = await AccommodationService.create(
-          tripId:        widget.tripId,
-          userId:        widget.userId,
-          name:          name,
-          city:          city,
-          url:           url.isEmpty ? null : url,
-          pricePerNight: price,
-          currency:      _currency,
-          checkIn:       _checkIn,
-          checkOut:      _checkOut,
-          status:        _status,
-          source:        _source ?? (url.isNotEmpty ? AccommodationSource.fromUrl(url) : null),
-          notes:         notes.isEmpty ? null : notes,
-          imageUrl:      _imageUrl,
+          tripId:             widget.tripId,
+          userId:             widget.userId,
+          name:               name,
+          city:               city,
+          url:                url.isEmpty ? null : url,
+          pricePerNight:      price,
+          currency:           _currency,
+          checkIn:            _checkIn,
+          checkOut:           _checkOut,
+          status:             _status,
+          source:             _source ?? (url.isNotEmpty ? AccommodationSource.fromUrl(url) : null),
+          notes:              notes.isEmpty ? null : notes,
+          imageUrl:           _imageUrl,
+          confirmationNumber: confirm.isEmpty ? null : confirm,
         );
       }
       if (!mounted) return;
@@ -433,6 +439,14 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
                 ),
               );
             }).toList(),
+          ),
+          const SizedBox(height: kSpace3),
+
+          WabwayTextField(
+            label: 'Confirmation number (optional)',
+            controller: _confirmCtrl,
+            textInputAction: TextInputAction.next,
+            hint: 'e.g. ABC123',
           ),
           const SizedBox(height: kSpace3),
 

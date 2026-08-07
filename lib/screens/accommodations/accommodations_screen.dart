@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
 import '../../core/supabase/accommodation_service.dart';
@@ -383,6 +385,50 @@ class _AccommodationCard extends StatelessWidget {
                                 ? kColorSuccess
                                 : kColorPrimary,
                             fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                      if (item.confirmationNumber != null) ...[
+                        const SizedBox(height: kSpace2),
+                        Row(
+                          children: [
+                            const Icon(Icons.confirmation_number_outlined, size: 13, color: kColorInkSoft),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                item.confirmationNumber!,
+                                style: kStyleCaption.copyWith(color: kColorInkSoft),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () {
+                                Clipboard.setData(ClipboardData(text: item.confirmationNumber!));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Confirmation number copied'),
+                                    duration: Duration(seconds: 2),
+                                  ),
+                                );
+                              },
+                              child: const Icon(Icons.copy_rounded, size: 13, color: kColorInkSoft),
+                            ),
+                          ],
+                        ),
+                      ],
+                      if (item.url != null && item.url!.isNotEmpty) ...[
+                        const SizedBox(height: kSpace2),
+                        GestureDetector(
+                          onTap: () async {
+                            final uri = Uri.tryParse(item.url!);
+                            if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+                          },
+                          child: Text(
+                            'Open booking →',
+                            style: kStyleCaption.copyWith(
+                              color: kColorPrimary,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ),
                       ],

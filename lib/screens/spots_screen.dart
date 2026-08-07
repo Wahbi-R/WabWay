@@ -823,6 +823,11 @@ class _DesktopLayout extends StatelessWidget {
                         onChanged: onFilterCategory,
                         spots: spots,
                       ),
+                      Builder(builder: (_) {
+                        final visited = spots.where((s) => s.status == SpotStatus.visited).length;
+                        if (visited == 0) return const SizedBox.shrink();
+                        return _SpotsProgressBar(visited: visited, total: spots.length);
+                      }),
                       Expanded(
                         child: spots.isEmpty
                             ? Center(

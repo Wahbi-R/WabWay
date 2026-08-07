@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 163,
+    label: 'Spots: visited progress bar on desktop',
+    changes: [
+      'The "X of Y spots visited" progress bar now appears in the desktop spots panel, matching the mobile view',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 162,
     label: 'Money: search cash withdrawals',
     changes: [

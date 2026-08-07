@@ -76,7 +76,9 @@ class _MoneyScreenState extends State<MoneyScreen> {
   DateTimeRange? _dateRange;
   _ReceiptSort _receiptSort = _ReceiptSort.newestFirst;
   String _receiptSearch = '';
+  String _cashSearch = '';
   final _searchCtrl = TextEditingController();
+  final _cashSearchCtrl = TextEditingController();
   String? _selectedReceiptId;
   String? _selectedWithdrawalId;
 
@@ -122,6 +124,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
     _debounce?.cancel();
     _realtimeChannel?.unsubscribe();
     _searchCtrl.dispose();
+    _cashSearchCtrl.dispose();
     super.dispose();
   }
 
@@ -497,7 +500,14 @@ class _MoneyScreenState extends State<MoneyScreen> {
       : _withdrawals.where((w) => w.id == _selectedWithdrawalId).firstOrNull;
 
   List<CashWithdrawal> get _sortedWithdrawals {
-    final list = List<CashWithdrawal>.from(_withdrawals);
+    var list = List<CashWithdrawal>.from(_withdrawals);
+    final q = _cashSearch.toLowerCase().trim();
+    if (q.isNotEmpty) {
+      list = list.where((w) {
+        bool m(String? s) => s != null && s.toLowerCase().contains(q);
+        return m(w.currency) || m(w.notes) || m(fmtAmount(w.amount, w.currency));
+      }).toList();
+    }
     if (_cashSort == _CashSort.oldest) {
       list.sort((a, b) => a.date.compareTo(b.date));
     } else {
@@ -757,6 +767,11 @@ class _MoneyScreenState extends State<MoneyScreen> {
       return Column(
         children: [
           _CashSummaryCard(withdrawals: _withdrawals),
+          WabwaySearchBar(
+            controller: _cashSearchCtrl,
+            hint: 'Search withdrawals…',
+            onChanged: (v) => setState(() => _cashSearch = v),
+          ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: kSpace4, vertical: kSpace2),
             child: Row(
@@ -780,18 +795,26 @@ class _MoneyScreenState extends State<MoneyScreen> {
             ),
           ),
           Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(kSpace4, 0, kSpace4, kSpace4),
-              itemCount: sorted.length,
-              separatorBuilder: (_, __) => const SizedBox(height: kSpace2),
-              itemBuilder: (_, i) => CashListTile(
-                withdrawal: sorted[i],
-                myId:       _userId,
-                members:    _members,
-                selected:   _selectedWithdrawalId == sorted[i].id,
-                onTap: () => setState(() => _selectedWithdrawalId = sorted[i].id),
-              ),
-            ),
+            child: sorted.isEmpty
+                ? Center(
+                    child: WabwayEmptyState(
+                      icon: Icons.search_off_rounded,
+                      title: 'No results for "$_cashSearch"',
+                      description: 'Try a different search term.',
+                    ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(kSpace4, 0, kSpace4, kSpace4),
+                    itemCount: sorted.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: kSpace2),
+                    itemBuilder: (_, i) => CashListTile(
+                      withdrawal: sorted[i],
+                      myId:       _userId,
+                      members:    _members,
+                      selected:   _selectedWithdrawalId == sorted[i].id,
+                      onTap: () => setState(() => _selectedWithdrawalId = sorted[i].id),
+                    ),
+                  ),
           ),
         ],
       );
@@ -1075,8 +1098,21 @@ class _MoneyScreenState extends State<MoneyScreen> {
                     return Column(
                       children: [
                         _CashSummaryCard(withdrawals: _withdrawals),
+                        WabwaySearchBar(
+                          controller: _cashSearchCtrl,
+                          hint: 'Search withdrawals…',
+                          onChanged: (v) => setState(() => _cashSearch = v),
+                        ),
                         Expanded(
-                          child: ListView.separated(
+                          child: sorted.isEmpty
+                              ? Center(
+                                  child: WabwayEmptyState(
+                                    icon: Icons.search_off_rounded,
+                                    title: 'No results for "$_cashSearch"',
+                                    description: 'Try a different search term.',
+                                  ),
+                                )
+                              : ListView.separated(
                             padding: const EdgeInsets.all(kSpace4),
                             itemCount: sorted.length,
                             separatorBuilder: (_, __) =>

@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 138,
+    label: 'Plan: jump to today',
+    changes: [
+      'A "today" button now appears in the plan screen when your trip has a day matching today — tap it to jump straight to today\'s schedule without scrolling',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 137,
     label: 'Travel: date-grouped timeline',
     changes: [

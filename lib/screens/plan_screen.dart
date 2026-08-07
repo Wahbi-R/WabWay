@@ -51,6 +51,7 @@ class _PlanScreenState extends State<PlanScreen> {
 
   String _search = '';
   final _searchCtrl = TextEditingController();
+  final _mobileListCtrl = ScrollController();
 
   ItineraryItem? get _selectedItem => itemById(_days, _selectedItemId ?? '');
   TripDay? get _selectedDay =>
@@ -70,6 +71,40 @@ class _PlanScreenState extends State<PlanScreen> {
     }
     if (totals.isEmpty) return null;
     return totals.entries.map((e) => fmtAmount(e.value, e.key)).join(' + ');
+  }
+
+  // Index of today's day in _days, or -1 if none.
+  int get _todayDayIndex {
+    final now = DateTime.now();
+    final todayKey = DateTime(now.year, now.month, now.day);
+    return _days.indexWhere((d) {
+      final k = DateTime(d.date.year, d.date.month, d.date.day);
+      return k == todayKey;
+    });
+  }
+
+  // Scrolls the mobile list to approximately today's day.
+  // Uses estimated heights since ListView.builder items may not be rendered.
+  void _scrollToToday() {
+    final idx = _todayDayIndex;
+    if (idx < 0 || !_mobileListCtrl.hasClients) return;
+
+    double offset = 16.0; // ListView top padding
+    if (_unplannedSpots.isNotEmpty) offset += 160.0; // rough unplanned section
+
+    for (int i = 0; i < idx; i++) {
+      final day = _days[i];
+      offset += 60.0; // day card header
+      offset += day.items.length * 56.0; // item tiles
+      if (day.notes?.isNotEmpty == true) offset += 32.0; // notes row
+      offset += 28.0; // card padding + spacing between cards
+    }
+
+    _mobileListCtrl.animateTo(
+      offset.clamp(0.0, _mobileListCtrl.position.maxScrollExtent),
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOut,
+    );
   }
 
   List<Spot> get _unplannedSpots {
@@ -101,6 +136,7 @@ class _PlanScreenState extends State<PlanScreen> {
   @override
   void dispose() {
     _searchCtrl.dispose();
+    _mobileListCtrl.dispose();
     _channel?.unsubscribe();
     _debounce?.cancel();
     super.dispose();
@@ -773,6 +809,13 @@ class _PlanScreenState extends State<PlanScreen> {
       appBar: AppBar(
         title: Text('Plan', style: kStyleTitle),
         actions: [
+          if (_todayDayIndex >= 0 && _search.isEmpty)
+            IconButton(
+              icon: const Icon(Icons.today_rounded, size: 20),
+              tooltip: 'Jump to today',
+              color: kColorPrimary,
+              onPressed: _scrollToToday,
+            ),
           if (_days.isNotEmpty) ...[
             IconButton(
               icon: const Icon(Icons.ios_share_rounded, size: 20),
@@ -840,6 +883,7 @@ class _PlanScreenState extends State<PlanScreen> {
                           child: _search.isNotEmpty
                               ? _buildMobileSearchResults(context)
                               : ListView.builder(
+                                  controller: _mobileListCtrl,
                                   padding: const EdgeInsets.all(kSpace4),
                                   itemCount: _days.length +
                                       (_unplannedSpots.isNotEmpty ? 1 : 0),

@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 177,
+    label: 'Docs: share your document list',
+    changes: [
+      'Tap the share icon in the Documents screen to send your document list as formatted text — grouped by type with title, amount, and notes',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 176,
     label: 'Links: share your link list',
     changes: [

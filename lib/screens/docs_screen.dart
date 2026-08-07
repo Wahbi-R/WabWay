@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
 import '../core/auth/profile_state.dart';
@@ -260,6 +262,39 @@ class _DocsScreenState extends State<DocsScreen> {
     );
   }
 
+  // ── Share ────────────────────────────────────────────────────────────────────
+
+  void _shareDocs() {
+    final list = _filtered;
+    if (list.isEmpty || kIsWeb) return;
+    final tripName = TripState.tripOf(context).name;
+    final buf = StringBuffer();
+    buf.writeln('$tripName — Documents');
+    buf.writeln();
+    final byType = <DocType, List<TripDocument>>{};
+    for (final doc in list) {
+      byType.putIfAbsent(doc.type, () => []).add(doc);
+    }
+    for (final type in DocType.values) {
+      final docs = byType[type];
+      if (docs == null || docs.isEmpty) continue;
+      buf.writeln('${type.label} (${docs.length})');
+      for (final d in docs) {
+        buf.write('  ${d.title}');
+        if (d.amount != null) {
+          final cur = d.currency ?? '';
+          buf.write(' — ${cur.isNotEmpty ? '$cur ' : ''}${d.amount!.toStringAsFixed(2)}');
+        }
+        buf.writeln();
+        if (d.notes != null && d.notes!.isNotEmpty) {
+          buf.writeln('    ${d.notes}');
+        }
+      }
+      buf.writeln();
+    }
+    Share.share(buf.toString().trim(), subject: '$tripName — Documents');
+  }
+
   // ── Build ────────────────────────────────────────────────────────────────────
 
   @override
@@ -310,6 +345,7 @@ class _DocsScreenState extends State<DocsScreen> {
             onAdd: () => _addDoc(context),
             sort: _sort,
             onSortChange: (s) => setState(() => _sort = s),
+            onShare: _docs.isNotEmpty && !kIsWeb ? _shareDocs : null,
           ),
           Expanded(
             child: Row(
@@ -403,6 +439,13 @@ class _DocsScreenState extends State<DocsScreen> {
       appBar: AppBar(
         title: Text('Documents', style: kStyleTitle),
         actions: [
+          if (_docs.isNotEmpty && !kIsWeb)
+            IconButton(
+              icon: const Icon(Icons.ios_share_rounded),
+              color: kColorInkSoft,
+              tooltip: 'Share document list',
+              onPressed: _shareDocs,
+            ),
           PopupMenuButton<_DocSort>(
             icon: Icon(
               Icons.sort_rounded,
@@ -515,12 +558,14 @@ class _DesktopDocsBar extends StatelessWidget {
     required this.onAdd,
     required this.sort,
     required this.onSortChange,
+    this.onShare,
   });
 
   final ValueChanged<String> onSearchChanged;
   final VoidCallback onAdd;
   final _DocSort sort;
   final ValueChanged<_DocSort> onSortChange;
+  final VoidCallback? onShare;
 
   @override
   Widget build(BuildContext context) {
@@ -544,6 +589,13 @@ class _DesktopDocsBar extends StatelessWidget {
             ),
           ),
           const Spacer(),
+          if (onShare != null)
+            IconButton(
+              icon: const Icon(Icons.ios_share_rounded),
+              color: kColorInkSoft,
+              tooltip: 'Share document list',
+              onPressed: onShare,
+            ),
           PopupMenuButton<_DocSort>(
             icon: Icon(
               Icons.sort_rounded,

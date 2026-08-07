@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/trip/app_trip_member.dart';
 import '../../core/trip/trip_state.dart';
+import '../../data/money_data.dart' show fmtAmount;
 import '../../data/plan_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
@@ -237,6 +238,40 @@ class _DayHeader extends StatelessWidget {
                   ],
                 ),
               ),
+
+              // Per-day planned cost total (hidden when no costs are set).
+              Builder(builder: (context) {
+                final Map<String, double> dayCosts = {};
+                for (final item in day.items) {
+                  if (item.plannedCost != null && item.plannedCost! > 0) {
+                    final c = item.currency ?? '';
+                    dayCosts[c] = (dayCosts[c] ?? 0) + item.plannedCost!;
+                  }
+                }
+                if (dayCosts.isEmpty) return const SizedBox.shrink();
+                final label = dayCosts.entries
+                    .map((e) => fmtAmount(e.value, e.key))
+                    .join(' + ');
+                return Padding(
+                  padding: const EdgeInsets.only(right: kSpace2),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: kColorPrimary.withValues(alpha: 0.08),
+                      borderRadius: kRadiusPill,
+                      border: Border.all(color: kColorPrimary.withValues(alpha: 0.2)),
+                    ),
+                    child: Text(
+                      label,
+                      style: kStyleCaption.copyWith(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: kColorPrimary,
+                      ),
+                    ),
+                  ),
+                );
+              }),
 
               // Completion badge — shows "X/Y done" when some are checked off,
               // plain count when none are done yet.

@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 139,
+    label: 'Plan: per-day cost totals',
+    changes: [
+      'Each plan day now shows the total planned cost for that day right in the day header — great for checking your daily budget at a glance',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 138,
     label: 'Plan: jump to today',
     changes: [

@@ -1049,30 +1049,50 @@ class _MoneyScreenState extends State<MoneyScreen> {
                                   return _DateGroupHeader(date: entry.date);
                                 }
                                 final r = (entry as _ReceiptItem).receipt;
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: kSpace2),
-                                  child: ReceiptListTile(
-                                    receipt:      r,
-                                    myId:         _userId,
-                                    members:      _members,
-                                    homeCurrency: _homeCurrency,
-                                    onTap: () => Navigator.push(
-                                      ctx,
-                                      MaterialPageRoute(
-                                        builder: (_) => ReceiptDetailScreen(
-                                          receipt:   r,
-                                          myId:      _userId,
-                                          members:   _members,
-                                          tripId:    _activeTripId!,
-                                          onDelete:  () => _deleteReceipt(r.id),
-                                          onUpdated: (updated) {
-                                            if (mounted) {
-                                              setState(() {
-                                                final idx = _receipts.indexWhere((x) => x.id == updated.id);
-                                                if (idx >= 0) _receipts[idx] = updated;
-                                              });
-                                            }
-                                          },
+                                return Dismissible(
+                                  key: ValueKey('receipt_${r.id}'),
+                                  direction: DismissDirection.endToStart,
+                                  confirmDismiss: (_) async {
+                                    _deleteReceipt(r.id);
+                                    ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                                      content: Text('"${r.title}" deleted.',
+                                          style: kStyleBody.copyWith(color: Colors.white)),
+                                      behavior: SnackBarBehavior.floating,
+                                    ));
+                                    return false;
+                                  },
+                                  background: Container(
+                                    alignment: Alignment.centerRight,
+                                    padding: const EdgeInsets.only(right: kSpace5, bottom: kSpace2),
+                                    color: Colors.red.shade50,
+                                    child: const Icon(Icons.delete_rounded,
+                                        color: Colors.red, size: 22),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(bottom: kSpace2),
+                                    child: ReceiptListTile(
+                                      receipt:      r,
+                                      myId:         _userId,
+                                      members:      _members,
+                                      homeCurrency: _homeCurrency,
+                                      onTap: () => Navigator.push(
+                                        ctx,
+                                        MaterialPageRoute(
+                                          builder: (_) => ReceiptDetailScreen(
+                                            receipt:   r,
+                                            myId:      _userId,
+                                            members:   _members,
+                                            tripId:    _activeTripId!,
+                                            onDelete:  () => _deleteReceipt(r.id),
+                                            onUpdated: (updated) {
+                                              if (mounted) {
+                                                setState(() {
+                                                  final idx = _receipts.indexWhere((x) => x.id == updated.id);
+                                                  if (idx >= 0) _receipts[idx] = updated;
+                                                });
+                                              }
+                                            },
+                                          ),
                                         ),
                                       ),
                                     ),

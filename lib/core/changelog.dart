@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 168,
+    label: 'Money: swipe receipt left to delete',
+    changes: [
+      'Swipe a receipt left to delete it without opening the detail screen — consistent with Travel, Stays, and Links',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 167,
     label: 'Money: filter receipts by payer on mobile',
     changes: [

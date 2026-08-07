@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 172,
+    label: 'Spots: quick-filter by status',
+    changes: [
+      'Filter chips for each status (Idea, Want to go, Visited…) now appear below the category strip — tap one or more to narrow the list without opening the filter sheet',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 171,
     label: 'Packing: share your list with the crew',
     changes: [

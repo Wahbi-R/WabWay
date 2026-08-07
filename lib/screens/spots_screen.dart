@@ -481,6 +481,7 @@ class _SpotsScreenState extends State<SpotsScreen> {
             selected: _selected,
             myVotes: _myVotes,
             filterCategory: _filterCategory,
+            filterStatuses: _filterStatuses,
             searchQuery: _searchQuery,
             searchCtrl: _searchCtrl,
             showSearch: _showSearch,
@@ -488,6 +489,13 @@ class _SpotsScreenState extends State<SpotsScreen> {
             canDelete: _canDelete,
             onSelectSpot: (s) => setState(() => _selectedId = s?.id),
             onFilterCategory: (c) => setState(() => _filterCategory = c),
+            onToggleStatus: (s) => setState(() {
+              if (_filterStatuses.contains(s)) {
+                _filterStatuses = {..._filterStatuses}..remove(s);
+              } else {
+                _filterStatuses = {..._filterStatuses, s};
+              }
+            }),
             onSearch: (q) => setState(() => _searchQuery = q),
             onToggleSearch: () => setState(() {
               _showSearch = !_showSearch;
@@ -505,8 +513,10 @@ class _SpotsScreenState extends State<SpotsScreen> {
           )
         : _MobileLayout(
             spots: _filtered,
+            allSpots: _spots,
             myVotes: _myVotes,
             filterCategory: _filterCategory,
+            filterStatuses: _filterStatuses,
             advancedFilterCount: _advancedFilterCount,
             searchQuery: _searchQuery,
             searchCtrl: _searchCtrl,
@@ -515,6 +525,13 @@ class _SpotsScreenState extends State<SpotsScreen> {
             onOpenSpot: (s) => _openDetailMobile(context, s),
             onLongPress: (s) => _quickStatusSheet(context, s),
             onFilterCategory: (c) => setState(() => _filterCategory = c),
+            onToggleStatus: (s) => setState(() {
+              if (_filterStatuses.contains(s)) {
+                _filterStatuses = {..._filterStatuses}..remove(s);
+              } else {
+                _filterStatuses = {..._filterStatuses, s};
+              }
+            }),
             onSearch: (q) => setState(() => _searchQuery = q),
             onToggleSearch: () => setState(() {
               _showSearch = !_showSearch;
@@ -566,8 +583,10 @@ PopupMenuItem<_SpotSort> _sortMenuItem(
 class _MobileLayout extends StatelessWidget {
   const _MobileLayout({
     required this.spots,
+    required this.allSpots,
     required this.myVotes,
     required this.filterCategory,
+    required this.filterStatuses,
     required this.advancedFilterCount,
     required this.searchQuery,
     required this.searchCtrl,
@@ -576,6 +595,7 @@ class _MobileLayout extends StatelessWidget {
     required this.onOpenSpot,
     required this.onLongPress,
     required this.onFilterCategory,
+    required this.onToggleStatus,
     required this.onSearch,
     required this.onToggleSearch,
     required this.onSortChange,
@@ -585,8 +605,10 @@ class _MobileLayout extends StatelessWidget {
   });
 
   final List<Spot> spots;
+  final List<Spot> allSpots;
   final Map<String, VoteType> myVotes;
   final SpotCategory? filterCategory;
+  final Set<SpotStatus> filterStatuses;
   final int advancedFilterCount;
   final String searchQuery;
   final TextEditingController searchCtrl;
@@ -595,6 +617,7 @@ class _MobileLayout extends StatelessWidget {
   final ValueChanged<Spot> onOpenSpot;
   final ValueChanged<Spot> onLongPress;
   final ValueChanged<SpotCategory?> onFilterCategory;
+  final ValueChanged<SpotStatus> onToggleStatus;
   final ValueChanged<String> onSearch;
   final VoidCallback onToggleSearch;
   final ValueChanged<_SpotSort> onSortChange;
@@ -683,7 +706,14 @@ class _MobileLayout extends StatelessWidget {
             child: _CategoryFilterStrip(
               selected: filterCategory,
               onChanged: onFilterCategory,
-              spots: spots,
+              spots: allSpots,
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: _StatusFilterStrip(
+              allSpots: allSpots,
+              filterStatuses: filterStatuses,
+              onToggle: onToggleStatus,
             ),
           ),
           SliverToBoxAdapter(
@@ -753,6 +783,7 @@ class _DesktopLayout extends StatelessWidget {
     required this.selected,
     required this.myVotes,
     required this.filterCategory,
+    required this.filterStatuses,
     required this.searchQuery,
     required this.searchCtrl,
     required this.showSearch,
@@ -760,6 +791,7 @@ class _DesktopLayout extends StatelessWidget {
     required this.canDelete,
     required this.onSelectSpot,
     required this.onFilterCategory,
+    required this.onToggleStatus,
     required this.onSearch,
     required this.onToggleSearch,
     required this.onSortChange,
@@ -776,6 +808,7 @@ class _DesktopLayout extends StatelessWidget {
   final Spot? selected;
   final Map<String, VoteType> myVotes;
   final SpotCategory? filterCategory;
+  final Set<SpotStatus> filterStatuses;
   final String searchQuery;
   final TextEditingController searchCtrl;
   final bool showSearch;
@@ -783,6 +816,7 @@ class _DesktopLayout extends StatelessWidget {
   final bool Function(Spot) canDelete;
   final ValueChanged<Spot?> onSelectSpot;
   final ValueChanged<SpotCategory?> onFilterCategory;
+  final ValueChanged<SpotStatus> onToggleStatus;
   final ValueChanged<String> onSearch;
   final VoidCallback onToggleSearch;
   final ValueChanged<_SpotSort> onSortChange;
@@ -821,7 +855,12 @@ class _DesktopLayout extends StatelessWidget {
                       _CategoryFilterStrip(
                         selected: filterCategory,
                         onChanged: onFilterCategory,
-                        spots: spots,
+                        spots: allSpots,
+                      ),
+                      _StatusFilterStrip(
+                        allSpots: allSpots,
+                        filterStatuses: filterStatuses,
+                        onToggle: onToggleStatus,
                       ),
                       Builder(builder: (_) {
                         final visited = spots.where((s) => s.status == SpotStatus.visited).length;
@@ -1107,6 +1146,60 @@ class _CategoryFilterStripState extends State<_CategoryFilterStrip> {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Status filter strip ─────────────────────────────────────────────────────
+
+class _StatusFilterStrip extends StatelessWidget {
+  const _StatusFilterStrip({
+    required this.allSpots,
+    required this.filterStatuses,
+    required this.onToggle,
+  });
+
+  final List<Spot> allSpots;
+  final Set<SpotStatus> filterStatuses;
+  final ValueChanged<SpotStatus> onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final presentStatuses = SpotStatus.values
+        .where((s) => allSpots.any((sp) => sp.status == s))
+        .toList();
+    if (presentStatuses.length < 2) return const SizedBox.shrink();
+
+    return SizedBox(
+      height: 44,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(kSpace4, 0, kSpace4, kSpace3),
+        children: presentStatuses.map((s) {
+          final count = allSpots.where((sp) => sp.status == s).length;
+          final selected = filterStatuses.contains(s);
+          return Padding(
+            padding: const EdgeInsets.only(right: kSpace2),
+            child: FilterChip(
+              label: Text('${s.label} ($count)'),
+              selected: selected,
+              onSelected: (_) => onToggle(s),
+              selectedColor: kColorPrimarySoft,
+              checkmarkColor: kColorPrimary,
+              side: BorderSide(
+                color: selected ? kColorPrimarySoftBorder : kColorBorder,
+              ),
+              shape: RoundedRectangleBorder(borderRadius: kRadiusPill),
+              labelStyle: kStyleCaption.copyWith(
+                color: selected ? kColorPrimary : kColorInk,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          );
+        }).toList(),
       ),
     );
   }

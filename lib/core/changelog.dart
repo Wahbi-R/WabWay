@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 161,
+    label: 'Docs: filter by who uploaded',
+    changes: [
+      'A new filter row appears in Documents when the trip has uploads from multiple people — tap a name to see only their files',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 160,
     label: 'Travel: export itinerary as CSV',
     changes: [

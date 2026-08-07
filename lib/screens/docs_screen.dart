@@ -45,6 +45,7 @@ class _DocsScreenState extends State<DocsScreen> {
 
   String? _selectedDocId;
   DocType? _filterType;
+  String? _filterUploaderId;
   _DocSort _sort = _DocSort.newest;
   String _search = '';
 
@@ -213,11 +214,12 @@ class _DocsScreenState extends State<DocsScreen> {
     final q = _search.toLowerCase().trim();
     final results = _docs.where((d) {
       final matchType = _filterType == null || d.type == _filterType;
+      final matchUploader = _filterUploaderId == null || d.uploadedById == _filterUploaderId;
       final matchSearch = q.isEmpty ||
           d.title.toLowerCase().contains(q) ||
           d.type.label.toLowerCase().contains(q) ||
           _memberName(d.uploadedById).toLowerCase().contains(q);
-      return matchType && matchSearch;
+      return matchType && matchUploader && matchSearch;
     }).toList();
     switch (_sort) {
       case _DocSort.newest:
@@ -231,6 +233,31 @@ class _DocsScreenState extends State<DocsScreen> {
         });
     }
     return results;
+  }
+
+  Widget _uploaderFilterStrip() {
+    final uploaderIds = _docs.map((d) => d.uploadedById).toSet();
+    if (uploaderIds.length < 2) return const SizedBox.shrink();
+    final myId = supabase.auth.currentUser?.id;
+    final uploaders = uploaderIds.toList()
+      ..sort((a, b) {
+        if (a == myId) return -1;
+        if (b == myId) return 1;
+        return _memberName(a).compareTo(_memberName(b));
+      });
+    return WabwayFilterStrip<String>(
+      selected: _filterUploaderId,
+      options: uploaders.map((id) => (
+        value: id,
+        label: id == myId ? 'Me' : _memberName(id),
+        count: _docs.where((d) => d.uploadedById == id).length,
+      )).toList(),
+      allCount: _docs.length,
+      onChanged: (id) => setState(() {
+        _filterUploaderId = id;
+        _selectedDocId = null;
+      }),
+    );
   }
 
   // ── Build ────────────────────────────────────────────────────────────────────
@@ -299,6 +326,7 @@ class _DocsScreenState extends State<DocsScreen> {
                         }),
                         scrollController: _filterScrollCtrl,
                       ),
+                      _uploaderFilterStrip(),
                       Expanded(child: _buildDesktopList()),
                     ],
                   ),
@@ -417,6 +445,7 @@ class _DocsScreenState extends State<DocsScreen> {
             }),
             scrollController: _filterScrollCtrl,
           ),
+          _uploaderFilterStrip(),
           Expanded(
             child: items.isEmpty
                 ? Center(

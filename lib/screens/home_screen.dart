@@ -591,7 +591,11 @@ class _TripHero extends StatelessWidget {
                     Expanded(
                       child: _HeroStat(
                         label: 'Spots visited',
-                        value: data != null ? '${data!.visitedCount}' : '—',
+                        value: data != null
+                            ? (data!.spotCount == 0
+                                ? '0'
+                                : '${data!.visitedCount}/${data!.spotCount}')
+                            : '—',
                       ),
                     ),
                     Expanded(
@@ -892,31 +896,63 @@ class _UpcomingCard extends StatelessWidget {
   const _UpcomingCard({required this.data});
   final _HomeData data;
 
+  static const int _maxItems = 3;
+
   @override
   Widget build(BuildContext context) {
-    final nextDay = data.nextDay;
-    final nextTravel = data.nextTravelItem;
+    final today = DateTime.now();
+    final todayOnly = DateTime(today.year, today.month, today.day);
 
-    final IconData icon;
-    final String label;
-    final String sub;
-    final DateTime? date;
+    // All upcoming plan days with at least one item, sorted soonest-first.
+    final upcomingDays = data.days
+        .where((d) => !d.date.isBefore(todayOnly) && d.items.isNotEmpty)
+        .toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
 
-    if (nextDay != null) {
-      final items = nextDay.sortedItems;
-      icon = Icons.calendar_month_rounded;
-      label = 'Day ${nextDay.dayNumber} · ${nextDay.city}';
-      sub = items.isNotEmpty ? items.first.title : '';
-      date = nextDay.date;
-    } else if (nextTravel != null) {
-      icon = nextTravel.type.icon;
-      label = nextTravel.title;
-      sub = [nextTravel.location, nextTravel.destination]
-          .whereType<String>()
-          .join(' → ');
-      date = nextTravel.date;
-    } else {
+    // All upcoming travel items with a date, sorted soonest-first.
+    final upcomingTravel = data.travelItems
+        .where((t) => t.date != null && !t.date!.isBefore(todayOnly))
+        .toList()
+      ..sort((a, b) => a.date!.compareTo(b.date!));
+
+    if (upcomingDays.isEmpty && upcomingTravel.isEmpty) {
       return const SizedBox.shrink();
+    }
+
+    // Merge the two sorted lists, interleaved by date, up to _maxItems.
+    final List<({IconData icon, String label, String sub, DateTime date})> items = [];
+    int di = 0, ti = 0;
+    while (items.length < _maxItems &&
+        (di < upcomingDays.length || ti < upcomingTravel.length)) {
+      final day = di < upcomingDays.length ? upcomingDays[di] : null;
+      final travel = ti < upcomingTravel.length ? upcomingTravel[ti] : null;
+
+      final bool useDay;
+      if (day != null && travel != null) {
+        useDay = !day.date.isAfter(travel.date!);
+      } else {
+        useDay = day != null;
+      }
+
+      if (useDay) {
+        final d = day!;
+        items.add((
+          icon: Icons.calendar_month_rounded,
+          label: 'Day ${d.dayNumber} · ${d.city}',
+          sub: d.sortedItems.isNotEmpty ? d.sortedItems.first.title : '',
+          date: d.date,
+        ));
+        di++;
+      } else {
+        final t = travel!;
+        items.add((
+          icon: t.type.icon,
+          label: t.title,
+          sub: [t.location, t.destination].whereType<String>().join(' → '),
+          date: t.date!,
+        ));
+        ti++;
+      }
     }
 
     return Column(
@@ -926,28 +962,37 @@ class _UpcomingCard extends StatelessWidget {
         const SizedBox(height: kSpace3),
         DecoratedBox(
           decoration: kCardDecoration(),
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: kSpace4,
-              vertical: kSpace2,
-            ),
-            leading: Container(
-              width: 36,
-              height: 36,
-              decoration: const BoxDecoration(
-                color: kColorSurfaceSunken,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, size: 18, color: kColorInkSoft),
-            ),
-            title: Text(label, style: kStyleBodyMedium),
-            subtitle: sub.isNotEmpty
-                ? Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Text(sub, style: kStyleCaption),
-                  )
-                : null,
-            trailing: date != null ? Text(fmtDate(date), style: kStyleOverline) : null,
+          child: Column(
+            children: [
+              for (int i = 0; i < items.length; i++) ...[
+                if (i > 0)
+                  const Divider(
+                      height: 1, indent: kSpace4 + 36 + kSpace3, endIndent: kSpace4),
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: kSpace4,
+                    vertical: kSpace2,
+                  ),
+                  leading: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: const BoxDecoration(
+                      color: kColorSurfaceSunken,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(items[i].icon, size: 18, color: kColorInkSoft),
+                  ),
+                  title: Text(items[i].label, style: kStyleBodyMedium),
+                  subtitle: items[i].sub.isNotEmpty
+                      ? Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(items[i].sub, style: kStyleCaption),
+                        )
+                      : null,
+                  trailing: Text(fmtDate(items[i].date), style: kStyleOverline),
+                ),
+              ],
+            ],
           ),
         ),
       ],

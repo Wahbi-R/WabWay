@@ -1172,6 +1172,13 @@ class _SpendingSummaryCard extends StatelessWidget {
     final sorted = totals.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
+    // Daily average — computed from distinct receipt dates.
+    final distinctDays = receipts
+        .map((r) => DateTime(r.date.year, r.date.month, r.date.day))
+        .toSet()
+        .length;
+    final avgPerDay = distinctDays > 0 ? grandTotal / distinctDays : null;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(kSpace4, kSpace4, kSpace4, 0),
       child: WabwayCard(
@@ -1184,6 +1191,15 @@ class _SpendingSummaryCard extends StatelessWidget {
                 Text('Spending by category',
                     style: kStyleCaption.copyWith(color: kColorInkSoft)),
                 const Spacer(),
+                if (avgPerDay != null) ...[
+                  Text(
+                    '~${fmtAmount(avgPerDay, homeCurrency)}/day',
+                    style: kStyleCaption.copyWith(color: kColorInkSoft),
+                  ),
+                  const SizedBox(width: kSpace2),
+                  const Text('·', style: TextStyle(color: kColorInkSoft)),
+                  const SizedBox(width: kSpace2),
+                ],
                 Text(fmtAmount(grandTotal, homeCurrency),
                     style: kStyleBodySemibold),
               ],

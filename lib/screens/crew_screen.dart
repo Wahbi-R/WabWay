@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
@@ -27,6 +28,8 @@ class CrewScreen extends StatefulWidget {
 
 class _CrewScreenState extends State<CrewScreen>
     with SingleTickerProviderStateMixin {
+  static const _kNativeChannel = MethodChannel('ca.wabble.wabway/location_sharing');
+
   late final TabController _tabs;
 
   List<TripMessage> _messages = [];
@@ -36,6 +39,7 @@ class _CrewScreenState extends State<CrewScreen>
   bool _sendingPing = false;
   bool _sendingFindMe = false;
   bool _sending = false;
+  bool _stopActionAdded = false;
 
   RealtimeChannel? _messageChannel;
   RealtimeChannel? _locationChannel;
@@ -51,6 +55,23 @@ class _CrewScreenState extends State<CrewScreen>
   void initState() {
     super.initState();
     _tabs = TabController(length: 2, vsync: this);
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      _kNativeChannel.setMethodCallHandler(_handleNativeCall);
+    }
+  }
+
+  Future<void> _handleNativeCall(MethodCall call) async {
+    if (call.method == 'onStopRequested') _stopSharing();
+  }
+
+  void _stopSharing() {
+    _positionStream?.cancel();
+    _positionStream = null;
+    _stopActionAdded = false;
+    if (_tripId != null && _userId != null) {
+      CrewService.deactivateLocationShare(tripId: _tripId!, userId: _userId!);
+    }
+    if (mounted) setState(() => _sharing = false);
   }
 
   @override
@@ -71,6 +92,9 @@ class _CrewScreenState extends State<CrewScreen>
       CrewService.deactivateLocationShare(tripId: _tripId!, userId: _userId!);
     }
     _positionStream?.cancel();
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      _kNativeChannel.setMethodCallHandler(null);
+    }
     _messageChannel?.unsubscribe();
     _locationChannel?.unsubscribe();
     _tabs.dispose();
@@ -147,13 +171,7 @@ class _CrewScreenState extends State<CrewScreen>
 
   Future<void> _toggleLocationSharing() async {
     if (_sharing) {
-      _positionStream?.cancel();
-      _positionStream = null;
-      try {
-        await CrewService.deactivateLocationShare(
-            tripId: _tripId!, userId: _userId!);
-      } catch (_) {}
-      if (mounted) setState(() => _sharing = false);
+      _stopSharing();
       return;
     }
 
@@ -174,6 +192,14 @@ class _CrewScreenState extends State<CrewScreen>
     _positionStream = Geolocator.getPositionStream(locationSettings: settings)
         .listen((pos) async {
       if (!_sharing || _tripId == null || _userId == null) return;
+      // On the first position received the foreground service is live —
+      // update its notification with a "Stop sharing" action button.
+      if (!_stopActionAdded && !kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+        _stopActionAdded = true;
+        try {
+          await _kNativeChannel.invokeMethod('addStopAction');
+        } catch (_) {}
+      }
       try {
         await CrewService.upsertLocationShare(
           tripId: _tripId!,
@@ -197,6 +223,7 @@ class _CrewScreenState extends State<CrewScreen>
           notificationTitle: 'WabWay location sharing',
           notificationText: 'Sharing your location with your crew',
           enableWakeLock: true,
+          setOngoing: true,
         ),
       );
     }

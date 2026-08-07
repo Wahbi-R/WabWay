@@ -102,6 +102,14 @@
             android:name="com.baseflow.geolocator.GeolocatorForegroundService"
             android:foregroundServiceType="location"
             android:exported="false"/>
+        <!-- Receives the "Stop sharing" action tap from the foreground notification -->
+        <receiver
+            android:name=".StopLocationReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="ca.wabble.wabway.STOP_LOCATION_SHARING"/>
+            </intent-filter>
+        </receiver>
         <!-- FileProvider for sharing downloaded APK URI with the installer -->
         <provider
             android:name="androidx.core.content.FileProvider"

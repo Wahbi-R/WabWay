@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 113,
+    label: 'Location sharing notification',
+    changes: [
+      'The location sharing notification can no longer be accidentally dismissed — it stays until you stop sharing',
+      'A "Stop sharing" button now appears directly in the notification so you can stop without opening the app',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 112,
     label: 'Money page scrolling',
     changes: [

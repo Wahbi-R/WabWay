@@ -1006,11 +1006,16 @@ class _PlanScreenState extends State<PlanScreen> {
                     ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'plan_fab',
-        onPressed: () {
+        onPressed: () async {
           if (_days.isEmpty) {
             _addDay(context);
+          } else if (_days.length == 1) {
+            _addItem(context, _days.first.id);
           } else {
-            _addItem(context, _days.last.id);
+            final result = await showDayPickerSheet(context, days: _days);
+            if (result == null || !mounted) return;
+            final (dayId, _) = result;
+            _addItem(context, dayId);
           }
         },
         icon: const Icon(Icons.event_note_rounded),

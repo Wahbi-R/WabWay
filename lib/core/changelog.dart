@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 159,
+    label: 'Plan: pick which day when adding an item',
+    changes: [
+      '"Add item" now asks which day when your trip has multiple days — no more items silently added to the last day',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 158,
     label: 'Packing: swipe to pack',
     changes: [

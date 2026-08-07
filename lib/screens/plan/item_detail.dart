@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/auth/profile_state.dart';
 import '../../core/supabase/doc_service.dart';
 import '../../core/supabase/plan_service.dart';
+import '../../core/trip/trip_state.dart';
 import '../../data/plan_data.dart';
 import '../../data/docs_data.dart';
 import '../../data/spot_data.dart' show Spot, fmtCommentTime;
@@ -904,6 +905,9 @@ class _MoveToDaySheet extends StatelessWidget {
 String _commentAuthorName(BuildContext context, String authorId) {
   final me = ProfileState.maybeOf(context);
   if (me?.id == authorId) return 'You';
+  final members = TripState.membersOf(context);
+  final match = members.where((m) => m.userId == authorId).firstOrNull;
+  if (match != null) return match.profile.displayName;
   return authorId.length >= 8 ? authorId.substring(0, 8) : authorId;
 }
 

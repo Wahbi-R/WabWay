@@ -13,12 +13,14 @@ class SpotListTile extends StatelessWidget {
     this.selected = false,
     this.myVote,
     this.onTap,
+    this.onLongPress,
   });
 
   final Spot spot;
   final bool selected;
   final VoteType? myVote;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -30,6 +32,7 @@ class SpotListTile extends StatelessWidget {
       hoverable: true,
       selected: selected,
       onTap: onTap,
+      onLongPress: onLongPress,
       child: Padding(
         padding: const EdgeInsets.all(kSpace4),
         child: Row(

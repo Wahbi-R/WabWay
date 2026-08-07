@@ -382,6 +382,73 @@ class _SpotsScreenState extends State<SpotsScreen> {
     );
   }
 
+  // ─── Quick status from long-press ─────────────────────────────────────────────
+
+  void _quickStatusSheet(BuildContext context, Spot spot) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: kColorPaper,
+      shape: const RoundedRectangleBorder(borderRadius: kRadiusSheet),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const WabwayDragHandle(),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: kSpace4),
+              child: Text(
+                spot.name,
+                style: kStyleBodyBold,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(height: kSpace2),
+            if (spot.status != SpotStatus.visited)
+              WabwayActionTile(
+                icon: Icons.check_circle_rounded,
+                label: 'Mark as visited',
+                color: kColorSuccess,
+                onTap: () { Navigator.pop(ctx); _setSpotStatus(spot, SpotStatus.visited); },
+              ),
+            if (spot.status != SpotStatus.skipped)
+              WabwayActionTile(
+                icon: Icons.cancel_rounded,
+                label: 'Skip this spot',
+                onTap: () { Navigator.pop(ctx); _setSpotStatus(spot, SpotStatus.skipped); },
+              ),
+            if (spot.status == SpotStatus.visited || spot.status == SpotStatus.skipped)
+              WabwayActionTile(
+                icon: Icons.restart_alt_rounded,
+                label: 'Reset to saved',
+                onTap: () { Navigator.pop(ctx); _setSpotStatus(spot, SpotStatus.idea); },
+              ),
+            const SizedBox(height: kSpace4),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _setSpotStatus(Spot spot, SpotStatus status) async {
+    try {
+      final updated = await SpotService.updateSpot(
+        spotId: spot.id,
+        name: spot.name,
+        city: spot.city,
+        area: spot.area,
+        category: spot.category,
+        status: status,
+        notes: spot.notes,
+        mapsUrl: spot.mapsUrl,
+        sourceUrl: spot.sourceUrl,
+        address: spot.address,
+      );
+      if (mounted) _onEditSpot(updated);
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) return const WabwayLoadingScaffold();
@@ -446,6 +513,7 @@ class _SpotsScreenState extends State<SpotsScreen> {
             showSearch: _showSearch,
             sortBy: _sortBy,
             onOpenSpot: (s) => _openDetailMobile(context, s),
+            onLongPress: (s) => _quickStatusSheet(context, s),
             onFilterCategory: (c) => setState(() => _filterCategory = c),
             onSearch: (q) => setState(() => _searchQuery = q),
             onToggleSearch: () => setState(() {
@@ -506,6 +574,7 @@ class _MobileLayout extends StatelessWidget {
     required this.showSearch,
     required this.sortBy,
     required this.onOpenSpot,
+    required this.onLongPress,
     required this.onFilterCategory,
     required this.onSearch,
     required this.onToggleSearch,
@@ -524,6 +593,7 @@ class _MobileLayout extends StatelessWidget {
   final bool showSearch;
   final _SpotSort sortBy;
   final ValueChanged<Spot> onOpenSpot;
+  final ValueChanged<Spot> onLongPress;
   final ValueChanged<SpotCategory?> onFilterCategory;
   final ValueChanged<String> onSearch;
   final VoidCallback onToggleSearch;
@@ -646,6 +716,7 @@ class _MobileLayout extends StatelessWidget {
                       spot: spots[i],
                       myVote: myVotes[spots[i].id],
                       onTap: () => onOpenSpot(spots[i]),
+                      onLongPress: () => onLongPress(spots[i]),
                     ),
                   ),
                 ),

@@ -10,6 +10,7 @@ class WabwayCard extends StatefulWidget {
     this.hoverable = false,
     this.selected = false,
     this.onTap,
+    this.onLongPress,
   });
 
   final Widget child;
@@ -17,6 +18,7 @@ class WabwayCard extends StatefulWidget {
   final bool hoverable;
   final bool selected;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
 
   @override
   State<WabwayCard> createState() => _WabwayCardState();
@@ -33,9 +35,10 @@ class _WabwayCardState extends State<WabwayCard> {
         ? Padding(padding: widget.padding!, child: widget.child)
         : widget.child;
 
-    if (widget.onTap != null) {
+    if (widget.onTap != null || widget.onLongPress != null) {
       content = InkWell(
         onTap: widget.onTap,
+        onLongPress: widget.onLongPress,
         borderRadius: kRadiusLg,
         splashColor: kColorPrimarySoft,
         highlightColor: kColorPrimarySoft.withValues(alpha: 0.4),

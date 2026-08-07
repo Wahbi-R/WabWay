@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 129,
+    label: 'Spots: quick status from list',
+    changes: [
+      'Long-press any spot to mark it visited, skip it, or reset it — no need to open the full detail',
+      'Plan item comments now show real names instead of garbled IDs',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 128,
     label: 'Plan item: tappable links',
     changes: [

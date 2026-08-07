@@ -213,6 +213,17 @@ class _PackingScreenState extends State<PackingScreen> {
     _load(silent: true);
   }
 
+  Future<void> _packAll() async {
+    final unpacked = _items.where((i) => !i.isPacked).toList();
+    if (unpacked.isEmpty) return;
+    final tripId = TripState.tripOf(context).id;
+    final userId = ProfileState.of(context).id;
+    setState(() {
+      _items = _items.map((i) => i.isPacked ? i : i.copyWith(isPacked: true, packedBy: userId)).toList();
+    });
+    PackingService.packAllItems(tripId, userId).catchError((_) => _load(silent: true));
+  }
+
   Future<void> _clearPacked() async {
     final packed = _items.where((i) => i.isPacked).toList();
     if (packed.isEmpty) return;
@@ -420,6 +431,7 @@ class _PackingScreenState extends State<PackingScreen> {
               if (v == 'template') _addFromTemplate();
               if (v == 'clear_packed') _clearPacked();
               if (v == 'share') _shareList();
+              if (v == 'pack_all') _packAll();
             },
             itemBuilder: (_) => [
               const PopupMenuItem(
@@ -430,6 +442,15 @@ class _PackingScreenState extends State<PackingScreen> {
                   Text('Add from template'),
                 ]),
               ),
+              if (total > packed)
+                const PopupMenuItem(
+                  value: 'pack_all',
+                  child: Row(children: [
+                    Icon(Icons.check_circle_rounded, size: 16),
+                    SizedBox(width: 10),
+                    Text('Pack all items'),
+                  ]),
+                ),
               if (!kIsWeb && total > 0)
                 const PopupMenuItem(
                   value: 'share',

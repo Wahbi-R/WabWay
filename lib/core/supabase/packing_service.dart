@@ -70,6 +70,14 @@ abstract final class PackingService {
         .eq('is_packed', true);
   }
 
+  static Future<void> packAllItems(String tripId, String userId) async {
+    await supabase
+        .from('packing_items')
+        .update({'is_packed': true, 'packed_by': userId})
+        .eq('trip_id', tripId)
+        .eq('is_packed', false);
+  }
+
   static Future<void> reorderItems(List<PackingItem> ordered) async {
     if (ordered.isEmpty) return;
     await supabase.from('packing_items').upsert(

@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 173,
+    label: 'Packing: pack all items at once',
+    changes: [
+      'Tap "Pack all items" from the packing menu to mark every remaining item as packed in one go — great for those final checks before heading to the airport',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 172,
     label: 'Spots: quick-filter by status',
     changes: [

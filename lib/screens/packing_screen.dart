@@ -25,12 +25,16 @@ class _PackingScreenState extends State<PackingScreen> {
   Timer? _debounce;
 
   String _search = '';
+  bool   _mineOnly = false;
   final _searchCtrl = TextEditingController();
 
-  List<PackingItem> get _filtered {
+  List<PackingItem> _getFiltered(String myId) {
     final q = _search.toLowerCase().trim();
-    if (q.isEmpty) return _items;
-    return _items.where((i) => i.title.toLowerCase().contains(q)).toList();
+    return _items.where((i) {
+      if (q.isNotEmpty && !i.title.toLowerCase().contains(q)) return false;
+      if (_mineOnly && i.assignedTo != myId) return false;
+      return true;
+    }).toList();
   }
 
   @override
@@ -243,9 +247,9 @@ class _PackingScreenState extends State<PackingScreen> {
     PackingService.reorderItems(unpacked).catchError((_) => _load(silent: true));
   }
 
-  Widget _buildList() {
-    final visible     = _filtered;
-    final canReorder  = _search.isEmpty;
+  Widget _buildList(List<PackingItem> filtered) {
+    final visible     = filtered;
+    final canReorder  = _search.isEmpty && !_mineOnly;
     final unpacked    = canReorder
         ? _items.where((i) => !i.isPacked).toList()
         : visible.where((i) => !i.isPacked).toList();
@@ -337,6 +341,8 @@ class _PackingScreenState extends State<PackingScreen> {
   Widget build(BuildContext context) {
     if (_loading) return const WabwayLoadingScaffold();
 
+    final myId  = ProfileState.of(context).id;
+    final filtered = _getFiltered(myId);
     final packed = _items.where((i) => i.isPacked).length;
     final total = _items.length;
 
@@ -403,17 +409,50 @@ class _PackingScreenState extends State<PackingScreen> {
                     hint: 'Search items…',
                     onChanged: (v) => setState(() => _search = v),
                   ),
+                  if (_items.any((i) => i.assignedTo != null))
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(kSpace4, 0, kSpace4, kSpace2),
+                      child: Row(
+                        children: [
+                          FilterChip(
+                            label: const Text('Mine only'),
+                            selected: _mineOnly,
+                            onSelected: (v) => setState(() => _mineOnly = v),
+                            selectedColor: kColorPrimarySoft,
+                            checkmarkColor: kColorPrimary,
+                            side: BorderSide(
+                              color: _mineOnly
+                                  ? kColorPrimarySoftBorder
+                                  : kColorBorder,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: kRadiusPill,
+                            ),
+                            labelStyle: kStyleCaption.copyWith(
+                              color: _mineOnly ? kColorPrimary : kColorInk,
+                              fontWeight: _mineOnly ? FontWeight.w600 : FontWeight.w400,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   _PackingProgress(packed: packed, total: total),
                   Expanded(
-                    child: _filtered.isEmpty
+                    child: filtered.isEmpty
                         ? Center(
                             child: WabwayEmptyState(
-                              icon: Icons.search_off_rounded,
-                              title: 'No results for "$_search"',
-                              description: 'Try a different search term.',
+                              icon: _mineOnly
+                                  ? Icons.person_off_rounded
+                                  : Icons.search_off_rounded,
+                              title: _mineOnly
+                                  ? 'No items assigned to you'
+                                  : 'No results for "$_search"',
+                              description: _mineOnly
+                                  ? 'Ask a crew member to assign you some items.'
+                                  : 'Try a different search term.',
                             ),
                           )
-                        : _buildList(),
+                        : _buildList(filtered),
                   ),
                 ],
               ),

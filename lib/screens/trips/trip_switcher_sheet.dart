@@ -41,14 +41,17 @@ Future<void> showTripSwitcherSheet(BuildContext context) {
   );
 }
 
-void _showJoinSheet(BuildContext context) {
-  showModalBottomSheet<void>(
+Future<void> _showJoinSheet(BuildContext context) async {
+  final tripId = await showModalBottomSheet<String?>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => _JoinTripProxy(onJoined: () => TripState.refresh(context)),
+    builder: (_) => const JoinWithCodeSheet(),
   );
+  if (tripId != null && context.mounted) {
+    TripState.refresh(context);
+  }
 }
 
 // ─── Sheet ───────────────────────────────────────────────────────────────────
@@ -197,15 +200,3 @@ class _TripSwitcherSheet extends StatelessWidget {
   }
 }
 
-// ─── Minimal join-code sheet proxy ────────────────────────────────────────────
-// Reuses the _JoinWithCodeSheet from trip_gate.dart by re-exporting a thin wrapper.
-
-class _JoinTripProxy extends StatelessWidget {
-  const _JoinTripProxy({required this.onJoined});
-  final VoidCallback onJoined;
-
-  @override
-  Widget build(BuildContext context) {
-    return const JoinWithCodeSheet();
-  }
-}

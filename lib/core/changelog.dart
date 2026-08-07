@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 115,
+    label: 'Invite code fix + email invites',
+    changes: [
+      'Fixed a bug that caused "something went wrong" when entering an invite code — invites now work correctly',
+      'You can now send an email invite directly from the Add Member sheet — if someone doesn\'t have a WabWay account yet, tap "Send email invite" to generate a code and open your mail app with it pre-filled',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 114,
     label: 'Location sharing improvements',
     changes: [

@@ -629,6 +629,18 @@ class _ActionsSection extends StatelessWidget {
           spacing: kSpace2,
           runSpacing: kSpace2,
           children: [
+            if (item.url != null)
+              WabwayButton(
+                label: 'Open booking',
+                icon: Icons.open_in_new_rounded,
+                size: WabwayButtonSize.sm,
+                onPressed: () async {
+                  final uri = Uri.tryParse(item.url!);
+                  if (uri != null && await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
+                },
+              ),
             if (linkedDocs.isNotEmpty)
               WabwayButton(
                 label: 'Open document',

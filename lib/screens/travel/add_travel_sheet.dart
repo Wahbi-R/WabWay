@@ -106,6 +106,7 @@ class _AddTravelContentState extends State<_AddTravelContent> {
   final _destinationCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
+  final _urlCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
 
   TravelItemType _type = TravelItemType.flight;
@@ -126,6 +127,7 @@ class _AddTravelContentState extends State<_AddTravelContent> {
       _destinationCtrl.text = item.destination ?? '';
       _addressCtrl.text = item.address ?? '';
       _confirmCtrl.text = item.confirmationNumber ?? '';
+      _urlCtrl.text = item.url ?? '';
       _notesCtrl.text = item.notes ?? '';
       _type   = item.type;
       _status = item.status;
@@ -154,6 +156,7 @@ class _AddTravelContentState extends State<_AddTravelContent> {
     _destinationCtrl.dispose();
     _addressCtrl.dispose();
     _confirmCtrl.dispose();
+    _urlCtrl.dispose();
     _notesCtrl.dispose();
     super.dispose();
   }
@@ -173,6 +176,7 @@ class _AddTravelContentState extends State<_AddTravelContent> {
       destination: _destinationCtrl.text.trim().isEmpty ? null : _destinationCtrl.text.trim(),
       address: _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim(),
       confirmationNumber: _confirmCtrl.text.trim().isEmpty ? null : _confirmCtrl.text.trim(),
+      url: _urlCtrl.text.trim().isEmpty ? null : _urlCtrl.text.trim(),
       notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
       linkedDocIds: _linkedDocIds.toList(),
     ));
@@ -406,6 +410,15 @@ class _AddTravelContentState extends State<_AddTravelContent> {
                     hint: 'Booking reference',
                     controller: _confirmCtrl,
                     textInputAction: TextInputAction.next,
+                  ),
+                  const SizedBox(height: kSpace4),
+
+                  WabwayTextField(
+                    label: 'Booking URL (optional)',
+                    hint: 'https://…',
+                    controller: _urlCtrl,
+                    textInputAction: TextInputAction.next,
+                    keyboardType: TextInputType.url,
                   ),
                   const SizedBox(height: kSpace4),
 

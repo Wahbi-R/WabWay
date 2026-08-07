@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 130,
+    label: 'Travel: booking URL',
+    changes: [
+      'Add a booking URL to any travel item (flight, hotel, rail pass, etc.) and tap "Open booking" to go straight to the airline or hotel manage-booking page',
+      'Works for any booking that has a web page — great for checking in or making seat changes on the go',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 129,
     label: 'Spots: quick status from list',
     changes: [

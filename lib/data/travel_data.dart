@@ -106,6 +106,7 @@ class TravelItem {
     this.location,
     this.destination,
     this.confirmationNumber,
+    this.url,
     this.address,
     this.notes,
     this.linkedDocIds = const [],
@@ -132,6 +133,8 @@ class TravelItem {
   final String? destination;
   // Booking/confirmation reference code
   final String? confirmationNumber;
+  // Booking page URL (e.g. airline manage-booking, hotel reservation page)
+  final String? url;
   // Street address (hotels, venues)
   final String? address;
   final String? notes;

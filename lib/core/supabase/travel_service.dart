@@ -42,6 +42,7 @@ abstract final class TravelService {
       location:               row['location'] as String?,
       destination:            row['destination'] as String?,
       confirmationNumber:     row['confirmation_number'] as String?,
+      url:                    row['url'] as String?,
       address:                row['address'] as String?,
       notes:                  row['notes'] as String?,
       linkedDocIds:           docIds,
@@ -93,6 +94,7 @@ abstract final class TravelService {
     String? location,
     String? destination,
     String? confirmationNumber,
+    String? url,
     String? address,
     String? notes,
     String? linkedItineraryItemId,
@@ -115,6 +117,8 @@ abstract final class TravelService {
         'destination': destination.trim(),
       if (confirmationNumber != null && confirmationNumber.trim().isNotEmpty)
         'confirmation_number': confirmationNumber.trim(),
+      if (url != null && url.trim().isNotEmpty)
+        'url': url.trim(),
       if (address != null && address.trim().isNotEmpty)
         'address': address.trim(),
       if (notes != null && notes.trim().isNotEmpty)
@@ -155,6 +159,7 @@ abstract final class TravelService {
       'location':            item.location,
       'destination':         item.destination,
       'confirmation_number': item.confirmationNumber,
+      'url':                 item.url,
       'address':             item.address,
       'notes':               item.notes,
     }).eq('id', item.id);

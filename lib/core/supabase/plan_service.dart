@@ -312,4 +312,33 @@ abstract final class PlanService {
     await supabase.from('itinerary_item_comments').delete().eq('id', commentId);
   }
 
+  static Future<void> syncDocLinks(
+    String itemId,
+    List<String> oldDocIds,
+    List<String> newDocIds,
+    String userId,
+  ) async {
+    final toRemove = oldDocIds.toSet().difference(newDocIds.toSet());
+    final toAdd    = newDocIds.toSet().difference(oldDocIds.toSet());
+
+    if (toRemove.isNotEmpty) {
+      await supabase
+          .from('document_links')
+          .delete()
+          .eq('linked_type', 'itinerary_item')
+          .eq('linked_id', itemId)
+          .inFilter('document_id', toRemove.toList());
+    }
+    if (toAdd.isNotEmpty) {
+      await supabase.from('document_links').insert(
+        toAdd.map((docId) => {
+          'document_id': docId,
+          'linked_type': 'itinerary_item',
+          'linked_id':   itemId,
+          'created_by':  userId,
+        }).toList(),
+      );
+    }
+  }
+
 }

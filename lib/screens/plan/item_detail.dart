@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/auth/profile_state.dart';
+import '../../core/supabase/client.dart';
 import '../../core/supabase/doc_service.dart';
 import '../../core/supabase/plan_service.dart';
 import '../../core/trip/trip_state.dart';
@@ -14,6 +15,7 @@ import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 import '../spots/spot_detail.dart';
 import 'add_item_sheet.dart';
+import 'doc_attach_sheet.dart';
 
 // ─── Mobile screen ────────────────────────────────────────────────────────────
 
@@ -545,7 +547,7 @@ class _DocChip extends StatelessWidget {
 
 // ─── Actions section ──────────────────────────────────────────────────────────
 
-class _ActionsSection extends StatelessWidget {
+class _ActionsSection extends StatefulWidget {
   const _ActionsSection({
     required this.item,
     this.spots = const [],
@@ -566,6 +568,61 @@ class _ActionsSection extends StatelessWidget {
   final VoidCallback? onDuplicate;
 
   @override
+  State<_ActionsSection> createState() => _ActionsSectionState();
+}
+
+class _ActionsSectionState extends State<_ActionsSection> {
+  Future<void> _attachDoc() async {
+    if (widget.docs.isEmpty) {
+      _snack(context, 'No documents in this trip yet.');
+      return;
+    }
+
+    final newIds = await showDocAttachSheet(
+      context,
+      docs: widget.docs,
+      initialSelectedIds: widget.item.linkedDocIds.toSet(),
+    );
+    if (newIds == null || !mounted) return;
+
+    final userId = supabase.auth.currentUser?.id ?? '';
+    try {
+      await PlanService.syncDocLinks(
+        widget.item.id,
+        widget.item.linkedDocIds,
+        newIds,
+        userId,
+      );
+      if (!mounted) return;
+      final updated = ItineraryItem(
+        id: widget.item.id,
+        dayId: widget.item.dayId,
+        title: widget.item.title,
+        type: widget.item.type,
+        time: widget.item.time,
+        city: widget.item.city,
+        country: widget.item.country,
+        location: widget.item.location,
+        mapsUrl: widget.item.mapsUrl,
+        confirmationUrl: widget.item.confirmationUrl,
+        notes: widget.item.notes,
+        linkedSpotId: widget.item.linkedSpotId,
+        linkedDocIds: newIds,
+        sortOrder: widget.item.sortOrder,
+        isDone: widget.item.isDone,
+        plannedCost: widget.item.plannedCost,
+        currency: widget.item.currency,
+      );
+      widget.onUpdated?.call(updated);
+      _snack(context,
+          newIds.isEmpty ? 'Documents unlinked.' : 'Documents updated.');
+    } catch (e) {
+      if (!mounted) return;
+      _snack(context, 'Could not update documents: $e');
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -576,19 +633,19 @@ class _ActionsSection extends StatelessWidget {
           spacing: kSpace2,
           runSpacing: kSpace2,
           children: [
-            if (item.mapsUrl != null)
+            if (widget.item.mapsUrl != null)
               WabwayButton(
                 label: 'Open Maps',
                 icon: Icons.map_rounded,
                 size: WabwayButtonSize.sm,
-                onPressed: () => _openMaps(context, item.mapsUrl!),
+                onPressed: () => _openMaps(context, widget.item.mapsUrl!),
               ),
             WabwayButton(
               label: 'Attach Document',
               icon: Icons.attach_file_rounded,
               variant: WabwayButtonVariant.ghost,
               size: WabwayButtonSize.sm,
-              onPressed: () => _snack(context, 'Attach a document to this item'),
+              onPressed: _attachDoc,
             ),
             WabwayButton(
               label: 'Edit',
@@ -597,15 +654,15 @@ class _ActionsSection extends StatelessWidget {
               size: WabwayButtonSize.sm,
               onPressed: () => _editItem(context),
             ),
-            if (onDuplicate != null)
+            if (widget.onDuplicate != null)
               WabwayButton(
                 label: 'Duplicate',
                 icon: Icons.copy_rounded,
                 variant: WabwayButtonVariant.ghost,
                 size: WabwayButtonSize.sm,
-                onPressed: onDuplicate,
+                onPressed: widget.onDuplicate,
               ),
-            if (onMove != null && days.length > 1)
+            if (widget.onMove != null && widget.days.length > 1)
               WabwayButton(
                 label: 'Move day',
                 icon: Icons.swap_vert_rounded,
@@ -629,26 +686,26 @@ class _ActionsSection extends StatelessWidget {
   Future<void> _editItem(BuildContext context) async {
     final updated = await showAddItemSheet(
       context,
-      dayId: item.dayId,
-      spots: spots,
-      docs: docs,
-      initialItem: item,
+      dayId: widget.item.dayId,
+      spots: widget.spots,
+      docs: widget.docs,
+      initialItem: widget.item,
     );
     if (updated != null && context.mounted) {
-      onUpdated?.call(updated);
+      widget.onUpdated?.call(updated);
       Navigator.maybePop(context);
     }
   }
 
   Future<void> _moveItem(BuildContext context) async {
-    final otherDays = days.where((d) => d.id != item.dayId).toList();
+    final otherDays = widget.days.where((d) => d.id != widget.item.dayId).toList();
     if (otherDays.isEmpty || !context.mounted) return;
     final picked = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (_) => _MoveToDaySheet(days: otherDays),
     );
-    if (picked != null && context.mounted) onMove?.call(picked);
+    if (picked != null && context.mounted) widget.onMove?.call(picked);
   }
 
   void _snack(BuildContext context, String msg) {
@@ -667,7 +724,7 @@ class _ActionsSection extends StatelessWidget {
         shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
         title: Text('Delete item?', style: kStyleBodySemibold),
         content: Text(
-          'Remove "${item.title}" from the itinerary?',
+          'Remove "${widget.item.title}" from the itinerary?',
           style: kStyleBody,
         ),
         actions: [
@@ -678,7 +735,7 @@ class _ActionsSection extends StatelessWidget {
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
-              onDelete?.call();
+              widget.onDelete?.call();
               if (context.mounted) Navigator.maybePop(context);
             },
             child: Text('Delete',

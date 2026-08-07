@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 133,
+    label: 'Plan items: attach documents',
+    changes: [
+      'Tap "Attach Document" on any plan item to link trip documents directly — meeting notes, tickets, confirmations — so everything for a day\'s activity is in one place',
+      'Already-linked documents are pre-checked so adding or removing a link is a single tap',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 132,
     label: 'Travel: attach documents',
     changes: [

@@ -26,6 +26,7 @@ enum _SpotSort {
   newest,      // DB insertion order — default
   alphabetical, // A→Z by spot name
   mostVoted,   // highest must-do vote count first, then total votes
+  byCity,      // grouped by city name A→Z, then spot name within city
 }
 
 class SpotsScreen extends StatefulWidget {
@@ -197,6 +198,12 @@ class _SpotsScreenState extends State<SpotsScreen> {
           final aTotal = VoteType.values.fold(0, (sum, v) => sum + a.votes.voters(v).length);
           final bTotal = VoteType.values.fold(0, (sum, v) => sum + b.votes.voters(v).length);
           return bTotal.compareTo(aTotal);
+        });
+      case _SpotSort.byCity:
+        list.sort((a, b) {
+          final cmp = a.city.toLowerCase().compareTo(b.city.toLowerCase());
+          if (cmp != 0) return cmp;
+          return a.name.toLowerCase().compareTo(b.name.toLowerCase());
         });
       case _SpotSort.newest:
         break; // _spots is already in newest-first order (insert at index 0)
@@ -664,6 +671,7 @@ class _MobileLayout extends StatelessWidget {
                   _sortMenuItem(_SpotSort.newest,       'Newest first', sortBy),
                   _sortMenuItem(_SpotSort.alphabetical, 'A – Z',        sortBy),
                   _sortMenuItem(_SpotSort.mostVoted,    'Most voted',   sortBy),
+                  _sortMenuItem(_SpotSort.byCity,       'By city',      sortBy),
                 ],
               ),
               Stack(
@@ -995,6 +1003,7 @@ class _DesktopTopBar extends StatelessWidget {
               _sortMenuItem(_SpotSort.newest,       'Newest first', sortBy),
               _sortMenuItem(_SpotSort.alphabetical, 'A – Z',        sortBy),
               _sortMenuItem(_SpotSort.mostVoted,    'Most voted',   sortBy),
+              _sortMenuItem(_SpotSort.byCity,       'By city',      sortBy),
             ],
           ),
           const SizedBox(width: kSpace2),

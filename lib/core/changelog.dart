@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 174,
+    label: 'Spots: sort by city',
+    changes: [
+      'Choose "By city" in the spots sort menu to group all your spots by location — handy for planning which areas to hit each day',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 173,
     label: 'Packing: pack all items at once',
     changes: [

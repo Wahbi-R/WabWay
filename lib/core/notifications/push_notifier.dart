@@ -14,6 +14,7 @@ Future<void> pushNotify({
   String? excludeUserId,
   Map<String, String> data = const {},
   String? prefKey, // one of kPrefNotif* constants — null means always send
+  bool highPriority = false,
 }) async {
   if (kIsWeb) return;
   if (prefKey != null) {
@@ -29,6 +30,7 @@ Future<void> pushNotify({
         'body': body,
         if (excludeUserId != null) 'exclude_user_id': excludeUserId,
         'data': data,
+        if (highPriority) 'high_priority': true,
       },
     );
   } catch (e) {

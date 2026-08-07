@@ -53,7 +53,7 @@ async function getFcmAccessToken(): Promise<string> {
 
 // ── Send one FCM message ──────────────────────────────────────────────────────
 
-async function sendFcm(token: string, title: string, body: string, data: Record<string, string>, accessToken: string) {
+async function sendFcm(token: string, title: string, body: string, data: Record<string, string>, accessToken: string, highPriority = false) {
   const res = await fetch(FCM_URL, {
     method: 'POST',
     headers: {
@@ -66,6 +66,13 @@ async function sendFcm(token: string, title: string, body: string, data: Record<
         notification: { title, body },
         data,
         android: { priority: 'high' },
+        // For SOS / high-priority calls, wake the device immediately on iOS too
+        ...(highPriority && {
+          apns: {
+            headers: { 'apns-priority': '10', 'apns-push-type': 'alert' },
+            payload: { aps: { sound: 'default', 'content-available': 1 } },
+          },
+        }),
       },
     }),
   })
@@ -83,7 +90,7 @@ async function sendFcm(token: string, title: string, body: string, data: Record<
 serve(async (req) => {
   if (req.method !== 'POST') return new Response('method not allowed', { status: 405 })
 
-  const { title, body, trip_id, exclude_user_id, data = {} } = await req.json()
+  const { title, body, trip_id, exclude_user_id, data = {}, high_priority = false } = await req.json()
   if (!title || !body || !trip_id) {
     return new Response('missing title/body/trip_id', { status: 400 })
   }
@@ -118,7 +125,7 @@ serve(async (req) => {
 
   const results = await Promise.all(
     tokens.map(async (row: { id: string; token: string }) => {
-      const result = await sendFcm(row.token, title, body, data, accessToken)
+      const result = await sendFcm(row.token, title, body, data, accessToken, high_priority)
       // Clean up stale tokens
       if (result === 'invalid') {
         await supabase.from('device_tokens').delete().eq('id', row.id)

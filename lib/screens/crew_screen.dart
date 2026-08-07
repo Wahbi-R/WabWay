@@ -274,6 +274,31 @@ class _CrewScreenState extends State<CrewScreen>
 
   Future<void> _sendFindMe() async {
     if (_sendingFindMe) return;
+
+    // Confirm before alerting the whole crew.
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: kColorPaper,
+        title: const Text('Alert your crew?'),
+        content: const Text(
+          'Everyone in the trip will get a high-priority notification and can navigate to your location.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: kColorDanger),
+            child: const Text('Send SOS'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+
     final granted = await _ensureLocationPermission();
     if (!granted || !mounted) return;
 
@@ -295,6 +320,7 @@ class _CrewScreenState extends State<CrewScreen>
         body: 'Tap to navigate to them',
         excludeUserId: _userId,
         data: {'screen': 'crew', 'trip_id': _tripId!},
+        highPriority: true,
       );
     } catch (_) {
       _showError('Could not get location');
@@ -957,70 +983,93 @@ class _InputBar extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(
-              horizontal: kSpace3, vertical: kSpace2),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          padding: const EdgeInsets.fromLTRB(kSpace3, kSpace2, kSpace3, kSpace2),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              _CircleIconButton(
-                tooltip: 'Link Up — share your location in chat',
-                icon: Icons.location_on_rounded,
-                color: kColorPrimarySoft,
-                iconColor: kColorPrimary,
-                loading: sendingPing,
-                onTap: onLinkUp,
-              ),
-              const SizedBox(width: kSpace1),
-              _CircleIconButton(
-                tooltip: 'Find Me — alert crew to come to you',
-                icon: Icons.sos_rounded,
-                color: kColorDangerSoft,
-                iconColor: kColorDanger,
-                loading: sendingFindMe,
-                onTap: onFindMe,
-              ),
-              const SizedBox(width: kSpace2),
-              Expanded(
-                child: TextField(
-                  controller: textController,
-                  style: kStyleBody,
-                  minLines: 1,
-                  maxLines: 5,
-                  textInputAction: TextInputAction.send,
-                  onSubmitted: (_) => onSend(),
-                  decoration: InputDecoration(
-                    hintText: 'Message the crew…',
-                    hintStyle: kStyleBody
-                        .copyWith(color: kColorInkSoft.withValues(alpha: 0.5)),
-                    filled: true,
-                    fillColor: kColorSurfaceSunken,
-                    border: const OutlineInputBorder(
-                      borderRadius: kRadiusPill,
-                      borderSide: BorderSide.none,
-                    ),
-                    enabledBorder: const OutlineInputBorder(
-                      borderRadius: kRadiusPill,
-                      borderSide: BorderSide.none,
-                    ),
-                    focusedBorder: const OutlineInputBorder(
-                      borderRadius: kRadiusPill,
-                      borderSide: BorderSide(
-                          color: kColorPrimary, width: 1.5),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: kSpace4, vertical: kSpace2 + 2),
-                    isDense: true,
+              // SOS button — prominent, full width
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: FilledButton.icon(
+                  onPressed: sendingFindMe ? null : onFindMe,
+                  icon: sendingFindMe
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.sos_rounded, size: 20),
+                  label: Text(
+                    sendingFindMe ? 'Alerting crew…' : 'SOS  ·  Find Me',
+                    style: kStyleBodySemibold.copyWith(color: Colors.white),
+                  ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: sendingFindMe ? kColorBorder : kColorDanger,
+                    foregroundColor: Colors.white,
+                    shape: const RoundedRectangleBorder(borderRadius: kRadiusMd),
+                    padding: EdgeInsets.zero,
                   ),
                 ),
               ),
-              const SizedBox(width: kSpace2),
-              _CircleIconButton(
-                tooltip: 'Send',
-                icon: Icons.send_rounded,
-                color: kColorPrimary,
-                iconColor: Colors.white,
-                loading: sending,
-                onTap: onSend,
+              const SizedBox(height: kSpace2),
+              // Message row
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  _CircleIconButton(
+                    tooltip: 'Link Up — share your location in chat',
+                    icon: Icons.location_on_rounded,
+                    color: kColorPrimarySoft,
+                    iconColor: kColorPrimary,
+                    loading: sendingPing,
+                    onTap: onLinkUp,
+                  ),
+                  const SizedBox(width: kSpace2),
+                  Expanded(
+                    child: TextField(
+                      controller: textController,
+                      style: kStyleBody,
+                      minLines: 1,
+                      maxLines: 5,
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: (_) => onSend(),
+                      decoration: InputDecoration(
+                        hintText: 'Message the crew…',
+                        hintStyle: kStyleBody.copyWith(
+                            color: kColorInkSoft.withValues(alpha: 0.5)),
+                        filled: true,
+                        fillColor: kColorSurfaceSunken,
+                        border: const OutlineInputBorder(
+                          borderRadius: kRadiusPill,
+                          borderSide: BorderSide.none,
+                        ),
+                        enabledBorder: const OutlineInputBorder(
+                          borderRadius: kRadiusPill,
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: const OutlineInputBorder(
+                          borderRadius: kRadiusPill,
+                          borderSide:
+                              BorderSide(color: kColorPrimary, width: 1.5),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: kSpace4, vertical: kSpace2 + 2),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: kSpace2),
+                  _CircleIconButton(
+                    tooltip: 'Send',
+                    icon: Icons.send_rounded,
+                    color: kColorPrimary,
+                    iconColor: Colors.white,
+                    loading: sending,
+                    onTap: onSend,
+                  ),
+                ],
               ),
             ],
           ),

@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 134,
+    label: 'Travel: plan + doc badges',
+    changes: [
+      'Travel item cards now show an "In plan" badge when that booking is already on your itinerary — so you never add a flight or hotel twice',
+      'A purple doc badge shows how many documents are linked — quick confirmation that your boarding pass or hotel voucher is attached',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 133,
     label: 'Plan items: attach documents',
     changes: [

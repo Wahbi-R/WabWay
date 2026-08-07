@@ -162,6 +162,29 @@ class _TravelItemCardState extends State<TravelItemCard> {
                           const SizedBox(height: kSpace2),
                           _ConfirmationRow(number: item.confirmationNumber!),
                         ],
+                        if (item.linkedDayId != null ||
+                            item.linkedDocIds.isNotEmpty) ...[
+                          const SizedBox(height: kSpace2),
+                          Row(
+                            children: [
+                              if (item.linkedDayId != null)
+                                _MicroBadge(
+                                  icon: Icons.event_note_rounded,
+                                  label: 'In plan',
+                                  color: const Color(0xFF4A9B8A),
+                                ),
+                              if (item.linkedDayId != null &&
+                                  item.linkedDocIds.isNotEmpty)
+                                const SizedBox(width: kSpace2),
+                              if (item.linkedDocIds.isNotEmpty)
+                                _MicroBadge(
+                                  icon: Icons.attach_file_rounded,
+                                  label: '${item.linkedDocIds.length} doc${item.linkedDocIds.length == 1 ? '' : 's'}',
+                                  color: const Color(0xFF7D6FB5),
+                                ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -172,6 +195,46 @@ class _TravelItemCardState extends State<TravelItemCard> {
         ),
       ),
     ),
+    );
+  }
+}
+
+// ─── Micro badge ──────────────────────────────────────────────────────────────
+
+class _MicroBadge extends StatelessWidget {
+  const _MicroBadge({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: kRadiusPill,
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 10, color: color),
+          const SizedBox(width: 3),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

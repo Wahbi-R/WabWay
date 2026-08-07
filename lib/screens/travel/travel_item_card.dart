@@ -5,19 +5,24 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 
-// Returns a short countdown label relative to today, or null when there is
-// no date or the item's start date has already passed.
-String? _countdownLabel(TravelItem item) {
+// Returns a short countdown label relative to today. Upcoming items show
+// "Today!", "Tomorrow", or "In N days". Past items show how long ago they
+// were. Cancelled items always return null.
+({String label, bool isPast}) _countdownLabel(TravelItem item) {
+  const none = (label: '', isPast: false);
+  if (item.status == TravelBookingStatus.cancelled) return none;
   final start = item.date;
-  if (start == null) return null;
+  if (start == null) return none;
   final now   = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
   final day   = DateTime(start.year, start.month, start.day);
-  if (today.isAfter(day)) return null;
-  final diff = day.difference(today).inDays;
-  if (diff == 0) return 'Today!';
-  if (diff == 1) return 'Tomorrow';
-  return 'In $diff days';
+  final diff  = day.difference(today).inDays;
+  if (diff == 0) return (label: 'Today!', isPast: false);
+  if (diff == 1) return (label: 'Tomorrow', isPast: false);
+  if (diff > 1)  return (label: 'In $diff days', isPast: false);
+  final past = -diff;
+  if (past == 1) return (label: 'Yesterday', isPast: true);
+  return (label: '$past days ago', isPast: true);
 }
 
 class TravelItemCard extends StatefulWidget {
@@ -44,8 +49,11 @@ class _TravelItemCardState extends State<TravelItemCard> {
     final item = widget.item;
     final color = item.type.color;
     final softColor = item.type.softColor;
+    final isPast = _countdownLabel(item).isPast;
 
-    return MouseRegion(
+    return Opacity(
+      opacity: isPast ? 0.65 : 1.0,
+      child: MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       cursor: SystemMouseCursors.click,
@@ -136,16 +144,20 @@ class _TravelItemCardState extends State<TravelItemCard> {
                           const SizedBox(height: kSpace2),
                           _DateRow(item: item),
                         ],
-                        if (_countdownLabel(item) != null) ...[
-                          const SizedBox(height: kSpace1),
-                          Text(
-                            _countdownLabel(item)!,
-                            style: kStyleCaption.copyWith(
-                              color: color,
-                              fontWeight: FontWeight.w600,
+                        Builder(builder: (_) {
+                          final cd = _countdownLabel(item);
+                          if (cd.label.isEmpty) return const SizedBox.shrink();
+                          return Padding(
+                            padding: const EdgeInsets.only(top: kSpace1),
+                            child: Text(
+                              cd.label,
+                              style: kStyleCaption.copyWith(
+                                color: cd.isPast ? kColorInkSoft : color,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                          ),
-                        ],
+                          );
+                        }),
                         if (item.hasConfirmation) ...[
                           const SizedBox(height: kSpace2),
                           _ConfirmationRow(number: item.confirmationNumber!),
@@ -159,10 +171,10 @@ class _TravelItemCardState extends State<TravelItemCard> {
           ),
         ),
       ),
+    ),
     );
   }
 }
-
 // ─── Type chip ────────────────────────────────────────────────────────────────
 
 class _TypeChip extends StatelessWidget {

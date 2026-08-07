@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 124,
+    label: 'Travel: past booking labels',
+    changes: [
+      'Completed travel items (departure in the past) now appear dimmed so upcoming bookings stand out',
+      'The countdown label switches to "Yesterday" or "N days ago" in muted grey once a booking has passed',
+      'Cancelled items are unchanged',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 123,
     label: 'Receipt "Paid by" filter',
     changes: [

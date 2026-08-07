@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 144,
+    label: 'Plan: trip progress bar',
+    changes: [
+      'A progress bar now appears on the Plan screen once you start checking off items — shows "X of Y done" with a percentage so you can see how the day (or whole trip) is going at a glance',
+      'The bar turns green when every item across all days is complete',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 143,
     label: 'Packing: add multiple items at once',
     changes: [

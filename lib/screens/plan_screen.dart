@@ -111,6 +111,9 @@ class _PlanScreenState extends State<PlanScreen> {
   int get _completedCount =>
       _days.fold(0, (sum, d) => sum + d.items.where((i) => i.isDone).length);
 
+  int get _totalItemCount =>
+      _days.fold(0, (sum, d) => sum + d.items.length);
+
   List<Spot> get _unplannedSpots {
     final linkedIds = {
       for (final day in _days)
@@ -685,6 +688,11 @@ class _PlanScreenState extends State<PlanScreen> {
                                       ),
                                       if (_search.isEmpty && _budgetSummary != null)
                                         _PlanBudgetBar(summary: _budgetSummary!),
+                                      if (_search.isEmpty && _completedCount > 0)
+                                        _PlanProgressBar(
+                                          done: _completedCount,
+                                          total: _totalItemCount,
+                                        ),
                                       Expanded(
                                         child: _search.isNotEmpty
                                             ? _buildDesktopSearchResults()
@@ -900,6 +908,11 @@ class _PlanScreenState extends State<PlanScreen> {
                         ),
                         if (_search.isEmpty && _budgetSummary != null)
                           _PlanBudgetBar(summary: _budgetSummary!),
+                        if (_search.isEmpty && _completedCount > 0)
+                          _PlanProgressBar(
+                            done: _completedCount,
+                            total: _totalItemCount,
+                          ),
                         Expanded(
                           child: _search.isNotEmpty
                               ? _buildMobileSearchResults(context)
@@ -1079,6 +1092,63 @@ class _PlanBudgetBar extends StatelessWidget {
           const SizedBox(width: kSpace2),
           Text('Planned · $summary',
               style: kStyleCaption.copyWith(color: kColorPrimary, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Progress bar ─────────────────────────────────────────────────────────────
+
+class _PlanProgressBar extends StatelessWidget {
+  const _PlanProgressBar({required this.done, required this.total});
+  final int done;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    final pct = total > 0 ? done / total : 0.0;
+    final allDone = done == total && total > 0;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: kSpace4, vertical: kSpace2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                allDone ? Icons.check_circle_rounded : Icons.checklist_rounded,
+                size: 14,
+                color: allDone ? kColorSuccess : kColorInkSoft,
+              ),
+              const SizedBox(width: kSpace2),
+              Text(
+                allDone ? 'All done!' : '$done of $total items done',
+                style: kStyleCaption.copyWith(
+                  color: allDone ? kColorSuccess : kColorInkSoft,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '${(pct * 100).round()}%',
+                style: kStyleCaption.copyWith(
+                  color: allDone ? kColorSuccess : kColorInkSoft,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: kRadiusPill,
+            child: LinearProgressIndicator(
+              value: pct,
+              minHeight: 4,
+              backgroundColor: kColorSurfaceSunken,
+              color: allDone ? kColorSuccess : kColorPrimary,
+            ),
+          ),
         ],
       ),
     );

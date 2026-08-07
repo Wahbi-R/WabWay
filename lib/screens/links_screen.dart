@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
@@ -194,6 +196,31 @@ class _LinksScreenState extends State<LinksScreen> {
     }
   }
 
+  void _shareLinks() {
+    final list = _filteredLinks;
+    if (list.isEmpty || kIsWeb) return;
+    final tripName = TripState.tripOf(context).name;
+    final buf = StringBuffer();
+    buf.writeln('$tripName — Links');
+    buf.writeln();
+    final byCategory = <LinkCategory, List<TripLink>>{};
+    for (final link in list) {
+      byCategory.putIfAbsent(link.category, () => []).add(link);
+    }
+    for (final cat in LinkCategory.values) {
+      final links = byCategory[cat];
+      if (links == null || links.isEmpty) continue;
+      buf.writeln(cat.label);
+      for (final l in links) {
+        buf.writeln('  ${l.title}');
+        buf.writeln('  ${l.url}');
+        if (l.notes != null && l.notes!.isNotEmpty) buf.writeln('  ${l.notes}');
+      }
+      buf.writeln();
+    }
+    Share.share(buf.toString().trim(), subject: '$tripName — Links');
+  }
+
   @override
   Widget build(BuildContext context) {
     final scaffold = Scaffold(
@@ -201,7 +228,14 @@ class _LinksScreenState extends State<LinksScreen> {
       appBar: AppBar(
         title: Text('Links', style: kStyleTitle),
         actions: [
-          if (_links.isNotEmpty)
+          if (_links.isNotEmpty) ...[
+            if (!kIsWeb)
+              IconButton(
+                icon: const Icon(Icons.ios_share_rounded),
+                color: kColorInkSoft,
+                tooltip: 'Share links',
+                onPressed: _shareLinks,
+              ),
             PopupMenuButton<_LinkSort>(
               icon: Icon(
                 Icons.sort_rounded,
@@ -215,6 +249,7 @@ class _LinksScreenState extends State<LinksScreen> {
                 _linkSortItem(_LinkSort.alphabetical, 'A – Z',        _sort),
               ],
             ),
+          ],
           IconButton(
             icon: const Icon(Icons.add_rounded),
             color: kColorPrimary,

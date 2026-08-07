@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 176,
+    label: 'Links: share your link list',
+    changes: [
+      'Tap the share icon in the Links screen to send your full link collection as a formatted list — grouped by category with title, URL, and notes for easy sharing',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 175,
     label: 'Stays: export to CSV',
     changes: [

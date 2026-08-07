@@ -239,6 +239,29 @@ class _DayHeader extends StatelessWidget {
                         ],
                       ],
                     ),
+                    // Time span row — shown when ≥2 items have a time set
+                    Builder(builder: (context) {
+                      final timed = day.items.where((i) => i.time != null).toList()
+                        ..sort((a, b) => a.time!.compareTo(b.time!));
+                      if (timed.length < 2) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.schedule_rounded, size: 11, color: kColorInkSoft),
+                            const SizedBox(width: 3),
+                            Text(
+                              '${timed.first.time} → ${timed.last.time}',
+                              style: GoogleFonts.ibmPlexMono(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w400,
+                                color: kColorInkSoft,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
                   ],
                 ),
               ),

@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 145,
+    label: 'Plan: day time span in card header',
+    changes: [
+      'When two or more items on a day have a time set, the day card now shows a "09:00 → 21:00" time range in the header — a quick glance at how packed the day is',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 144,
     label: 'Plan: trip progress bar',
     changes: [

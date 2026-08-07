@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 107,
+    label: 'Mobile web fixes',
+    changes: [
+      'Opening wabway.wabble.ca on mobile now shows the app icon and a spinner instead of a blank screen while everything loads',
+      'The Search keyboard key in place search now reliably shows results on mobile — no more results disappearing when the keyboard closes',
+      'Search field now shows "Searching in [destination]" to confirm your trip\'s location is being used for local results',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 106,
     label: 'Smarter spot search',
     changes: [

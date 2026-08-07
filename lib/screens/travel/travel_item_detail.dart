@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/supabase/client.dart';
 import '../../core/supabase/doc_service.dart';
 import '../../core/supabase/plan_service.dart';
+import '../../core/supabase/travel_service.dart';
 import '../../core/trip/trip_state.dart';
 import '../../data/travel_data.dart';
 import '../../data/docs_data.dart';
@@ -688,6 +689,56 @@ class _ActionsSectionState extends State<_ActionsSection> {
     }
   }
 
+  Future<void> _attachDoc() async {
+    if (widget.docs.isEmpty) {
+      _snack(context, 'No documents in this trip yet.');
+      return;
+    }
+
+    final newIds = await showDocAttachSheet(
+      context,
+      docs: widget.docs,
+      initialSelectedIds: widget.item.linkedDocIds.toSet(),
+    );
+    if (newIds == null || !mounted) return;
+
+    final userId = supabase.auth.currentUser?.id ?? '';
+    try {
+      await TravelService.syncDocLinks(
+        widget.item.id,
+        widget.item.linkedDocIds,
+        newIds,
+        userId,
+      );
+      if (!mounted) return;
+      final updated = TravelItem(
+        id: widget.item.id,
+        title: widget.item.title,
+        type: widget.item.type,
+        status: widget.item.status,
+        date: widget.item.date,
+        endDate: widget.item.endDate,
+        time: widget.item.time,
+        endTime: widget.item.endTime,
+        location: widget.item.location,
+        destination: widget.item.destination,
+        confirmationNumber: widget.item.confirmationNumber,
+        url: widget.item.url,
+        address: widget.item.address,
+        notes: widget.item.notes,
+        linkedDocIds: newIds,
+        linkedItineraryItemId: widget.item.linkedItineraryItemId,
+        linkedDayId: widget.item.linkedDayId,
+      );
+      widget.onUpdated?.call(updated);
+      _snack(context,
+          newIds.isEmpty ? 'Documents unlinked.' : 'Documents updated.');
+    } catch (e) {
+      if (!mounted) return;
+      _snack(context, 'Could not update documents: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final linkedDocs = widget.item.linkedDocIds
@@ -728,7 +779,7 @@ class _ActionsSectionState extends State<_ActionsSection> {
               icon: Icons.attach_file_rounded,
               variant: WabwayButtonVariant.ghost,
               size: WabwayButtonSize.sm,
-              onPressed: () => _snack(context, 'Attach a document to this item'),
+              onPressed: _attachDoc,
             ),
             WabwayButton(
               label: _itineraryLoading ? 'Adding…' : 'Add to itinerary',
@@ -881,7 +932,32 @@ void _showActionsSheet(
           _SheetTile(
             icon: Icons.attach_file_rounded,
             label: 'Attach document',
-            onTap: () => Navigator.pop(ctx),
+            onTap: () async {
+              Navigator.pop(ctx);
+              if (docs.isEmpty) return;
+              final newIds = await showDocAttachSheet(
+                context,
+                docs: docs,
+                initialSelectedIds: item.linkedDocIds.toSet(),
+              );
+              if (newIds == null || !context.mounted) return;
+              final userId = supabase.auth.currentUser?.id ?? '';
+              await TravelService.syncDocLinks(
+                  item.id, item.linkedDocIds, newIds, userId);
+              if (context.mounted) {
+                onUpdated?.call(TravelItem(
+                  id: item.id, title: item.title, type: item.type,
+                  status: item.status, date: item.date, endDate: item.endDate,
+                  time: item.time, endTime: item.endTime, location: item.location,
+                  destination: item.destination,
+                  confirmationNumber: item.confirmationNumber, url: item.url,
+                  address: item.address, notes: item.notes,
+                  linkedDocIds: newIds,
+                  linkedItineraryItemId: item.linkedItineraryItemId,
+                  linkedDayId: item.linkedDayId,
+                ));
+              }
+            },
           ),
           _SheetTile(
             icon: Icons.event_note_rounded,
@@ -1006,6 +1082,115 @@ class _StatusBadge extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Doc attach sheet ─────────────────────────────────────────────────────────
+
+Future<List<String>?> showDocAttachSheet(
+  BuildContext context, {
+  required List<TripDocument> docs,
+  required Set<String> initialSelectedIds,
+}) {
+  return showModalBottomSheet<List<String>>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => _DocAttachSheet(
+      docs: docs,
+      initialSelectedIds: initialSelectedIds,
+    ),
+  );
+}
+
+class _DocAttachSheet extends StatefulWidget {
+  const _DocAttachSheet({
+    required this.docs,
+    required this.initialSelectedIds,
+  });
+  final List<TripDocument> docs;
+  final Set<String> initialSelectedIds;
+
+  @override
+  State<_DocAttachSheet> createState() => _DocAttachSheetState();
+}
+
+class _DocAttachSheetState extends State<_DocAttachSheet> {
+  late final Set<String> _selected = Set.from(widget.initialSelectedIds);
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.55,
+      minChildSize: 0.35,
+      maxChildSize: 0.9,
+      expand: false,
+      builder: (_, ctrl) => DecoratedBox(
+        decoration: const BoxDecoration(
+          color: kColorPaper,
+          borderRadius: kRadiusSheet,
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(kSpace4, kSpace2, kSpace4, kSpace2),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const WabwayDragHandle(),
+                  const SizedBox(height: kSpace2),
+                  Text('Link documents', style: kStyleBodySemibold),
+                  const SizedBox(height: kSpace1),
+                  Text('Select documents to attach to this travel item.',
+                      style: kStyleCaption.copyWith(color: kColorInkSoft)),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: ListView(
+                controller: ctrl,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: kSpace4, vertical: kSpace2),
+                children: widget.docs.map((d) {
+                  final checked = _selected.contains(d.id);
+                  return CheckboxListTile(
+                    value: checked,
+                    onChanged: (v) => setState(() =>
+                        (v ?? false)
+                            ? _selected.add(d.id)
+                            : _selected.remove(d.id)),
+                    title: Text(d.title, style: kStyleBody),
+                    subtitle: Text(d.type.label, style: kStyleCaption),
+                    secondary: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: d.type.softColor,
+                        borderRadius: kRadiusMd,
+                      ),
+                      child: Icon(d.type.icon, size: 16, color: d.type.color),
+                    ),
+                    activeColor: kColorPrimary,
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                  );
+                }).toList(),
+              ),
+            ),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(kSpace4, kSpace2, kSpace4, kSpace4),
+                child: WabwayButton(
+                  label: 'Save',
+                  onPressed: () => Navigator.pop(context, _selected.toList()),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

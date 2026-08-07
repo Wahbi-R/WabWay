@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 132,
+    label: 'Travel: attach documents',
+    changes: [
+      'Tap "Attach document" on a travel item to link any trip document — boarding passes, booking confirmations, hotel vouchers — directly to that item',
+      'Previously linked documents are pre-selected, so you can add or remove links in one step',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 131,
     label: 'Travel: add to itinerary',
     changes: [

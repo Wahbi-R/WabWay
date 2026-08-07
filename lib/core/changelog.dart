@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 117,
+    label: 'Update prompt now shows before login',
+    changes: [
+      'If a new version of WabWay is available, you\'ll now see the update prompt on the sign-in screen and the "no trips" screen — not just after you\'ve loaded your trip',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 116,
     label: 'Invite links + Android banner',
     changes: [

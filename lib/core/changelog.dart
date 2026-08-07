@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 123,
+    label: 'Receipt "Paid by" filter',
+    changes: [
+      'In the Money tab, filter receipts by who paid — tap a crew member\'s name chip to see only their receipts',
+      'Stacks with the category filter, date range, search, and sort — narrow down any combination',
+      'Only appears when more than one person has paid a receipt, so solo trips stay clutter-free',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 122,
     label: 'Stays improvements',
     changes: [

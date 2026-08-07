@@ -69,6 +69,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
 
   _MoneyTab _tab = _MoneyTab.receipts;
   ReceiptCategory? _filterCategory;
+  String? _filterPayerId;
   DateTimeRange? _dateRange;
   _ReceiptSort _receiptSort = _ReceiptSort.newestFirst;
   String _receiptSearch = '';
@@ -137,6 +138,31 @@ class _MoneyScreenState extends State<MoneyScreen> {
       allCount: _receipts.length,
       onChanged: (c) => setState(() {
         _filterCategory = c;
+        _selectedReceiptId = null;
+      }),
+    );
+  }
+
+  Widget _payerFilterStrip() {
+    final payerIds = _receipts.map((r) => r.paidById).toSet();
+    if (payerIds.length < 2) return const SizedBox.shrink();
+    final payers = payerIds
+        .map((id) => _members.firstWhere(
+              (m) => m.id == id,
+              orElse: () => TripMember(id: id, name: 'Unknown'),
+            ))
+        .toList()
+      ..sort((a, b) => a.name.compareTo(b.name));
+    return WabwayFilterStrip<String>(
+      selected: _filterPayerId,
+      options: payers.map((m) => (
+        value: m.id,
+        label: m.id == _userId ? 'Me' : m.name,
+        count: _receipts.where((r) => r.paidById == m.id).length,
+      )).toList(),
+      allCount: _receipts.length,
+      onChanged: (id) => setState(() {
+        _filterPayerId = id;
         _selectedReceiptId = null;
       }),
     );
@@ -338,6 +364,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
     }
     final base = _receipts.where((r) {
       if (_filterCategory != null && r.category != _filterCategory) return false;
+      if (_filterPayerId != null && r.paidById != _filterPayerId) return false;
       if (_dateRange != null) {
         final day = DateUtils.dateOnly(r.date);
         if (day.isBefore(_dateRange!.start) || day.isAfter(_dateRange!.end)) return false;
@@ -586,6 +613,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
               ),
             ],
           ),
+          _payerFilterStrip(),
           Expanded(
             child: listItems.isEmpty
                 ? Center(
@@ -597,12 +625,14 @@ class _MoneyScreenState extends State<MoneyScreen> {
                           ? 'No results for "$_receiptSearch"'
                           : _dateRange != null
                               ? 'No receipts in that date range'
-                              : 'No ${_filterCategory?.label ?? ''} receipts',
+                              : _filterPayerId != null
+                                  ? 'No receipts paid by that person'
+                                  : 'No ${_filterCategory?.label ?? ''} receipts',
                       description: _receiptSearch.isNotEmpty
                           ? 'Try a different search term.'
                           : _dateRange != null
                               ? 'Try a wider date range or clear the filter.'
-                              : 'Try a different category filter.',
+                              : 'Try a different filter.',
                     ),
                   )
                 : ListView.builder(

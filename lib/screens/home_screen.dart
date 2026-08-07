@@ -92,6 +92,16 @@ class _HomeData {
     return null;
   }
 
+  // Travel items whose date is today.
+  List<TravelItem> get todayTravelItems {
+    final today = _today();
+    return travelItems.where((t) {
+      if (t.date == null) return false;
+      final d = t.date!;
+      return d.year == today.year && d.month == today.month && d.day == today.day;
+    }).toList();
+  }
+
   // First day from today (inclusive) that has at least one itinerary item.
   // Days are sorted chronologically by PlanService, so the first match is correct.
   TripDay? get nextDay {
@@ -372,7 +382,10 @@ class _HomeScreenState extends State<HomeScreen> {
             _PinboardCard(tripId: trip.id),
             if (data != null && data.todayDay != null) ...[
               const SizedBox(height: kSpace4),
-              _TodayAgendaCard(day: data.todayDay!),
+              _TodayAgendaCard(
+                day: data.todayDay!,
+                travelItems: data.todayTravelItems,
+              ),
             ] else if (data != null &&
                 (data.nextDay != null || data.nextTravelItem != null)) ...[
               const SizedBox(height: kSpace4),
@@ -945,8 +958,9 @@ class _UpcomingCard extends StatelessWidget {
 // ─── Today's agenda card (shown when today is a plan day) ────────────────────
 
 class _TodayAgendaCard extends StatefulWidget {
-  const _TodayAgendaCard({required this.day});
+  const _TodayAgendaCard({required this.day, this.travelItems = const []});
   final TripDay day;
+  final List<TravelItem> travelItems;
 
   @override
   State<_TodayAgendaCard> createState() => _TodayAgendaCardState();
@@ -1074,6 +1088,48 @@ class _TodayAgendaCardState extends State<_TodayAgendaCard> {
                     ],
                   );
                 }),
+              // Today's travel bookings (flights, hotels, etc.)
+              if (widget.travelItems.isNotEmpty) ...[
+                const Divider(height: 1, color: kColorBorder),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(kSpace4, kSpace2, kSpace4, kSpace1),
+                  child: Text('Bookings today',
+                      style: kStyleCaption.copyWith(color: kColorInkSoft)),
+                ),
+                ...widget.travelItems.map((t) => ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: kSpace4, vertical: kSpace1),
+                  leading: Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: t.type.color.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(t.type.icon, size: 14, color: t.type.color),
+                  ),
+                  title: Text(t.title,
+                      style: kStyleBodyMedium,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                  subtitle: () {
+                    final parts = [
+                      if (t.time != null) t.time!,
+                      if (t.location != null) t.location!,
+                      if (t.destination != null && t.location != null) '→ ${t.destination!}',
+                      if (t.confirmationNumber != null) t.confirmationNumber!,
+                    ];
+                    if (parts.isEmpty) return null;
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 1),
+                      child: Text(parts.join('  ·  '),
+                          style: kStyleCaption,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
+                    );
+                  }(),
+                )),
+              ],
             ],
           ),
         ),

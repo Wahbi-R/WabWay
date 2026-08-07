@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 146,
+    label: 'Home: today\'s bookings in agenda',
+    changes: [
+      'If you have a flight, hotel check-in, or any other booking today, it now appears in a "Bookings today" section at the bottom of the Today card on the home screen',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 145,
     label: 'Plan: day time span in card header',
     changes: [

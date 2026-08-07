@@ -24,6 +24,7 @@ class TripDayCard extends StatefulWidget {
     this.daySelected = false,
     this.onEditDay,
     this.onDeleteDay,
+    this.onCopyDay,
     this.onReorder,
     this.onToggleDone,
     this.hideCompleted = false,
@@ -38,6 +39,7 @@ class TripDayCard extends StatefulWidget {
   final bool daySelected;
   final VoidCallback? onEditDay;
   final VoidCallback? onDeleteDay;
+  final VoidCallback? onCopyDay;
   final ValueChanged<List<ItineraryItem>>? onReorder;
   final ValueChanged<String>? onToggleDone;
   final bool hideCompleted;
@@ -79,6 +81,7 @@ class _TripDayCardState extends State<TripDayCard> {
             selected: widget.daySelected,
             onTap: headerTappable ? _handleHeaderTap : null,
             onEdit: widget.onEditDay,
+            onCopy: widget.onCopyDay,
             onDelete: widget.onDeleteDay,
           ),
           const Divider(height: 1, color: kColorBorder),
@@ -126,7 +129,7 @@ class _TripDayCardState extends State<TripDayCard> {
 
 // ─── Day header ───────────────────────────────────────────────────────────────
 
-enum _DayMenuAction { edit, delete }
+enum _DayMenuAction { edit, copy, delete }
 
 class _DayHeader extends StatelessWidget {
   const _DayHeader({
@@ -137,6 +140,7 @@ class _DayHeader extends StatelessWidget {
     required this.selected,
     this.onTap,
     this.onEdit,
+    this.onCopy,
     this.onDelete,
   });
 
@@ -147,6 +151,7 @@ class _DayHeader extends StatelessWidget {
   final bool selected;
   final VoidCallback? onTap;
   final VoidCallback? onEdit;
+  final VoidCallback? onCopy;
   final VoidCallback? onDelete;
 
   @override
@@ -325,7 +330,7 @@ class _DayHeader extends StatelessWidget {
                     ),
                   );
                 }),
-              if (onEdit != null || onDelete != null) ...[
+              if (onEdit != null || onCopy != null || onDelete != null) ...[
                 const SizedBox(width: kSpace2),
                 PopupMenuButton<_DayMenuAction>(
                   padding: EdgeInsets.zero,
@@ -333,7 +338,8 @@ class _DayHeader extends StatelessWidget {
                   iconColor: kColorInkSoft,
                   icon: const Icon(Icons.more_vert_rounded),
                   onSelected: (action) {
-                    if (action == _DayMenuAction.edit) onEdit?.call();
+                    if (action == _DayMenuAction.edit)   onEdit?.call();
+                    if (action == _DayMenuAction.copy)   onCopy?.call();
                     if (action == _DayMenuAction.delete) onDelete?.call();
                   },
                   itemBuilder: (_) => [
@@ -344,6 +350,15 @@ class _DayHeader extends StatelessWidget {
                           Icon(Icons.edit_outlined, size: 16),
                           SizedBox(width: 10),
                           Text('Edit day'),
+                        ]),
+                      ),
+                    if (onCopy != null)
+                      const PopupMenuItem(
+                        value: _DayMenuAction.copy,
+                        child: Row(children: [
+                          Icon(Icons.copy_rounded, size: 16),
+                          SizedBox(width: 10),
+                          Text('Copy day as text'),
                         ]),
                       ),
                     if (onDelete != null)

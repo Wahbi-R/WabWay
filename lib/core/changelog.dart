@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 153,
+    label: 'Plan: copy day as text',
+    changes: [
+      'Tap ··· on any day card and choose "Copy day as text" to copy a formatted itinerary to your clipboard — paste it into messages to share with the group',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 152,
     label: 'Links: sort by date or title',
     changes: [

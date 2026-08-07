@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:share_plus/share_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
@@ -415,6 +416,26 @@ class _PlanScreenState extends State<PlanScreen> {
     });
   }
 
+  Future<void> _copyDay(TripDay day) async {
+    final buf = StringBuffer();
+    buf.writeln('Day ${day.dayNumber} – ${day.city}');
+    final sorted = day.sortedItems;
+    for (final item in sorted) {
+      final prefix = item.hasTime ? '${item.time} ' : '';
+      buf.writeln('• $prefix${item.title}');
+    }
+    await Clipboard.setData(ClipboardData(text: buf.toString().trim()));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Day ${day.dayNumber} copied to clipboard'),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   Future<void> _deleteDay(TripDay day) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -729,6 +750,7 @@ class _PlanScreenState extends State<PlanScreen> {
                                                       daySelected: _selectedDayId == _days[di].id,
                                                       onEditDay: () => _onEditDay(_days[di]),
                                                       onDeleteDay: () => _deleteDay(_days[di]),
+                                                      onCopyDay: () => _copyDay(_days[di]),
                                                       onReorder: (newOrder) =>
                                                           _onReorderItems(_days[di].id, newOrder),
                                                       onToggleDone: _toggleItemDone,
@@ -970,6 +992,7 @@ class _PlanScreenState extends State<PlanScreen> {
                                         onAddItem: () => _addItem(context, _days[di].id),
                                         onEditDay: () => _onEditDay(_days[di]),
                                         onDeleteDay: () => _deleteDay(_days[di]),
+                                        onCopyDay: () => _copyDay(_days[di]),
                                         onReorder: (newOrder) =>
                                             _onReorderItems(_days[di].id, newOrder),
                                         onToggleDone: _toggleItemDone,

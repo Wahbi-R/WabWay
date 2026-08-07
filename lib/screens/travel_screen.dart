@@ -48,6 +48,7 @@ class _TravelScreenState extends State<TravelScreen> {
   String? _selectedId;
 
   final _searchCtrl = TextEditingController();
+  final _listCtrl = ScrollController();
 
   TravelItem? get _selectedItem =>
       _selectedId == null ? null : _items.where((i) => i.id == _selectedId).firstOrNull;
@@ -92,7 +93,36 @@ class _TravelScreenState extends State<TravelScreen> {
     _channel?.unsubscribe();
     _debounce?.cancel();
     _searchCtrl.dispose();
+    _listCtrl.dispose();
     super.dispose();
+  }
+
+  bool get _hasTodayItem {
+    final now = DateTime.now();
+    final todayKey = DateTime(now.year, now.month, now.day);
+    return _filtered.any((i) {
+      if (i.date == null) return false;
+      final k = DateTime(i.date!.year, i.date!.month, i.date!.day);
+      return k == todayKey;
+    });
+  }
+
+  void _scrollToToday() {
+    final now = DateTime.now();
+    final todayKey = DateTime(now.year, now.month, now.day);
+    final mixed = _buildMixedList(_filtered);
+    final idx = mixed.indexWhere((e) => e is DateTime && e == todayKey);
+    if (idx < 0 || !_listCtrl.hasClients) return;
+    double offset = kSpace3;
+    for (int i = 0; i < idx; i++) {
+      final e = mixed[i];
+      offset += (e is DateTime || e is String) ? 32.0 : 88.0;
+    }
+    _listCtrl.animateTo(
+      offset.clamp(0.0, _listCtrl.position.maxScrollExtent),
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOut,
+    );
   }
 
   bool _offline = false;
@@ -390,6 +420,15 @@ class _TravelScreenState extends State<TravelScreen> {
       backgroundColor: kColorCream,
       appBar: AppBar(
         title: Text('Travel', style: kStyleTitle),
+        actions: [
+          if (_hasTodayItem && _filter == null && _search.isEmpty)
+            IconButton(
+              icon: const Icon(Icons.today_rounded, size: 20),
+              tooltip: 'Jump to today',
+              color: kColorPrimary,
+              onPressed: _scrollToToday,
+            ),
+        ],
       ),
       body: Column(
         children: [
@@ -486,6 +525,7 @@ class _TravelScreenState extends State<TravelScreen> {
     final mixed = _buildMixedList(items);
 
     return ListView.builder(
+      controller: desktop ? null : _listCtrl,
       padding: EdgeInsets.fromLTRB(
         kSpace4,
         kSpace3,

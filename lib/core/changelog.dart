@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 150,
+    label: 'Travel: filter by booking status',
+    changes: [
+      'New status chips below the type filter — tap "Tentative" to see what still needs confirming, "Cancelled" to see what fell through',
+      'Chips only appear when you have items with more than one booking status',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 149,
     label: 'Plan: swipe to check off items',
     changes: [

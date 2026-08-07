@@ -44,6 +44,7 @@ class _TravelScreenState extends State<TravelScreen> {
   Timer? _debounce;
 
   TravelItemType? _filter;
+  TravelBookingStatus? _statusFilter;
   String _search = '';
   String? _selectedId;
 
@@ -59,6 +60,9 @@ class _TravelScreenState extends State<TravelScreen> {
     var items = _filter == null
         ? List<TravelItem>.from(_items)
         : _items.where((i) => i.type == _filter).toList();
+    if (_statusFilter != null) {
+      items = items.where((i) => i.status == _statusFilter).toList();
+    }
     final q = _search.toLowerCase().trim();
     if (q.isNotEmpty) {
       bool m(String? s) => s != null && s.toLowerCase().contains(q);
@@ -375,6 +379,14 @@ class _TravelScreenState extends State<TravelScreen> {
                         }),
                         items: _items,
                       ),
+                      _StatusFilterChips(
+                        selected: _statusFilter,
+                        onSelect: (s) => setState(() {
+                          _statusFilter = _statusFilter == s ? null : s;
+                          _selectedId = null;
+                        }),
+                        items: _items,
+                      ),
                       Expanded(child: _buildList(desktop: true)),
                     ],
                   ),
@@ -442,6 +454,11 @@ class _TravelScreenState extends State<TravelScreen> {
             onSelect: (t) => setState(() => _filter = _filter == t ? null : t),
             items: _items,
           ),
+          _StatusFilterChips(
+            selected: _statusFilter,
+            onSelect: (s) => setState(() => _statusFilter = _statusFilter == s ? null : s),
+            items: _items,
+          ),
           Expanded(child: _buildList(desktop: false)),
         ],
       ),
@@ -487,7 +504,7 @@ class _TravelScreenState extends State<TravelScreen> {
 
     if (items.isEmpty) {
       return Center(
-        child: _filter == null && _search.isEmpty
+        child: _filter == null && _statusFilter == null && _search.isEmpty
             ? Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -513,12 +530,17 @@ class _TravelScreenState extends State<TravelScreen> {
                     title: 'No results for "$_search"',
                     description: 'Try a different search term.',
                   )
-                : WabwayEmptyState(
-                icon: _filter!.icon,
-                title: 'No ${_filter!.label.toLowerCase()}s',
-                description:
-                    'No ${_filter!.label.toLowerCase()} items added yet.',
-              ),
+                : _statusFilter != null
+                    ? WabwayEmptyState(
+                        icon: _statusFilter!.icon,
+                        title: 'No ${_statusFilter!.label.toLowerCase()} bookings',
+                        description: 'No items with that status.',
+                      )
+                    : WabwayEmptyState(
+                        icon: _filter!.icon,
+                        title: 'No ${_filter!.label.toLowerCase()}s',
+                        description: 'No ${_filter!.label.toLowerCase()} items added yet.',
+                      ),
       );
     }
 
@@ -646,6 +668,75 @@ class _DesktopTravelBar extends StatelessWidget {
             onPressed: onAdd,
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Booking status filter chips ──────────────────────────────────────────────
+
+class _StatusFilterChips extends StatelessWidget {
+  const _StatusFilterChips({
+    required this.selected,
+    required this.onSelect,
+    required this.items,
+  });
+
+  final TravelBookingStatus? selected;
+  final ValueChanged<TravelBookingStatus> onSelect;
+  final List<TravelItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final presentStatuses = TravelBookingStatus.values
+        .where((s) => items.any((i) => i.status == s))
+        .toList();
+    // Only show if more than one status is present
+    if (presentStatuses.length < 2) return const SizedBox.shrink();
+    return SizedBox(
+      height: 40,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: kSpace4, vertical: kSpace1),
+        children: presentStatuses.map((status) {
+          final isActive = selected == status;
+          final count = items.where((i) => i.status == status).length;
+          return Padding(
+            padding: const EdgeInsets.only(right: kSpace2),
+            child: GestureDetector(
+              onTap: () => onSelect(status),
+              child: AnimatedContainer(
+                duration: kDurationFast,
+                padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: 5),
+                decoration: BoxDecoration(
+                  color: isActive ? status.color : kColorSurfaceSunken,
+                  borderRadius: kRadiusPill,
+                  border: Border.all(
+                    color: isActive ? status.color : kColorBorder,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      status.icon,
+                      size: 12,
+                      color: isActive ? Colors.white : status.color,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${status.label} ($count)',
+                      style: kStyleCaption.copyWith(
+                        color: isActive ? Colors.white : kColorInk,
+                        fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }).toList(),
       ),
     );
   }

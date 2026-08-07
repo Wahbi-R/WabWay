@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 154,
+    label: 'Money: cash summary + sort',
+    changes: [
+      'The Cash tab now shows a summary card with total withdrawn per currency and ATM fees when you have two or more withdrawals',
+      'A sort button lets you switch between "Newest first" and "Oldest first" on the Cash tab',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 153,
     label: 'Plan: copy day as text',
     changes: [

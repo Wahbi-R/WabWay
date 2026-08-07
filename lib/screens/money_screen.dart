@@ -46,6 +46,8 @@ enum _ReceiptSort {
   };
 }
 
+enum _CashSort { newest, oldest }
+
 // Mixed list entries for the receipt list — either a sticky date header or an
 // actual receipt row. Using a sealed class keeps the switch exhaustive.
 sealed class _ReceiptListEntry {}
@@ -62,6 +64,7 @@ class MoneyScreen extends StatefulWidget {
 class _MoneyScreenState extends State<MoneyScreen> {
   List<Receipt> _receipts = [];
   List<CashWithdrawal> _withdrawals = [];
+  _CashSort _cashSort = _CashSort.newest;
   bool _loading = true;
   bool _error = false;
   bool _offline = false;
@@ -493,6 +496,16 @@ class _MoneyScreenState extends State<MoneyScreen> {
       ? null
       : _withdrawals.where((w) => w.id == _selectedWithdrawalId).firstOrNull;
 
+  List<CashWithdrawal> get _sortedWithdrawals {
+    final list = List<CashWithdrawal>.from(_withdrawals);
+    if (_cashSort == _CashSort.oldest) {
+      list.sort((a, b) => a.date.compareTo(b.date));
+    } else {
+      list.sort((a, b) => b.date.compareTo(a.date));
+    }
+    return list;
+  }
+
   // ── Mutations ─────────────────────────────────────────────────────────────────
 
   String get _homeCurrency => TripState.tripOf(context).homeCurrency;
@@ -740,18 +753,47 @@ class _MoneyScreenState extends State<MoneyScreen> {
           label: 'No withdrawals yet',
         );
       }
-      return ListView.separated(
-        padding: const EdgeInsets.all(kSpace4),
-        itemCount: _withdrawals.length,
-        separatorBuilder: (_, __) => const SizedBox(height: kSpace2),
-        itemBuilder: (_, i) => CashListTile(
-          withdrawal: _withdrawals[i],
-          myId:       _userId,
-          members:    _members,
-          selected:   _selectedWithdrawalId == _withdrawals[i].id,
-          onTap: () =>
-              setState(() => _selectedWithdrawalId = _withdrawals[i].id),
-        ),
+      final sorted = _sortedWithdrawals;
+      return Column(
+        children: [
+          _CashSummaryCard(withdrawals: _withdrawals),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: kSpace4, vertical: kSpace2),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                PopupMenuButton<_CashSort>(
+                  icon: Icon(
+                    Icons.sort_rounded,
+                    size: 18,
+                    color: _cashSort != _CashSort.newest ? kColorPrimary : kColorInkSoft,
+                  ),
+                  tooltip: 'Sort withdrawals',
+                  initialValue: _cashSort,
+                  onSelected: (s) => setState(() => _cashSort = s),
+                  itemBuilder: (_) => [
+                    _cashSortItem(_CashSort.newest, 'Newest first', _cashSort),
+                    _cashSortItem(_CashSort.oldest, 'Oldest first', _cashSort),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.separated(
+              padding: const EdgeInsets.fromLTRB(kSpace4, 0, kSpace4, kSpace4),
+              itemCount: sorted.length,
+              separatorBuilder: (_, __) => const SizedBox(height: kSpace2),
+              itemBuilder: (_, i) => CashListTile(
+                withdrawal: sorted[i],
+                myId:       _userId,
+                members:    _members,
+                selected:   _selectedWithdrawalId == sorted[i].id,
+                onTap: () => setState(() => _selectedWithdrawalId = sorted[i].id),
+              ),
+            ),
+          ),
+        ],
       );
     }
 
@@ -869,6 +911,21 @@ class _MoneyScreenState extends State<MoneyScreen> {
                 onPressed: _exportReceipts,
               ),
             ],
+            if (_tab == _MoneyTab.cash && _withdrawals.isNotEmpty)
+              PopupMenuButton<_CashSort>(
+                icon: Icon(
+                  Icons.sort_rounded,
+                  size: 20,
+                  color: _cashSort != _CashSort.newest ? kColorPrimary : kColorInkSoft,
+                ),
+                tooltip: 'Sort withdrawals',
+                initialValue: _cashSort,
+                onSelected: (s) => setState(() => _cashSort = s),
+                itemBuilder: (_) => [
+                  _cashSortItem(_CashSort.newest, 'Newest first', _cashSort),
+                  _cashSortItem(_CashSort.oldest, 'Oldest first', _cashSort),
+                ],
+              ),
             IconButton(
               icon: const Icon(Icons.currency_exchange_rounded, size: 20),
               color: kColorInkSoft,
@@ -1013,32 +1070,42 @@ class _MoneyScreenState extends State<MoneyScreen> {
                     title: 'No withdrawals yet',
                     description: 'Tap + to log an ATM withdrawal.',
                   )
-                : ListView.separated(
-                    padding: const EdgeInsets.all(kSpace4),
-                    itemCount: _withdrawals.length,
-                    separatorBuilder: (_, __) =>
-                        const SizedBox(height: kSpace2),
-                    itemBuilder: (ctx, i) {
-                      final w = _withdrawals[i];
-                      return CashListTile(
-                        withdrawal: w,
-                        myId:       _userId,
-                        members:    _members,
-                        onTap: () => Navigator.push(
-                          ctx,
-                          MaterialPageRoute(
-                            builder: (_) => CashDetailScreen(
-                              withdrawal: w,
-                              myId:       _userId,
-                              members:    _members,
-                              tripId:     _activeTripId ?? '',
-                              onDelete:   () => _deleteWithdrawal(w.id),
-                            ),
+                : Builder(builder: (_) {
+                    final sorted = _sortedWithdrawals;
+                    return Column(
+                      children: [
+                        _CashSummaryCard(withdrawals: _withdrawals),
+                        Expanded(
+                          child: ListView.separated(
+                            padding: const EdgeInsets.all(kSpace4),
+                            itemCount: sorted.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: kSpace2),
+                            itemBuilder: (ctx, i) {
+                              final w = sorted[i];
+                              return CashListTile(
+                                withdrawal: w,
+                                myId:       _userId,
+                                members:    _members,
+                                onTap: () => Navigator.push(
+                                  ctx,
+                                  MaterialPageRoute(
+                                    builder: (_) => CashDetailScreen(
+                                      withdrawal: w,
+                                      myId:       _userId,
+                                      members:    _members,
+                                      tripId:     _activeTripId ?? '',
+                                      onDelete:   () => _deleteWithdrawal(w.id),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                         ),
-                      );
-                    },
-                  ),
+                      ],
+                    );
+                  }),
 
             // Settle Up tab
             SettleUpPanel(
@@ -1445,6 +1512,108 @@ class _SortButton extends StatelessWidget {
                 ),
               ))
           .toList(),
+    );
+  }
+}
+
+// ─── Cash sort helper ─────────────────────────────────────────────────────────
+
+PopupMenuItem<_CashSort> _cashSortItem(
+    _CashSort value, String label, _CashSort current) {
+  return PopupMenuItem(
+    value: value,
+    child: Row(
+      children: [
+        SizedBox(
+          width: 20,
+          child: current == value
+              ? const Icon(Icons.check_rounded, size: 16, color: kColorPrimary)
+              : null,
+        ),
+        const SizedBox(width: kSpace2),
+        Text(label),
+      ],
+    ),
+  );
+}
+
+// ─── Cash summary card ────────────────────────────────────────────────────────
+
+class _CashSummaryCard extends StatelessWidget {
+  const _CashSummaryCard({required this.withdrawals});
+  final List<CashWithdrawal> withdrawals;
+
+  @override
+  Widget build(BuildContext context) {
+    if (withdrawals.length < 2) return const SizedBox.shrink();
+
+    final Map<String, double> amountByCurrency = {};
+    final Map<String, double> feesByCurrency = {};
+    for (final w in withdrawals) {
+      amountByCurrency[w.currency] =
+          (amountByCurrency[w.currency] ?? 0.0) + w.amount;
+      if (w.atmFee > 0) {
+        feesByCurrency[w.currency] =
+            (feesByCurrency[w.currency] ?? 0.0) + w.atmFee;
+      }
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(kSpace4, kSpace4, kSpace4, 0),
+      child: WabwayCard(
+        padding: const EdgeInsets.symmetric(
+            horizontal: kSpace4, vertical: kSpace3),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text('Cash withdrawn',
+                    style: kStyleCaption.copyWith(color: kColorInkSoft)),
+                const Spacer(),
+                Text('${withdrawals.length} withdrawals',
+                    style: kStyleCaption.copyWith(color: kColorInkSoft)),
+              ],
+            ),
+            const SizedBox(height: kSpace2),
+            ...amountByCurrency.entries.map((e) => Padding(
+                  padding: const EdgeInsets.only(bottom: kSpace1),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.atm_rounded,
+                          size: 12, color: kColorInkSoft),
+                      const SizedBox(width: kSpace2),
+                      Expanded(
+                        child: Text(e.key,
+                            style: kStyleCaption.copyWith(
+                                color: kColorInkSoft)),
+                      ),
+                      Text(fmtAmount(e.value, e.key),
+                          style: kStyleBodySemibold),
+                    ],
+                  ),
+                )),
+            if (feesByCurrency.isNotEmpty) ...[
+              const Divider(height: kSpace3),
+              ...feesByCurrency.entries.map((e) => Row(
+                    children: [
+                      const Icon(Icons.price_check_rounded,
+                          size: 12, color: kColorWarning),
+                      const SizedBox(width: kSpace2),
+                      Expanded(
+                        child: Text('ATM fees (${e.key})',
+                            style: kStyleCaption.copyWith(
+                                color: kColorInkSoft)),
+                      ),
+                      Text(fmtAmount(e.value, e.key),
+                          style: kStyleCaptionMedium.copyWith(
+                              color: kColorWarning)),
+                    ],
+                  )),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }

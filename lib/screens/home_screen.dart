@@ -74,8 +74,9 @@ class _HomeData {
   final List<AppTripMember> members;
   final List<ActivityEvent> activityEvents;
 
-  int get spotCount => spots.length;
-  int get docCount  => docs.length;
+  int get spotCount    => spots.length;
+  int get visitedCount => spots.where((s) => s.status == SpotStatus.visited).length;
+  int get docCount     => docs.length;
 
   // Sum of home-currency equivalents — consistent across multi-currency trips.
   double get totalSpent => receipts.fold(0.0, (s, r) => s + r.homeAmount);
@@ -576,8 +577,8 @@ class _TripHero extends StatelessWidget {
                   children: [
                     Expanded(
                       child: _HeroStat(
-                        label: 'Spots saved',
-                        value: data != null ? '${data!.spotCount}' : '—',
+                        label: 'Spots visited',
+                        value: data != null ? '${data!.visitedCount}' : '—',
                       ),
                     ),
                     Expanded(

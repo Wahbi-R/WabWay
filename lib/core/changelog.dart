@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 127,
+    label: 'Home: Spots visited count',
+    changes: [
+      'The trip hero now shows how many spots you\'ve actually visited — not just how many are on the list',
+      'Gives a quick at-a-glance sense of trip progress as you check places off',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 126,
     label: 'Packing list: "Mine only" filter',
     changes: [

@@ -1013,6 +1013,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
                                 _dateRangeChip(),
                               ],
                             ),
+                            _payerFilterStrip(),
                             _quickDatePresets(),
                           ],
                         ),

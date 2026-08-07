@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 167,
+    label: 'Money: filter receipts by payer on mobile',
+    changes: [
+      'The "filter by who paid" chip row now appears on the mobile Receipts tab — tap a person to see only their expenses',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 166,
     label: 'Travel: swipe left to delete',
     changes: [

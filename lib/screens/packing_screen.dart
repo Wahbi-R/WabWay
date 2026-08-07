@@ -210,6 +210,30 @@ class _PackingScreenState extends State<PackingScreen> {
     PackingService.clearPackedItems(tripId).catchError((_) => _load(silent: true));
   }
 
+  Future<void> _addFromTemplate() async {
+    final result = await showModalBottomSheet<List<String>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: kColorPaper,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => const _TemplateSheet(),
+    );
+    if (result == null || result.isEmpty || !mounted) return;
+
+    final tripId = TripState.tripOf(context).id;
+    final userId = ProfileState.of(context).id;
+    final existing = _items.map((i) => i.title.toLowerCase()).toSet();
+    final toAdd = result.where((t) => !existing.contains(t.toLowerCase())).toList();
+    if (toAdd.isEmpty) return;
+
+    for (final title in toAdd) {
+      await PackingService.addItem(tripId, title, userId);
+    }
+    _load(silent: true);
+  }
+
   void _reorder(int oldIndex, int newIndex, List<PackingItem> unpacked) {
     if (newIndex > oldIndex) newIndex -= 1;
     final moved = unpacked.removeAt(oldIndex);
@@ -339,13 +363,22 @@ class _PackingScreenState extends State<PackingScreen> {
             tooltip: 'Add item',
             onPressed: _addItem,
           ),
-          if (packed > 0)
-            PopupMenuButton<String>(
-              iconColor: kColorInkSoft,
-              onSelected: (v) {
-                if (v == 'clear_packed') _clearPacked();
-              },
-              itemBuilder: (_) => [
+          PopupMenuButton<String>(
+            iconColor: kColorInkSoft,
+            onSelected: (v) {
+              if (v == 'template') _addFromTemplate();
+              if (v == 'clear_packed') _clearPacked();
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'template',
+                child: Row(children: [
+                  Icon(Icons.list_alt_rounded, size: 16),
+                  SizedBox(width: 10),
+                  Text('Add from template'),
+                ]),
+              ),
+              if (packed > 0)
                 const PopupMenuItem(
                   value: 'clear_packed',
                   child: Row(children: [
@@ -354,15 +387,15 @@ class _PackingScreenState extends State<PackingScreen> {
                     Text('Clear packed items', style: TextStyle(color: Colors.red)),
                   ]),
                 ),
-              ],
-            ),
+            ],
+          ),
           const SizedBox(width: 4),
         ],
       ),
       body: RefreshIndicator(
         onRefresh: () => _load(),
         child: total == 0
-            ? _EmptyState(onAdd: _addItem)
+            ? _EmptyState(onAdd: _addItem, onTemplate: _addFromTemplate)
             : Column(
                 children: [
                   WabwaySearchBar(
@@ -370,6 +403,7 @@ class _PackingScreenState extends State<PackingScreen> {
                     hint: 'Search items…',
                     onChanged: (v) => setState(() => _search = v),
                   ),
+                  _PackingProgress(packed: packed, total: total),
                   Expanded(
                     child: _filtered.isEmpty
                         ? Center(
@@ -391,8 +425,9 @@ class _PackingScreenState extends State<PackingScreen> {
 // ─── Empty state ──────────────────────────────────────────────────────────────
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.onAdd});
+  const _EmptyState({required this.onAdd, required this.onTemplate});
   final VoidCallback onAdd;
+  final VoidCallback onTemplate;
 
   @override
   Widget build(BuildContext context) {
@@ -411,6 +446,218 @@ class _EmptyState extends StatelessWidget {
             icon: const Icon(Icons.add_rounded, size: 18),
             label: const Text('Add item'),
             style: FilledButton.styleFrom(backgroundColor: kColorPrimary),
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: onTemplate,
+            icon: const Icon(Icons.list_alt_rounded, size: 18),
+            label: const Text('Add from template'),
+            style: OutlinedButton.styleFrom(foregroundColor: kColorPrimary),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Progress bar ─────────────────────────────────────────────────────────────
+
+class _PackingProgress extends StatelessWidget {
+  const _PackingProgress({required this.packed, required this.total});
+  final int packed;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    if (total == 0) return const SizedBox.shrink();
+    final progress = packed / total;
+    final allDone  = packed == total;
+    final color    = allDone ? kColorSuccess : kColorPrimary;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(kSpace4, kSpace3, kSpace4, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: kRadiusPill,
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 6,
+                    backgroundColor: kColorBorder,
+                    valueColor: AlwaysStoppedAnimation(color),
+                  ),
+                ),
+              ),
+              const SizedBox(width: kSpace3),
+              Text(
+                allDone ? 'All packed!' : '$packed of $total packed',
+                style: kStyleCaption.copyWith(color: color),
+              ),
+            ],
+          ),
+          const SizedBox(height: kSpace3),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Template sheet ───────────────────────────────────────────────────────────
+
+const _kTemplates = <({String category, IconData icon, List<String> items})>[
+  (
+    category: 'Documents',
+    icon: Icons.badge_rounded,
+    items: ['Passport', 'Travel insurance', 'Flight tickets', 'Hotel bookings', 'Visa / entry docs', 'Driver\'s licence', 'Credit cards', 'Emergency contacts'],
+  ),
+  (
+    category: 'Toiletries',
+    icon: Icons.soap_rounded,
+    items: ['Toothbrush', 'Toothpaste', 'Shampoo', 'Conditioner', 'Body wash', 'Deodorant', 'Sunscreen', 'Razor', 'Lip balm', 'Hand sanitiser'],
+  ),
+  (
+    category: 'Clothes',
+    icon: Icons.checkroom_rounded,
+    items: ['T-shirts', 'Underwear', 'Socks', 'Jeans / trousers', 'Jacket', 'Pyjamas', 'Swimwear', 'Comfortable shoes', 'Sandals', 'Hat / cap'],
+  ),
+  (
+    category: 'Electronics',
+    icon: Icons.devices_rounded,
+    items: ['Phone charger', 'Power bank', 'Adapter / converter', 'Earphones / AirPods', 'Camera', 'Laptop', 'Laptop charger', 'E-reader'],
+  ),
+  (
+    category: 'Health & Meds',
+    icon: Icons.medical_services_rounded,
+    items: ['Prescription medication', 'Pain reliever', 'Antihistamine', 'Band-aids / plasters', 'Insect repellent', 'Motion sickness pills'],
+  ),
+  (
+    category: 'Comfort & Entertainment',
+    icon: Icons.headphones_rounded,
+    items: ['Neck pillow', 'Eye mask', 'Earplugs', 'Snacks', 'Book / magazine', 'Playing cards'],
+  ),
+];
+
+class _TemplateSheet extends StatefulWidget {
+  const _TemplateSheet();
+
+  @override
+  State<_TemplateSheet> createState() => _TemplateSheetState();
+}
+
+class _TemplateSheetState extends State<_TemplateSheet> {
+  final _selected = <String>{};
+  int? _expandedCategory;
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.75,
+      maxChildSize: 0.95,
+      minChildSize: 0.4,
+      expand: false,
+      builder: (_, ctrl) => Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(kSpace4, kSpace3, kSpace4, 0),
+            child: Row(
+              children: [
+                Expanded(child: Text('Add from template', style: kStyleTitle)),
+                if (_selected.isNotEmpty)
+                  FilledButton(
+                    onPressed: () => Navigator.pop(context, _selected.toList()),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: kColorPrimary,
+                      padding: const EdgeInsets.symmetric(horizontal: kSpace4, vertical: kSpace2),
+                    ),
+                    child: Text('Add ${_selected.length}'),
+                  ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: kSpace4, vertical: kSpace2),
+            child: Text(
+              'Tap items to select, then tap Add.',
+              style: kStyleCaption.copyWith(color: kColorInkSoft),
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: ListView.builder(
+              controller: ctrl,
+              itemCount: _kTemplates.length,
+              itemBuilder: (_, i) {
+                final cat = _kTemplates[i];
+                final expanded = _expandedCategory == i;
+                final selectedInCat = cat.items.where(_selected.contains).length;
+                return Column(
+                  children: [
+                    ListTile(
+                      leading: Icon(cat.icon, color: kColorPrimary, size: 20),
+                      title: Text(cat.category, style: kStyleBodySemibold),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (selectedInCat > 0)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(color: kColorPrimary, borderRadius: kRadiusPill),
+                              child: Text('$selectedInCat', style: kStyleCaption.copyWith(color: Colors.white)),
+                            ),
+                          const SizedBox(width: kSpace2),
+                          Icon(expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded, color: kColorInkSoft),
+                        ],
+                      ),
+                      onTap: () => setState(() => _expandedCategory = expanded ? null : i),
+                    ),
+                    if (expanded)
+                      ...cat.items.map((item) {
+                        final sel = _selected.contains(item);
+                        return CheckboxListTile(
+                          value: sel,
+                          onChanged: (_) => setState(() {
+                            if (sel) _selected.remove(item); else _selected.add(item);
+                          }),
+                          title: Text(item, style: kStyleBody),
+                          activeColor: kColorPrimary,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          contentPadding: const EdgeInsets.only(left: kSpace10, right: kSpace4),
+                          dense: true,
+                        );
+                      }),
+                    const Divider(height: 1),
+                  ],
+                );
+              },
+            ),
+          ),
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.all(kSpace4),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _selected.isEmpty
+                      ? null
+                      : () => Navigator.pop(context, _selected.toList()),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: kColorPrimary,
+                    disabledBackgroundColor: kColorBorder,
+                    padding: const EdgeInsets.symmetric(vertical: kSpace3),
+                    shape: const RoundedRectangleBorder(borderRadius: kRadiusMd),
+                  ),
+                  child: Text(
+                    _selected.isEmpty ? 'Select items to add' : 'Add ${_selected.length} item${_selected.length == 1 ? '' : 's'}',
+                    style: kStyleBodySemibold.copyWith(color: Colors.white),
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),

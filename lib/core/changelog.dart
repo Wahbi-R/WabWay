@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 120,
+    label: 'Packing list progress & templates',
+    changes: [
+      'A progress bar at the top of the packing list shows how many items are packed — and turns green when everything is done',
+      'New "Add from template" option (overflow menu or empty state) lets you pick common travel items across 6 categories without typing each one',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 119,
     label: 'Open email app from sign-in',
     changes: [

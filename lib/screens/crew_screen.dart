@@ -436,6 +436,7 @@ class _CrewScreenState extends State<CrewScreen>
           _MapTab(
             locations: _locations,
             members: members,
+            messages: _messages,
             currentUserId: _userId ?? '',
             onSetMeetupPoint: _onSetMeetupPoint,
           ),
@@ -1000,9 +1001,9 @@ class _InputBar extends StatelessWidget {
                           child: CircularProgressIndicator(
                               strokeWidth: 2, color: Colors.white),
                         )
-                      : const Icon(Icons.sos_rounded, size: 20),
+                      : const Icon(Icons.crisis_alert_rounded, size: 20),
                   label: Text(
-                    sendingFindMe ? 'Alerting crew…' : 'SOS  ·  Find Me',
+                    sendingFindMe ? 'Alerting crew…' : 'Find Me',
                     style: kStyleBodySemibold.copyWith(color: Colors.white),
                   ),
                   style: FilledButton.styleFrom(
@@ -1130,12 +1131,14 @@ class _MapTab extends StatelessWidget {
   const _MapTab({
     required this.locations,
     required this.members,
+    required this.messages,
     required this.currentUserId,
     required this.onSetMeetupPoint,
   });
 
   final List<LocationShare> locations;
   final List<AppTripMember> members;
+  final List<TripMessage> messages;
   final String currentUserId;
   final void Function(LatLng) onSetMeetupPoint;
 
@@ -1147,10 +1150,32 @@ class _MapTab extends StatelessWidget {
     }
   }
 
+  LocationShare? _myLocation() {
+    try {
+      return locations.firstWhere((l) => l.userId == currentUserId);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Users who sent a findMe in the last 2 hours.
+  Set<String> _findMeUserIds() => messages
+      .where((m) =>
+          m.type == MessageType.findMe &&
+          DateTime.now().difference(m.createdAt).inHours < 2)
+      .map((m) => m.authorId)
+      .toSet();
+
+  String _formatDistance(double meters) {
+    if (meters < 1000) return '${meters.round()} m';
+    return '${(meters / 1000).toStringAsFixed(1)} km';
+  }
+
   void _showMemberSheet(
     BuildContext context,
     LocationShare loc,
     AppTripMember? member,
+    String? distanceLabel,
   ) {
     final name = member?.profile.displayName ?? 'Crew member';
     showModalBottomSheet(
@@ -1168,9 +1193,20 @@ class _MapTab extends StatelessWidget {
             children: [
               Text(name, style: kStyleTitle),
               const SizedBox(height: kSpace1),
-              Text(
-                'Last updated ${_formatRelative(loc.lastUpdatedAt)}',
-                style: kStyleCaption.copyWith(color: kColorInkSoft),
+              Row(
+                children: [
+                  Text(
+                    'Last updated ${_formatRelative(loc.lastUpdatedAt)}',
+                    style: kStyleCaption.copyWith(color: kColorInkSoft),
+                  ),
+                  if (distanceLabel != null) ...[
+                    Text('  ·  ', style: kStyleCaption.copyWith(color: kColorInkSoft)),
+                    const Icon(Icons.straighten_rounded, size: 12, color: kColorInkSoft),
+                    const SizedBox(width: 3),
+                    Text(distanceLabel,
+                        style: kStyleCaption.copyWith(color: kColorInkSoft)),
+                  ],
+                ],
               ),
               const SizedBox(height: kSpace4),
               SizedBox(
@@ -1251,6 +1287,9 @@ class _MapTab extends StatelessWidget {
     final avgLng =
         locations.map((l) => l.lng).reduce((a, b) => a + b) / locations.length;
 
+    final findMeIds = _findMeUserIds();
+    final myLoc = _myLocation();
+
     return Stack(
       children: [
         FlutterMap(
@@ -1268,35 +1307,78 @@ class _MapTab extends StatelessWidget {
               markers: locations.map((loc) {
                 final member = _memberById(loc.userId);
                 final isMe = loc.userId == currentUserId;
-                final initials = member?.profile.initials ?? '?';
-                final color = isMe ? kColorPrimary : kColorSecondary;
+                final isFindMe = findMeIds.contains(loc.userId);
+
+                // Distance from me to this member (null if my location unknown or this is me)
+                final String? distanceLabel = (!isMe && myLoc != null)
+                    ? _formatDistance(Geolocator.distanceBetween(
+                        myLoc.lat, myLoc.lng, loc.lat, loc.lng))
+                    : null;
+
+                final Color markerColor = isFindMe
+                    ? kColorDanger
+                    : (isMe ? kColorPrimary : kColorSecondary);
+
+                final Widget markerContent = isFindMe
+                    ? const Icon(Icons.crisis_alert_rounded,
+                        size: 18, color: Colors.white)
+                    : Text(
+                        member?.profile.initials ?? '?',
+                        style: kStyleBodySemibold.copyWith(
+                          color: Colors.white,
+                          fontSize: 13,
+                        ),
+                      );
 
                 return Marker(
                   point: LatLng(loc.lat, loc.lng),
-                  width: 44,
-                  height: 44,
+                  width: 64,
+                  height: distanceLabel != null ? 62 : 44,
+                  alignment: Alignment.topCenter,
                   child: GestureDetector(
                     onTap: isMe
                         ? null
-                        : () => _showMemberSheet(context, loc, member),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: color,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2.5),
-                        boxShadow: kShadowMd,
-                      ),
-                      child: Center(
-                        child: Text(
-                          initials,
-                          style: kStyleBodySemibold.copyWith(
-                            color: Colors.white,
-                            fontSize: 13,
+                        : () => _showMemberSheet(context, loc, member, distanceLabel),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: markerColor,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: isFindMe
+                                  ? const Color(0xFFFFD0D0)
+                                  : Colors.white,
+                              width: isFindMe ? 3 : 2.5,
+                            ),
+                            boxShadow: kShadowMd,
                           ),
+                          child: Center(child: markerContent),
                         ),
-                      ),
+                        if (distanceLabel != null) ...[
+                          const SizedBox(height: 3),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 5, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: kColorPaper,
+                              borderRadius: kRadiusPill,
+                              border: Border.all(color: kColorBorder),
+                              boxShadow: kShadowXs,
+                            ),
+                            child: Text(
+                              distanceLabel,
+                              style: kStyleCaption.copyWith(
+                                fontSize: 10,
+                                color: kColorInk,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 );

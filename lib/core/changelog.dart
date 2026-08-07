@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 160,
+    label: 'Travel: export itinerary as CSV',
+    changes: [
+      'A share button in Travel lets you export your bookings as a CSV — filtered results only, so you can share just your flights, just your hotels, etc.',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 159,
     label: 'Plan: pick which day when adding an item',
     changes: [

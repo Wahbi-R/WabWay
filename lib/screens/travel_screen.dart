@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
 import '../core/notifications/push_notifier.dart';
@@ -316,6 +318,41 @@ class _TravelScreenState extends State<TravelScreen> {
     }
   }
 
+  void _exportCsv() {
+    final items = _filtered;
+    if (items.isEmpty) return;
+    if (kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Export is not supported on web.',
+            style: kStyleBody.copyWith(color: Colors.white)),
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
+    final tripName = TripState.maybeOf(context)?.trip.name ?? 'Trip';
+    final buf = StringBuffer();
+    buf.writeln('Type,Status,Title,Date,End Date,Time,End Time,From,To,Confirmation,Address,Notes');
+    for (final i in items) {
+      buf.writeln([
+        _csvCell(i.type.label),
+        _csvCell(i.status.label),
+        _csvCell(i.title),
+        _csvCell(i.date?.toIso8601String().substring(0, 10) ?? ''),
+        _csvCell(i.endDate?.toIso8601String().substring(0, 10) ?? ''),
+        _csvCell(i.time ?? ''),
+        _csvCell(i.endTime ?? ''),
+        _csvCell(i.location ?? ''),
+        _csvCell(i.destination ?? ''),
+        _csvCell(i.confirmationNumber ?? ''),
+        _csvCell(i.address ?? ''),
+        _csvCell(i.notes ?? ''),
+      ].join(','));
+    }
+    Share.share(buf.toString(), subject: '$tripName — Travel');
+  }
+
+  static String _csvCell(String v) => '"${v.replaceAll('"', '""')}"';
+
   @override
   Widget build(BuildContext context) {
     if (_loading) return const WabwayLoadingScaffold();
@@ -439,6 +476,12 @@ class _TravelScreenState extends State<TravelScreen> {
               tooltip: 'Jump to today',
               color: kColorPrimary,
               onPressed: _scrollToToday,
+            ),
+          if (_items.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.ios_share_rounded, size: 20),
+              tooltip: 'Export as CSV',
+              onPressed: _exportCsv,
             ),
         ],
       ),

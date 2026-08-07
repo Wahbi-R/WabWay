@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 128,
+    label: 'Plan item: tappable links',
+    changes: [
+      'Google Maps and confirmation links on plan items now show "Open →" and open in your browser — no more "Link available" dead end',
+      'Tapping the linked spot card now opens the full Spot detail screen',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 127,
     label: 'Home: Spots visited count',
     changes: [

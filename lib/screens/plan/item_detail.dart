@@ -11,6 +11,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
+import '../spots/spot_detail.dart';
 import 'add_item_sheet.dart';
 
 // ─── Mobile screen ────────────────────────────────────────────────────────────
@@ -175,7 +176,7 @@ class _ItemDetailContentState extends State<ItemDetailContent> {
 
               if (linkedSpot != null) ...[
                 const SizedBox(height: kSpace4),
-                _SpotSection(spot: linkedSpot),
+                _SpotSection(spot: linkedSpot, docs: widget.docs),
               ],
 
               if (linkedDocs.isNotEmpty) ...[
@@ -348,20 +349,19 @@ class _MetaCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rows = <(IconData, String, String?)>[
-      if (item.hasTime)
-        (Icons.schedule_rounded, 'Time', item.time),
-      if (item.city != null)
-        (Icons.location_city_rounded, 'City', item.city),
-      if (item.location != null)
-        (Icons.place_rounded, 'Location', item.location),
-      if (item.mapsUrl != null)
-        (Icons.map_rounded, 'Google Maps', 'Link available'),
-      if (item.confirmationUrl != null)
-        (Icons.confirmation_number_rounded, 'Confirmation', 'Link available'),
+    final staticRows = <(IconData, String, String?)>[
+      if (item.hasTime)     (Icons.schedule_rounded,       'Time',     item.time),
+      if (item.city != null)    (Icons.location_city_rounded,  'City',     item.city),
+      if (item.location != null)(Icons.place_rounded,           'Location', item.location),
     ];
 
-    if (rows.isEmpty) return const SizedBox.shrink();
+    final hasMaps   = item.mapsUrl != null;
+    final hasConf   = item.confirmationUrl != null;
+    final totalRows = staticRows.length + (hasMaps ? 1 : 0) + (hasConf ? 1 : 0);
+
+    if (totalRows == 0) return const SizedBox.shrink();
+
+    Widget divider() => const Divider(height: kSpace4, thickness: 1, color: kColorBorder);
 
     return Container(
       decoration: BoxDecoration(
@@ -373,10 +373,49 @@ class _MetaCard extends StatelessWidget {
       padding: const EdgeInsets.all(kSpace4),
       child: Column(
         children: [
-          for (int i = 0; i < rows.length; i++) ...[
-            if (i > 0) const Divider(height: kSpace4, thickness: 1, color: kColorBorder),
-            WabwayMetaRow(icon: rows[i].$1, label: rows[i].$2, value: rows[i].$3 ?? ''),
+          for (int i = 0; i < staticRows.length; i++) ...[
+            if (i > 0) divider(),
+            WabwayMetaRow(icon: staticRows[i].$1, label: staticRows[i].$2, value: staticRows[i].$3 ?? ''),
           ],
+          if (hasMaps) ...[
+            if (staticRows.isNotEmpty) divider(),
+            _LinkRow(icon: Icons.map_rounded, label: 'Google Maps', url: item.mapsUrl!),
+          ],
+          if (hasConf) ...[
+            if (staticRows.isNotEmpty || hasMaps) divider(),
+            _LinkRow(icon: Icons.confirmation_number_rounded, label: 'Confirmation', url: item.confirmationUrl!),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _LinkRow extends StatelessWidget {
+  const _LinkRow({required this.icon, required this.label, required this.url});
+  final IconData icon;
+  final String label;
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () async {
+        final uri = Uri.tryParse(url);
+        if (uri != null && await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        }
+      },
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: kColorInkSoft),
+          const SizedBox(width: kSpace2),
+          Text(label, style: kStyleCaption),
+          const Spacer(),
+          Text(
+            'Open →',
+            style: kStyleBodyMedium.copyWith(color: kColorPrimary, decoration: TextDecoration.underline),
+          ),
         ],
       ),
     );
@@ -386,8 +425,9 @@ class _MetaCard extends StatelessWidget {
 // ─── Linked spot section ──────────────────────────────────────────────────────
 
 class _SpotSection extends StatelessWidget {
-  const _SpotSection({required this.spot});
+  const _SpotSection({required this.spot, this.docs = const []});
   final Spot spot;
+  final List<TripDocument> docs;
 
   @override
   Widget build(BuildContext context) {
@@ -399,14 +439,12 @@ class _SpotSection extends StatelessWidget {
         WabwayCard(
           hoverable: true,
           padding: const EdgeInsets.all(kSpace3),
-          onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text('Navigate to spot: ${spot.name}',
-                  style: kStyleBody.copyWith(color: Colors.white)),
-              behavior: SnackBarBehavior.floating,
-              duration: const Duration(seconds: 2),
-            ));
-          },
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => SpotDetailScreen(spot: spot, docs: docs),
+            ),
+          ),
           child: Row(
             children: [
               Container(

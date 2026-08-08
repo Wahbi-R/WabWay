@@ -182,6 +182,15 @@ class _CrewScreenState extends State<CrewScreen>
       tripId: _tripId!,
       userId: _userId!,
       settings: _buildLocationSettings(),
+      onError: (e) {
+        if (!mounted) return;
+        if (e is LocationServiceDisabledException) {
+          _showError('Location services are off — enable them in Settings');
+          Geolocator.openLocationSettings();
+        } else {
+          _showError('Location sharing stopped unexpectedly');
+        }
+      },
     );
   }
 

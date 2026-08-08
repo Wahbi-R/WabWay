@@ -11,6 +11,22 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 180,
+    label: 'Fix: push notifications now deliver',
+    changes: [
+      'Push notifications (crew messages, location sharing, Find Me) now reach your device reliably — a server-side JWT encoding bug was silently dropping every notification',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 179,
+    label: 'Fix: location sharing crash when GPS off',
+    changes: [
+      'Starting location sharing with GPS disabled no longer crashes — the app now shows a helpful message and opens Location Settings instead',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 178,
     label: 'Money: clear all filters at once',
     changes: [

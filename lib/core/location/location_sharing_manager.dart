@@ -34,32 +34,39 @@ class LocationSharingManager {
     required String tripId,
     required String userId,
     required LocationSettings settings,
+    void Function(Object error)? onError,
   }) async {
     _tripId = tripId;
     _userId = userId;
     isSharing.value = true;
 
-    _sub = Geolocator.getPositionStream(locationSettings: settings)
-        .listen((pos) async {
-      if (!isSharing.value) return;
-      // First position means the foreground service is live — add stop button.
-      if (!_stopActionAdded &&
-          !kIsWeb &&
-          defaultTargetPlatform == TargetPlatform.android) {
-        _stopActionAdded = true;
+    _sub = Geolocator.getPositionStream(locationSettings: settings).listen(
+      (pos) async {
+        if (!isSharing.value) return;
+        // First position means the foreground service is live — add stop button.
+        if (!_stopActionAdded &&
+            !kIsWeb &&
+            defaultTargetPlatform == TargetPlatform.android) {
+          _stopActionAdded = true;
+          try {
+            await _channel.invokeMethod('addStopAction');
+          } catch (_) {}
+        }
         try {
-          await _channel.invokeMethod('addStopAction');
+          await CrewService.upsertLocationShare(
+            tripId: _tripId!,
+            userId: _userId!,
+            lat: pos.latitude,
+            lng: pos.longitude,
+          );
         } catch (_) {}
-      }
-      try {
-        await CrewService.upsertLocationShare(
-          tripId: _tripId!,
-          userId: _userId!,
-          lat: pos.latitude,
-          lng: pos.longitude,
-        );
-      } catch (_) {}
-    });
+      },
+      onError: (Object e) async {
+        await stop();
+        onError?.call(e);
+      },
+      cancelOnError: true,
+    );
   }
 
   Future<void> stop() async {

@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 183,
+    label: 'Fix: crew chat + members update live',
+    changes: [
+      'Crew chat messages now appear immediately after you send them — no more leaving and re-entering',
+      'New trip members now show up without restarting the app',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 182,
     label: 'Add Spot: address search + UX polish',
     changes: [

@@ -288,6 +288,10 @@ class _CrewScreenState extends State<CrewScreen>
         authorId: _userId!,
         body: text,
       );
+      // Refresh immediately so the sender sees their message without waiting
+      // for the realtime subscription (which requires the table to be in the
+      // Supabase realtime publication).
+      await _onNewMessage();
       pushNotify(
         tripId: _tripId!,
         title: 'New crew message',
@@ -317,6 +321,7 @@ class _CrewScreenState extends State<CrewScreen>
         lat: pos.latitude,
         lng: pos.longitude,
       );
+      await _onNewMessage();
     } catch (_) {
       _showError('Could not get location');
     } finally {
@@ -363,6 +368,7 @@ class _CrewScreenState extends State<CrewScreen>
         lat: pos.latitude,
         lng: pos.longitude,
       );
+      await _onNewMessage();
       pushNotify(
         tripId: _tripId!,
         title: '\u{1F6A8} $_myDisplayName needs the crew!',
@@ -409,6 +415,7 @@ class _CrewScreenState extends State<CrewScreen>
         lat: point.latitude,
         lng: point.longitude,
       );
+      await _onNewMessage();
       pushNotify(
         tripId: _tripId!,
         title: '\u{1F4CD} $_myDisplayName set a meetup point',

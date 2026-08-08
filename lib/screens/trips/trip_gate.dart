@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/supabase/client.dart';
 import '../../core/invite/invite_link_handler.dart';
 import '../../widgets/update_checker_banner.dart';
 import '../../core/trip/app_trip.dart';
@@ -27,11 +28,18 @@ class _TripGateState extends State<TripGate> {
   List<AppTrip> _trips = [];
   List<AppTripMember> _members = [];
   int _selectedIndex = 0;
+  RealtimeChannel? _membersChannel;
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _membersChannel?.unsubscribe();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -55,11 +63,38 @@ class _TripGateState extends State<TripGate> {
         _selectedIndex = idx;
         _loading = false;
       });
+      _subscribeToMembers(trips[idx].id);
       // Existing member arrived via an invite link → show join sheet.
       _maybeShowPendingInvite(fromNoTrips: false);
     } catch (_) {
       if (mounted) setState(() { _loading = false; _error = true; });
     }
+  }
+
+  void _subscribeToMembers(String tripId) {
+    _membersChannel?.unsubscribe();
+    _membersChannel = supabase
+        .channel('trip_members:$tripId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'trip_members',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'trip_id',
+            value: tripId,
+          ),
+          callback: (_) => _reloadMembers(),
+        )
+        .subscribe();
+  }
+
+  Future<void> _reloadMembers() async {
+    if (_trips.isEmpty || !mounted) return;
+    try {
+      final members = await TripService.loadTripMembers(_trips[_selectedIndex].id);
+      if (mounted) setState(() => _members = members);
+    } catch (_) {}
   }
 
   void _maybeShowPendingInvite({required bool fromNoTrips}) {
@@ -80,6 +115,7 @@ class _TripGateState extends State<TripGate> {
       final members = await TripService.loadTripMembers(trip.id);
       if (!mounted) return;
       setState(() { _selectedIndex = idx; _members = members; _loading = false; });
+      _subscribeToMembers(trip.id);
     } catch (_) {
       if (mounted) setState(() { _loading = false; });
     }

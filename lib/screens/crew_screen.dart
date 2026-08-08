@@ -221,6 +221,15 @@ class _CrewScreenState extends State<CrewScreen>
         );
         return true;
       }
+      // Check that the device's location service is turned on.
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        if (mounted) {
+          _showError('Location services are off — enable them in Settings');
+          await Geolocator.openLocationSettings();
+        }
+        return false;
+      }
       var perm = await Geolocator.checkPermission();
       if (perm == LocationPermission.denied) {
         perm = await Geolocator.requestPermission();
@@ -234,6 +243,24 @@ class _CrewScreenState extends State<CrewScreen>
     } catch (_) {
       if (mounted) _showError('Could not access location');
       return false;
+    }
+  }
+
+  /// Gets current position with a 10-second timeout, falling back to the last
+  /// known position if GPS hasn't acquired a fix yet (common indoors).
+  Future<Position> _getCurrentPosition() async {
+    try {
+      return await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
+    } catch (_) {
+      // Timeout or GPS unavailable — try last known position.
+      final last = await Geolocator.getLastKnownPosition();
+      if (last != null) return last;
+      rethrow;
     }
   }
 
@@ -270,10 +297,7 @@ class _CrewScreenState extends State<CrewScreen>
 
     setState(() => _sendingPing = true);
     try {
-      final pos = await Geolocator.getCurrentPosition(
-        locationSettings:
-            const LocationSettings(accuracy: LocationAccuracy.high),
-      );
+      final pos = await _getCurrentPosition();
       await CrewService.sendLocationPing(
         tripId: _tripId!,
         authorId: _userId!,
@@ -319,10 +343,7 @@ class _CrewScreenState extends State<CrewScreen>
 
     setState(() => _sendingFindMe = true);
     try {
-      final pos = await Geolocator.getCurrentPosition(
-        locationSettings:
-            const LocationSettings(accuracy: LocationAccuracy.high),
-      );
+      final pos = await _getCurrentPosition();
       await CrewService.sendFindMe(
         tripId: _tripId!,
         authorId: _userId!,

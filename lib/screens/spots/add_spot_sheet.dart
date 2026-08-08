@@ -175,6 +175,11 @@ class _AddSpotContentState extends State<_AddSpotContent> {
   String? _placeSource;
   String? _placeId;
 
+  // Address search state
+  List<PlaceSuggestion> _addrResults   = [];
+  bool                  _addrSearching = false;
+  bool                  _showAddrResults = false;
+
 
   @override
   void initState() {
@@ -266,6 +271,7 @@ class _AddSpotContentState extends State<_AddSpotContent> {
     _            => SpotCategory.landmark,
   };
 
+
   void _applySuggestion(PlaceSuggestion place) {
     _nameCtrl.text    = place.name;
     _cityCtrl.text    = place.city;
@@ -274,11 +280,76 @@ class _AddSpotContentState extends State<_AddSpotContent> {
     _countryCtrl.text = place.country;
     _mapsCtrl.text    = place.mapsUrl;
     setState(() {
-      _category    = place.category;
+      // If the search returned no specific category (defaulted to landmark),
+      // try to infer one from the place name for better auto-selection.
+      _category    = place.category != SpotCategory.landmark
+          ? place.category
+          : _inferCategoryFromName(place.name);
       _latitude    = place.latitude;
       _longitude   = place.longitude;
       _placeSource = 'place_search';
       _placeId     = place.placeId;
+      _showAddrResults = false;
+      _addrResults     = [];
+    });
+  }
+
+  SpotCategory _inferCategoryFromName(String name) {
+    final n = name.toLowerCase();
+    if (n.contains('restaurant') || n.contains('cafe') || n.contains('coffee') ||
+        n.contains('sushi') || n.contains('ramen') || n.contains('curry') ||
+        n.contains('noodle') || n.contains('bistro') || n.contains('diner') ||
+        n.contains('grill') || n.contains('bakery') || n.contains('kitchen') ||
+        n.contains('izakaya') || n.contains('yakitori') || n.contains('bar') ||
+        n.contains('food')) { return SpotCategory.food; }
+    if (n.contains('shop') || n.contains('store') || n.contains('market') ||
+        n.contains('mall') || n.contains('boutique') || n.contains('outlet')) {
+      return SpotCategory.shopping;
+    }
+    if (n.contains('park') || n.contains('garden') || n.contains('beach') ||
+        n.contains('forest') || n.contains('lake') || n.contains('mountain') ||
+        n.contains('waterfall') || n.contains('nature') || n.contains('river')) {
+      return SpotCategory.nature;
+    }
+    if (n.contains('museum') || n.contains('gallery') || n.contains('shrine') ||
+        n.contains('temple') || n.contains('castle') || n.contains('theatre') ||
+        n.contains('zoo') || n.contains('aquarium') || n.contains('tower') ||
+        n.contains('monument') || n.contains('ruins') || n.contains('palace')) {
+      return SpotCategory.experience;
+    }
+    if (n.contains('club') || n.contains('pub') || n.contains('lounge') ||
+        n.contains('nightclub') || n.contains('karaoke') || n.contains('disco')) {
+      return SpotCategory.nightlife;
+    }
+    return SpotCategory.landmark;
+  }
+
+  Future<void> _searchAddress() async {
+    final q = _addressCtrl.text.trim();
+    if (q.isEmpty) return;
+    setState(() {
+      _addrSearching   = true;
+      _addrResults     = [];
+      _showAddrResults = true;
+    });
+    final results = await PlaceSearchService.search(q, limit: 5);
+    if (!mounted) return;
+    setState(() { _addrSearching = false; _addrResults = results; });
+  }
+
+  void _applyAddressResult(PlaceSuggestion place) {
+    setState(() {
+      _addressCtrl.text = place.address.isNotEmpty ? place.address : place.name;
+      _latitude  ??= place.latitude;
+      _longitude ??= place.longitude;
+      if (_countryCtrl.text.trim().isEmpty && place.country.isNotEmpty) {
+        _countryCtrl.text = place.country;
+      }
+      if (_cityCtrl.text.trim().isEmpty && place.city.isNotEmpty) {
+        _cityCtrl.text = place.city;
+      }
+      _showAddrResults = false;
+      _addrResults     = [];
     });
   }
 
@@ -350,7 +421,10 @@ class _AddSpotContentState extends State<_AddSpotContent> {
 
   @override
   Widget build(BuildContext context) {
-    final bottomPad = MediaQuery.viewInsetsOf(context).bottom;
+    final keyboardPad = MediaQuery.viewInsetsOf(context).bottom;
+    // viewPaddingOf gives the hardware nav-bar height regardless of SafeArea,
+    // ensuring the Add button is never hidden behind the system nav bar.
+    final navBarPad   = MediaQuery.viewPaddingOf(context).bottom;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -395,7 +469,7 @@ class _AddSpotContentState extends State<_AddSpotContent> {
               kSpace4,
               0,
               kSpace4,
-              kSpace6 + bottomPad,
+              kSpace6 + keyboardPad + navBarPad,
             ),
             child: Form(
               key: _formKey,
@@ -455,8 +529,25 @@ class _AddSpotContentState extends State<_AddSpotContent> {
                     label: 'Address',
                     hint: 'Street address (optional)',
                     controller: _addressCtrl,
-                    textInputAction: TextInputAction.next,
+                    suffixIcon: _addrSearching
+                        ? Icons.hourglass_top_rounded
+                        : Icons.search_rounded,
+                    onSuffixTap: _searchAddress,
+                    textInputAction: TextInputAction.search,
+                    onFieldSubmitted: (_) => _searchAddress(),
                   ),
+                  if (_showAddrResults) ...[
+                    const SizedBox(height: 2),
+                    _AddrResultsDropdown(
+                      results: _addrResults,
+                      loading: _addrSearching,
+                      onSelected: _applyAddressResult,
+                      onDismiss: () => setState(() {
+                        _showAddrResults = false;
+                        _addrResults     = [];
+                      }),
+                    ),
+                  ],
                   const SizedBox(height: kSpace4),
 
                   WabwayTextField(
@@ -560,4 +651,113 @@ class _AddSpotContentState extends State<_AddSpotContent> {
     );
   }
 
+}
+
+// ─── Address search results dropdown ─────────────────────────────────────────
+
+class _AddrResultsDropdown extends StatelessWidget {
+  const _AddrResultsDropdown({
+    required this.results,
+    required this.loading,
+    required this.onSelected,
+    required this.onDismiss,
+  });
+
+  final List<PlaceSuggestion> results;
+  final bool loading;
+  final ValueChanged<PlaceSuggestion> onSelected;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: kColorPaper,
+        borderRadius: kRadiusMd,
+        border: Border.all(color: kColorBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: loading
+          ? const Padding(
+              padding: EdgeInsets.all(kSpace4),
+              child: Center(
+                child: SizedBox(
+                  width: 20, height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            )
+          : results.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: kSpace4, vertical: kSpace3),
+                  child: Text('No results found',
+                      style: kStyleCaption.copyWith(color: kColorInkSoft)),
+                )
+              : Column(
+                  children: [
+                    ...results.map((p) {
+                      final subtitle = [
+                        if (p.address.isNotEmpty) p.address,
+                        if (p.city.isNotEmpty)    p.city,
+                        if (p.country.isNotEmpty) p.country,
+                      ].join(', ');
+                      return InkWell(
+                        onTap: () => onSelected(p),
+                        borderRadius: kRadiusMd,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: kSpace3, vertical: kSpace3),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.place_outlined, size: 16,
+                                  color: kColorInkSoft),
+                              const SizedBox(width: kSpace2),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(p.name, style: kStyleBodyMedium),
+                                    if (subtitle.isNotEmpty)
+                                      Text(subtitle,
+                                          style: kStyleCaption.copyWith(
+                                              color: kColorInkSoft),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                    InkWell(
+                      onTap: onDismiss,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: kSpace3, vertical: kSpace2),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.close_rounded, size: 14,
+                                color: kColorInkSoft),
+                            const SizedBox(width: 4),
+                            Text('Dismiss',
+                                style: kStyleCaption.copyWith(
+                                    color: kColorInkSoft)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+    );
+  }
 }

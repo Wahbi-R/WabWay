@@ -11,6 +11,17 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 182,
+    label: 'Add Spot: address search + UX polish',
+    changes: [
+      'The Add Spot button is no longer hidden behind your phone\'s home/back bar',
+      'Category auto-selects when you pick a place from search — with smart name-based guessing as a fallback',
+      'Address field now has a search icon: type any address and tap 🔍 to look it up and fill in coordinates',
+      'Searching a place now keeps the name visible in the search field after you select it',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 181,
     label: 'Fix: Find Me SOS now works',
     changes: [

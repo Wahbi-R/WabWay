@@ -124,7 +124,7 @@ class _PlaceSearchFieldState extends State<PlaceSearchField> {
   }
 
   void _select(PlaceSuggestion place) {
-    _ctrl.clear();
+    _ctrl.text = place.name;
     _focus.unfocus();
     setState(() { _results = []; _showResults = false; _loading = false; });
     widget.onSelected(place);

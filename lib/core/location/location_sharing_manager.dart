@@ -16,6 +16,9 @@ class LocationSharingManager {
 
   final isSharing = ValueNotifier<bool>(false);
 
+  /// Last position received from the stream — available instantly when sharing.
+  Position? lastPosition;
+
   StreamSubscription<Position>? _sub;
   String? _tripId;
   String? _userId;
@@ -43,6 +46,7 @@ class LocationSharingManager {
     _sub = Geolocator.getPositionStream(locationSettings: settings).listen(
       (pos) async {
         if (!isSharing.value) return;
+        lastPosition = pos;
         // First position means the foreground service is live — add stop button.
         if (!_stopActionAdded &&
             !kIsWeb &&

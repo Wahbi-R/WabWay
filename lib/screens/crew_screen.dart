@@ -255,26 +255,20 @@ class _CrewScreenState extends State<CrewScreen>
     }
   }
 
-  /// Gets current position with layered fallbacks:
-  /// 1. High-accuracy GPS (10s timeout)
-  /// 2. Last-known position (cached)
-  /// 3. Network/WiFi positioning — medium accuracy, works with approximate
-  ///    location permission on Android 12+ and indoors without GPS fix.
+  /// Gets current position with layered fallbacks (fastest first):
+  /// 1. Cached position from active location-sharing stream (instant)
+  /// 2. Last-known position from OS (instant, usually fresh)
+  /// 3. One-shot medium-accuracy request (15s timeout — network/WiFi)
   Future<Position> _getCurrentPosition() async {
-    try {
-      return await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 10),
-        ),
-      );
-    } catch (_) {
-      // Try cached position first — fast and free.
-      final last = await Geolocator.getLastKnownPosition();
-      if (last != null) return last;
-    }
-    // Final fallback: network/WiFi positioning with a 15s timeout.
-    // Works when GPS is unavailable or only "approximate" location was granted.
+    // If the sharing stream is running, its most recent fix is right there.
+    final cached = LocationSharingManager.instance.lastPosition;
+    if (cached != null) return cached;
+
+    // OS-cached position — instant, no radio needed.
+    final last = await Geolocator.getLastKnownPosition();
+    if (last != null) return last;
+
+    // Nothing cached — request a fresh fix (medium accuracy works without GPS).
     return await Geolocator.getCurrentPosition(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.medium,
@@ -378,7 +372,7 @@ class _CrewScreenState extends State<CrewScreen>
         highPriority: true,
       );
     } catch (_) {
-      _showError('Could not get location');
+      _showError('Could not send SOS — check your connection');
     } finally {
       if (mounted) setState(() => _sendingFindMe = false);
     }

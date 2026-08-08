@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 181,
+    label: 'Fix: Find Me SOS now works',
+    changes: [
+      'The Find Me SOS button no longer shows "Could not get location" — a database constraint was blocking the alert message from being saved',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 180,
     label: 'Fix: push notifications now deliver',
     changes: [

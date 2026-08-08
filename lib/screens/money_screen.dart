@@ -130,6 +130,23 @@ class _MoneyScreenState extends State<MoneyScreen> {
 
   // ── Helpers ───────────────────────────────────────────────────────────────────
 
+  bool get _hasActiveFilters =>
+      _filterCategory != null ||
+      _filterPayerId != null ||
+      _dateRange != null ||
+      _receiptSearch.isNotEmpty;
+
+  void _clearAllFilters() {
+    setState(() {
+      _filterCategory = null;
+      _filterPayerId = null;
+      _dateRange = null;
+      _receiptSearch = '';
+      _selectedReceiptId = null;
+    });
+    _searchCtrl.clear();
+  }
+
   Widget _receiptFilterStrip() {
     final present = ReceiptCategory.values
         .where((c) => _receipts.any((r) => r.category == c))
@@ -710,6 +727,38 @@ class _MoneyScreenState extends State<MoneyScreen> {
           ),
           _payerFilterStrip(),
           _quickDatePresets(),
+          if (_hasActiveFilters)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(kSpace4, 0, kSpace4, kSpace2),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: GestureDetector(
+                  onTap: _clearAllFilters,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: kColorDanger.withValues(alpha: 0.07),
+                      borderRadius: kRadiusPill,
+                      border: Border.all(color: kColorDanger.withValues(alpha: 0.25)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.close_rounded, size: 12, color: kColorDanger),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Clear filters',
+                          style: kStyleCaption.copyWith(
+                            color: kColorDanger,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           Expanded(
             child: listItems.isEmpty
                 ? Center(
@@ -1015,6 +1064,38 @@ class _MoneyScreenState extends State<MoneyScreen> {
                             ),
                             _payerFilterStrip(),
                             _quickDatePresets(),
+                            if (_hasActiveFilters)
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(kSpace4, 0, kSpace4, kSpace2),
+                                child: Align(
+                                  alignment: Alignment.centerRight,
+                                  child: GestureDetector(
+                                    onTap: _clearAllFilters,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: 5),
+                                      decoration: BoxDecoration(
+                                        color: kColorDanger.withValues(alpha: 0.07),
+                                        borderRadius: kRadiusPill,
+                                        border: Border.all(color: kColorDanger.withValues(alpha: 0.25)),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.close_rounded, size: 12, color: kColorDanger),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            'Clear filters',
+                                            style: kStyleCaption.copyWith(
+                                              color: kColorDanger,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                       ),

@@ -246,8 +246,11 @@ class _CrewScreenState extends State<CrewScreen>
     }
   }
 
-  /// Gets current position with a 10-second timeout, falling back to the last
-  /// known position if GPS hasn't acquired a fix yet (common indoors).
+  /// Gets current position with layered fallbacks:
+  /// 1. High-accuracy GPS (10s timeout)
+  /// 2. Last-known position (cached)
+  /// 3. Network/WiFi positioning — medium accuracy, works with approximate
+  ///    location permission on Android 12+ and indoors without GPS fix.
   Future<Position> _getCurrentPosition() async {
     try {
       return await Geolocator.getCurrentPosition(
@@ -257,11 +260,18 @@ class _CrewScreenState extends State<CrewScreen>
         ),
       );
     } catch (_) {
-      // Timeout or GPS unavailable — try last known position.
+      // Try cached position first — fast and free.
       final last = await Geolocator.getLastKnownPosition();
       if (last != null) return last;
-      rethrow;
     }
+    // Final fallback: network/WiFi positioning with a 15s timeout.
+    // Works when GPS is unavailable or only "approximate" location was granted.
+    return await Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.medium,
+        timeLimit: Duration(seconds: 15),
+      ),
+    );
   }
 
   Future<void> _sendMessage() async {

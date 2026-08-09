@@ -7,10 +7,12 @@ import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
 import '../core/auth/profile_state.dart';
+import '../core/supabase/accommodation_service.dart';
 import '../core/supabase/client.dart';
 import '../core/supabase/doc_service.dart';
 import '../core/supabase/spot_service.dart';
 import '../core/trip/trip_state.dart';
+import '../data/accommodation_data.dart';
 import '../data/docs_data.dart';
 import '../data/spot_data.dart';
 import '../theme/app_colors.dart';
@@ -39,6 +41,7 @@ class SpotsScreen extends StatefulWidget {
 class _SpotsScreenState extends State<SpotsScreen> {
   List<Spot> _spots = [];
   List<TripDocument> _docs = [];
+  List<Accommodation> _stays = [];
   Map<String, VoteType> _myVotes = {};
   bool _loading = true;
   bool _error = false;
@@ -84,7 +87,7 @@ class _SpotsScreenState extends State<SpotsScreen> {
   void _subscribeRealtime(String tripId) {
     _realtimeChannel?.unsubscribe();
     _realtimeChannel = supabase
-        .channel('spots-$tripId')
+        .channel('spots-all-$tripId')
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
@@ -108,6 +111,17 @@ class _SpotsScreenState extends State<SpotsScreen> {
           table: 'spot_comments',
           callback: (_) => _scheduleReload(),
         )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'accommodations',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'trip_id',
+            value: tripId,
+          ),
+          callback: (_) => _scheduleReload(),
+        )
         .subscribe();
   }
 
@@ -125,9 +139,11 @@ class _SpotsScreenState extends State<SpotsScreen> {
       final results = await Future.wait([
         SpotService.loadSpots(tripId),
         DocService.loadDocuments(tripId),
+        AccommodationService.loadAll(tripId),
       ]);
       final spots = results[0] as List<Spot>;
-      final docs = results[1] as List<TripDocument>;
+      final docs  = results[1] as List<TripDocument>;
+      final stays = results[2] as List<Accommodation>;
       if (!mounted) return;
 
       final myId = supabase.auth.currentUser?.id;
@@ -143,7 +159,14 @@ class _SpotsScreenState extends State<SpotsScreen> {
         }
       }
 
-      setState(() { _spots = spots; _docs = docs; _myVotes = myVotes; _loading = false; _offline = false; });
+      setState(() {
+        _spots = spots;
+        _docs = docs;
+        _stays = stays;
+        _myVotes = myVotes;
+        _loading = false;
+        _offline = false;
+      });
     } catch (_) {
       if (!mounted) return;
       if (silent) { setState(() => _offline = true); return; }
@@ -366,6 +389,17 @@ class _SpotsScreenState extends State<SpotsScreen> {
     }
   }
 
+  // ─── Stay detail ─────────────────────────────────────────────────────────────
+
+  void _openStayDetailMobile(BuildContext context, Accommodation stay) {
+    showModalBottomSheet(
+      context: context,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _StayMiniSheet(stay: stay),
+    );
+  }
+
   // ─── Mobile detail ────────────────────────────────────────────────────────────
 
   void _openDetailMobile(BuildContext context, Spot spot) {
@@ -484,6 +518,7 @@ class _SpotsScreenState extends State<SpotsScreen> {
         ? _DesktopLayout(
             spots: _filtered,
             allSpots: _spots,
+            stays: _stays,
             docs: _docs,
             selected: _selected,
             myVotes: _myVotes,
@@ -517,10 +552,12 @@ class _SpotsScreenState extends State<SpotsScreen> {
             onDelete: _deleteSpot,
             onEdit: _onEditSpot,
             onAdd: () => _addSpot(context),
+            onOpenStay: (a) => _openStayDetailMobile(context, a),
           )
         : _MobileLayout(
             spots: _filtered,
             allSpots: _spots,
+            stays: _stays,
             myVotes: _myVotes,
             filterCategory: _filterCategory,
             filterStatuses: _filterStatuses,
@@ -530,6 +567,7 @@ class _SpotsScreenState extends State<SpotsScreen> {
             showSearch: _showSearch,
             sortBy: _sortBy,
             onOpenSpot: (s) => _openDetailMobile(context, s),
+            onOpenStay: (a) => _openStayDetailMobile(context, a),
             onLongPress: (s) => _quickStatusSheet(context, s),
             onFilterCategory: (c) => setState(() => _filterCategory = c),
             onToggleStatus: (s) => setState(() {
@@ -591,6 +629,7 @@ class _MobileLayout extends StatelessWidget {
   const _MobileLayout({
     required this.spots,
     required this.allSpots,
+    required this.stays,
     required this.myVotes,
     required this.filterCategory,
     required this.filterStatuses,
@@ -600,6 +639,7 @@ class _MobileLayout extends StatelessWidget {
     required this.showSearch,
     required this.sortBy,
     required this.onOpenSpot,
+    required this.onOpenStay,
     required this.onLongPress,
     required this.onFilterCategory,
     required this.onToggleStatus,
@@ -613,6 +653,7 @@ class _MobileLayout extends StatelessWidget {
 
   final List<Spot> spots;
   final List<Spot> allSpots;
+  final List<Accommodation> stays;
   final Map<String, VoteType> myVotes;
   final SpotCategory? filterCategory;
   final Set<SpotStatus> filterStatuses;
@@ -622,6 +663,7 @@ class _MobileLayout extends StatelessWidget {
   final bool showSearch;
   final _SpotSort sortBy;
   final ValueChanged<Spot> onOpenSpot;
+  final ValueChanged<Accommodation> onOpenStay;
   final ValueChanged<Spot> onLongPress;
   final ValueChanged<SpotCategory?> onFilterCategory;
   final ValueChanged<SpotStatus> onToggleStatus;
@@ -731,40 +773,60 @@ class _MobileLayout extends StatelessWidget {
               return _SpotsProgressBar(visited: visited, total: spots.length);
             }),
           ),
-          spots.isEmpty
-              ? SliverFillRemaining(
-                  child: Center(
-                    child: WabwayEmptyState(
-                      icon: Icons.place_rounded,
-                      title: 'No spots yet',
-                      description: searchQuery.isNotEmpty
-                          ? 'No spots match "$searchQuery".'
-                          : 'Add the first place worth visiting.',
-                      action: searchQuery.isEmpty
-                          ? WabwayButton(
-                              label: 'Add a spot',
-                              icon: Icons.add_rounded,
-                              onPressed: onAdd,
-                            )
-                          : null,
-                    ),
-                  ),
-                )
-              : SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(
-                      kSpace4, kSpace2, kSpace4, kSpace4),
-                  sliver: SliverList.separated(
-                    itemCount: spots.length,
-                    separatorBuilder: (_, __) =>
-                        const SizedBox(height: kSpace3),
-                    itemBuilder: (_, i) => SpotListTile(
-                      spot: spots[i],
-                      myVote: myVotes[spots[i].id],
-                      onTap: () => onOpenSpot(spots[i]),
-                      onLongPress: () => onLongPress(spots[i]),
-                    ),
+          if (spots.isEmpty && stays.isEmpty)
+            SliverFillRemaining(
+              child: Center(
+                child: WabwayEmptyState(
+                  icon: Icons.place_rounded,
+                  title: 'No spots yet',
+                  description: searchQuery.isNotEmpty
+                      ? 'No spots match "$searchQuery".'
+                      : 'Add the first place worth visiting.',
+                  action: searchQuery.isEmpty
+                      ? WabwayButton(
+                          label: 'Add a spot',
+                          icon: Icons.add_rounded,
+                          onPressed: onAdd,
+                        )
+                      : null,
+                ),
+              ),
+            )
+          else if (spots.isEmpty)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: kSpace4, vertical: kSpace5),
+                child: Center(
+                  child: Text(
+                    searchQuery.isNotEmpty
+                        ? 'No spots match "$searchQuery".'
+                        : 'No spots yet.',
+                    style: kStyleCaption.copyWith(color: kColorInkSoft),
                   ),
                 ),
+              ),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(
+                  kSpace4, kSpace2, kSpace4, kSpace2),
+              sliver: SliverList.separated(
+                itemCount: spots.length,
+                separatorBuilder: (_, __) =>
+                    const SizedBox(height: kSpace3),
+                itemBuilder: (_, i) => SpotListTile(
+                  spot: spots[i],
+                  myVote: myVotes[spots[i].id],
+                  onTap: () => onOpenSpot(spots[i]),
+                  onLongPress: () => onLongPress(spots[i]),
+                ),
+              ),
+            ),
+          if (stays.isNotEmpty)
+            SliverToBoxAdapter(
+              child: _StaysSection(stays: stays, onTap: onOpenStay),
+            ),
           const SliverToBoxAdapter(child: SizedBox(height: kSpace16)),
         ],
       ),
@@ -787,6 +849,7 @@ class _DesktopLayout extends StatelessWidget {
   const _DesktopLayout({
     required this.spots,
     required this.allSpots,
+    required this.stays,
     required this.docs,
     required this.selected,
     required this.myVotes,
@@ -808,10 +871,12 @@ class _DesktopLayout extends StatelessWidget {
     required this.onDelete,
     required this.onEdit,
     required this.onAdd,
+    required this.onOpenStay,
   });
 
   final List<Spot> spots;
   final List<Spot> allSpots;
+  final List<Accommodation> stays;
   final List<TripDocument> docs;
   final Spot? selected;
   final Map<String, VoteType> myVotes;
@@ -833,6 +898,7 @@ class _DesktopLayout extends StatelessWidget {
   final Future<void> Function(String) onDelete;
   final ValueChanged<Spot> onEdit;
   final VoidCallback onAdd;
+  final ValueChanged<Accommodation> onOpenStay;
 
   @override
   Widget build(BuildContext context) {
@@ -876,7 +942,7 @@ class _DesktopLayout extends StatelessWidget {
                         return _SpotsProgressBar(visited: visited, total: spots.length);
                       }),
                       Expanded(
-                        child: spots.isEmpty
+                        child: (spots.isEmpty && stays.isEmpty)
                             ? Center(
                                 child: WabwayEmptyState(
                                   icon: Icons.place_rounded,
@@ -886,22 +952,45 @@ class _DesktopLayout extends StatelessWidget {
                                       : 'Add the first place worth visiting.',
                                 ),
                               )
-                            : ListView.separated(
+                            : ListView(
                                 padding: const EdgeInsets.fromLTRB(
                                     kSpace4, kSpace2, kSpace4, kSpace4),
-                                itemCount: spots.length,
-                                separatorBuilder: (_, __) =>
-                                    const SizedBox(height: kSpace3),
-                                itemBuilder: (_, i) => SpotListTile(
-                                  spot: spots[i],
-                                  selected: selected?.id == spots[i].id,
-                                  myVote: myVotes[spots[i].id],
-                                  onTap: () => onSelectSpot(
-                                    selected?.id == spots[i].id
-                                        ? null
-                                        : spots[i],
-                                  ),
-                                ),
+                                children: [
+                                  if (spots.isEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: kSpace4),
+                                      child: Text(
+                                        searchQuery.isNotEmpty
+                                            ? 'No spots match "$searchQuery".'
+                                            : 'No spots yet.',
+                                        style: kStyleCaption.copyWith(
+                                            color: kColorInkSoft),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    )
+                                  else
+                                    ...List.generate(spots.length, (i) {
+                                      final s = spots[i];
+                                      return Padding(
+                                        padding: EdgeInsets.only(
+                                            bottom: i < spots.length - 1
+                                                ? kSpace3
+                                                : 0),
+                                        child: SpotListTile(
+                                          spot: s,
+                                          selected: selected?.id == s.id,
+                                          myVote: myVotes[s.id],
+                                          onTap: () => onSelectSpot(
+                                            selected?.id == s.id ? null : s,
+                                          ),
+                                        ),
+                                      );
+                                    }),
+                                  if (stays.isNotEmpty)
+                                    _StaysSection(
+                                        stays: stays, onTap: onOpenStay),
+                                ],
                               ),
                       ),
                     ],
@@ -1199,7 +1288,7 @@ class _StatusFilterStrip extends StatelessWidget {
               side: BorderSide(
                 color: selected ? kColorPrimarySoftBorder : kColorBorder,
               ),
-              shape: RoundedRectangleBorder(borderRadius: kRadiusPill),
+              shape: const RoundedRectangleBorder(borderRadius: kRadiusPill),
               labelStyle: kStyleCaption.copyWith(
                 color: selected ? kColorPrimary : kColorInk,
                 fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
@@ -1485,6 +1574,193 @@ class _SearchField extends StatelessWidget {
         focusedBorder: const OutlineInputBorder(
           borderRadius: kRadiusSm,
           borderSide: BorderSide(color: kColorPrimary),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Stays section ─────────────────────────────────────────────────────────────
+
+class _StaysSection extends StatelessWidget {
+  const _StaysSection({required this.stays, required this.onTap});
+
+  final List<Accommodation> stays;
+  final ValueChanged<Accommodation> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: kSpace5),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: kSpace1),
+          child: Row(
+            children: [
+              const Icon(Icons.hotel_rounded, size: 14, color: kColorInkSoft),
+              const SizedBox(width: kSpace2),
+              Text('Stays', style: kStyleCaption.copyWith(color: kColorInkSoft)),
+            ],
+          ),
+        ),
+        const SizedBox(height: kSpace2),
+        ...List.generate(stays.length, (i) {
+          final stay = stays[i];
+          return Padding(
+            padding: EdgeInsets.only(bottom: i < stays.length - 1 ? kSpace3 : 0),
+            child: _StayRow(stay: stay, onTap: () => onTap(stay)),
+          );
+        }),
+      ],
+    );
+  }
+}
+
+class _StayRow extends StatelessWidget {
+  const _StayRow({required this.stay, required this.onTap});
+
+  final Accommodation stay;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return WabwayCard(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.all(kSpace3),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: stay.status.color.withValues(alpha: 0.12),
+                borderRadius: kRadiusSm,
+              ),
+              child: Icon(Icons.hotel_rounded,
+                  size: 18, color: stay.status.color),
+            ),
+            const SizedBox(width: kSpace3),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(stay.name,
+                      style: kStyleBodyBold,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 2),
+                  Text(stay.city,
+                      style: kStyleCaption.copyWith(color: kColorInkSoft),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                ],
+              ),
+            ),
+            const SizedBox(width: kSpace2),
+            WabwayBadge(
+              label: stay.status.label,
+              tone: stay.status.tone,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Stay mini sheet ───────────────────────────────────────────────────────────
+
+class _StayMiniSheet extends StatelessWidget {
+  const _StayMiniSheet({required this.stay});
+
+  final Accommodation stay;
+
+  String _fmt(DateTime dt) =>
+      '${dt.month}/${dt.day}/${dt.year}';
+
+  @override
+  Widget build(BuildContext context) {
+    final nights = stay.nights;
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(kSpace5, kSpace4, kSpace5, kSpace5),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(stay.name,
+                      style: kStyleBodyBold,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis),
+                ),
+                const SizedBox(width: kSpace3),
+                WabwayBadge(
+                  label: stay.status.label,
+                  tone: stay.status.tone,
+                ),
+              ],
+            ),
+            const SizedBox(height: kSpace2),
+            Text(stay.city,
+                style: kStyleCaption.copyWith(color: kColorInkSoft)),
+            if (stay.address != null) ...[
+              const SizedBox(height: kSpace1),
+              Text(stay.address!,
+                  style: kStyleCaption.copyWith(color: kColorInkSoft)),
+            ],
+            if (stay.checkIn != null || stay.checkOut != null) ...[
+              const SizedBox(height: kSpace4),
+              const Divider(height: 1),
+              const SizedBox(height: kSpace4),
+              Row(
+                children: [
+                  if (stay.checkIn != null)
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Check-in',
+                              style:
+                                  kStyleCaption.copyWith(color: kColorInkSoft)),
+                          const SizedBox(height: 2),
+                          Text(_fmt(stay.checkIn!), style: kStyleBodyMedium),
+                        ],
+                      ),
+                    ),
+                  if (stay.checkOut != null)
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Check-out',
+                              style:
+                                  kStyleCaption.copyWith(color: kColorInkSoft)),
+                          const SizedBox(height: 2),
+                          Text(_fmt(stay.checkOut!), style: kStyleBodyMedium),
+                        ],
+                      ),
+                    ),
+                  if (nights != null)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text('Nights',
+                            style:
+                                kStyleCaption.copyWith(color: kColorInkSoft)),
+                        const SizedBox(height: 2),
+                        Text('$nights', style: kStyleBodyMedium),
+                      ],
+                    ),
+                ],
+              ),
+            ],
+            const SizedBox(height: kSpace4),
+          ],
         ),
       ),
     );

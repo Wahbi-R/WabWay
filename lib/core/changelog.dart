@@ -11,6 +11,18 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 186,
+    label: 'Stays in Spots screen',
+    changes: [
+      'Accommodations now appear below the spots list in the Spots screen',
+      'Tap any stay to see its name, status, check-in/out dates, and address',
+      'Stays are grouped under a "Stays" section header with a hotel icon',
+      'Each stay shows a color-coded icon based on its booking status',
+      'New stays and updates appear in real time — no refresh needed',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 185,
     label: 'Plan: calendar view',
     changes: [

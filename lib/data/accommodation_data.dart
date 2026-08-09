@@ -90,6 +90,7 @@ class Accommodation {
     this.notes,
     this.imageUrl,
     this.confirmationNumber,
+    this.spotId,
     required this.createdBy,
     required this.createdAt,
   });
@@ -111,6 +112,7 @@ class Accommodation {
   final String? notes;
   final String? imageUrl;
   final String? confirmationNumber;
+  final String? spotId;
   final String createdBy;
   final DateTime createdAt;
 
@@ -131,6 +133,8 @@ class Accommodation {
     return AccommodationSource.other;
   }
 
+  static const _clearSpotId = Object();
+
   Accommodation copyWith({
     String? name,
     String? url,
@@ -147,6 +151,7 @@ class Accommodation {
     String? notes,
     String? imageUrl,
     String? confirmationNumber,
+    Object? spotId = _clearSpotId,
   }) => Accommodation(
     id:                 id,
     tripId:             tripId,
@@ -165,6 +170,7 @@ class Accommodation {
     notes:              notes ?? this.notes,
     imageUrl:           imageUrl ?? this.imageUrl,
     confirmationNumber: confirmationNumber ?? this.confirmationNumber,
+    spotId:             identical(spotId, _clearSpotId) ? this.spotId : spotId as String?,
     createdBy:          createdBy,
     createdAt:          createdAt,
   );

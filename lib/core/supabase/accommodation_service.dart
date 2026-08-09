@@ -86,6 +86,7 @@ abstract final class AccommodationService {
         notes:              row['notes'] as String?,
         imageUrl:           row['image_url'] as String?,
         confirmationNumber: row['confirmation_number'] as String?,
+        spotId:             row['spot_id'] as String?,
         createdBy:          row['created_by'] as String? ?? '',
         createdAt:          DateTime.parse(row['created_at'] as String),
       );
@@ -125,6 +126,7 @@ abstract final class AccommodationService {
     String? notes,
     String? imageUrl,
     String? confirmationNumber,
+    String? spotId,
   }) async {
     final inserted = await supabase.from('accommodations').insert({
       'trip_id':         tripId,
@@ -144,6 +146,7 @@ abstract final class AccommodationService {
       if (notes              != null && notes.trim().isNotEmpty)               'notes':               notes.trim(),
       if (imageUrl           != null && imageUrl.trim().isNotEmpty)            'image_url':           imageUrl.trim(),
       if (confirmationNumber != null && confirmationNumber.trim().isNotEmpty)  'confirmation_number': confirmationNumber.trim(),
+      if (spotId             != null)                                          'spot_id':             spotId,
     }).select('*').single();
     return _fromRow(inserted);
   }
@@ -165,6 +168,7 @@ abstract final class AccommodationService {
       'notes':               item.notes?.trim(),
       'image_url':           item.imageUrl?.trim(),
       'confirmation_number': item.confirmationNumber?.trim(),
+      'spot_id':             item.spotId,
     }).eq('id', item.id).select('*').single();
     return _fromRow(updated);
   }
@@ -178,5 +182,12 @@ abstract final class AccommodationService {
 
   static Future<void> delete(String id) async {
     await supabase.from('accommodations').delete().eq('id', id);
+  }
+
+  static Future<void> linkSpot(String id, String? spotId) async {
+    await supabase
+        .from('accommodations')
+        .update({'spot_id': spotId})
+        .eq('id', id);
   }
 }

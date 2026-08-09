@@ -392,11 +392,14 @@ class _SpotsScreenState extends State<SpotsScreen> {
   // ─── Stay detail ─────────────────────────────────────────────────────────────
 
   void _openStayDetailMobile(BuildContext context, Accommodation stay) {
+    final linkedSpot = stay.spotId != null
+        ? _spots.where((s) => s.id == stay.spotId).firstOrNull
+        : null;
     showModalBottomSheet(
       context: context,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _StayMiniSheet(stay: stay),
+      builder: (_) => _StayMiniSheet(stay: stay, linkedSpot: linkedSpot),
     );
   }
 
@@ -404,6 +407,7 @@ class _SpotsScreenState extends State<SpotsScreen> {
 
   void _openDetailMobile(BuildContext context, Spot spot) {
     final docs = _docs;
+    final linkedStay = _stays.where((s) => s.spotId == spot.id).firstOrNull;
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -418,6 +422,10 @@ class _SpotsScreenState extends State<SpotsScreen> {
             _deleteSpot(spot.id);
             Navigator.pop(context);
           },
+          linkedStay: linkedStay,
+          onOpenStay: linkedStay != null
+              ? () => _openStayDetailMobile(context, linkedStay)
+              : null,
         ),
       ),
     );
@@ -1002,18 +1010,27 @@ class _DesktopLayout extends StatelessWidget {
                 Expanded(
                   child: selected == null
                       ? _DesktopEmptyDetail(onAdd: onAdd)
-                      : SingleChildScrollView(
-                          child: SpotDetailContent(
-                            key: ValueKey(selected!.id),
-                            spot: selected!,
-                            myVote: myVotes[selected!.id],
-                            onVote: (v) => onVote(selected!.id, v),
-                            canDelete: canDelete(selected!),
-                            docs: docs,
-                            onEdit: onEdit,
-                            onDelete: () => onDelete(selected!.id),
-                          ),
-                        ),
+                      : Builder(builder: (ctx) {
+                          final linkedStay = stays
+                              .where((s) => s.spotId == selected!.id)
+                              .firstOrNull;
+                          return SingleChildScrollView(
+                            child: SpotDetailContent(
+                              key: ValueKey(selected!.id),
+                              spot: selected!,
+                              myVote: myVotes[selected!.id],
+                              onVote: (v) => onVote(selected!.id, v),
+                              canDelete: canDelete(selected!),
+                              docs: docs,
+                              onEdit: onEdit,
+                              onDelete: () => onDelete(selected!.id),
+                              linkedStay: linkedStay,
+                              onOpenStay: linkedStay != null
+                                  ? () => onOpenStay(linkedStay)
+                                  : null,
+                            ),
+                          );
+                        }),
                 ),
               ],
             ),
@@ -1673,9 +1690,10 @@ class _StayRow extends StatelessWidget {
 // ── Stay mini sheet ───────────────────────────────────────────────────────────
 
 class _StayMiniSheet extends StatelessWidget {
-  const _StayMiniSheet({required this.stay});
+  const _StayMiniSheet({required this.stay, this.linkedSpot});
 
   final Accommodation stay;
+  final Spot? linkedSpot;
 
   String _fmt(DateTime dt) =>
       '${dt.month}/${dt.day}/${dt.year}';
@@ -1712,6 +1730,28 @@ class _StayMiniSheet extends StatelessWidget {
               const SizedBox(height: kSpace1),
               Text(stay.address!,
                   style: kStyleCaption.copyWith(color: kColorInkSoft)),
+            ],
+            if (linkedSpot != null) ...[
+              const SizedBox(height: kSpace3),
+              Row(
+                children: [
+                  Icon(linkedSpot!.category.icon,
+                      size: 14, color: kColorInkSoft),
+                  const SizedBox(width: kSpace2),
+                  Expanded(
+                    child: Text(
+                      linkedSpot!.name,
+                      style: kStyleCaption.copyWith(color: kColorInkSoft),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  WabwayBadge(
+                    label: linkedSpot!.status.label,
+                    tone: linkedSpot!.status.tone,
+                  ),
+                ],
+              ),
             ],
             if (stay.checkIn != null || stay.checkOut != null) ...[
               const SizedBox(height: kSpace4),

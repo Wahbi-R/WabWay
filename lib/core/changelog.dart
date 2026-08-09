@@ -11,6 +11,17 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 187,
+    label: 'Link stays to spots',
+    changes: [
+      'Open any stay and tap "Linked spot" to connect it to one of your trip spots',
+      'The spot detail now shows a "Linked stay" card with dates and booking status',
+      'Stay detail sheets show the linked spot name and status',
+      'Remove a link any time from the edit form — no data is deleted',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 186,
     label: 'Stays in Spots screen',
     changes: [

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../core/places/listing_parser.dart';
 import '../../core/supabase/accommodation_service.dart';
+import '../../core/supabase/spot_service.dart';
 import '../../data/accommodation_data.dart';
+import '../../data/spot_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
@@ -50,6 +52,9 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
   String? _imageUrl;
   String? _parseError;
 
+  String? _linkedSpotId;
+  Spot?   _linkedSpot;
+
   @override
   void initState() {
     super.initState();
@@ -71,7 +76,8 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
       _source     = e.source;
       _checkIn    = e.checkIn;
       _checkOut   = e.checkOut;
-      _imageUrl   = e.imageUrl;
+      _imageUrl        = e.imageUrl;
+      _linkedSpotId    = e.spotId;
     } else if (widget.prefilled != null) {
       _applyPrefilled(widget.prefilled!);
       if (widget.initialUrl != null) _urlCtrl.text = widget.initialUrl!;
@@ -158,6 +164,7 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
           notes:              notes.isEmpty ? null : notes,
           imageUrl:           _imageUrl,
           confirmationNumber: confirm.isEmpty ? null : confirm,
+          spotId:             _linkedSpotId,
         );
         result = await AccommodationService.update(updated);
       } else {
@@ -176,6 +183,7 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
           notes:              notes.isEmpty ? null : notes,
           imageUrl:           _imageUrl,
           confirmationNumber: confirm.isEmpty ? null : confirm,
+          spotId:             _linkedSpotId,
         );
       }
       if (!mounted) return;
@@ -208,6 +216,32 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
         behavior: SnackBarBehavior.floating,
       ));
     }
+  }
+
+  Future<void> _pickSpot() async {
+    List<Spot> spots;
+    try {
+      spots = await SpotService.loadSpots(widget.tripId);
+    } catch (_) {
+      spots = [];
+    }
+    if (!mounted) return;
+
+    final result = await showModalBottomSheet<_SpotPickerResult>(
+      context: context,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _SpotPickerSheet(
+        spots: spots,
+        selectedId: _linkedSpotId,
+      ),
+    );
+    if (!mounted || result == null) return;
+    setState(() {
+      _linkedSpotId = result.spot?.id;
+      _linkedSpot   = result.spot;
+    });
   }
 
   Future<void> _pickDate({required bool isCheckIn}) async {
@@ -247,11 +281,11 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
           ),
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(kSpace4, kSpace3, kSpace4, 0),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(kSpace4, kSpace3, kSpace4, 0),
                 child: Row(
                   children: [
-                    const WabwayDragHandle(),
+                    WabwayDragHandle(),
                   ],
                 ),
               ),
@@ -465,6 +499,13 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
             textInputAction: TextInputAction.done,
           ),
 
+          const SizedBox(height: kSpace3),
+          _SpotLinkTile(
+            linkedSpot: _linkedSpot,
+            linkedSpotId: _linkedSpotId,
+            onTap: _pickSpot,
+          ),
+
           if (detectedSrc != null && detectedSrc != AccommodationSource.other) ...[
             const SizedBox(height: kSpace3),
             Row(
@@ -542,6 +583,176 @@ class _CurrencySelector extends StatelessWidget {
   }
 }
 
+// ─── Spot link tile ──────────────────────────────────────────────────────────
+
+class _SpotPickerResult {
+  const _SpotPickerResult(this.spot);
+  final Spot? spot;
+}
+
+class _SpotLinkTile extends StatelessWidget {
+  const _SpotLinkTile({
+    required this.linkedSpot,
+    required this.linkedSpotId,
+    required this.onTap,
+  });
+
+  final Spot?   linkedSpot;
+  final String? linkedSpotId;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isLinked = linkedSpotId != null;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: 14),
+        decoration: BoxDecoration(
+          color: kColorSurfaceSunken,
+          borderRadius: kRadiusMd,
+          border: Border.all(
+            color: isLinked ? kColorPrimary.withValues(alpha: 0.4) : kColorBorder,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              isLinked ? Icons.place_rounded : Icons.link_rounded,
+              size: 16,
+              color: isLinked ? kColorPrimary : kColorInkSoft,
+            ),
+            const SizedBox(width: kSpace2),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Linked spot', style: kStyleOverline),
+                  const SizedBox(height: 2),
+                  Text(
+                    isLinked
+                        ? (linkedSpot?.name ?? 'Spot linked')
+                        : 'None — tap to link',
+                    style: kStyleBody.copyWith(
+                      color: isLinked ? kColorInk : kColorInkSoft,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, size: 18, color: kColorInkSoft),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Spot picker sheet ────────────────────────────────────────────────────────
+
+class _SpotPickerSheet extends StatelessWidget {
+  const _SpotPickerSheet({required this.spots, required this.selectedId});
+
+  final List<Spot> spots;
+  final String?    selectedId;
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      minChildSize: 0.4,
+      maxChildSize: 0.9,
+      builder: (context, scrollCtrl) {
+        return DecoratedBox(
+          decoration: const BoxDecoration(
+            color: kColorPaper,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: Column(
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(kSpace4, kSpace3, kSpace4, 0),
+                child: Row(children: [WabwayDragHandle()]),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(kSpace4, kSpace2, kSpace4, kSpace3),
+                child: Row(
+                  children: [
+                    Text('Link to spot', style: kStyleTitle),
+                    const Spacer(),
+                    WabwayIconButton(
+                      icon: Icons.close_rounded,
+                      label: 'Close',
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: ListView(
+                  controller: scrollCtrl,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: kSpace4, vertical: kSpace3),
+                  children: [
+                    if (selectedId != null)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.link_off_rounded,
+                            color: kColorDanger),
+                        title: Text('Remove link',
+                            style: kStyleBody.copyWith(color: kColorDanger)),
+                        onTap: () => Navigator.pop(
+                            context, const _SpotPickerResult(null)),
+                      ),
+                    if (spots.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: kSpace8),
+                        child: Text(
+                          'No spots in this trip yet.',
+                          style: kStyleCaption.copyWith(color: kColorInkSoft),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ...spots.map((s) {
+                      final isSelected = s.id == selectedId;
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                          s.category.icon,
+                          color: isSelected ? kColorPrimary : kColorInkSoft,
+                          size: 20,
+                        ),
+                        title: Text(s.name,
+                            style: kStyleBody.copyWith(
+                              color: isSelected ? kColorPrimary : kColorInk,
+                              fontWeight: isSelected
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                            )),
+                        subtitle: Text(s.city,
+                            style: kStyleCaption.copyWith(
+                                color: kColorInkSoft)),
+                        trailing: isSelected
+                            ? const Icon(Icons.check_circle_rounded,
+                                color: kColorPrimary)
+                            : null,
+                        onTap: () =>
+                            Navigator.pop(context, _SpotPickerResult(s)),
+                      );
+                    }),
+                    const SizedBox(height: kSpace8),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
 // ─── Date field ───────────────────────────────────────────────────────────────
 
 class _DateField extends StatelessWidget {
@@ -585,7 +796,7 @@ class _DateField extends StatelessWidget {
                 ],
               ),
             ),
-            Icon(Icons.calendar_today_rounded, size: 16, color: kColorInkSoft),
+            const Icon(Icons.calendar_today_rounded, size: 16, color: kColorInkSoft),
           ],
         ),
       ),

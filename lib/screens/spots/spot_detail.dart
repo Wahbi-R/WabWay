@@ -7,6 +7,7 @@ import '../../core/supabase/doc_service.dart';
 import '../../core/supabase/plan_service.dart';
 import '../../core/supabase/spot_service.dart';
 import '../../core/trip/trip_state.dart';
+import '../../data/accommodation_data.dart';
 import '../../data/docs_data.dart';
 import '../../data/plan_data.dart';
 import '../../data/spot_data.dart';
@@ -41,6 +42,8 @@ class SpotDetailScreen extends StatelessWidget {
     this.onDelete,
     this.onEdit,
     this.docs = const [],
+    this.linkedStay,
+    this.onOpenStay,
   });
 
   final Spot spot;
@@ -50,6 +53,8 @@ class SpotDetailScreen extends StatelessWidget {
   final VoidCallback? onDelete;
   final ValueChanged<Spot>? onEdit;
   final List<TripDocument> docs;
+  final Accommodation? linkedStay;
+  final VoidCallback? onOpenStay;
 
   @override
   Widget build(BuildContext context) {
@@ -100,6 +105,8 @@ class SpotDetailScreen extends StatelessWidget {
           myVote: myVote,
           onVote: onVote,
           docs: docs,
+          linkedStay: linkedStay,
+          onOpenStay: onOpenStay,
         ),
       ),
     );
@@ -119,6 +126,8 @@ class SpotDetailContent extends StatefulWidget {
     this.onDelete,
     this.onEdit,
     this.docs = const [],
+    this.linkedStay,
+    this.onOpenStay,
   });
 
   final Spot spot;
@@ -129,6 +138,8 @@ class SpotDetailContent extends StatefulWidget {
   final VoidCallback? onDelete;
   final ValueChanged<Spot>? onEdit;
   final List<TripDocument> docs;
+  final Accommodation? linkedStay;
+  final VoidCallback? onOpenStay;
 
   @override
   State<SpotDetailContent> createState() => _SpotDetailContentState();
@@ -374,6 +385,17 @@ class _SpotDetailContentState extends State<SpotDetailContent> {
                 const SizedBox(height: kSpace4),
               ],
 
+              // ── Linked stay
+              if (widget.linkedStay != null) ...[
+                _LinkedStayCard(
+                  stay: widget.linkedStay!,
+                  onTap: widget.onOpenStay,
+                ),
+                const SizedBox(height: kSpace4),
+                const Divider(height: 1),
+                const SizedBox(height: kSpace4),
+              ],
+
               // ── Linked documents
               Builder(builder: (context) {
                 final linked = widget.docs.where((d) => d.links.any(
@@ -447,9 +469,9 @@ class _SpotDetailContentState extends State<SpotDetailContent> {
                       label: const Text('Mark as confirmed'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: kColorInkSoft,
-                        side: BorderSide(color: kColorBorder),
+                        side: const BorderSide(color: kColorBorder),
                         padding: const EdgeInsets.symmetric(vertical: 10),
-                        shape: RoundedRectangleBorder(borderRadius: kRadiusMd),
+                        shape: const RoundedRectangleBorder(borderRadius: kRadiusMd),
                       ),
                     ),
                   ),
@@ -467,7 +489,7 @@ class _SpotDetailContentState extends State<SpotDetailContent> {
                             backgroundColor: kColorSuccess,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: kRadiusMd),
+                            shape: const RoundedRectangleBorder(borderRadius: kRadiusMd),
                           ),
                         ),
                       ),
@@ -480,9 +502,9 @@ class _SpotDetailContentState extends State<SpotDetailContent> {
                           label: const Text('Skip'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: kColorInkSoft,
-                            side: BorderSide(color: kColorBorder),
+                            side: const BorderSide(color: kColorBorder),
                             padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: kRadiusMd),
+                            shape: const RoundedRectangleBorder(borderRadius: kRadiusMd),
                           ),
                         ),
                       ),
@@ -652,7 +674,7 @@ class _AddToPlanButtonState extends State<_AddToPlanButton> {
           foregroundColor: kColorPrimary,
           side: BorderSide(color: kColorPrimary.withValues(alpha: 0.5)),
           padding: const EdgeInsets.symmetric(vertical: 11),
-          shape: RoundedRectangleBorder(borderRadius: kRadiusMd),
+          shape: const RoundedRectangleBorder(borderRadius: kRadiusMd),
         ),
       ),
     );
@@ -774,6 +796,81 @@ class _LinkedDocTileState extends State<_LinkedDocTile> {
             const Icon(Icons.open_in_new_rounded, size: 16, color: kColorInkSoft),
         ],
       ),
+    );
+  }
+}
+
+// ─── Linked stay card ─────────────────────────────────────────────────────────
+
+class _LinkedStayCard extends StatelessWidget {
+  const _LinkedStayCard({required this.stay, this.onTap});
+
+  final Accommodation stay;
+  final VoidCallback? onTap;
+
+  static String _fmtDate(DateTime dt) {
+    const months = ['Jan','Feb','Mar','Apr','May','Jun',
+                    'Jul','Aug','Sep','Oct','Nov','Dec'];
+    return '${months[dt.month - 1]} ${dt.day}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final nights = stay.nights;
+    String? dateRange;
+    if (stay.checkIn != null && stay.checkOut != null) {
+      dateRange = '${_fmtDate(stay.checkIn!)} – ${_fmtDate(stay.checkOut!)}';
+      if (nights != null) dateRange += ' · $nights ${nights == 1 ? 'night' : 'nights'}';
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Linked stay', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
+        const SizedBox(height: kSpace2),
+        WabwayCard(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(kSpace3),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: stay.status.color.withValues(alpha: 0.12),
+                    borderRadius: kRadiusSm,
+                  ),
+                  child: Icon(Icons.hotel_rounded,
+                      size: 18, color: stay.status.color),
+                ),
+                const SizedBox(width: kSpace3),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(stay.name,
+                          style: kStyleBodyBold,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
+                      if (dateRange != null)
+                        Text(dateRange,
+                            style: kStyleCaption.copyWith(color: kColorInkSoft),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: kSpace2),
+                WabwayBadge(
+                  label: stay.status.label,
+                  tone: stay.status.tone,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

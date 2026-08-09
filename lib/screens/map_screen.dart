@@ -212,11 +212,14 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _openStayDetail(Accommodation stay) {
+    final linkedSpot = stay.spotId != null
+        ? _spots.where((s) => s.id == stay.spotId).firstOrNull
+        : null;
     showModalBottomSheet(
       context: context,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _StayDetailSheet(stay: stay),
+      builder: (_) => _StayDetailSheet(stay: stay, linkedSpot: linkedSpot),
     );
   }
 
@@ -885,8 +888,9 @@ class _StayListRow extends StatelessWidget {
 // ─── Stay detail sheet ────────────────────────────────────────────────────────
 
 class _StayDetailSheet extends StatelessWidget {
-  const _StayDetailSheet({required this.stay});
+  const _StayDetailSheet({required this.stay, this.linkedSpot});
   final Accommodation stay;
+  final Spot? linkedSpot;
 
   String _fmt(DateTime? d) {
     if (d == null) return '—';
@@ -961,6 +965,25 @@ class _StayDetailSheet extends StatelessWidget {
                     Text('(${stay.nights} nights)',
                         style: kStyleCaption.copyWith(color: kColorInkSoft)),
                   ],
+                ],
+              ),
+            ],
+            if (linkedSpot != null) ...[
+              const SizedBox(height: kSpace2),
+              Row(
+                children: [
+                  Icon(linkedSpot!.category.icon, size: 14, color: kColorInkSoft),
+                  const SizedBox(width: kSpace2),
+                  Expanded(
+                    child: Text(linkedSpot!.name,
+                        style: kStyleCaption.copyWith(color: kColorInkSoft),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
+                  ),
+                  WabwayBadge(
+                    label: linkedSpot!.status.label,
+                    tone: linkedSpot!.status.tone,
+                  ),
                 ],
               ),
             ],

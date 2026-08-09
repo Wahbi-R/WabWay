@@ -6,9 +6,11 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
+import '../core/supabase/accommodation_service.dart';
 import '../core/supabase/client.dart';
 import '../core/supabase/spot_service.dart';
 import '../core/trip/trip_state.dart';
+import '../data/accommodation_data.dart';
 import '../data/spot_data.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
@@ -26,10 +28,11 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   List<Spot> _spots = [];
+  List<Accommodation> _accommodations = [];
   bool _loading = true;
   bool _error = false;
   bool _showMap = true;
-  Set<SpotCategory> _hiddenCategories = {};
+  final Set<SpotCategory> _hiddenCategories = {};
   String? _activeTripId;
   RealtimeChannel? _realtimeChannel;
   Timer? _debounce;
@@ -59,7 +62,7 @@ class _MapScreenState extends State<MapScreen> {
   void _subscribeRealtime(String tripId) {
     _realtimeChannel?.unsubscribe();
     _realtimeChannel = supabase
-        .channel('map-spots-$tripId')
+        .channel('map-all-$tripId')
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
@@ -85,15 +88,38 @@ class _MapScreenState extends State<MapScreen> {
                 () { if (mounted) _load(tripId, silent: true); });
           },
         )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'accommodations',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'trip_id',
+            value: tripId,
+          ),
+          callback: (_) {
+            _debounce?.cancel();
+            _debounce = Timer(const Duration(milliseconds: 400),
+                () { if (mounted) _load(tripId, silent: true); });
+          },
+        )
         .subscribe();
   }
 
   Future<void> _load(String tripId, {bool silent = false}) async {
     if (!silent) setState(() { _loading = true; _error = false; });
     try {
-      final spots = await SpotService.loadSpots(tripId);
+      final results = await Future.wait([
+        SpotService.loadSpots(tripId),
+        AccommodationService.loadAll(tripId),
+      ]);
       if (!mounted) return;
-      setState(() { _spots = spots; _loading = false; _error = false; });
+      setState(() {
+        _spots = results[0] as List<Spot>;
+        _accommodations = results[1] as List<Accommodation>;
+        _loading = false;
+        _error = false;
+      });
       _fitIfNeeded();
     } catch (_) {
       if (!mounted) return;
@@ -101,38 +127,16 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  void _fitIfNeeded() {
-    if (!_needsFit) return;
-    final mapped = _mappedSpots;
-    if (mapped.isEmpty) return;
-    _needsFit = false;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      if (mapped.length == 1) {
-        _mapController.move(
-            LatLng(mapped.first.latitude!, mapped.first.longitude!), 14);
-      } else {
-        _mapController.fitCamera(
-          CameraFit.bounds(
-            bounds: _spotBounds(mapped),
-            padding: const EdgeInsets.all(56),
-          ),
-        );
-      }
-    });
-  }
-
-  LatLngBounds _spotBounds(List<Spot> spots) {
-    final lats = spots.map((s) => s.latitude!);
-    final lngs = spots.map((s) => s.longitude!);
-    return LatLngBounds(
-      LatLng(lats.reduce(min), lngs.reduce(min)),
-      LatLng(lats.reduce(max), lngs.reduce(max)),
-    );
-  }
-
   List<Spot> get _mappedSpots =>
       _spots.where((s) => s.isMapReady).toList();
+
+  List<Accommodation> get _mappedAccommodations =>
+      _accommodations.where((a) => a.latitude != null && a.longitude != null).toList();
+
+  List<LatLng> get _allMappedPoints => [
+    ..._mappedSpots.map((s) => LatLng(s.latitude!, s.longitude!)),
+    ..._mappedAccommodations.map((a) => LatLng(a.latitude!, a.longitude!)),
+  ];
 
   List<Spot> get _visibleSpots => _hiddenCategories.isEmpty
       ? _mappedSpots
@@ -146,11 +150,40 @@ class _MapScreenState extends State<MapScreen> {
     return SpotCategory.values.where(seen.contains).toList();
   }
 
+  void _fitIfNeeded() {
+    if (!_needsFit) return;
+    final pts = _allMappedPoints;
+    if (pts.isEmpty) return;
+    _needsFit = false;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (pts.length == 1) {
+        _mapController.move(pts.first, 14);
+      } else {
+        _mapController.fitCamera(
+          CameraFit.bounds(
+            bounds: _boundsOf(pts),
+            padding: const EdgeInsets.all(56),
+          ),
+        );
+      }
+    });
+  }
+
+  LatLngBounds _boundsOf(List<LatLng> pts) {
+    final lats = pts.map((p) => p.latitude);
+    final lngs = pts.map((p) => p.longitude);
+    return LatLngBounds(
+      LatLng(lats.reduce(min), lngs.reduce(min)),
+      LatLng(lats.reduce(max), lngs.reduce(max)),
+    );
+  }
+
   LatLng get _center {
-    final mapped = _mappedSpots;
-    if (mapped.isEmpty) return const LatLng(35.6762, 139.6503); // Tokyo default
-    final lat = mapped.map((s) => s.latitude!).reduce((a, b) => a + b) / mapped.length;
-    final lng = mapped.map((s) => s.longitude!).reduce((a, b) => a + b) / mapped.length;
+    final pts = _allMappedPoints;
+    if (pts.isEmpty) return const LatLng(35.6762, 139.6503); // Tokyo default
+    final lat = pts.map((p) => p.latitude).reduce((a, b) => a + b) / pts.length;
+    final lng = pts.map((p) => p.longitude).reduce((a, b) => a + b) / pts.length;
     return LatLng(lat, lng);
   }
 
@@ -176,6 +209,15 @@ class _MapScreenState extends State<MapScreen> {
     if (spot != null && mounted) {
       setState(() => _spots.insert(0, spot));
     }
+  }
+
+  void _openStayDetail(Accommodation stay) {
+    showModalBottomSheet(
+      context: context,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _StayDetailSheet(stay: stay),
+    );
   }
 
   void _openDetail(Spot spot) {
@@ -336,19 +378,23 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Widget _buildMap() {
-    final mapped = _mappedSpots;
+    final pts = _allMappedPoints;
 
-    if (mapped.isEmpty) {
+    if (pts.isEmpty) {
       return const Center(
         child: WabwayEmptyState(
           icon: Icons.map_outlined,
-          title: 'No spots on map yet',
-          description: 'Add spots with a Google Maps URL or use the search in the Spots screen to get coordinates.',
+          title: 'No spots or stays on map yet',
+          description: 'Add spots with a Google Maps URL or add stays with an address to see them here.',
         ),
       );
     }
 
-    final visible = _visibleSpots;
+    final visible        = _visibleSpots;
+    final mappedStays    = _mappedAccommodations;
+    final unmappedSpots  = _spots.length - _mappedSpots.length;
+    final unmappedStays  = _accommodations.length - mappedStays.length;
+    final totalUnmapped  = unmappedSpots + unmappedStays;
 
     return Stack(
       children: [
@@ -385,12 +431,25 @@ class _MapScreenState extends State<MapScreen> {
                 );
               }).toList(),
             ),
+            MarkerLayer(
+              markers: mappedStays.map((stay) {
+                return Marker(
+                  point: LatLng(stay.latitude!, stay.longitude!),
+                  width: 40,
+                  height: 56,
+                  child: GestureDetector(
+                    onTap: () => _openStayDetail(stay),
+                    child: _StayMarker(stay: stay),
+                  ),
+                );
+              }).toList(),
+            ),
           ],
         ),
         _categoryFilterStrip(),
 
         // Unmapped count banner
-        if (_spots.length > mapped.length)
+        if (totalUnmapped > 0)
           Positioned(
             bottom: MediaQuery.paddingOf(context).bottom + kSpace3,
             left: kSpace4,
@@ -407,7 +466,7 @@ class _MapScreenState extends State<MapScreen> {
                     const SizedBox(width: kSpace2),
                     Expanded(
                       child: Text(
-                        '${_spots.length - mapped.length} spot${_spots.length - mapped.length == 1 ? '' : 's'} without coordinates — switch to List to see all.',
+                        '$totalUnmapped item${totalUnmapped == 1 ? '' : 's'} without coordinates — switch to List to see all.',
                         style: kStyleCaption.copyWith(color: kColorInkSoft),
                       ),
                     ),
@@ -435,19 +494,23 @@ class _MapScreenState extends State<MapScreen> {
   // ─── List view ────────────────────────────────────────────────────────────────
 
   Widget _buildList() {
-    if (_spots.isEmpty) {
+    final hasSpots = _spots.isNotEmpty;
+    final hasStays = _accommodations.isNotEmpty;
+
+    if (!hasSpots && !hasStays) {
       return const Center(
         child: WabwayEmptyState(
           icon: Icons.place_outlined,
-          title: 'No spots yet',
-          description: 'Add spots from the Spots tab.',
+          title: 'Nothing here yet',
+          description: 'Add spots from the Spots tab or stays from the Stays tab.',
         ),
       );
     }
 
-    // Group: mapped first, then unmapped
-    final mapped   = _mappedSpots;
-    final unmapped = _spots.where((s) => !s.isMapReady).toList();
+    final mappedSpots     = _mappedSpots;
+    final unmappedSpots   = _spots.where((s) => !s.isMapReady).toList();
+    final mappedStays     = _mappedAccommodations;
+    final unmappedStays   = _accommodations.where((a) => a.latitude == null || a.longitude == null).toList();
 
     return RefreshIndicator(
       onRefresh: () => _load(_activeTripId!),
@@ -456,14 +519,14 @@ class _MapScreenState extends State<MapScreen> {
             kSpace4, kSpace3, kSpace4,
             kSpace6 + MediaQuery.paddingOf(context).bottom),
         children: [
-          if (mapped.isNotEmpty) ...[
+          if (mappedSpots.isNotEmpty) ...[
             _SectionLabel(
               icon: Icons.my_location_rounded,
-              label: 'On map (${mapped.length})',
+              label: 'Spots on map (${mappedSpots.length})',
               color: kColorSuccess,
             ),
             const SizedBox(height: kSpace2),
-            ...mapped.map((s) => _SpotListRow(
+            ...mappedSpots.map((s) => _SpotListRow(
                   spot: s,
                   showMapIcon: true,
                   onTap: () {
@@ -477,18 +540,54 @@ class _MapScreenState extends State<MapScreen> {
                 )),
             const SizedBox(height: kSpace4),
           ],
-          if (unmapped.isNotEmpty) ...[
+          if (mappedStays.isNotEmpty) ...[
+            _SectionLabel(
+              icon: Icons.hotel_rounded,
+              label: 'Stays on map (${mappedStays.length})',
+              color: const Color(0xFF7B61FF),
+            ),
+            const SizedBox(height: kSpace2),
+            ...mappedStays.map((a) => _StayListRow(
+                  stay: a,
+                  showMapIcon: true,
+                  onTap: () {
+                    setState(() => _showMap = true);
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      _mapController.move(
+                          LatLng(a.latitude!, a.longitude!), 15);
+                    });
+                  },
+                  onDetailTap: () => _openStayDetail(a),
+                )),
+            const SizedBox(height: kSpace4),
+          ],
+          if (unmappedSpots.isNotEmpty) ...[
             _SectionLabel(
               icon: Icons.location_off_rounded,
-              label: 'No coordinates (${unmapped.length})',
+              label: 'Spots without coordinates (${unmappedSpots.length})',
               color: kColorInkSoft,
             ),
             const SizedBox(height: kSpace2),
-            ...unmapped.map((s) => _SpotListRow(
+            ...unmappedSpots.map((s) => _SpotListRow(
                   spot: s,
                   showMapIcon: false,
                   onTap: () => _openDetail(s),
                   onDetailTap: () => _openDetail(s),
+                )),
+            const SizedBox(height: kSpace4),
+          ],
+          if (unmappedStays.isNotEmpty) ...[
+            _SectionLabel(
+              icon: Icons.location_off_rounded,
+              label: 'Stays without coordinates (${unmappedStays.length})',
+              color: kColorInkSoft,
+            ),
+            const SizedBox(height: kSpace2),
+            ...unmappedStays.map((a) => _StayListRow(
+                  stay: a,
+                  showMapIcon: false,
+                  onTap: () => _openStayDetail(a),
+                  onDetailTap: () => _openStayDetail(a),
                 )),
           ],
         ],
@@ -666,6 +765,215 @@ class _SectionLabel extends StatelessWidget {
         Text(label,
             style: kStyleOverline.copyWith(color: color, letterSpacing: 0.5)),
       ],
+    );
+  }
+}
+
+// ─── Stay marker ──────────────────────────────────────────────────────────────
+
+class _StayMarker extends StatelessWidget {
+  const _StayMarker({required this.stay});
+  final Accommodation stay;
+
+  Color get _color => switch (stay.status) {
+        AccommodationStatus.brainstorming => const Color(0xFF9E9E9E),
+        AccommodationStatus.shortlisted   => const Color(0xFFB8860B),
+        AccommodationStatus.booked        => kColorSuccess,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: _color,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 2),
+            boxShadow: const [
+              BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2)),
+            ],
+          ),
+          child: const Icon(Icons.hotel_rounded, size: 15, color: Colors.white),
+        ),
+        CustomPaint(
+          size: const Size(10, 8),
+          painter: _PinTailPainter(color: _color),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Stay list row ────────────────────────────────────────────────────────────
+
+class _StayListRow extends StatelessWidget {
+  const _StayListRow({
+    required this.stay,
+    required this.showMapIcon,
+    required this.onTap,
+    required this.onDetailTap,
+  });
+
+  final Accommodation stay;
+  final bool          showMapIcon;
+  final VoidCallback  onTap;
+  final VoidCallback  onDetailTap;
+
+  Color get _statusColor => switch (stay.status) {
+        AccommodationStatus.brainstorming => const Color(0xFF9E9E9E),
+        AccommodationStatus.shortlisted   => const Color(0xFFB8860B),
+        AccommodationStatus.booked        => kColorSuccess,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: kSpace2),
+      child: WabwayCard(
+        hoverable: true,
+        onTap: onTap,
+        padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: kSpace3),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: _statusColor.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.hotel_rounded, size: 18, color: _statusColor),
+            ),
+            const SizedBox(width: kSpace3),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(stay.name,
+                      style: kStyleBodyMedium,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                  Text(stay.city,
+                      style: kStyleCaption.copyWith(color: kColorInkSoft),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                ],
+              ),
+            ),
+            const SizedBox(width: kSpace2),
+            if (showMapIcon)
+              const Icon(Icons.my_location_rounded, size: 14, color: kColorSuccess),
+            const SizedBox(width: kSpace2),
+            WabwayBadge(label: stay.status.label, tone: stay.status.tone),
+            const SizedBox(width: kSpace2),
+            GestureDetector(
+              onTap: onDetailTap,
+              child: const Icon(Icons.chevron_right_rounded,
+                  size: 18, color: kColorInkSoft),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Stay detail sheet ────────────────────────────────────────────────────────
+
+class _StayDetailSheet extends StatelessWidget {
+  const _StayDetailSheet({required this.stay});
+  final Accommodation stay;
+
+  String _fmt(DateTime? d) {
+    if (d == null) return '—';
+    return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: kColorPaper,
+        borderRadius: kRadiusSheet,
+      ),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          kSpace4,
+          kSpace4,
+          kSpace4,
+          kSpace4 + MediaQuery.paddingOf(context).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: kColorPrimary.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.hotel_rounded, size: 20, color: kColorPrimary),
+                ),
+                const SizedBox(width: kSpace3),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(stay.name, style: kStyleBodyBold),
+                      Text(stay.city, style: kStyleCaption.copyWith(color: kColorInkSoft)),
+                    ],
+                  ),
+                ),
+                WabwayBadge(label: stay.status.label, tone: stay.status.tone),
+              ],
+            ),
+            if (stay.address != null) ...[
+              const SizedBox(height: kSpace3),
+              Row(
+                children: [
+                  const Icon(Icons.location_on_outlined, size: 14, color: kColorInkSoft),
+                  const SizedBox(width: kSpace2),
+                  Expanded(
+                    child: Text(stay.address!,
+                        style: kStyleCaption.copyWith(color: kColorInkSoft)),
+                  ),
+                ],
+              ),
+            ],
+            if (stay.checkIn != null || stay.checkOut != null) ...[
+              const SizedBox(height: kSpace2),
+              Row(
+                children: [
+                  const Icon(Icons.date_range_rounded, size: 14, color: kColorInkSoft),
+                  const SizedBox(width: kSpace2),
+                  Text('${_fmt(stay.checkIn)} → ${_fmt(stay.checkOut)}',
+                      style: kStyleCaption.copyWith(color: kColorInkSoft)),
+                  if (stay.nights != null) ...[
+                    const SizedBox(width: kSpace2),
+                    Text('(${stay.nights} nights)',
+                        style: kStyleCaption.copyWith(color: kColorInkSoft)),
+                  ],
+                ],
+              ),
+            ],
+            if (stay.notes != null) ...[
+              const SizedBox(height: kSpace2),
+              Text(stay.notes!,
+                  style: kStyleCaption.copyWith(color: kColorInkSoft),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }

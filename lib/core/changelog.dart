@@ -11,6 +11,18 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 184,
+    label: 'Stays now appear on the map',
+    changes: [
+      'Accommodations with an address now show as hotel markers on the Map screen',
+      'Tap a stay marker to see its name, status, check-in/check-out dates, and address',
+      'List view shows stays grouped by whether they have coordinates or not',
+      'Map camera automatically fits to include both spots and stays',
+      'New stays update the map in real time — no refresh needed',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 183,
     label: 'Fix: crew chat + members update live',
     changes: [

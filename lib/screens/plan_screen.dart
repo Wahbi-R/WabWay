@@ -53,6 +53,9 @@ class _PlanScreenState extends State<PlanScreen> {
   String _search = '';
   bool _hideCompleted = false;
   bool? _forceCollapsed;
+  bool _showCalendar = false;
+  DateTime _calFocus    = DateTime.now();
+  DateTime? _calSelected;
   final _searchCtrl = TextEditingController();
   final _mobileListCtrl = ScrollController();
 
@@ -130,6 +133,17 @@ class _PlanScreenState extends State<PlanScreen> {
         .toList();
   }
 
+  Map<String, TripDay> get _daysByDate {
+    final m = <String, TripDay>{};
+    for (final d in _days) {
+      final k = '${d.date.year}-'
+          '${d.date.month.toString().padLeft(2, '0')}-'
+          '${d.date.day.toString().padLeft(2, '0')}';
+      m[k] = d;
+    }
+    return m;
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -200,8 +214,8 @@ class _PlanScreenState extends State<PlanScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      if (!silent) setState(() { _loading = false; _error = e.toString(); });
-      else setState(() => _offline = true);
+      if (!silent) { setState(() { _loading = false; _error = e.toString(); }); }
+      else { setState(() => _offline = true); }
     }
   }
 
@@ -849,52 +863,63 @@ class _PlanScreenState extends State<PlanScreen> {
       appBar: AppBar(
         title: Text('Plan', style: kStyleTitle),
         actions: [
-          if (_todayDayIndex >= 0 && _search.isEmpty)
+          IconButton(
+            icon: Icon(
+              _showCalendar ? Icons.list_rounded : Icons.calendar_view_month_rounded,
+              size: 20,
+            ),
+            tooltip: _showCalendar ? 'List view' : 'Calendar view',
+            color: _showCalendar ? kColorPrimary : kColorInkSoft,
+            onPressed: () => setState(() => _showCalendar = !_showCalendar),
+          ),
+          if (_todayDayIndex >= 0 && _search.isEmpty && !_showCalendar)
             IconButton(
               icon: const Icon(Icons.today_rounded, size: 20),
               tooltip: 'Jump to today',
               color: kColorPrimary,
               onPressed: _scrollToToday,
             ),
-          if ((_hideCompleted || _completedCount > 0) && _search.isEmpty)
-            IconButton(
-              icon: Icon(
-                _hideCompleted
-                    ? Icons.visibility_off_rounded
-                    : Icons.visibility_rounded,
-                size: 20,
-              ),
-              tooltip: _hideCompleted ? 'Show completed' : 'Hide completed',
-              color: _hideCompleted ? kColorPrimary : kColorInkSoft,
-              onPressed: () => setState(() => _hideCompleted = !_hideCompleted),
-            ),
-          if (_days.length >= 2 && _search.isEmpty)
-            IconButton(
-              icon: Icon(
-                _forceCollapsed == true
-                    ? Icons.unfold_more_rounded
-                    : Icons.unfold_less_rounded,
-                size: 20,
-              ),
-              tooltip: _forceCollapsed == true ? 'Expand all days' : 'Collapse all days',
-              color: _forceCollapsed == true ? kColorPrimary : kColorInkSoft,
-              onPressed: () => setState(() =>
-                  _forceCollapsed = _forceCollapsed == true ? false : true),
-            ),
-          if (_days.isNotEmpty) ...[
-            IconButton(
-              icon: const Icon(Icons.ios_share_rounded, size: 20),
-              tooltip: 'Export plan',
-              color: kColorInkSoft,
-              onPressed: _exportPlan,
-            ),
-            if (!kIsWeb)
+          if (!_showCalendar) ...[
+            if ((_hideCompleted || _completedCount > 0) && _search.isEmpty)
               IconButton(
-                icon: const Icon(Icons.calendar_month_rounded, size: 20),
-                tooltip: 'Export to calendar (.ics)',
-                color: kColorInkSoft,
-                onPressed: _exportToCalendar,
+                icon: Icon(
+                  _hideCompleted
+                      ? Icons.visibility_off_rounded
+                      : Icons.visibility_rounded,
+                  size: 20,
+                ),
+                tooltip: _hideCompleted ? 'Show completed' : 'Hide completed',
+                color: _hideCompleted ? kColorPrimary : kColorInkSoft,
+                onPressed: () => setState(() => _hideCompleted = !_hideCompleted),
               ),
+            if (_days.length >= 2 && _search.isEmpty)
+              IconButton(
+                icon: Icon(
+                  _forceCollapsed == true
+                      ? Icons.unfold_more_rounded
+                      : Icons.unfold_less_rounded,
+                  size: 20,
+                ),
+                tooltip: _forceCollapsed == true ? 'Expand all days' : 'Collapse all days',
+                color: _forceCollapsed == true ? kColorPrimary : kColorInkSoft,
+                onPressed: () => setState(() =>
+                    _forceCollapsed = _forceCollapsed == true ? false : true),
+              ),
+            if (_days.isNotEmpty) ...[
+              IconButton(
+                icon: const Icon(Icons.ios_share_rounded, size: 20),
+                tooltip: 'Export plan',
+                color: kColorInkSoft,
+                onPressed: _exportPlan,
+              ),
+              if (!kIsWeb)
+                IconButton(
+                  icon: const Icon(Icons.calendar_month_rounded, size: 20),
+                  tooltip: 'Export to calendar (.ics)',
+                  color: kColorInkSoft,
+                  onPressed: _exportToCalendar,
+                ),
+            ],
           ],
           TextButton.icon(
             onPressed: () => _addDay(context),
@@ -915,6 +940,8 @@ class _PlanScreenState extends State<PlanScreen> {
                     description: _error!,
                   ),
                 )
+              : _showCalendar
+                  ? _buildMobileCalendar(context)
               : (_days.isEmpty && _unplannedSpots.isEmpty)
                   ? Center(
                       child: Column(
@@ -1038,6 +1065,216 @@ class _PlanScreenState extends State<PlanScreen> {
           'Add item',
           style: kStyleButtonMd.copyWith(color: kColorTextOnPrimary),
         ),
+      ),
+    );
+  }
+
+  // ─── Calendar view (mobile) ───────────────────────────────────────────────────
+
+  Widget _buildMobileCalendar(BuildContext context) {
+    if (_days.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const WabwayEmptyState(
+              icon: Icons.calendar_today_rounded,
+              title: 'No days yet',
+              description: 'Add your first trip day to start planning.',
+            ),
+            const SizedBox(height: kSpace4),
+            WabwayButton(
+              label: 'Add Day',
+              icon: Icons.add_rounded,
+              onPressed: () => _addDay(context),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final daysMap   = _daysByDate;
+    final selKey    = _calSelected == null
+        ? null
+        : '${_calSelected!.year}-'
+          '${_calSelected!.month.toString().padLeft(2, '0')}-'
+          '${_calSelected!.day.toString().padLeft(2, '0')}';
+    final selDay    = selKey != null ? daysMap[selKey] : null;
+    final today     = DateTime.now();
+
+    return Column(
+      children: [
+        // Month navigator
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: kSpace4, vertical: kSpace2),
+          child: Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.chevron_left_rounded),
+                color: kColorInkSoft,
+                onPressed: () => setState(() => _calFocus = DateTime(
+                    _calFocus.year, _calFocus.month - 1, 1)),
+              ),
+              Expanded(
+                child: Text(
+                  _monthLabel(_calFocus),
+                  style: kStyleBodyBold,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.chevron_right_rounded),
+                color: kColorInkSoft,
+                onPressed: () => setState(() => _calFocus = DateTime(
+                    _calFocus.year, _calFocus.month + 1, 1)),
+              ),
+            ],
+          ),
+        ),
+        // Calendar grid
+        _CalendarGrid(
+          focus: _calFocus,
+          daysMap: daysMap,
+          selected: _calSelected,
+          today: today,
+          onSelect: (d) => setState(() => _calSelected = d),
+        ),
+        const Divider(height: 1, color: kColorBorder),
+        // Selected day items
+        Expanded(
+          child: selDay != null
+              ? _buildCalendarDayItems(context, selDay)
+              : selKey != null
+                  ? _buildCalendarDayEmpty(context)
+                  : const Center(
+                      child: WabwayEmptyState(
+                        icon: Icons.touch_app_rounded,
+                        title: 'Tap a date',
+                        description: 'Select a date to see its planned items.',
+                      ),
+                    ),
+        ),
+      ],
+    );
+  }
+
+  String _monthLabel(DateTime d) {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ];
+    return '${months[d.month - 1]} ${d.year}';
+  }
+
+  Widget _buildCalendarDayItems(BuildContext context, TripDay day) {
+    final items = day.sortedItems
+        .where((i) => !(_hideCompleted && i.isDone))
+        .toList();
+
+    return RefreshIndicator(
+      onRefresh: () => _loadAll(silent: true),
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(
+          kSpace4, kSpace3, kSpace4,
+          kSpace6 + MediaQuery.paddingOf(context).bottom,
+        ),
+        children: [
+          Row(
+            children: [
+              Text(
+                'Day ${day.dayNumber} · ${day.city}',
+                style: kStyleBodyBold,
+              ),
+              const SizedBox(width: kSpace2),
+              Text(fmtDate(day.date),
+                  style: kStyleCaption.copyWith(color: kColorInkSoft)),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: () => _addItem(context, day.id),
+                icon: const Icon(Icons.add_rounded, size: 16),
+                label: Text('Add', style: kStyleCaptionMedium),
+                style: TextButton.styleFrom(
+                  foregroundColor: kColorPrimary,
+                  padding: const EdgeInsets.symmetric(horizontal: kSpace2),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ],
+          ),
+          if (day.notes != null && day.notes!.isNotEmpty) ...[
+            const SizedBox(height: kSpace2),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: kSpace2),
+              decoration: BoxDecoration(
+                color: kColorSurfaceSunken,
+                borderRadius: kRadiusMd,
+                border: Border.all(color: kColorBorder),
+              ),
+              child: Text(day.notes!,
+                  style: kStyleCaption.copyWith(color: kColorInkSoft)),
+            ),
+          ],
+          const SizedBox(height: kSpace3),
+          if (items.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: kSpace6),
+                child: Text(
+                  'No items for this day yet',
+                  style: kStyleCaption.copyWith(color: kColorInkSoft),
+                ),
+              ),
+            )
+          else
+            ...items.map((item) => _CalendarItemTile(
+                  item: item,
+                  onTap: () {
+                    final days  = List<TripDay>.from(_days);
+                    final spots = _spots;
+                    final docs  = _docs;
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ItemDetailScreen(
+                          item: item,
+                          day: day,
+                          spots: spots,
+                          docs: docs,
+                          days: days,
+                          onDelete: () => _deleteItem(item.id),
+                          onUpdated: _updateItem,
+                          onMove: (newDayId) => _onMoveItem(item, newDayId),
+                          onDuplicate: () => _onDuplicateItem(item),
+                        ),
+                      ),
+                    );
+                  },
+                  onToggleDone: () => _toggleItemDone(item.id),
+                )),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCalendarDayEmpty(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          WabwayEmptyState(
+            icon: Icons.event_available_rounded,
+            title: 'No plan for this date',
+            description: 'Add a day for ${_calSelected == null ? 'this date' : fmtDate(_calSelected!)} to start planning.',
+          ),
+          const SizedBox(height: kSpace4),
+          WabwayButton(
+            label: 'Add Day',
+            icon: Icons.add_rounded,
+            variant: WabwayButtonVariant.ghost,
+            onPressed: () => _addDay(context),
+          ),
+        ],
       ),
     );
   }
@@ -1784,6 +2021,236 @@ class _UnplannedSpotRow extends StatelessWidget {
         ),
         if (!isLast) const Divider(height: 1, indent: kSpace4, color: kColorBorder),
       ],
+    );
+  }
+}
+
+// ─── Calendar grid ────────────────────────────────────────────────────────────
+
+class _CalendarGrid extends StatelessWidget {
+  const _CalendarGrid({
+    required this.focus,
+    required this.daysMap,
+    required this.selected,
+    required this.today,
+    required this.onSelect,
+  });
+
+  final DateTime focus;
+  final Map<String, TripDay> daysMap;
+  final DateTime? selected;
+  final DateTime today;
+  final ValueChanged<DateTime> onSelect;
+
+  static const _weekdays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+  String _key(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  bool _sameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  @override
+  Widget build(BuildContext context) {
+    final firstOfMonth = DateTime(focus.year, focus.month, 1);
+    // weekday: 1=Mon … 7=Sun; offset to Sunday-start grid
+    final startOffset = firstOfMonth.weekday % 7;
+    final gridStart = firstOfMonth.subtract(Duration(days: startOffset));
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: kSpace4),
+      child: Column(
+        children: [
+          // Weekday header
+          Row(
+            children: _weekdays.map((d) => Expanded(
+              child: Center(
+                child: Text(
+                  d,
+                  style: kStyleCaption.copyWith(
+                    color: kColorInkSoft,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            )).toList(),
+          ),
+          const SizedBox(height: 4),
+          // Grid rows
+          ...List.generate(6, (row) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 2),
+              child: Row(
+                children: List.generate(7, (col) {
+                  final cellDate =
+                      gridStart.add(Duration(days: row * 7 + col));
+                  final inMonth = cellDate.month == focus.month;
+                  final isToday = _sameDay(cellDate, today);
+                  final isSel   = selected != null && _sameDay(cellDate, selected!);
+                  final key     = _key(cellDate);
+                  final hasDay  = daysMap.containsKey(key);
+                  final tripDay = daysMap[key];
+
+                  // Dot colors from item types
+                  final dots = tripDay != null
+                      ? tripDay.items
+                          .map((i) => i.type.color)
+                          .toSet()
+                          .take(3)
+                          .toList()
+                      : <Color>[];
+
+                  return Expanded(
+                    child: GestureDetector(
+                      onTap: () => onSelect(cellDate),
+                      child: Container(
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: isSel
+                              ? kColorPrimary
+                              : isToday
+                                  ? kColorPrimary.withValues(alpha: 0.1)
+                                  : Colors.transparent,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              '${cellDate.day}',
+                              style: kStyleCaption.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: isSel
+                                    ? Colors.white
+                                    : !inMonth
+                                        ? kColorBorder
+                                        : isToday
+                                            ? kColorPrimary
+                                            : hasDay
+                                                ? kColorInk
+                                                : kColorInkSoft,
+                              ),
+                            ),
+                            if (dots.isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: dots.map((c) => Container(
+                                  width: 4,
+                                  height: 4,
+                                  margin: const EdgeInsets.symmetric(horizontal: 1),
+                                  decoration: BoxDecoration(
+                                    color: isSel ? Colors.white70 : c,
+                                    shape: BoxShape.circle,
+                                  ),
+                                )).toList(),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            );
+          }),
+          const SizedBox(height: kSpace2),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Calendar item tile ───────────────────────────────────────────────────────
+
+class _CalendarItemTile extends StatelessWidget {
+  const _CalendarItemTile({
+    required this.item,
+    required this.onTap,
+    required this.onToggleDone,
+  });
+
+  final ItineraryItem item;
+  final VoidCallback  onTap;
+  final VoidCallback  onToggleDone;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: kSpace2),
+      child: WabwayCard(
+        hoverable: true,
+        onTap: onTap,
+        padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: 10),
+        child: Row(
+          children: [
+            GestureDetector(
+              onTap: onToggleDone,
+              child: AnimatedContainer(
+                duration: kDurationFast,
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: item.isDone
+                      ? kColorSuccess
+                      : Colors.transparent,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: item.isDone ? kColorSuccess : kColorBorder,
+                    width: 1.5,
+                  ),
+                ),
+                child: item.isDone
+                    ? const Icon(Icons.check_rounded,
+                        size: 13, color: Colors.white)
+                    : null,
+              ),
+            ),
+            const SizedBox(width: kSpace3),
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: item.type.softColor,
+                borderRadius: kRadiusSm,
+              ),
+              child: Icon(item.type.icon, size: 14, color: item.type.color),
+            ),
+            const SizedBox(width: kSpace2),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.title,
+                    style: kStyleBodyMedium.copyWith(
+                      decoration: item.isDone ? TextDecoration.lineThrough : null,
+                      color: item.isDone ? kColorInkSoft : kColorInk,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (item.hasTime || item.location != null)
+                    Text(
+                      [
+                        if (item.hasTime) item.time!,
+                        if (item.location != null && item.location!.isNotEmpty)
+                          item.location,
+                      ].join(' · '),
+                      style: kStyleCaption.copyWith(color: kColorInkSoft),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: kSpace2),
+            const Icon(Icons.chevron_right_rounded,
+                size: 18, color: kColorInkSoft),
+          ],
+        ),
+      ),
     );
   }
 }

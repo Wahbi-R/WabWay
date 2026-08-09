@@ -11,6 +11,18 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 185,
+    label: 'Plan: calendar view',
+    changes: [
+      'Tap the calendar icon in the Plan screen to switch to a month-grid view',
+      'Days with planned items show coloured dots — one per activity type',
+      'Tap any date to see its items with checkboxes and a quick Add button',
+      'Tap an item to open its full details, just like in list mode',
+      'Navigate months with the arrow buttons; switch back to list any time',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 184,
     label: 'Stays now appear on the map',
     changes: [

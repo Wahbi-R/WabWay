@@ -11,6 +11,18 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 188,
+    label: 'Shopping list',
+    changes: [
+      'Add a shared shopping list from the More tab (or Shopping in the sidebar)',
+      'Type an item name and tap + to add it instantly, or use the tune icon for quantity, notes, and a linked spot',
+      'Check off items as you shop — checked items move to a separate section',
+      'Swipe left on any item to delete it, or clear all checked items at once',
+      'Everyone on the trip sees changes live thanks to real-time sync',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 187,
     label: 'Link stays to spots',
     changes: [

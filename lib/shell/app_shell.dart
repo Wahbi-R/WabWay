@@ -19,6 +19,7 @@ import '../screens/map_screen.dart';
 import '../screens/links_screen.dart';
 import '../screens/accommodations/accommodations_screen.dart';
 import '../screens/packing_screen.dart';
+import '../screens/shopping/shopping_screen.dart';
 import '../screens/crew_screen.dart';
 import '../screens/placeholder_screen.dart';
 import '../screens/trips/trip_switcher_sheet.dart';
@@ -165,6 +166,13 @@ const _desktopDestinations = [
     builder: _buildPacking,
   ),
   _NavDest(
+    key: 'shopping',
+    label: 'Shopping',
+    icon: Icons.shopping_cart_outlined,
+    selectedIcon: Icons.shopping_cart_rounded,
+    builder: _buildShopping,
+  ),
+  _NavDest(
     key: 'members',
     label: 'Members',
     icon: Icons.group_outlined,
@@ -193,8 +201,9 @@ Widget _buildStays(BuildContext _)   => const AccommodationsScreen();
 Widget _buildMoney(BuildContext _)   => const MoneyScreen();
 Widget _buildDocs(BuildContext _)    => const DocsScreen();
 Widget _buildMembers(BuildContext _) => const MembersScreen();
-Widget _buildPacking(BuildContext _)  => const PackingScreen();
-Widget _buildMore(BuildContext _)    => const MoreScreen();
+Widget _buildPacking(BuildContext _)   => const PackingScreen();
+Widget _buildShopping(BuildContext _)  => const ShoppingScreen();
+Widget _buildMore(BuildContext _)      => const MoreScreen();
 Widget _buildSettings(BuildContext _) => const SettingsScreen();
 
 // ─── AppShell — responsive entry point ───────────────────────────────────────
@@ -230,12 +239,12 @@ class _AppShellState extends State<AppShell> {
   // Maps notification screen key → mobile tab index (desktop uses key directly).
   static const _mobileKeyToIndex = {
     'home': 0, 'spots': 1, 'plan': 2, 'money': 3, 'more': 4,
-    // crew/travel/docs/links live under More on mobile — open More tab.
-    'crew': 4, 'travel': 4, 'docs': 4,
+    // crew/travel/docs/links/shopping live under More on mobile — open More tab.
+    'crew': 4, 'travel': 4, 'docs': 4, 'shopping': 4,
   };
   static const _desktopKeyToIndex = {
     'home': 0, 'crew': 1, 'spots': 2, 'links': 3, 'plan': 5,
-    'travel': 6, 'money': 8, 'docs': 9,
+    'travel': 6, 'money': 8, 'docs': 9, 'shopping': 11,
   };
 
   void _switchTab(String screenKey) {
@@ -583,7 +592,7 @@ class _SidebarHeader extends StatelessWidget {
               ),
             ),
             if (hasMany)
-              Icon(Icons.unfold_more_rounded, size: 16, color: kColorInkSoft),
+              const Icon(Icons.unfold_more_rounded, size: 16, color: kColorInkSoft),
           ],
         ),
       ),

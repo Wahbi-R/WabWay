@@ -16,6 +16,7 @@ import 'map_screen.dart';
 import 'travel_screen.dart';
 import 'links_screen.dart';
 import 'packing_screen.dart';
+import 'shopping/shopping_screen.dart';
 import 'photos_screen.dart';
 import 'members/add_member_sheet.dart';
 import 'members/invite_sheet.dart';
@@ -324,6 +325,12 @@ class MoreScreen extends StatelessWidget {
                     icon: Icons.folder_rounded,
                     label: 'Documents',
                     onTap: () => _pushWithState(context, const DocsScreen()),
+                  ),
+                  const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
+                  _SettingsRow(
+                    icon: Icons.shopping_cart_rounded,
+                    label: 'Shopping List',
+                    onTap: () => _pushWithState(context, const ShoppingScreen()),
                   ),
                 ],
               ),

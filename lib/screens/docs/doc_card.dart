@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../core/auth/profile_state.dart';
+import '../../core/providers/profile_provider.dart';
+import '../../core/providers/trip_provider.dart';
 import '../../core/supabase/client.dart';
 import '../../core/supabase/doc_service.dart';
-import '../../core/trip/trip_state.dart';
 import '../../data/date_utils.dart';
 import '../../data/docs_data.dart';
 import '../../theme/app_colors.dart';
@@ -11,10 +12,10 @@ import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 
-String _uploaderName(BuildContext context, String userId) {
-  final myId = supabase.auth.currentUser?.id ?? ProfileState.maybeOf(context)?.id;
+String _uploaderName(WidgetRef ref, String userId) {
+  final myId = supabase.auth.currentUser?.id ?? ref.read(profileProvider)?.id;
   if (myId != null && userId == myId) return 'You';
-  final members = TripState.membersOf(context);
+  final members = ref.read(tripMembersProvider);
   final match = members.where((m) => m.userId == userId).firstOrNull;
   if (match != null) return match.profile.displayName;
   return userId.length >= 8 ? userId.substring(0, 8) : userId;
@@ -22,7 +23,7 @@ String _uploaderName(BuildContext context, String userId) {
 
 // ─── Grid card (mobile 2-col) ─────────────────────────────────────────────────
 
-class DocGridCard extends StatelessWidget {
+class DocGridCard extends ConsumerWidget {
   const DocGridCard({
     super.key,
     required this.doc,
@@ -35,7 +36,7 @@ class DocGridCard extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return WabwayCard(
       hoverable: true,
       selected: selected,
@@ -106,7 +107,7 @@ class DocGridCard extends StatelessWidget {
                       const SizedBox(width: 3),
                       Expanded(
                         child: Text(
-                          _uploaderName(context, doc.uploadedById),
+                          _uploaderName(ref, doc.uploadedById),
                           style: kStyleCaption.copyWith(fontSize: 11),
                           overflow: TextOverflow.ellipsis,
                         ),

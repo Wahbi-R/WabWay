@@ -6,12 +6,13 @@ import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
-import '../core/auth/profile_state.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/providers/profile_provider.dart';
+import '../core/providers/trip_provider.dart';
 import '../core/supabase/accommodation_service.dart';
 import '../core/supabase/client.dart';
 import '../core/supabase/doc_service.dart';
 import '../core/supabase/spot_service.dart';
-import '../core/trip/trip_state.dart';
 import '../data/accommodation_data.dart';
 import '../data/docs_data.dart';
 import '../data/spot_data.dart';
@@ -31,14 +32,14 @@ enum _SpotSort {
   byCity,      // grouped by city name A→Z, then spot name within city
 }
 
-class SpotsScreen extends StatefulWidget {
+class SpotsScreen extends ConsumerStatefulWidget {
   const SpotsScreen({super.key});
 
   @override
-  State<SpotsScreen> createState() => _SpotsScreenState();
+  ConsumerState<SpotsScreen> createState() => _SpotsScreenState();
 }
 
-class _SpotsScreenState extends State<SpotsScreen> {
+class _SpotsScreenState extends ConsumerState<SpotsScreen> {
   List<Spot> _spots = [];
   List<TripDocument> _docs = [];
   List<Accommodation> _stays = [];
@@ -66,14 +67,14 @@ class _SpotsScreenState extends State<SpotsScreen> {
       _filterStatuses.length + (_filterCity != null ? 1 : 0);
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final tripId = TripState.tripOf(context).id;
-    if (tripId != _activeTripId) {
-      _activeTripId = tripId;
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _activeTripId = ref.read(activeTripIdProvider);
       _loadSpots();
-      _subscribeRealtime(tripId);
-    }
+      _subscribeRealtime(_activeTripId!);
+    });
   }
 
   @override
@@ -135,7 +136,7 @@ class _SpotsScreenState extends State<SpotsScreen> {
   Future<void> _loadSpots({bool silent = false}) async {
     if (!silent) setState(() { _loading = true; _error = false; });
     try {
-      final tripId = TripState.tripOf(context).id;
+      final tripId = _activeTripId!;
       final results = await Future.wait([
         SpotService.loadSpots(tripId),
         DocService.loadDocuments(tripId),
@@ -171,7 +172,7 @@ class _SpotsScreenState extends State<SpotsScreen> {
       if (!mounted) return;
       if (silent) { setState(() => _offline = true); return; }
       // Try to show cached data on cold-start failure
-      final tripId = TripState.maybeOf(context)?.trip.id ?? '';
+      final tripId = _activeTripId ?? '';
       final cachedSpots = tripId.isNotEmpty
           ? await SpotService.loadSpotsFromCache(tripId)
           : null;
@@ -250,14 +251,14 @@ class _SpotsScreenState extends State<SpotsScreen> {
     final myId = supabase.auth.currentUser?.id;
     if (myId == null) return false;
     if (spot.addedById == myId) return true;
-    return TripState.membersOf(context).any((m) => m.userId == myId && m.isOwner);
+    return ref.read(tripMembersProvider).any((m) => m.userId == myId && m.isOwner);
   }
 
   // ─── Mutations ───────────────────────────────────────────────────────────────
 
   Future<void> _addSpot(BuildContext context) async {
-    final tripId = TripState.tripOf(context).id;
-    final userId = ProfileState.of(context).id;
+    final tripId = _activeTripId!;
+    final userId = ref.read(profileProvider)?.id ?? '';
     final spot = await showAddSpotSheet(context, tripId: tripId, userId: userId);
     if (spot != null && mounted) {
       setState(() {
@@ -334,7 +335,7 @@ class _SpotsScreenState extends State<SpotsScreen> {
     final visible = _filtered;
     if (visible.isEmpty) return;
 
-    final tripName = TripState.maybeOf(context)?.trip.name ?? 'Trip';
+    final tripName = ref.read(activeTripProvider)?.name ?? 'Trip';
 
     final buf = StringBuffer();
     buf.writeln('Name,City,Area,Country,Category,Status,Address,Maps URL,Notes');
@@ -500,6 +501,13 @@ class _SpotsScreenState extends State<SpotsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<String>(activeTripIdProvider, (prev, next) {
+      if (next != _activeTripId) {
+        _activeTripId = next;
+        _loadSpots();
+        _subscribeRealtime(next);
+      }
+    });
     if (_loading) return const WabwayLoadingScaffold();
 
     if (_error) {

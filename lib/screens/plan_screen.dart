@@ -7,11 +7,12 @@ import 'package:share_plus/share_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/providers/trip_provider.dart';
 import '../core/supabase/client.dart';
 import '../core/supabase/plan_service.dart';
 import '../core/supabase/spot_service.dart';
 import '../core/supabase/doc_service.dart';
-import '../core/trip/trip_state.dart';
 import '../data/money_data.dart' show fmtAmount;
 import '../data/plan_data.dart';
 import '../data/spot_data.dart';
@@ -25,14 +26,14 @@ import 'plan/item_detail.dart';
 import 'plan/add_item_sheet.dart';
 import 'plan/day_picker_sheet.dart';
 
-class PlanScreen extends StatefulWidget {
+class PlanScreen extends ConsumerStatefulWidget {
   const PlanScreen({super.key});
 
   @override
-  State<PlanScreen> createState() => _PlanScreenState();
+  ConsumerState<PlanScreen> createState() => _PlanScreenState();
 }
 
-class _PlanScreenState extends State<PlanScreen> {
+class _PlanScreenState extends ConsumerState<PlanScreen> {
   final List<TripDay> _days = [];
   final List<Spot> _spots = [];
   final List<TripDocument> _docs = [];
@@ -145,15 +146,15 @@ class _PlanScreenState extends State<PlanScreen> {
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _userId = supabase.auth.currentUser?.id ?? '';
-    final tripId = TripState.tripOf(context).id;
-    if (tripId != _activeTripId) {
-      _activeTripId = tripId;
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _userId = supabase.auth.currentUser?.id ?? '';
+      _activeTripId = ref.read(activeTripIdProvider);
       _loadAll();
-      _subscribeRealtime(tripId);
-    }
+      _subscribeRealtime(_activeTripId);
+    });
   }
 
   @override
@@ -306,6 +307,7 @@ class _PlanScreenState extends State<PlanScreen> {
     final draft = await showAddItemSheet(
       context,
       dayId: dayId,
+      defaultCurrency: ref.read(activeTripProvider)?.homeCurrency ?? '',
       spots: _spots,
       docs: _docs,
     );
@@ -551,8 +553,7 @@ class _PlanScreenState extends State<PlanScreen> {
   void _exportPlan() {
     if (_days.isEmpty) return;
     final buf = StringBuffer();
-    final tripState = TripState.maybeOf(context);
-    final tripName = tripState?.trip.name ?? 'Trip';
+    final tripName = ref.read(activeTripProvider)?.name ?? 'Trip';
     buf.writeln('$tripName — Itinerary');
     buf.writeln('=' * 40);
     for (final day in _days) {
@@ -599,8 +600,7 @@ class _PlanScreenState extends State<PlanScreen> {
       return;
     }
     if (_days.isEmpty) return;
-    final tripState = TripState.maybeOf(context);
-    final tripName = tripState?.trip.name ?? 'Trip';
+    final tripName = ref.read(activeTripProvider)?.name ?? 'Trip';
 
     final buf = StringBuffer();
     buf.writeln('BEGIN:VCALENDAR');
@@ -666,6 +666,13 @@ class _PlanScreenState extends State<PlanScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<String>(activeTripIdProvider, (prev, next) {
+      if (next != _activeTripId) {
+        _activeTripId = next;
+        _loadAll();
+        _subscribeRealtime(next);
+      }
+    });
     final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
     final base = isDesktop ? _buildDesktop(context) : _buildMobile(context);
     if (!_offline) return base;

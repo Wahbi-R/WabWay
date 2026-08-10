@@ -5,13 +5,14 @@ import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
 import '../core/notifications/push_notifier.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/providers/trip_provider.dart';
 import '../core/supabase/client.dart';
 import '../core/supabase/accommodation_service.dart';
 import '../core/supabase/travel_service.dart';
 import '../core/supabase/doc_service.dart';
 import '../core/supabase/plan_service.dart';
 import '../data/accommodation_data.dart';
-import '../core/trip/trip_state.dart';
 import 'notification_settings_screen.dart';
 import '../data/date_utils.dart';
 import '../data/travel_data.dart';
@@ -25,14 +26,14 @@ import 'travel/travel_item_card.dart';
 import 'travel/travel_item_detail.dart';
 import 'travel/add_travel_sheet.dart';
 
-class TravelScreen extends StatefulWidget {
+class TravelScreen extends ConsumerStatefulWidget {
   const TravelScreen({super.key});
 
   @override
-  State<TravelScreen> createState() => _TravelScreenState();
+  ConsumerState<TravelScreen> createState() => _TravelScreenState();
 }
 
-class _TravelScreenState extends State<TravelScreen> {
+class _TravelScreenState extends ConsumerState<TravelScreen> {
   final List<TravelItem> _items = [];
   final List<TripDocument> _docs = [];
   final List<TripDay> _days = [];
@@ -83,15 +84,15 @@ class _TravelScreenState extends State<TravelScreen> {
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _userId = supabase.auth.currentUser?.id ?? '';
-    final tripId = TripState.tripOf(context).id;
-    if (tripId != _activeTripId) {
-      _activeTripId = tripId;
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _userId = supabase.auth.currentUser?.id ?? '';
+      _activeTripId = ref.read(activeTripIdProvider);
       _loadAll();
-      _subscribeRealtime(tripId);
-    }
+      _subscribeRealtime(_activeTripId);
+    });
   }
 
   @override
@@ -329,7 +330,7 @@ class _TravelScreenState extends State<TravelScreen> {
       ));
       return;
     }
-    final tripName = TripState.maybeOf(context)?.trip.name ?? 'Trip';
+    final tripName = ref.read(activeTripProvider)?.name ?? 'Trip';
     final buf = StringBuffer();
     buf.writeln('Type,Status,Title,Date,End Date,Time,End Time,From,To,Confirmation,Address,Notes');
     for (final i in items) {
@@ -355,6 +356,13 @@ class _TravelScreenState extends State<TravelScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<String>(activeTripIdProvider, (prev, next) {
+      if (next != _activeTripId) {
+        _activeTripId = next;
+        _loadAll();
+        _subscribeRealtime(next);
+      }
+    });
     if (_loading) return const WabwayLoadingScaffold();
 
     if (_error != null) {

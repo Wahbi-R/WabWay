@@ -4,11 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/providers/trip_provider.dart';
 import '../core/supabase/client.dart';
 import '../core/supabase/money_service.dart';
 import '../core/supabase/settlement_service.dart';
 import '../core/sync_queue.dart';
-import '../core/trip/trip_state.dart';
 import '../data/money_data.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
@@ -54,14 +55,14 @@ sealed class _ReceiptListEntry {}
 class _DateHeader  extends _ReceiptListEntry { final DateTime date; _DateHeader(this.date); }
 class _ReceiptItem extends _ReceiptListEntry { final Receipt receipt; _ReceiptItem(this.receipt); }
 
-class MoneyScreen extends StatefulWidget {
+class MoneyScreen extends ConsumerStatefulWidget {
   const MoneyScreen({super.key});
 
   @override
-  State<MoneyScreen> createState() => _MoneyScreenState();
+  ConsumerState<MoneyScreen> createState() => _MoneyScreenState();
 }
 
-class _MoneyScreenState extends State<MoneyScreen> {
+class _MoneyScreenState extends ConsumerState<MoneyScreen> {
   List<Receipt> _receipts = [];
   List<CashWithdrawal> _withdrawals = [];
   _CashSort _cashSort = _CashSort.newest;
@@ -93,14 +94,9 @@ class _MoneyScreenState extends State<MoneyScreen> {
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────────
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-
-    // Capture real identity and member list from the inherited widget tree.
-    // These are stored as instance fields — no global mutation.
+  void _rebuildMembers() {
     final myId = supabase.auth.currentUser?.id ?? '';
-    final appMembers = TripState.membersOf(context);
+    final appMembers = ref.read(tripMembersProvider);
     _userId  = myId;
     _members = appMembers.isEmpty
         ? [TripMember(id: myId.isEmpty ? 'you' : myId, name: 'You')]
@@ -110,13 +106,18 @@ class _MoneyScreenState extends State<MoneyScreen> {
                   name: m.userId == myId ? 'You' : m.profile.displayName,
                 ))
             .toList();
+  }
 
-    final tripId = TripState.tripOf(context).id;
-    if (tripId != _activeTripId) {
-      _activeTripId = tripId;
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _rebuildMembers();
+      _activeTripId = ref.read(activeTripIdProvider);
       _loadAll();
-      _subscribeRealtime(tripId);
-    }
+      _subscribeRealtime(_activeTripId!);
+    });
   }
 
   @override
@@ -535,7 +536,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
 
   // ── Mutations ─────────────────────────────────────────────────────────────────
 
-  String get _homeCurrency => TripState.tripOf(context).homeCurrency;
+  String get _homeCurrency => ref.read(activeTripProvider)?.homeCurrency ?? '';
 
   void _exportReceipts() {
     final receipts = _filteredReceipts;
@@ -547,7 +548,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
       ));
       return;
     }
-    final tripName = TripState.maybeOf(context)?.trip.name ?? 'Trip';
+    final tripName = ref.read(activeTripProvider)?.name ?? 'Trip';
     final buf = StringBuffer();
     buf.writeln('Date,Title,Category,Amount,Currency,Home Amount,Home Currency,Paid By,Splits,Notes');
     for (final r in receipts) {
@@ -625,6 +626,14 @@ class _MoneyScreenState extends State<MoneyScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<String>(activeTripIdProvider, (prev, next) {
+      if (next != _activeTripId) {
+        _activeTripId = next;
+        _rebuildMembers();
+        _loadAll();
+        _subscribeRealtime(next);
+      }
+    });
     if (_loading) return const WabwayLoadingScaffold();
 
     if (_error) {

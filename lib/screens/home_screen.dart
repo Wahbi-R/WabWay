@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../widgets/android_download_banner.dart';
 import '../widgets/update_checker_banner.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../core/auth/profile_state.dart';
+import '../core/providers/profile_provider.dart';
+import '../core/providers/trip_provider.dart';
 import '../core/supabase/activity_service.dart';
 import '../core/supabase/doc_service.dart';
 import '../core/supabase/links_service.dart';
@@ -13,7 +15,6 @@ import '../core/supabase/spot_service.dart';
 import '../core/supabase/travel_service.dart';
 import '../core/trip/app_trip.dart';
 import '../core/trip/app_trip_member.dart';
-import '../core/trip/trip_state.dart';
 import 'onboarding_screen.dart';
 import 'trips/trip_settings_sheet.dart';
 import '../data/activity_data.dart';
@@ -132,14 +133,14 @@ class _HomeData {
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> {
   _HomeData? _data;
   Object? _error;
   bool _loaded = false;
@@ -148,36 +149,33 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) showOnboardingIfNeeded(context);
+      if (!mounted) return;
+      showOnboardingIfNeeded(context);
+      if (!_loaded) {
+        _loaded = true;
+        _load();
+      }
     });
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_loaded) {
-      _loaded = true;
-      _load();
-    }
-  }
-
   Future<void> _load() async {
-    final trip = TripState.tripOf(context);
-    final members = TripState.membersOf(context);
-    final myId = ProfileState.of(context).id;
+    final trip = ref.read(activeTripProvider);
+    final members = ref.read(tripMembersProvider);
+    final myId = ref.read(profileProvider)?.id ?? '';
 
     try {
       // All eight sources in one round-trip so the home screen loads in parallel.
       // results[0..7] must stay in sync with the list order below.
+      final tripId = trip?.id ?? '';
       final results = await Future.wait([
-        SpotService.loadSpots(trip.id),
-        DocService.loadDocuments(trip.id),
-        PlanService.loadAll(trip.id),
-        TravelService.loadItems(trip.id),
-        MoneyService.loadReceipts(trip.id),
-        MoneyService.loadWithdrawals(trip.id),
-        ActivityService.loadEvents(trip.id),
-        LinksService.loadLinks(trip.id),
+        SpotService.loadSpots(tripId),
+        DocService.loadDocuments(tripId),
+        PlanService.loadAll(tripId),
+        TravelService.loadItems(tripId),
+        MoneyService.loadReceipts(tripId),
+        MoneyService.loadWithdrawals(tripId),
+        ActivityService.loadEvents(tripId),
+        LinksService.loadLinks(tripId),
       ]);
 
       final spots        = results[0] as List<Spot>;
@@ -212,7 +210,7 @@ class _HomeScreenState extends State<HomeScreen> {
           receipts: receipts,
           links: links,
           balancesByCurrency: balancesByCurrency,
-          homeCurrency: trip.homeCurrency,
+          homeCurrency: trip?.homeCurrency ?? '',
           memberMap: memberMap,
           members: members,
           activityEvents: activities,
@@ -235,21 +233,9 @@ class _HomeScreenState extends State<HomeScreen> {
   // Shared AppBar actions — import, global search, notification settings.
   // Defined once here so the error-state and success-state scaffolds stay in sync.
   void _openCrewScreen(BuildContext context) {
-    final trip    = TripState.tripOf(context);
-    final members = TripState.membersOf(context);
-    final profile = ProfileState.of(context);
     Navigator.push<void>(
       context,
-      MaterialPageRoute(
-        builder: (_) => ProfileState(
-          profile: profile,
-          child: TripState(
-            trip: trip,
-            members: members,
-            child: const CrewScreen(),
-          ),
-        ),
-      ),
+      MaterialPageRoute(builder: (_) => const CrewScreen()),
     );
   }
 
@@ -264,20 +250,20 @@ class _HomeScreenState extends State<HomeScreen> {
       icon: const Icon(Icons.download_rounded),
       color: kColorInkSoft,
       tooltip: 'Import',
-      onPressed: () => showImportScreen(context),
+      onPressed: () => showImportScreen(context, ref),
     ),
     IconButton(
       icon: const Icon(Icons.search_rounded),
       color: kColorInkSoft,
       tooltip: 'Search',
       onPressed: () {
-        final trip    = TripState.tripOf(context);
-        final members = TripState.membersOf(context);
+        final trip    = ref.read(activeTripProvider);
+        final members = ref.read(tripMembersProvider);
         showGlobalSearch(
           context,
-          tripId:   trip.id,
-          tripName: trip.name,
-          userId:   ProfileState.of(context).id,
+          tripId:   trip?.id ?? '',
+          tripName: trip?.name ?? '',
+          userId:   ref.read(profileProvider)?.id ?? '',
           members:  members,
         );
       },
@@ -297,8 +283,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final trip = TripState.tripOf(context);
-    final members = TripState.membersOf(context);
+    final trip    = ref.watch(activeTripProvider);
+    final members = ref.watch(tripMembersProvider);
 
     if (_error != null && _data == null) {
       return Scaffold(
@@ -323,7 +309,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     final data = _data;
-    final myId   = ProfileState.of(context).id;
+    final myId    = ref.watch(profileProvider)?.id ?? '';
     final isOwner = members.any((m) => m.userId == myId && m.isOwner);
 
     return Scaffold(
@@ -340,8 +326,8 @@ class _HomeScreenState extends State<HomeScreen> {
               .toList();
           await showAddReceiptSheet(
             context,
-            tripId: trip.id,
-            userId: ProfileState.of(context).id,
+            tripId: trip?.id ?? '',
+            userId: ref.read(profileProvider)?.id ?? '',
             members: tripMembers,
             homeCurrency: data?.homeCurrency ?? 'CAD',
           );
@@ -359,27 +345,27 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             const UpdateCheckerBanner(),
             const SizedBox(height: kSpace3),
-            RepaintBoundary(
-              child: _TripHero(
-                trip: trip,
-                memberCount: members.length,
-                data: data,
-                // Owners can tap the hero to edit trip details inline
-                onTap: isOwner ? () => showTripSettingsSheet(context, trip: trip) : null,
+            if (trip != null)
+              RepaintBoundary(
+                child: _TripHero(
+                  trip: trip,
+                  memberCount: members.length,
+                  data: data,
+                  onTap: isOwner ? () => showTripSettingsSheet(context, ref, trip: trip) : null,
+                ),
               ),
-            ),
             const SizedBox(height: kSpace4),
             _QuickBalanceCard(data: data),
-            if (data != null && trip.budget != null) ...[
+            if (data != null && trip?.budget != null) ...[
               const SizedBox(height: kSpace3),
               _BudgetProgressBar(
                 spent: data.totalSpent,
-                budget: trip.budget!,
+                budget: trip!.budget!,
                 currency: trip.homeCurrency,
               ),
             ],
             const SizedBox(height: kSpace4),
-            _PinboardCard(tripId: trip.id),
+            _PinboardCard(tripId: trip?.id ?? ''),
             if (data != null && data.todayDay != null) ...[
               const SizedBox(height: kSpace4),
               _TodayAgendaCard(
@@ -1192,7 +1178,7 @@ class _ActivityFeed extends StatelessWidget {
     required this.myId,
   });
   final _HomeData? data;
-  final AppTrip trip;
+  final AppTrip? trip;
   final String myId;
 
   @override
@@ -1266,8 +1252,8 @@ class _ActivityFeed extends StatelessWidget {
           return (ctx) => Navigator.push(ctx, MaterialPageRoute(
             builder: (_) => DocDetailScreen(
               doc:            doc,
-              tripId:         trip.id,
-              tripName:       trip.name,
+              tripId:         trip?.id ?? '',
+              tripName:       trip?.name ?? '',
               availableSpots: d.spots,
             ),
           ));
@@ -1291,7 +1277,7 @@ class _ActivityFeed extends StatelessWidget {
               receipt: receipt,
               myId:    myId,
               members: moneyMembers,
-              tripId:  trip.id,
+              tripId:  trip?.id ?? '',
             ),
           ));
 

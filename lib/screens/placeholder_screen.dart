@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import '../core/auth/profile_state.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/providers/profile_provider.dart';
+import '../core/providers/trip_provider.dart';
 import '../core/supabase/auth_service.dart';
-import '../core/trip/trip_state.dart';
 import 'account_sheets.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
@@ -12,12 +13,12 @@ import 'pins_screen.dart';
 import 'members/invite_sheet.dart';
 import 'trips/trip_settings_sheet.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final profile = ProfileState.maybeOf(context);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profile = ref.watch(profileProvider);
     return Scaffold(
       backgroundColor: kColorCream,
       appBar: AppBar(title: Text('Settings', style: kStyleTitle)),
@@ -54,7 +55,7 @@ class SettingsScreen extends StatelessWidget {
                     _SettingsTile(
                       icon: Icons.badge_rounded,
                       label: 'Edit name',
-                      onTap: () => showEditNameSheet(context),
+                      onTap: () => showEditNameSheet(context, ref),
                     ),
                     const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
                     _SettingsTile(
@@ -78,7 +79,7 @@ class SettingsScreen extends StatelessWidget {
           Text('TRIP', style: kStyleOverline),
           const SizedBox(height: kSpace3),
           Builder(builder: (ctx) {
-            final trip = TripState.tripOf(ctx);
+            final trip = ref.watch(activeTripProvider)!;
             return DecoratedBox(
               decoration: kCardDecoration(),
               child: Material(
@@ -88,7 +89,7 @@ class SettingsScreen extends StatelessWidget {
                     _SettingsTile(
                       icon: Icons.tune_rounded,
                       label: 'Trip settings',
-                      onTap: () => showTripSettingsSheet(ctx, trip: trip),
+                      onTap: () => showTripSettingsSheet(ctx, ref, trip: trip),
                     ),
                     const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
                     _SettingsTile(

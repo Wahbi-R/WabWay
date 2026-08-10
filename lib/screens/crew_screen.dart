@@ -7,26 +7,27 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show RealtimeChannel;
-import '../core/auth/profile_state.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/providers/profile_provider.dart';
+import '../core/providers/trip_provider.dart';
 import '../core/location/location_sharing_manager.dart';
 import '../core/supabase/crew_service.dart';
 import '../core/trip/app_trip_member.dart';
 import '../core/notifications/push_notifier.dart';
 import 'notification_settings_screen.dart';
-import '../core/trip/trip_state.dart';
 import '../data/crew_data.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
 
-class CrewScreen extends StatefulWidget {
+class CrewScreen extends ConsumerStatefulWidget {
   const CrewScreen({super.key});
 
   @override
-  State<CrewScreen> createState() => _CrewScreenState();
+  ConsumerState<CrewScreen> createState() => _CrewScreenState();
 }
 
-class _CrewScreenState extends State<CrewScreen>
+class _CrewScreenState extends ConsumerState<CrewScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabs;
 
@@ -51,21 +52,16 @@ class _CrewScreenState extends State<CrewScreen>
     super.initState();
     _tabs = TabController(length: 2, vsync: this);
     LocationSharingManager.instance.isSharing.addListener(_onSharingChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _tripId = ref.read(activeTripIdProvider);
+      _userId = ref.read(profileProvider)?.id;
+      _load(_tripId!);
+    });
   }
 
   void _onSharingChanged() {
     if (mounted) setState(() {});
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final tripId = TripState.tripOf(context).id;
-    if (tripId != _tripId) {
-      _tripId = tripId;
-      _userId = ProfileState.of(context).id;
-      _load(tripId);
-    }
   }
 
   @override
@@ -151,7 +147,7 @@ class _CrewScreenState extends State<CrewScreen>
 
   String get _myDisplayName {
     try {
-      return TripState.membersOf(context)
+      return ref.read(tripMembersProvider)
           .firstWhere((m) => m.userId == _userId)
           .profile
           .displayName;
@@ -440,7 +436,14 @@ class _CrewScreenState extends State<CrewScreen>
 
   @override
   Widget build(BuildContext context) {
-    final members = TripState.membersOf(context);
+    ref.listen<String>(activeTripIdProvider, (prev, next) {
+      if (next != _tripId) {
+        _tripId = next;
+        _userId = ref.read(profileProvider)?.id;
+        _load(next);
+      }
+    });
+    final members = ref.watch(tripMembersProvider);
 
     return Scaffold(
       backgroundColor: kColorCream,

@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/providers/trip_provider.dart';
 import '../../core/supabase/client.dart';
 import '../../core/supabase/shopping_service.dart';
 import '../../core/supabase/spot_service.dart';
-import '../../core/trip/trip_state.dart';
 import '../../data/shopping_data.dart';
 import '../../data/spot_data.dart';
 import '../../theme/app_colors.dart';
@@ -11,14 +12,14 @@ import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 
-class ShoppingScreen extends StatefulWidget {
+class ShoppingScreen extends ConsumerStatefulWidget {
   const ShoppingScreen({super.key});
 
   @override
-  State<ShoppingScreen> createState() => _ShoppingScreenState();
+  ConsumerState<ShoppingScreen> createState() => _ShoppingScreenState();
 }
 
-class _ShoppingScreenState extends State<ShoppingScreen> {
+class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
   String _tripId = '';
   List<ShoppingItem> _items   = [];
   bool               _loading = true;
@@ -30,13 +31,13 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
   List<ShoppingItem> get _checked   => _items.where((i) =>  i.checked).toList();
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final tripId = TripState.tripOf(context).id;
-    if (tripId != _tripId) {
-      _tripId = tripId;
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _tripId = ref.read(activeTripIdProvider);
       _load();
-    }
+    });
   }
 
   Future<void> _load({bool silent = false}) async {
@@ -207,6 +208,12 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<String>(activeTripIdProvider, (prev, next) {
+      if (next != _tripId) {
+        _tripId = next;
+        _load();
+      }
+    });
     return Scaffold(
       backgroundColor: kColorCream,
       appBar: AppBar(

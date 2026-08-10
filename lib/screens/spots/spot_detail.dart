@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../core/auth/profile_state.dart';
+import '../../core/providers/profile_provider.dart';
+import '../../core/providers/trip_provider.dart';
 import '../../core/supabase/client.dart';
 import '../../core/supabase/doc_service.dart';
 import '../../core/supabase/plan_service.dart';
 import '../../core/supabase/spot_service.dart';
-import '../../core/trip/trip_state.dart';
 import '../../data/accommodation_data.dart';
 import '../../data/docs_data.dart';
 import '../../data/plan_data.dart';
@@ -21,10 +22,10 @@ import 'spot_vote_chip.dart';
 
 // ─── Member name helper ────────────────────────────────────────────────────────
 
-String _memberName(BuildContext context, String userId) {
-  final me = ProfileState.maybeOf(context);
+String _memberName(WidgetRef ref, String userId) {
+  final me = ref.read(profileProvider);
   if (me?.id == userId) return 'You';
-  final members = TripState.membersOf(context);
+  final members = ref.read(tripMembersProvider);
   final match = members.where((m) => m.userId == userId).firstOrNull;
   if (match != null) return match.profile.displayName;
   return userId.length >= 8 ? userId.substring(0, 8) : userId;
@@ -32,7 +33,7 @@ String _memberName(BuildContext context, String userId) {
 
 // ─── Full-screen route for mobile ─────────────────────────────────────────────
 
-class SpotDetailScreen extends StatelessWidget {
+class SpotDetailScreen extends ConsumerWidget {
   const SpotDetailScreen({
     super.key,
     required this.spot,
@@ -57,7 +58,7 @@ class SpotDetailScreen extends StatelessWidget {
   final VoidCallback? onOpenStay;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       backgroundColor: kColorCream,
       appBar: AppBar(
@@ -78,7 +79,7 @@ class SpotDetailScreen extends StatelessWidget {
               icon: const Icon(Icons.edit_outlined),
               color: kColorInkSoft,
               onPressed: () async {
-                final tripId = TripState.tripOf(context).id;
+                final tripId = ref.read(activeTripIdProvider);
                 final userId = supabase.auth.currentUser?.id ?? '';
                 final updated = await showEditSpotSheet(
                   context,
@@ -115,7 +116,7 @@ class SpotDetailScreen extends StatelessWidget {
 
 // ─── Shared detail content (mobile screen + desktop panel) ────────────────────
 
-class SpotDetailContent extends StatefulWidget {
+class SpotDetailContent extends ConsumerStatefulWidget {
   const SpotDetailContent({
     super.key,
     required this.spot,
@@ -142,10 +143,10 @@ class SpotDetailContent extends StatefulWidget {
   final VoidCallback? onOpenStay;
 
   @override
-  State<SpotDetailContent> createState() => _SpotDetailContentState();
+  ConsumerState<SpotDetailContent> createState() => _SpotDetailContentState();
 }
 
-class _SpotDetailContentState extends State<SpotDetailContent> {
+class _SpotDetailContentState extends ConsumerState<SpotDetailContent> {
   late VoteType? _myVote;
   final _commentCtrl = TextEditingController();
   final List<SpotComment> _extraComments = [];
@@ -238,7 +239,7 @@ class _SpotDetailContentState extends State<SpotDetailContent> {
   @override
   Widget build(BuildContext context) {
     final allComments = [...widget.spot.comments, ..._extraComments];
-    final myName = ProfileState.maybeOf(context)?.displayName ?? 'You';
+    final myName = ref.watch(profileProvider)?.displayName ?? 'You';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -265,7 +266,7 @@ class _SpotDetailContentState extends State<SpotDetailContent> {
                     const SizedBox(width: kSpace2),
                     GestureDetector(
                       onTap: () async {
-                        final tripId = TripState.tripOf(context).id;
+                        final tripId = ref.read(activeTripIdProvider);
                         final userId = supabase.auth.currentUser?.id ?? '';
                         final updated = await showEditSpotSheet(
                           context,
@@ -564,15 +565,15 @@ class _SpotDetailContentState extends State<SpotDetailContent> {
 
 // ─── Add to Plan button ────────────────────────────────────────────────────────
 
-class _AddToPlanButton extends StatefulWidget {
+class _AddToPlanButton extends ConsumerStatefulWidget {
   const _AddToPlanButton({required this.spot});
   final Spot spot;
 
   @override
-  State<_AddToPlanButton> createState() => _AddToPlanButtonState();
+  ConsumerState<_AddToPlanButton> createState() => _AddToPlanButtonState();
 }
 
-class _AddToPlanButtonState extends State<_AddToPlanButton> {
+class _AddToPlanButtonState extends ConsumerState<_AddToPlanButton> {
   bool _loading = false;
 
   ItineraryItemType get _itemType => switch (widget.spot.category) {
@@ -583,7 +584,7 @@ class _AddToPlanButtonState extends State<_AddToPlanButton> {
 
   Future<void> _tap() async {
     if (_loading) return;
-    final tripId = TripState.tripOf(context).id;
+    final tripId = ref.read(activeTripIdProvider);
     final userId = supabase.auth.currentUser?.id ?? '';
 
     setState(() => _loading = true);
@@ -939,12 +940,12 @@ class _PhotoHeader extends StatelessWidget {
   }
 }
 
-class _GroupVotesSummary extends StatelessWidget {
+class _GroupVotesSummary extends ConsumerWidget {
   const _GroupVotesSummary({required this.votes});
   final SpotVotes votes;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final rows = <Widget>[];
 
     for (final type in VoteType.values) {
@@ -959,7 +960,7 @@ class _GroupVotesSummary extends StatelessWidget {
                     (id) => Padding(
                       padding: const EdgeInsets.only(right: 6),
                       child: WabwayAvatar(
-                        name: _memberName(context, id),
+                        name: _memberName(ref, id),
                         size: WabwayAvatarSize.xs,
                       ),
                     ),
@@ -986,13 +987,13 @@ class _GroupVotesSummary extends StatelessWidget {
   }
 }
 
-class _CommentRow extends StatelessWidget {
+class _CommentRow extends ConsumerWidget {
   const _CommentRow({required this.comment});
   final SpotComment comment;
 
   @override
-  Widget build(BuildContext context) {
-    final name = _memberName(context, comment.authorId);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final name = _memberName(ref, comment.authorId);
     return Padding(
       padding: const EdgeInsets.only(bottom: kSpace4),
       child: Row(

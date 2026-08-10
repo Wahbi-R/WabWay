@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 189,
+    label: 'Under the hood — stability improvements',
+    changes: [
+      'All screens now load trip and profile data from a single reactive source',
+      'Switching trips refreshes every screen instantly without restarting the app',
+      'Eliminates a class of crashes that could occur when navigating quickly after launch',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 188,
     label: 'Shopping list',
     changes: [

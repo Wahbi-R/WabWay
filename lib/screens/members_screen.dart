@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../core/auth/profile_state.dart';
+import '../core/providers/profile_provider.dart';
+import '../core/providers/trip_provider.dart';
 import '../core/supabase/trip_service.dart';
 import '../core/trip/app_trip_member.dart';
-import '../core/trip/trip_state.dart';
 import '../data/date_utils.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_theme.dart';
@@ -11,14 +12,14 @@ import '../theme/app_decorations.dart';
 import '../widgets/widgets.dart';
 import 'members/add_member_sheet.dart';
 
-class MembersScreen extends StatelessWidget {
+class MembersScreen extends ConsumerWidget {
   const MembersScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final members = TripState.membersOf(context);
-    final trip = TripState.tripOf(context);
-    final currentUserId = ProfileState.maybeOf(context)?.id;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final members = ref.watch(tripMembersProvider);
+    final trip = ref.watch(activeTripProvider)!;
+    final currentUserId = ref.watch(profileProvider)?.id;
     final isOwner = members.any((m) => m.userId == currentUserId && m.isOwner);
 
     return Scaffold(
@@ -45,7 +46,7 @@ class MembersScreen extends StatelessWidget {
                 context,
                 tripId: trip.id,
                 existingMemberIds: members.map((m) => m.userId).toSet(),
-                onMemberAdded: () => TripState.refresh(context),
+                onMemberAdded: () => ref.read(tripNotifierProvider.notifier).load(),
               ),
             ),
             const SizedBox(width: kSpace4),
@@ -74,7 +75,7 @@ class MembersScreen extends StatelessWidget {
 
 // ─── Member card ──────────────────────────────────────────────────────────────
 
-class _MemberCard extends StatelessWidget {
+class _MemberCard extends ConsumerWidget {
   const _MemberCard({
     required this.member,
     required this.isMe,
@@ -85,18 +86,18 @@ class _MemberCard extends StatelessWidget {
   final bool isMe;
   final String tripId;
 
-  Future<void> _editDates(BuildContext context) async {
+  Future<void> _editDates(BuildContext context, WidgetRef ref) async {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _MemberDatesSheet(member: member, tripId: tripId),
     );
-    if (context.mounted) TripState.refresh(context);
+    if (context.mounted) ref.read(tripNotifierProvider.notifier).load();
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final displayName =
         isMe ? '${member.profile.displayName} (You)' : member.profile.displayName;
 
@@ -153,7 +154,7 @@ class _MemberCard extends StatelessWidget {
                 const Spacer(),
                 if (isMe)
                   GestureDetector(
-                    onTap: () => _editDates(context),
+                    onTap: () => _editDates(context, ref),
                     child: Text(
                       'Edit',
                       style: kStyleCaption.copyWith(color: kColorPrimary),
@@ -164,7 +165,7 @@ class _MemberCard extends StatelessWidget {
           ] else if (isMe) ...[
             const SizedBox(height: kSpace3),
             GestureDetector(
-              onTap: () => _editDates(context),
+              onTap: () => _editDates(context, ref),
               child: Row(
                 children: [
                   const Icon(Icons.add_rounded, size: 14, color: kColorPrimary),

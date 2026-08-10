@@ -11,14 +11,15 @@ import '../../core/places/listing_parser.dart';
 import '../../core/places/social_place_extractor.dart';
 import '../../core/platform/platform_file.dart';
 import '../../core/share/file_type_registry.dart';
-import '../../core/auth/profile_state.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/providers/profile_provider.dart';
+import '../../core/providers/trip_provider.dart';
 import '../../core/supabase/doc_service.dart';
 import '../../core/supabase/links_service.dart';
 import '../../core/supabase/money_service.dart';
 import '../../core/supabase/plan_service.dart';
 import '../../core/supabase/spot_service.dart';
 import '../../core/supabase/travel_service.dart';
-import '../../core/trip/trip_state.dart';
 import '../../data/docs_data.dart';
 import '../../data/links_data.dart';
 import '../../data/money_data.dart';
@@ -40,9 +41,9 @@ import 'share_form.dart';
 
 // ─── Entry point for import mode ─────────────────────────────────────────────
 
-void showImportScreen(BuildContext context) {
-  final tripId = TripState.tripOf(context).id;
-  final userId = ProfileState.of(context).id;
+void showImportScreen(BuildContext context, WidgetRef ref) {
+  final tripId = ref.read(activeTripIdProvider);
+  final userId = ref.read(profileProvider)!.id;
   Navigator.of(context).push(MaterialPageRoute<void>(
     builder: (_) => IncomingShareScreen(
       share: null,
@@ -1598,23 +1599,23 @@ class _ParseItineraryBanner extends StatelessWidget {
 
 // ─── Demo launcher ────────────────────────────────────────────────────────────
 
-class IncomingShareDemoLauncher extends StatefulWidget {
+class IncomingShareDemoLauncher extends ConsumerStatefulWidget {
   const IncomingShareDemoLauncher({super.key});
 
   @override
-  State<IncomingShareDemoLauncher> createState() =>
+  ConsumerState<IncomingShareDemoLauncher> createState() =>
       _IncomingShareDemoLauncherState();
 }
 
-class _IncomingShareDemoLauncherState extends State<IncomingShareDemoLauncher> {
+class _IncomingShareDemoLauncherState extends ConsumerState<IncomingShareDemoLauncher> {
   int _shareIndex = 0;
 
   IncomingShare get _currentShare =>
       kMockIncomingShares[_shareIndex % kMockIncomingShares.length];
 
   void _launch() {
-    final tripId = TripState.tripOf(context).id;
-    final userId = ProfileState.of(context).id;
+    final tripId = ref.read(activeTripIdProvider);
+    final userId = ref.read(profileProvider)!.id;
     Navigator.push(
       context,
       MaterialPageRoute(

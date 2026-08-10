@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../core/auth/profile_state.dart';
+import '../../core/providers/profile_provider.dart';
+import '../../core/providers/trip_provider.dart';
 import '../../core/supabase/client.dart';
 import '../../core/supabase/doc_service.dart';
 import '../../core/supabase/plan_service.dart';
-import '../../core/trip/trip_state.dart';
 import '../../data/money_data.dart' show fmtAmount;
 import '../../data/plan_data.dart';
 import '../../data/docs_data.dart';
@@ -20,7 +21,7 @@ import 'doc_attach_sheet.dart';
 
 // ─── Mobile screen ────────────────────────────────────────────────────────────
 
-class ItemDetailScreen extends StatelessWidget {
+class ItemDetailScreen extends ConsumerWidget {
   const ItemDetailScreen({
     super.key,
     required this.item,
@@ -45,7 +46,8 @@ class ItemDetailScreen extends StatelessWidget {
   final VoidCallback? onDuplicate;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final defaultCurrency = ref.read(activeTripProvider)?.homeCurrency ?? '';
     return Scaffold(
       backgroundColor: kColorCream,
       appBar: AppBar(
@@ -57,6 +59,7 @@ class ItemDetailScreen extends StatelessWidget {
             onPressed: () => _showActionsSheet(
               context, item, spots, docs, onDelete, onUpdated,
               days: days, onMove: onMove, onDuplicate: onDuplicate,
+              defaultCurrency: defaultCurrency,
             ),
           ),
           const SizedBox(width: kSpace2),
@@ -81,7 +84,7 @@ class ItemDetailScreen extends StatelessWidget {
 
 // ─── Shared content ───────────────────────────────────────────────────────────
 
-class ItemDetailContent extends StatefulWidget {
+class ItemDetailContent extends ConsumerStatefulWidget {
   const ItemDetailContent({
     super.key,
     required this.item,
@@ -106,10 +109,10 @@ class ItemDetailContent extends StatefulWidget {
   final VoidCallback? onDuplicate;
 
   @override
-  State<ItemDetailContent> createState() => _ItemDetailContentState();
+  ConsumerState<ItemDetailContent> createState() => _ItemDetailContentState();
 }
 
-class _ItemDetailContentState extends State<ItemDetailContent> {
+class _ItemDetailContentState extends ConsumerState<ItemDetailContent> {
   List<ItineraryItemComment> _comments = [];
   bool _commentsLoading = true;
   bool _commentSubmitting = false;
@@ -135,7 +138,7 @@ class _ItemDetailContentState extends State<ItemDetailContent> {
   Future<void> _submitComment() async {
     final body = _commentCtrl.text.trim();
     if (body.isEmpty || _commentSubmitting) return;
-    final authorId = ProfileState.maybeOf(context)?.id;
+    final authorId = ref.read(profileProvider)?.id;
     if (authorId == null) return;
     setState(() => _commentSubmitting = true);
     try {
@@ -165,7 +168,7 @@ class _ItemDetailContentState extends State<ItemDetailContent> {
         .map((id) => widget.docs.where((d) => d.id == id).firstOrNull)
         .whereType<TripDocument>()
         .toList();
-    final myName = ProfileState.maybeOf(context)?.displayName ?? 'You';
+    final myName = ref.watch(profileProvider)?.displayName ?? 'You';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -552,7 +555,7 @@ class _DocChip extends StatelessWidget {
 
 // ─── Actions section ──────────────────────────────────────────────────────────
 
-class _ActionsSection extends StatefulWidget {
+class _ActionsSection extends ConsumerStatefulWidget {
   const _ActionsSection({
     required this.item,
     this.spots = const [],
@@ -573,10 +576,10 @@ class _ActionsSection extends StatefulWidget {
   final VoidCallback? onDuplicate;
 
   @override
-  State<_ActionsSection> createState() => _ActionsSectionState();
+  ConsumerState<_ActionsSection> createState() => _ActionsSectionState();
 }
 
-class _ActionsSectionState extends State<_ActionsSection> {
+class _ActionsSectionState extends ConsumerState<_ActionsSection> {
   Future<void> _attachDoc() async {
     if (widget.docs.isEmpty) {
       _snack(context, 'No documents in this trip yet.');
@@ -692,6 +695,7 @@ class _ActionsSectionState extends State<_ActionsSection> {
     final updated = await showAddItemSheet(
       context,
       dayId: widget.item.dayId,
+      defaultCurrency: ref.read(activeTripProvider)?.homeCurrency ?? '',
       spots: widget.spots,
       docs: widget.docs,
       initialItem: widget.item,
@@ -805,8 +809,9 @@ void _showActionsSheet(
   VoidCallback? onDelete,
   ValueChanged<ItineraryItem>? onUpdated, {
   List<TripDay> days = const [],
-  ValueChanged<String>? onMove, // newDayId
+  ValueChanged<String>? onMove,
   VoidCallback? onDuplicate,
+  String defaultCurrency = '',
 }) {
   showModalBottomSheet<void>(
     context: context,
@@ -834,6 +839,7 @@ void _showActionsSheet(
               final updated = await showAddItemSheet(
                 context,
                 dayId: item.dayId,
+                defaultCurrency: defaultCurrency,
                 spots: spots,
                 docs: docs,
                 initialItem: item,
@@ -964,22 +970,22 @@ class _MoveToDaySheet extends StatelessWidget {
 
 // ─── Item comment widgets ─────────────────────────────────────────────────────
 
-String _commentAuthorName(BuildContext context, String authorId) {
-  final me = ProfileState.maybeOf(context);
+String _commentAuthorName(WidgetRef ref, String authorId) {
+  final me = ref.read(profileProvider);
   if (me?.id == authorId) return 'You';
-  final members = TripState.membersOf(context);
+  final members = ref.read(tripMembersProvider);
   final match = members.where((m) => m.userId == authorId).firstOrNull;
   if (match != null) return match.profile.displayName;
   return authorId.length >= 8 ? authorId.substring(0, 8) : authorId;
 }
 
-class _ItemCommentRow extends StatelessWidget {
+class _ItemCommentRow extends ConsumerWidget {
   const _ItemCommentRow({required this.comment});
   final ItineraryItemComment comment;
 
   @override
-  Widget build(BuildContext context) {
-    final name = _commentAuthorName(context, comment.authorId);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final name = _commentAuthorName(ref, comment.authorId);
     return Padding(
       padding: const EdgeInsets.only(bottom: kSpace4),
       child: Row(

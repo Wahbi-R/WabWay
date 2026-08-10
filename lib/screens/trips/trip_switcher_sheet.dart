@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/providers/trip_provider.dart';
 import '../../core/trip/app_trip.dart';
-import '../../core/trip/trip_state.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
@@ -8,10 +9,9 @@ import '../../widgets/widgets.dart';
 import 'create_trip_screen.dart';
 import 'trip_gate.dart';
 
-Future<void> showTripSwitcherSheet(BuildContext context) {
-  // Capture TripState before pushing modal
-  final currentTripId = TripState.tripOf(context).id;
-  final allTrips      = TripState.allTripsOf(context);
+Future<void> showTripSwitcherSheet(BuildContext context, WidgetRef ref) {
+  final currentTripId = ref.read(activeTripIdProvider);
+  final allTrips      = ref.read(allTripsProvider);
 
   return showModalBottomSheet<void>(
     context: context,
@@ -23,25 +23,25 @@ Future<void> showTripSwitcherSheet(BuildContext context) {
       allTrips:      allTrips,
       onSwitch: (trip) {
         Navigator.pop(ctx);
-        TripState.switchTrip(context, trip);
+        ref.read(tripNotifierProvider.notifier).switchTrip(trip);
       },
       onCreateTrip: () {
         Navigator.pop(ctx);
         Navigator.of(context).push<void>(MaterialPageRoute(
           builder: (_) => CreateTripScreen(
-            onCreated: (_) async => TripState.refresh(context),
+            onCreated: (_) async => ref.read(tripNotifierProvider.notifier).load(),
           ),
         ));
       },
       onJoinTrip: () {
         Navigator.pop(ctx);
-        _showJoinSheet(context);
+        _showJoinSheet(context, ref);
       },
     ),
   );
 }
 
-Future<void> _showJoinSheet(BuildContext context) async {
+Future<void> _showJoinSheet(BuildContext context, WidgetRef ref) async {
   final tripId = await showModalBottomSheet<String?>(
     context: context,
     isScrollControlled: true,
@@ -50,7 +50,7 @@ Future<void> _showJoinSheet(BuildContext context) async {
     builder: (_) => const JoinWithCodeSheet(),
   );
   if (tripId != null && context.mounted) {
-    TripState.refresh(context);
+    ref.read(tripNotifierProvider.notifier).load();
   }
 }
 

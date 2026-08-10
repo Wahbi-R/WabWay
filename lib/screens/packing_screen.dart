@@ -3,28 +3,32 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show RealtimeChannel;
-import '../core/auth/profile_state.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/providers/profile_provider.dart';
+import '../core/providers/trip_provider.dart';
 import '../core/supabase/packing_service.dart';
 import '../core/trip/app_trip_member.dart';
-import '../core/trip/trip_state.dart';
 import '../data/packing_data.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
 import '../widgets/widgets.dart';
 
-class PackingScreen extends StatefulWidget {
+class PackingScreen extends ConsumerStatefulWidget {
   const PackingScreen({super.key});
 
   @override
-  State<PackingScreen> createState() => _PackingScreenState();
+  ConsumerState<PackingScreen> createState() => _PackingScreenState();
 }
 
-class _PackingScreenState extends State<PackingScreen> {
+class _PackingScreenState extends ConsumerState<PackingScreen> {
   List<PackingItem> _items = [];
   bool _loading = true;
   RealtimeChannel? _channel;
   Timer? _debounce;
+
+  String _tripId = '';
+  String _myId   = '';
 
   String _search = '';
   bool   _mineOnly = false;
@@ -40,10 +44,15 @@ class _PackingScreenState extends State<PackingScreen> {
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _load();
-    _subscribe();
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _tripId = ref.read(activeTripIdProvider);
+      _myId   = ref.read(profileProvider)?.id ?? '';
+      _load();
+      _subscribe();
+    });
   }
 
   @override
@@ -56,8 +65,7 @@ class _PackingScreenState extends State<PackingScreen> {
 
   Future<void> _load({bool silent = false}) async {
     if (!silent && mounted) setState(() => _loading = true);
-    final tripId = TripState.tripOf(context).id;
-    final items = await PackingService.fetchAll(tripId);
+    final items = await PackingService.fetchAll(_tripId);
     if (!mounted) return;
     setState(() {
       _items = items;
@@ -66,8 +74,7 @@ class _PackingScreenState extends State<PackingScreen> {
   }
 
   void _subscribe() {
-    final tripId = TripState.tripOf(context).id;
-    _channel = PackingService.subscribe(tripId, () {
+    _channel = PackingService.subscribe(_tripId, () {
       _debounce?.cancel();
       _debounce = Timer(const Duration(milliseconds: 400), () => _load(silent: true));
     });
@@ -112,8 +119,8 @@ class _PackingScreenState extends State<PackingScreen> {
       ),
     );
     if (confirmed != true || !mounted || ctrl.text.trim().isEmpty) return;
-    final tripId = TripState.tripOf(context).id;
-    final userId = ProfileState.of(context).id;
+    final tripId = _tripId;
+    final userId = _myId;
     final titles = ctrl.text
         .split(',')
         .map((s) => s.trim())
@@ -134,7 +141,7 @@ class _PackingScreenState extends State<PackingScreen> {
   }
 
   Future<void> _toggle(PackingItem item) async {
-    final userId = ProfileState.of(context).id;
+    final userId = _myId;
     setState(() {
       final idx = _items.indexWhere((i) => i.id == item.id);
       if (idx >= 0) _items[idx] = item.copyWith(isPacked: !item.isPacked, packedBy: userId);
@@ -143,8 +150,8 @@ class _PackingScreenState extends State<PackingScreen> {
   }
 
   Future<void> _assign(PackingItem item) async {
-    final members = TripState.membersOf(context);
-    final myId    = ProfileState.of(context).id;
+    final members = ref.read(tripMembersProvider);
+    final myId    = _myId;
     final result  = await showDialog<({String? userId})>(
       context: context,
       builder: (_) => _AssignDialog(
@@ -216,8 +223,8 @@ class _PackingScreenState extends State<PackingScreen> {
   Future<void> _packAll() async {
     final unpacked = _items.where((i) => !i.isPacked).toList();
     if (unpacked.isEmpty) return;
-    final tripId = TripState.tripOf(context).id;
-    final userId = ProfileState.of(context).id;
+    final tripId = _tripId;
+    final userId = _myId;
     setState(() {
       _items = _items.map((i) => i.isPacked ? i : i.copyWith(isPacked: true, packedBy: userId)).toList();
     });
@@ -248,9 +255,8 @@ class _PackingScreenState extends State<PackingScreen> {
       ),
     );
     if (confirmed != true || !mounted) return;
-    final tripId = TripState.tripOf(context).id;
     setState(() => _items.removeWhere((i) => i.isPacked));
-    PackingService.clearPackedItems(tripId).catchError((_) => _load(silent: true));
+    PackingService.clearPackedItems(_tripId).catchError((_) => _load(silent: true));
   }
 
   Future<void> _addFromTemplate() async {
@@ -265,8 +271,8 @@ class _PackingScreenState extends State<PackingScreen> {
     );
     if (result == null || result.isEmpty || !mounted) return;
 
-    final tripId = TripState.tripOf(context).id;
-    final userId = ProfileState.of(context).id;
+    final tripId = _tripId;
+    final userId = _myId;
     final existing = _items.map((i) => i.title.toLowerCase()).toSet();
     final toAdd = result.where((t) => !existing.contains(t.toLowerCase())).toList();
     if (toAdd.isEmpty) return;
@@ -279,7 +285,7 @@ class _PackingScreenState extends State<PackingScreen> {
 
   void _shareList() {
     if (_items.isEmpty) return;
-    final tripName = TripState.tripOf(context).name;
+    final tripName = ref.read(activeTripProvider)?.name ?? 'Trip';
     final buf = StringBuffer();
     buf.writeln('$tripName — Packing List');
     buf.writeln();
@@ -395,9 +401,17 @@ class _PackingScreenState extends State<PackingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<String>(activeTripIdProvider, (prev, next) {
+      if (next != _tripId) {
+        _tripId = next;
+        _myId   = ref.read(profileProvider)?.id ?? '';
+        _load();
+        _subscribe();
+      }
+    });
     if (_loading) return const WabwayLoadingScaffold();
 
-    final myId  = ProfileState.of(context).id;
+    final myId  = _myId;
     final filtered = _getFiltered(myId);
     final packed = _items.where((i) => i.isPacked).length;
     final total = _items.length;
@@ -784,7 +798,7 @@ class _TemplateSheetState extends State<_TemplateSheet> {
 
 enum _TileAction { assign, rename, delete }
 
-class _PackingTile extends StatelessWidget {
+class _PackingTile extends ConsumerWidget {
   const _PackingTile({
     super.key,
     required this.item,
@@ -805,9 +819,9 @@ class _PackingTile extends StatelessWidget {
   final bool showHandle;
 
   @override
-  Widget build(BuildContext context) {
-    final myId   = ProfileState.maybeOf(context)?.id;
-    final members = TripState.membersOf(context);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final myId   = ref.watch(profileProvider)?.id;
+    final members = ref.watch(tripMembersProvider);
 
     // Resolve packedBy to a display name (shown when packed).
     String? packedByName;

@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../core/auth/profile_state.dart';
+import '../core/providers/profile_provider.dart';
+import '../core/providers/trip_provider.dart';
 import '../core/share/share_handler.dart';
 import '../screens/share/incoming_share_screen.dart';
 import '../theme/app_colors.dart';
@@ -23,7 +25,6 @@ import '../screens/shopping/shopping_screen.dart';
 import '../screens/crew_screen.dart';
 import '../screens/placeholder_screen.dart';
 import '../screens/trips/trip_switcher_sheet.dart';
-import '../core/trip/trip_state.dart';
 import '../core/changelog.dart';
 import '../core/notifications/notification_service.dart';
 
@@ -208,14 +209,14 @@ Widget _buildSettings(BuildContext _) => const SettingsScreen();
 
 // ─── AppShell — responsive entry point ───────────────────────────────────────
 
-class AppShell extends StatefulWidget {
+class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key});
 
   @override
-  State<AppShell> createState() => _AppShellState();
+  ConsumerState<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
+class _AppShellState extends ConsumerState<AppShell> {
   int _mobileIndex = 0;
   int _desktopIndex = 0;
 
@@ -263,8 +264,8 @@ class _AppShellState extends State<AppShell> {
     final share = ShareHandler.instance.pending;
     if (share == null || !mounted) return;
     ShareHandler.instance.consume();
-    final tripId = TripState.tripOf(context).id;
-    final userId = ProfileState.of(context).id;
+    final tripId = ref.read(activeTripIdProvider);
+    final userId = ref.read(profileProvider)?.id ?? '';
     Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => IncomingShareScreen(
         share: share,
@@ -539,14 +540,14 @@ class _WabwaySidebar extends StatelessWidget {
   }
 }
 
-class _SidebarHeader extends StatelessWidget {
+class _SidebarHeader extends ConsumerWidget {
   @override
-  Widget build(BuildContext context) {
-    final trip    = TripState.maybeOf(context)?.trip;
-    final hasMany = (TripState.allTripsOf(context)).length > 1;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final trip    = ref.watch(activeTripProvider);
+    final hasMany = ref.watch(allTripsProvider).length > 1;
 
     return GestureDetector(
-      onTap: () => showTripSwitcherSheet(context),
+      onTap: () => showTripSwitcherSheet(context, ref),
       child: Padding(
         padding: const EdgeInsets.all(kSpace5),
         child: Row(

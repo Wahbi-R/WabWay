@@ -2,16 +2,18 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/providers/trip_provider.dart';
 import '../../core/supabase/trip_service.dart';
 import '../../core/trip/app_trip.dart';
-import '../../core/trip/trip_state.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 
 Future<void> showTripSettingsSheet(
-  BuildContext context, {
+  BuildContext context,
+  WidgetRef ref, {
   required AppTrip trip,
 }) {
   return showModalBottomSheet<void>(
@@ -21,7 +23,7 @@ Future<void> showTripSettingsSheet(
     backgroundColor: Colors.transparent,
     builder: (_) => _TripSettingsSheet(
       trip: trip,
-      onSaved: () => TripState.refresh(context),
+      onSaved: () => ref.read(tripNotifierProvider.notifier).load(),
     ),
   );
 }

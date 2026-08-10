@@ -1,74 +1,44 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../core/supabase/client.dart';
 import '../../core/invite/invite_link_handler.dart';
-import '../../widgets/update_checker_banner.dart';
-import '../../core/trip/app_trip.dart';
-import '../../core/trip/app_trip_member.dart';
-import '../../core/trip/trip_state.dart';
+import '../../core/providers/trip_provider.dart';
+import '../../core/supabase/client.dart';
 import '../../core/supabase/invite_service.dart';
-import '../../core/supabase/trip_service.dart';
+import '../../core/trip/app_trip.dart';
 import '../../shell/app_shell.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
+import '../../widgets/update_checker_banner.dart';
 import '../../widgets/widgets.dart';
 import 'create_trip_screen.dart';
 
-class TripGate extends StatefulWidget {
+class TripGate extends ConsumerStatefulWidget {
   const TripGate({super.key});
 
   @override
-  State<TripGate> createState() => _TripGateState();
+  ConsumerState<TripGate> createState() => _TripGateState();
 }
 
-class _TripGateState extends State<TripGate> {
-  bool _loading = true;
-  bool _error = false;
-  List<AppTrip> _trips = [];
-  List<AppTripMember> _members = [];
-  int _selectedIndex = 0;
+class _TripGateState extends ConsumerState<TripGate> {
   RealtimeChannel? _membersChannel;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    ref.read(tripNotifierProvider.notifier).load().then((_) {
+      if (!mounted) return;
+      final tripId = ref.read(activeTripIdProvider);
+      if (tripId.isNotEmpty) _subscribeToMembers(tripId);
+      _maybeShowPendingInvite();
+    });
   }
 
   @override
   void dispose() {
     _membersChannel?.unsubscribe();
     super.dispose();
-  }
-
-  Future<void> _load() async {
-    setState(() { _loading = true; _error = false; });
-    try {
-      final trips = await TripService.loadUserTrips();
-      if (!mounted) return;
-      if (trips.isEmpty) {
-        setState(() { _trips = []; _loading = false; });
-        // If there's a pending invite, auto-show the join sheet.
-        _maybeShowPendingInvite(fromNoTrips: true);
-        return;
-      }
-      // Keep selection index valid after refresh
-      final idx = _selectedIndex.clamp(0, trips.length - 1);
-      final members = await TripService.loadTripMembers(trips[idx].id);
-      if (!mounted) return;
-      setState(() {
-        _trips = trips;
-        _members = members;
-        _selectedIndex = idx;
-        _loading = false;
-      });
-      _subscribeToMembers(trips[idx].id);
-      // Existing member arrived via an invite link → show join sheet.
-      _maybeShowPendingInvite(fromNoTrips: false);
-    } catch (_) {
-      if (mounted) setState(() { _loading = false; _error = true; });
-    }
   }
 
   void _subscribeToMembers(String tripId) {
@@ -84,45 +54,27 @@ class _TripGateState extends State<TripGate> {
             column: 'trip_id',
             value: tripId,
           ),
-          callback: (_) => _reloadMembers(),
+          callback: (_) =>
+              ref.read(tripNotifierProvider.notifier).reloadMembers(),
         )
         .subscribe();
   }
 
-  Future<void> _reloadMembers() async {
-    if (_trips.isEmpty || !mounted) return;
-    try {
-      final members = await TripService.loadTripMembers(_trips[_selectedIndex].id);
-      if (mounted) setState(() => _members = members);
-    } catch (_) {}
-  }
-
-  void _maybeShowPendingInvite({required bool fromNoTrips}) {
+  void _maybeShowPendingInvite() {
     final code = InviteLinkHandler.instance.pendingCode.value;
     if (code == null) return;
-    // Delay one frame so the widget tree is built before showing the sheet.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _openJoinSheet(context, initialCode: code);
     });
   }
 
-  Future<void> _switchTrip(AppTrip trip) async {
-    final idx = _trips.indexWhere((t) => t.id == trip.id);
-    if (idx < 0 || idx == _selectedIndex) return;
-    setState(() { _loading = true; });
-    try {
-      final members = await TripService.loadTripMembers(trip.id);
-      if (!mounted) return;
-      setState(() { _selectedIndex = idx; _members = members; _loading = false; });
-      _subscribeToMembers(trip.id);
-    } catch (_) {
-      if (mounted) setState(() { _loading = false; });
-    }
+  Future<void> _reload() async {
+    await ref.read(tripNotifierProvider.notifier).load();
+    if (!mounted) return;
+    final tripId = ref.read(activeTripIdProvider);
+    if (tripId.isNotEmpty) _subscribeToMembers(tripId);
   }
-
-  Future<void> _onTripCreated(String tripId) async => _load();
-  Future<void> _onTripJoined(String tripId) async => _load();
 
   Future<void> _openJoinSheet(BuildContext ctx, {String? initialCode}) async {
     final tripId = await showModalBottomSheet<String?>(
@@ -132,29 +84,24 @@ class _TripGateState extends State<TripGate> {
       backgroundColor: Colors.transparent,
       builder: (_) => JoinWithCodeSheet(initialCode: initialCode),
     );
-    if (tripId != null) await _onTripJoined(tripId);
+    if (tripId != null) await _reload();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const _TripLoadingScreen();
-    if (_error)   return _ErrorScreen(onRetry: _load);
+    final tripData = ref.watch(tripNotifierProvider);
 
-    if (_trips.isEmpty) {
+    if (tripData.loading) return const _TripLoadingScreen();
+    if (tripData.error)   return _ErrorScreen(onRetry: _reload);
+
+    if (tripData.trips.isEmpty) {
       return _NoTripsScreen(
-        onTripCreated: _onTripCreated,
+        onTripCreated: (_) => _reload(),
         onOpenJoinSheet: (ctx) => _openJoinSheet(ctx),
       );
     }
 
-    return TripState(
-      trip: _trips[_selectedIndex],
-      members: _members,
-      allTrips: _trips,
-      onRefresh: _load,
-      onSwitchTrip: _switchTrip,
-      child: const AppShell(),
-    );
+    return const AppShell();
   }
 }
 
@@ -185,7 +132,6 @@ class _NoTripsScreen extends StatelessWidget {
                 children: [
                   const UpdateCheckerBanner(),
                   const SizedBox(height: kSpace3),
-                  // Logo
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -210,11 +156,8 @@ class _NoTripsScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: kSpace6),
-                  Text(
-                    'Where are you headed?',
-                    style: kStyleTitle,
-                    textAlign: TextAlign.center,
-                  ),
+                  Text('Where are you headed?', style: kStyleTitle,
+                      textAlign: TextAlign.center),
                   const SizedBox(height: kSpace2),
                   Text(
                     'Start planning a new trip, or join one a friend has already created.',
@@ -227,7 +170,8 @@ class _NoTripsScreen extends StatelessWidget {
                     onPressed: () => Navigator.push<void>(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => CreateTripScreen(onCreated: onTripCreated),
+                        builder: (_) =>
+                            CreateTripScreen(onCreated: onTripCreated),
                       ),
                     ),
                     fullWidth: true,
@@ -279,9 +223,7 @@ class _JoinWithCodeSheetState extends State<JoinWithCodeSheet> {
   @override
   void initState() {
     super.initState();
-    if (widget.initialCode != null) {
-      _codeCtrl.text = widget.initialCode!;
-    }
+    if (widget.initialCode != null) _codeCtrl.text = widget.initialCode!;
   }
 
   @override
@@ -293,12 +235,9 @@ class _JoinWithCodeSheetState extends State<JoinWithCodeSheet> {
   Future<void> _submit() async {
     final code = _codeCtrl.text.trim().toUpperCase();
     if (code.isEmpty) return;
-
     setState(() { _loading = true; _error = null; });
-
     try {
       final tripId = await InviteService.redeemInvite(code);
-      // Clear any persisted invite link so it doesn't re-trigger next session.
       await InviteLinkHandler.instance.clearCode();
       if (!mounted) return;
       Navigator.pop(context, tripId);
@@ -310,14 +249,16 @@ class _JoinWithCodeSheetState extends State<JoinWithCodeSheet> {
       setState(() { _loading = false; _error = msg; });
     } catch (_) {
       if (!mounted) return;
-      setState(() { _loading = false; _error = 'Something went wrong. Please try again.'; });
+      setState(() {
+        _loading = false;
+        _error = 'Something went wrong. Please try again.';
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final bottomPad = MediaQuery.viewInsetsOf(context).bottom;
-
     return DecoratedBox(
       decoration: const BoxDecoration(
         color: kColorPaper,
@@ -331,7 +272,6 @@ class _JoinWithCodeSheetState extends State<JoinWithCodeSheet> {
           children: [
             const WabwayDragHandle(),
             const SizedBox(height: kSpace3),
-
             Row(
               children: [
                 Text('Join a trip', style: kStyleTitle),
@@ -344,7 +284,6 @@ class _JoinWithCodeSheetState extends State<JoinWithCodeSheet> {
               ],
             ),
             const SizedBox(height: kSpace5),
-
             WabwayTextField(
               label: 'Invite code',
               hint: 'e.g. ABCD1234',
@@ -353,12 +292,10 @@ class _JoinWithCodeSheetState extends State<JoinWithCodeSheet> {
               autofocus: true,
               onSubmitted: (_) => _submit(),
             ),
-
             if (_error != null) ...[
               const SizedBox(height: kSpace3),
               Text(_error!, style: kStyleCaption.copyWith(color: kColorDanger)),
             ],
-
             const SizedBox(height: kSpace4),
             WabwayButton(
               label: 'Join trip',
@@ -433,24 +370,15 @@ class _ErrorScreen extends StatelessWidget {
                         color: kColorDangerSoft,
                         borderRadius: kRadiusMd,
                       ),
-                      child: const Icon(
-                        Icons.wifi_off_rounded,
-                        color: kColorDanger,
-                        size: 24,
-                      ),
+                      child: const Icon(Icons.wifi_off_rounded,
+                          color: kColorDanger, size: 24),
                     ),
                     const SizedBox(height: kSpace4),
-                    Text(
-                      'Could not load trips',
-                      style: kStyleTitle,
-                      textAlign: TextAlign.center,
-                    ),
+                    Text('Could not load trips', style: kStyleTitle,
+                        textAlign: TextAlign.center),
                     const SizedBox(height: kSpace2),
-                    Text(
-                      'Check your connection and try again.',
-                      style: kStyleCaption,
-                      textAlign: TextAlign.center,
-                    ),
+                    Text('Check your connection and try again.',
+                        style: kStyleCaption, textAlign: TextAlign.center),
                     const SizedBox(height: kSpace5),
                     WabwayButton(
                       label: 'Try again',

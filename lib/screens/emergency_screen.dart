@@ -1,33 +1,39 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../core/providers/trip_provider.dart';
 import '../core/supabase/emergency_service.dart';
-import '../core/trip/trip_state.dart';
 import '../data/emergency_data.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
 import '../widgets/widgets.dart';
 
-class EmergencyScreen extends StatefulWidget {
+class EmergencyScreen extends ConsumerStatefulWidget {
   const EmergencyScreen({super.key});
 
   @override
-  State<EmergencyScreen> createState() => _EmergencyScreenState();
+  ConsumerState<EmergencyScreen> createState() => _EmergencyScreenState();
 }
 
-class _EmergencyScreenState extends State<EmergencyScreen> {
+class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
   TripEmergencyInfo? _info;
   bool _loading = true;
+  String _activeTripId = '';
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _load();
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _activeTripId = ref.read(activeTripIdProvider);
+      _load();
+    });
   }
 
   Future<void> _load() async {
-    final tripId = TripState.tripOf(context).id;
+    final tripId = _activeTripId;
     final info = await EmergencyService.fetch(tripId);
     if (!mounted) return;
     setState(() {
@@ -37,7 +43,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
   }
 
   void _edit() async {
-    final tripId = TripState.tripOf(context).id;
+    final tripId = _activeTripId;
     final result = await showModalBottomSheet<TripEmergencyInfo>(
       context: context,
       isScrollControlled: true,
@@ -54,6 +60,12 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<String>(activeTripIdProvider, (prev, next) {
+      if (next != _activeTripId) {
+        _activeTripId = next;
+        _load();
+      }
+    });
     if (_loading) return const WabwayLoadingScaffold();
 
     return Scaffold(

@@ -1,9 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/auth/app_profile.dart';
-import '../../core/auth/profile_state.dart';
 import '../../core/debug/app_logger.dart';
+import '../../core/providers/profile_provider.dart';
 import '../../core/supabase/auth_service.dart';
 import '../../core/supabase/client.dart';
 import '../trips/trip_gate.dart';
@@ -14,29 +15,29 @@ import '../../widgets/wabway_button.dart';
 import '../../widgets/wabway_text_field.dart';
 import 'sign_in_screen.dart';
 
-class AuthGate extends StatefulWidget {
+class AuthGate extends ConsumerStatefulWidget {
   const AuthGate({super.key});
 
   @override
-  State<AuthGate> createState() => _AuthGateState();
+  ConsumerState<AuthGate> createState() => _AuthGateState();
 }
 
-class _AuthGateState extends State<AuthGate> {
+class _AuthGateState extends ConsumerState<AuthGate> {
   late final StreamSubscription<AuthState> _sub;
-  AppProfile? _profile;
   bool _loading = true;
   bool _showPasswordRecovery = false;
+
+  AppProfile? get _profile => ref.read(profileProvider);
 
   @override
   void initState() {
     super.initState();
     _sub = supabase.auth.onAuthStateChange.listen(_onAuthChange);
-
     final session = supabase.auth.currentSession;
     if (session != null) {
       _fetchProfile(session.user.id);
     } else {
-      _loading = false;
+      setState(() => _loading = false);
     }
   }
 
@@ -47,17 +48,19 @@ class _AuthGateState extends State<AuthGate> {
   }
 
   void _onAuthChange(AuthState state) {
-    AppLogger.instance.log('authStateChange → ${state.event}  uid=${state.session?.user.id}', tag: 'AUTH');
+    AppLogger.instance.log(
+        'authStateChange → ${state.event}  uid=${state.session?.user.id}',
+        tag: 'AUTH');
     switch (state.event) {
       case AuthChangeEvent.passwordRecovery:
-        // User clicked a password-reset link — show the set-new-password form.
         if (mounted) setState(() { _showPasswordRecovery = true; _loading = false; });
       case AuthChangeEvent.signedIn:
         final uid = state.session?.user.id;
         if (uid != null && _profile == null) _fetchProfile(uid);
       case AuthChangeEvent.signedOut:
         if (mounted) {
-          setState(() { _profile = null; _loading = false; _showPasswordRecovery = false; });
+          ref.read(profileProvider.notifier).set(null);
+          setState(() { _loading = false; _showPasswordRecovery = false; });
         }
       default:
         break;
@@ -71,23 +74,21 @@ class _AuthGateState extends State<AuthGate> {
           .select()
           .eq('id', userId)
           .maybeSingle();
-
       if (!mounted) return;
-
       final profile = data != null
           ? AppProfile.fromMap(data)
           : AppProfile(
               id: userId,
               displayName: supabase.auth.currentUser?.userMetadata?['display_name']
-                      as String?
-                  ?? supabase.auth.currentUser?.email?.split('@').first
-                  ?? 'Traveller',
+                      as String? ??
+                  supabase.auth.currentUser?.email?.split('@').first ??
+                  'Traveller',
               displayNameIsSet:
                   supabase.auth.currentUser?.userMetadata?['display_name'] != null,
               email: supabase.auth.currentUser?.email ?? '',
             );
-
-      setState(() { _profile = profile; _loading = false; });
+      ref.read(profileProvider.notifier).set(profile);
+      if (mounted) setState(() => _loading = false);
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
@@ -96,9 +97,9 @@ class _AuthGateState extends State<AuthGate> {
   Future<void> _setDisplayName(String name) async {
     await AuthService.updateDisplayName(name);
     if (!mounted) return;
-    setState(() {
-      _profile = _profile?.copyWith(displayName: name, displayNameIsSet: true);
-    });
+    final current = ref.read(profileProvider);
+    ref.read(profileProvider.notifier).set(
+        current?.copyWith(displayName: name, displayNameIsSet: true));
   }
 
   void _refreshProfile() {
@@ -108,14 +109,15 @@ class _AuthGateState extends State<AuthGate> {
 
   @override
   Widget build(BuildContext context) {
+    final profile = ref.watch(profileProvider);
+
     if (_loading) return const _SplashScreen();
 
     if (_showPasswordRecovery) {
       return _PasswordRecoveryScreen(
         onDone: () => setState(() {
           _showPasswordRecovery = false;
-          // Profile may already be loaded from a prior session.
-          if (_profile == null) {
+          if (profile == null) {
             final uid = supabase.auth.currentUser?.id;
             if (uid != null) _fetchProfile(uid);
           }
@@ -123,15 +125,11 @@ class _AuthGateState extends State<AuthGate> {
       );
     }
 
-    if (_profile != null) {
-      if (!_profile!.displayNameIsSet) {
+    if (profile != null) {
+      if (!profile.displayNameIsSet) {
         return _NamePromptScreen(onNameSet: _setDisplayName);
       }
-      return ProfileState(
-        profile: _profile!,
-        onRefresh: _refreshProfile,
-        child: const TripGate(),
-      );
+      return const TripGate();
     }
 
     return const SignInScreen();
@@ -272,14 +270,15 @@ class _NamePromptScreenState extends State<_NamePromptScreen> {
   }
 }
 
-// ─── Password recovery (after clicking reset link) ────────────────────────────
+// ─── Password recovery ────────────────────────────────────────────────────────
 
 class _PasswordRecoveryScreen extends StatefulWidget {
   const _PasswordRecoveryScreen({required this.onDone});
   final VoidCallback onDone;
 
   @override
-  State<_PasswordRecoveryScreen> createState() => _PasswordRecoveryScreenState();
+  State<_PasswordRecoveryScreen> createState() =>
+      _PasswordRecoveryScreenState();
 }
 
 class _PasswordRecoveryScreenState extends State<_PasswordRecoveryScreen> {
@@ -322,12 +321,14 @@ class _PasswordRecoveryScreenState extends State<_PasswordRecoveryScreen> {
               decoration: kCardDecoration(),
               child: Padding(
                 padding: const EdgeInsets.all(kSpace6),
-                child: _done ? _DoneState(onContinue: widget.onDone) : _FormState(
-                  ctrl: _ctrl,
-                  loading: _loading,
-                  error: _error,
-                  onSubmit: _submit,
-                ),
+                child: _done
+                    ? _DoneState(onContinue: widget.onDone)
+                    : _FormState(
+                        ctrl: _ctrl,
+                        loading: _loading,
+                        error: _error,
+                        onSubmit: _submit,
+                      ),
               ),
             ),
           ),
@@ -402,7 +403,8 @@ class _DoneState extends StatelessWidget {
         const SizedBox(height: kSpace4),
         Text('Password saved', style: kStyleTitle, textAlign: TextAlign.center),
         const SizedBox(height: kSpace2),
-        Text('You can now sign in with your email and password.', style: kStyleCaption, textAlign: TextAlign.center),
+        Text('You can now sign in with your email and password.',
+            style: kStyleCaption, textAlign: TextAlign.center),
         const SizedBox(height: kSpace5),
         WabwayButton(
           label: 'Continue',

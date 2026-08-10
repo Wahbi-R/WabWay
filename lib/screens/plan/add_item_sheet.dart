@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../core/trip/trip_state.dart';
 import '../../data/plan_data.dart';
 import '../../data/docs_data.dart';
 import '../../data/spot_data.dart';
@@ -24,12 +23,12 @@ ItineraryItemType _typeFromCategory(SpotCategory cat) => switch (cat) {
 Future<ItineraryItem?> showAddItemSheet(
   BuildContext context, {
   required String dayId,
+  required String defaultCurrency,
   List<Spot> spots = const [],
   List<TripDocument> docs = const [],
   ItineraryItem? initialItem,
 }) {
   final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
-  final defaultCurrency = TripState.tripOf(context).defaultCurrency;
 
   if (isDesktop) {
     return showDialog<ItineraryItem>(

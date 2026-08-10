@@ -6,11 +6,12 @@ import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
-import '../core/auth/profile_state.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/providers/profile_provider.dart';
+import '../core/providers/trip_provider.dart';
 import '../core/supabase/client.dart';
 import '../core/supabase/doc_service.dart';
 import '../core/supabase/spot_service.dart';
-import '../core/trip/trip_state.dart';
 import '../data/docs_data.dart';
 import '../data/spot_data.dart';
 import '../theme/app_colors.dart';
@@ -23,14 +24,14 @@ import 'docs/add_doc_sheet.dart';
 
 enum _DocSort { newest, alphabetical, type }
 
-class DocsScreen extends StatefulWidget {
+class DocsScreen extends ConsumerStatefulWidget {
   const DocsScreen({super.key});
 
   @override
-  State<DocsScreen> createState() => _DocsScreenState();
+  ConsumerState<DocsScreen> createState() => _DocsScreenState();
 }
 
-class _DocsScreenState extends State<DocsScreen> {
+class _DocsScreenState extends ConsumerState<DocsScreen> {
   List<TripDocument> _docs = [];
   List<Spot> _availableSpots = [];
 
@@ -54,25 +55,27 @@ class _DocsScreenState extends State<DocsScreen> {
   final _searchCtrl = TextEditingController();
   final _filterScrollCtrl = ScrollController();
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final tripId = TripState.tripOf(context).id;
-    if (tripId != _activeTripId) {
-      _activeTripId = tripId;
-      _loadDocs();
-      _loadAvailableSpots();
-      _subscribeRealtime(tripId);
-    }
-
-    // Rebuild member name resolver whenever TripState changes
-    final members = TripState.membersOf(context);
+  void _rebuildMemberName() {
+    final members = ref.read(tripMembersProvider);
     final myId = supabase.auth.currentUser?.id;
     _memberName = (userId) {
       if (userId == myId) return 'You';
       final m = members.where((m) => m.userId == userId).firstOrNull;
       return m?.profile.displayName ?? userId;
     };
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _activeTripId = ref.read(activeTripIdProvider);
+      _rebuildMemberName();
+      _loadDocs();
+      _loadAvailableSpots();
+      _subscribeRealtime(_activeTripId!);
+    });
   }
 
   @override
@@ -89,7 +92,7 @@ class _DocsScreenState extends State<DocsScreen> {
   Future<void> _loadDocs({bool silent = false}) async {
     if (!silent) setState(() { _loading = true; _error = false; });
     try {
-      final tripId = TripState.tripOf(context).id;
+      final tripId = _activeTripId!;
       final docs = await DocService.loadDocuments(tripId);
       if (!mounted) return;
       setState(() { _docs = docs; _loading = false; _offline = false; });
@@ -97,7 +100,7 @@ class _DocsScreenState extends State<DocsScreen> {
       if (!mounted) return;
       if (silent) { setState(() => _offline = true); return; }
       // Try cached data on cold-start failure
-      final tripId = TripState.maybeOf(context)?.trip.id ?? '';
+      final tripId = _activeTripId ?? '';
       final cached = tripId.isNotEmpty
           ? await DocService.loadDocumentsFromCache(tripId)
           : null;
@@ -112,7 +115,7 @@ class _DocsScreenState extends State<DocsScreen> {
 
   Future<void> _loadAvailableSpots() async {
     try {
-      final tripId = TripState.tripOf(context).id;
+      final tripId = _activeTripId!;
       final spots = await SpotService.loadSpots(tripId);
       if (mounted) setState(() => _availableSpots = spots);
     } catch (_) {}
@@ -154,9 +157,10 @@ class _DocsScreenState extends State<DocsScreen> {
   // ── Mutations ────────────────────────────────────────────────────────────────
 
   Future<void> _addDoc(BuildContext context) async {
-    final tripId = TripState.tripOf(context).id;
-    final tripName = TripState.tripOf(context).name;
-    final userId = ProfileState.of(context).id;
+    final trip = ref.read(activeTripProvider);
+    final tripId   = trip?.id ?? _activeTripId ?? '';
+    final tripName = trip?.name ?? 'Trip';
+    final userId   = ref.read(profileProvider)?.id ?? '';
 
     final doc = await showAddDocSheet(
       context,
@@ -267,7 +271,7 @@ class _DocsScreenState extends State<DocsScreen> {
   void _shareDocs() {
     final list = _filtered;
     if (list.isEmpty || kIsWeb) return;
-    final tripName = TripState.tripOf(context).name;
+    final tripName = ref.read(activeTripProvider)?.name ?? 'Trip';
     final buf = StringBuffer();
     buf.writeln('$tripName — Documents');
     buf.writeln();
@@ -299,6 +303,15 @@ class _DocsScreenState extends State<DocsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<String>(activeTripIdProvider, (prev, next) {
+      if (next != _activeTripId) {
+        _activeTripId = next;
+        _rebuildMemberName();
+        _loadDocs();
+        _loadAvailableSpots();
+        _subscribeRealtime(next);
+      }
+    });
     if (_loading) return const WabwayLoadingScaffold();
 
     if (_error) {
@@ -413,13 +426,13 @@ class _DocsScreenState extends State<DocsScreen> {
         ),
       );
     }
-    final trip = TripState.tripOf(context);
+    final trip = ref.read(activeTripProvider);
     return SingleChildScrollView(
       child: DocDetailContent(
         key: ValueKey(doc.id),
         doc: doc,
-        tripId: trip.id,
-        tripName: trip.name,
+        tripId: trip?.id ?? _activeTripId ?? '',
+        tripName: trip?.name ?? 'Trip',
         availableSpots: _availableSpots,
         onDelete: () => _deleteDoc(doc),
         onRenamed: (title) => setState(() {
@@ -513,15 +526,15 @@ class _DocsScreenState extends State<DocsScreen> {
                     itemBuilder: (ctx, i) => DocGridCard(
                       doc: items[i],
                       onTap: () {
-                        final trip = TripState.tripOf(context);
+                        final trip = ref.read(activeTripProvider);
                         final doc = items[i];
                         Navigator.push(
                           ctx,
                           MaterialPageRoute(
                             builder: (_) => DocDetailScreen(
                               doc: doc,
-                              tripId: trip.id,
-                              tripName: trip.name,
+                              tripId: trip?.id ?? _activeTripId ?? '',
+                              tripName: trip?.name ?? 'Trip',
                               availableSpots: _availableSpots,
                               onDelete: () => _deleteDoc(doc),
                               onRenamed: (title) => setState(() {

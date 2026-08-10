@@ -6,9 +6,10 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/providers/trip_provider.dart';
 import '../../core/supabase/accommodation_service.dart';
 import '../../core/supabase/client.dart';
-import '../../core/trip/trip_state.dart';
 import '../../data/accommodation_data.dart';
 import '../../data/date_utils.dart';
 import '../../theme/app_colors.dart';
@@ -19,14 +20,14 @@ import 'add_accommodation_sheet.dart';
 
 enum _StaySort { checkIn, alphabetical, newest }
 
-class AccommodationsScreen extends StatefulWidget {
+class AccommodationsScreen extends ConsumerStatefulWidget {
   const AccommodationsScreen({super.key});
 
   @override
-  State<AccommodationsScreen> createState() => _AccommodationsScreenState();
+  ConsumerState<AccommodationsScreen> createState() => _AccommodationsScreenState();
 }
 
-class _AccommodationsScreenState extends State<AccommodationsScreen> {
+class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen> {
   List<Accommodation> _items = [];
   bool _loading = true;
   bool _error   = false;
@@ -42,14 +43,14 @@ class _AccommodationsScreenState extends State<AccommodationsScreen> {
   final _searchCtrl = TextEditingController();
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final tripId = TripState.tripOf(context).id;
-    if (tripId != _activeTripId) {
-      _activeTripId = tripId;
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _activeTripId = ref.read(activeTripIdProvider);
       _load();
-      _subscribe(tripId);
-    }
+      _subscribe(_activeTripId!);
+    });
   }
 
   @override
@@ -87,8 +88,7 @@ class _AccommodationsScreenState extends State<AccommodationsScreen> {
   Future<void> _load({bool silent = false}) async {
     if (!silent) setState(() { _loading = true; _error = false; });
     try {
-      final tripId = TripState.tripOf(context).id;
-      final items  = await AccommodationService.loadAll(tripId);
+      final items  = await AccommodationService.loadAll(_activeTripId!);
       if (!mounted) return;
       setState(() { _items = items; _loading = false; _offline = false; });
     } catch (_) {
@@ -131,7 +131,7 @@ class _AccommodationsScreenState extends State<AccommodationsScreen> {
   void _exportCsv() {
     final list = _filtered;
     if (list.isEmpty || kIsWeb) return;
-    final tripName = TripState.tripOf(context).name;
+    final tripName = ref.read(activeTripProvider)?.name ?? 'Trip';
     final buf = StringBuffer();
     buf.writeln('Name,City,Check-in,Check-out,Nights,Price/night,Currency,Total,Status,Source,Confirmation,URL,Notes');
     for (final a in list) {
@@ -182,7 +182,7 @@ class _AccommodationsScreenState extends State<AccommodationsScreen> {
   }
 
   Future<void> _openAdd(BuildContext context, {Accommodation? editing}) async {
-    final tripId = TripState.tripOf(context).id;
+    final tripId = _activeTripId!;
     final userId = supabase.auth.currentUser?.id ?? '';
     final result = await showModalBottomSheet<AccommodationSheetResult>(
       context: context,
@@ -212,6 +212,13 @@ class _AccommodationsScreenState extends State<AccommodationsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<String>(activeTripIdProvider, (prev, next) {
+      if (next != _activeTripId) {
+        _activeTripId = next;
+        _load();
+        _subscribe(next);
+      }
+    });
     if (_loading) return const WabwayLoadingScaffold();
 
     if (_error) {

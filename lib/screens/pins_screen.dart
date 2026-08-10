@@ -1,23 +1,24 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show RealtimeChannel;
-import '../core/auth/profile_state.dart';
+import '../core/providers/profile_provider.dart';
+import '../core/providers/trip_provider.dart';
 import '../core/supabase/pins_service.dart';
-import '../core/trip/trip_state.dart';
 import '../data/pins_data.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
 import '../widgets/widgets.dart';
 
-class PinsScreen extends StatefulWidget {
+class PinsScreen extends ConsumerStatefulWidget {
   const PinsScreen({super.key});
 
   @override
-  State<PinsScreen> createState() => _PinsScreenState();
+  ConsumerState<PinsScreen> createState() => _PinsScreenState();
 }
 
-class _PinsScreenState extends State<PinsScreen> {
+class _PinsScreenState extends ConsumerState<PinsScreen> {
   List<TripPin> _pins = [];
   bool _loading = true;
   String _tripId = '';
@@ -26,14 +27,18 @@ class _PinsScreenState extends State<PinsScreen> {
   Timer? _debounce;
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _tripId = TripState.tripOf(context).id;
-    _myId   = ProfileState.of(context).id;
-    _load();
-    _channel ??= PinsService.subscribe(_tripId, () {
-      _debounce?.cancel();
-      _debounce = Timer(const Duration(milliseconds: 400), () => _load(silent: true));
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _tripId = ref.read(activeTripIdProvider);
+      _myId   = ref.read(profileProvider)?.id ?? '';
+      _load();
+      _channel ??= PinsService.subscribe(_tripId, () {
+        _debounce?.cancel();
+        _debounce = Timer(
+            const Duration(milliseconds: 400), () => _load(silent: true));
+      });
     });
   }
 
@@ -108,6 +113,14 @@ class _PinsScreenState extends State<PinsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<String>(activeTripIdProvider, (prev, next) {
+      if (next != _tripId) {
+        _tripId = next;
+        _myId = ref.read(profileProvider)?.id ?? '';
+        _load();
+      }
+    });
+
     if (_loading) return const WabwayLoadingScaffold();
 
     return Scaffold(
@@ -176,7 +189,7 @@ class _EmptyState extends StatelessWidget {
 
 // ─── Pin card ─────────────────────────────────────────────────────────────────
 
-class _PinCard extends StatelessWidget {
+class _PinCard extends ConsumerWidget {
   const _PinCard({
     required this.pin,
     required this.myId,
@@ -190,9 +203,9 @@ class _PinCard extends StatelessWidget {
   final VoidCallback onDelete;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isMe = pin.authorId == myId;
-    final members = TripState.membersOf(context);
+    final members = ref.watch(tripMembersProvider);
     final match = members.where((m) => m.userId == pin.authorId).firstOrNull;
     final name = isMe
         ? 'You'
@@ -222,10 +235,7 @@ class _PinCard extends StatelessWidget {
                     style: kStyleOverline.copyWith(color: pinColor),
                   ),
                   const Spacer(),
-                  Text(
-                    _fmtPinTime(pin.createdAt),
-                    style: kStyleOverline,
-                  ),
+                  Text(_fmtPinTime(pin.createdAt), style: kStyleOverline),
                   if (isMe) ...[
                     const SizedBox(width: kSpace2),
                     PopupMenuButton<String>(

@@ -1,14 +1,15 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
-import '../core/auth/profile_state.dart';
+import '../core/providers/profile_provider.dart';
+import '../core/providers/trip_provider.dart';
 import '../core/supabase/client.dart';
 import '../core/supabase/links_service.dart';
-import '../core/trip/trip_state.dart';
 import '../data/links_data.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
@@ -18,14 +19,14 @@ import 'links/add_link_sheet.dart';
 
 enum _LinkSort { newest, oldest, alphabetical }
 
-class LinksScreen extends StatefulWidget {
+class LinksScreen extends ConsumerStatefulWidget {
   const LinksScreen({super.key});
 
   @override
-  State<LinksScreen> createState() => _LinksScreenState();
+  ConsumerState<LinksScreen> createState() => _LinksScreenState();
 }
 
-class _LinksScreenState extends State<LinksScreen> {
+class _LinksScreenState extends ConsumerState<LinksScreen> {
   List<TripLink> _links = [];
   bool _loading = true;
   bool _error   = false;
@@ -63,14 +64,14 @@ class _LinksScreenState extends State<LinksScreen> {
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final tripId = TripState.tripOf(context).id;
-    if (tripId != _activeTripId) {
-      _activeTripId = tripId;
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _activeTripId = ref.read(activeTripIdProvider);
       _load();
-      _subscribe(tripId);
-    }
+      _subscribe(_activeTripId!);
+    });
   }
 
   @override
@@ -115,7 +116,7 @@ class _LinksScreenState extends State<LinksScreen> {
   }
 
   Future<void> _addLink() async {
-    final userId = ProfileState.of(context).id;
+    final userId = ref.read(profileProvider)!.id;
     final link = await showAddLinkSheet(
       context,
       tripId: _activeTripId!,
@@ -127,7 +128,7 @@ class _LinksScreenState extends State<LinksScreen> {
   }
 
   Future<void> _editLink(TripLink link) async {
-    final userId = ProfileState.of(context).id;
+    final userId = ref.read(profileProvider)!.id;
     final updated = await showAddLinkSheet(
       context,
       tripId: _activeTripId!,
@@ -199,7 +200,7 @@ class _LinksScreenState extends State<LinksScreen> {
   void _shareLinks() {
     final list = _filteredLinks;
     if (list.isEmpty || kIsWeb) return;
-    final tripName = TripState.tripOf(context).name;
+    final tripName = ref.read(activeTripProvider)!.name;
     final buf = StringBuffer();
     buf.writeln('$tripName — Links');
     buf.writeln();
@@ -223,6 +224,13 @@ class _LinksScreenState extends State<LinksScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<String>(activeTripIdProvider, (prev, next) {
+      if (next != _activeTripId) {
+        _activeTripId = next;
+        _load();
+        _subscribe(next);
+      }
+    });
     final scaffold = Scaffold(
       backgroundColor: kColorCream,
       appBar: AppBar(

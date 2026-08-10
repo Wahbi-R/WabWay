@@ -1,10 +1,11 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../core/auth/profile_state.dart';
+import '../core/providers/profile_provider.dart';
+import '../core/providers/trip_provider.dart';
 import '../core/supabase/auth_service.dart';
 import '../core/supabase/trip_service.dart';
-import '../core/trip/trip_state.dart';
 import 'account_sheets.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_theme.dart';
@@ -27,37 +28,16 @@ import 'diagnostics_screen.dart';
 import 'notification_settings_screen.dart';
 import '../core/changelog.dart';
 
-// Pushes a secondary screen with the active trip + current profile already
-// injected via InheritedWidgets. All six "Explore" routes use this helper to
-// avoid repeating ~12 lines of state-passing boilerplate for each screen.
-void _pushWithState(BuildContext context, Widget screen) {
-  final trip    = TripState.tripOf(context);
-  final members = TripState.membersOf(context);
-  final profile = ProfileState.of(context);
-  Navigator.push<void>(
-    context,
-    MaterialPageRoute(
-      builder: (_) => ProfileState(
-        profile: profile,
-        child: TripState(
-          trip: trip,
-          members: members,
-          child: screen,
-        ),
-      ),
-    ),
-  );
-}
-
-class MoreScreen extends StatelessWidget {
+class MoreScreen extends ConsumerWidget {
   const MoreScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final members = TripState.membersOf(context);
-    final trip = TripState.tripOf(context);
-    final currentUserId = ProfileState.maybeOf(context)?.id;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final members = ref.watch(tripMembersProvider);
+    final trip = ref.watch(activeTripProvider);
+    final currentUserId = ref.watch(profileProvider)?.id;
     final isOwner = members.any((m) => m.userId == currentUserId && m.isOwner);
+    final reload = () => ref.read(tripNotifierProvider.notifier).load();
 
     return Scaffold(
       backgroundColor: kColorCream,
@@ -85,14 +65,14 @@ class MoreScreen extends StatelessWidget {
                   child: const Icon(Icons.swap_horiz_rounded,
                       size: 20, color: kColorPrimary),
                 ),
-                title: Text(trip.name, style: kStyleBodyMedium),
+                title: Text(trip?.name ?? '', style: kStyleBodyMedium),
                 subtitle: Padding(
                   padding: const EdgeInsets.only(top: 2),
                   child: Text('Tap to switch trip', style: kStyleCaption),
                 ),
                 trailing: Icon(Icons.chevron_right_rounded,
                     color: kColorTextTertiary(), size: 18),
-                onTap: () => showTripSwitcherSheet(context),
+                onTap: () => showTripSwitcherSheet(context, ref),
               ),
             ),
           ),
@@ -127,7 +107,7 @@ class MoreScreen extends StatelessWidget {
                 ),
                 trailing: Icon(Icons.chevron_right_rounded,
                     color: kColorTextTertiary(), size: 18),
-                onTap: () => _pushWithState(context, const CrewScreen()),
+                onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const CrewScreen())),
               ),
             ),
           ),
@@ -192,7 +172,7 @@ class MoreScreen extends StatelessWidget {
                                         size: 18, color: kColorDanger),
                                     tooltip: 'Remove member',
                                     onPressed: () => _confirmRemoveMember(
-                                        context, trip.id, member),
+                                        context, trip?.id ?? '', member, reload),
                                   )
                                 : null,
                       ),
@@ -240,9 +220,9 @@ class MoreScreen extends StatelessWidget {
                           color: kColorTextTertiary()),
                       onTap: () => showAddMemberSheet(
                         context,
-                        tripId: trip.id,
+                        tripId: trip?.id ?? '',
                         existingMemberIds: members.map((m) => m.userId).toSet(),
-                        onMemberAdded: () => TripState.refresh(context),
+                        onMemberAdded: reload,
                       ),
                     ),
                     const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
@@ -266,7 +246,7 @@ class MoreScreen extends StatelessWidget {
                       ),
                       trailing: Icon(Icons.chevron_right_rounded,
                           color: kColorTextTertiary()),
-                      onTap: () => showInviteSheet(context, tripId: trip.id),
+                      onTap: () => showInviteSheet(context, tripId: trip?.id ?? ''),
                     ),
                   ],
                 ),
@@ -288,49 +268,49 @@ class MoreScreen extends StatelessWidget {
                   _SettingsRow(
                     icon: Icons.luggage_rounded,
                     label: 'Packing List',
-                    onTap: () => _pushWithState(context, const PackingScreen()),
+                    onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const PackingScreen())),
                   ),
                   const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
                   _SettingsRow(
                     icon: Icons.map_rounded,
                     label: 'Map',
-                    onTap: () => _pushWithState(context, const MapScreen()),
+                    onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const MapScreen())),
                   ),
                   const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
                   _SettingsRow(
                     icon: Icons.flight_rounded,
                     label: 'Travel',
-                    onTap: () => _pushWithState(context, const TravelScreen()),
+                    onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const TravelScreen())),
                   ),
                   const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
                   _SettingsRow(
                     icon: Icons.photo_library_rounded,
                     label: 'Photos',
-                    onTap: () => _pushWithState(context, const PhotosScreen()),
+                    onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const PhotosScreen())),
                   ),
                   const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
                   _SettingsRow(
                     icon: Icons.link_rounded,
                     label: 'Links',
-                    onTap: () => _pushWithState(context, const LinksScreen()),
+                    onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const LinksScreen())),
                   ),
                   const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
                   _SettingsRow(
                     icon: Icons.hotel_rounded,
                     label: 'Stays',
-                    onTap: () => _pushWithState(context, const AccommodationsScreen()),
+                    onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const AccommodationsScreen())),
                   ),
                   const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
                   _SettingsRow(
                     icon: Icons.folder_rounded,
                     label: 'Documents',
-                    onTap: () => _pushWithState(context, const DocsScreen()),
+                    onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const DocsScreen())),
                   ),
                   const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
                   _SettingsRow(
                     icon: Icons.shopping_cart_rounded,
                     label: 'Shopping List',
-                    onTap: () => _pushWithState(context, const ShoppingScreen()),
+                    onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const ShoppingScreen())),
                   ),
                 ],
               ),
@@ -349,7 +329,7 @@ class MoreScreen extends StatelessWidget {
               child: _SettingsRow(
                 icon: Icons.download_rounded,
                 label: 'Import file or link',
-                onTap: () => showImportScreen(context),
+                onTap: () => showImportScreen(context, ref),
               ),
             ),
           ),
@@ -367,7 +347,7 @@ class MoreScreen extends StatelessWidget {
                     _SettingsRow(
                       icon: Icons.settings_rounded,
                       label: 'Edit trip details',
-                      onTap: () => showTripSettingsSheet(context, trip: trip),
+                      onTap: () { if (trip != null) showTripSettingsSheet(context, ref, trip: trip); },
                     ),
                     const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
                   ],
@@ -387,14 +367,14 @@ class MoreScreen extends StatelessWidget {
                       icon: Icons.swap_horiz_rounded,
                       label: 'Transfer ownership',
                       onTap: () => _showTransferOwnershipSheet(
-                          context, trip, members, currentUserId),
+                          context, trip, members, currentUserId, reload),
                     ),
                     const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
                     _SettingsRow(
                       icon: Icons.delete_rounded,
                       label: 'Delete trip',
                       color: kColorDanger,
-                      onTap: () => _confirmDeleteTrip(context, trip),
+                      onTap: () => _confirmDeleteTrip(context, trip, reload),
                     ),
                   ],
                   if (!isOwner) ...[
@@ -403,7 +383,7 @@ class MoreScreen extends StatelessWidget {
                       icon: Icons.logout_rounded,
                       label: 'Leave trip',
                       color: kColorDanger,
-                      onTap: () => _confirmLeaveTrip(context, trip),
+                      onTap: () => _confirmLeaveTrip(context, trip, reload),
                     ),
                   ],
                 ],
@@ -473,14 +453,12 @@ class MoreScreen extends StatelessWidget {
                 icon: Icons.bug_report_rounded,
                 label: 'Diagnostics',
                 onTap: () {
-                  final profile = ProfileState.maybeOf(context);
-                  final activeTrip = TripState.maybeOf(context)?.trip;
                   Navigator.push<void>(
                     context,
                     MaterialPageRoute(
                       builder: (_) => DiagnosticsScreen(
-                        profile: profile,
-                        trip: activeTrip,
+                        profile: ref.read(profileProvider),
+                        trip: ref.read(activeTripProvider),
                       ),
                     ),
                   );
@@ -496,10 +474,10 @@ class MoreScreen extends StatelessWidget {
   }
 }
 
-class _AccountSection extends StatelessWidget {
+class _AccountSection extends ConsumerWidget {
   @override
-  Widget build(BuildContext context) {
-    final profile = ProfileState.maybeOf(context);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profile = ref.watch(profileProvider);
     return DecoratedBox(
       decoration: kCardDecoration(),
       child: Material(
@@ -529,7 +507,7 @@ class _AccountSection extends StatelessWidget {
               _SettingsRow(
                 icon: Icons.badge_rounded,
                 label: 'Edit name',
-                onTap: () => showEditNameSheet(context),
+                onTap: () => showEditNameSheet(context, ref),
               ),
               const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
               _SettingsRow(
@@ -563,7 +541,7 @@ class _SectionHeader extends StatelessWidget {
 // ─── Trip actions ─────────────────────────────────────────────────────────────
 
 Future<void> _confirmRemoveMember(
-    BuildContext context, String tripId, member) async {
+    BuildContext context, String tripId, member, VoidCallback onRefresh) async {
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
@@ -589,7 +567,7 @@ Future<void> _confirmRemoveMember(
   if (confirmed != true || !context.mounted) return;
   try {
     await TripService.removeMember(tripId, member.userId as String);
-    if (context.mounted) TripState.refresh(context);
+    if (context.mounted) onRefresh();
   } catch (_) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -602,7 +580,7 @@ Future<void> _confirmRemoveMember(
   }
 }
 
-Future<void> _confirmLeaveTrip(BuildContext context, trip) async {
+Future<void> _confirmLeaveTrip(BuildContext context, trip, VoidCallback onRefresh) async {
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
@@ -628,7 +606,7 @@ Future<void> _confirmLeaveTrip(BuildContext context, trip) async {
   if (confirmed != true || !context.mounted) return;
   try {
     await TripService.leaveTrip(trip.id);
-    if (context.mounted) TripState.refresh(context);
+    if (context.mounted) onRefresh();
   } catch (_) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -639,7 +617,7 @@ Future<void> _confirmLeaveTrip(BuildContext context, trip) async {
   }
 }
 
-Future<void> _confirmDeleteTrip(BuildContext context, trip) async {
+Future<void> _confirmDeleteTrip(BuildContext context, trip, VoidCallback onRefresh) async {
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
@@ -665,7 +643,7 @@ Future<void> _confirmDeleteTrip(BuildContext context, trip) async {
   if (confirmed != true || !context.mounted) return;
   try {
     await TripService.deleteTrip(trip.id);
-    if (context.mounted) TripState.refresh(context);
+    if (context.mounted) onRefresh();
   } catch (_) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -682,6 +660,7 @@ void _showTransferOwnershipSheet(
   trip,
   List members,
   String? currentUserId,
+  VoidCallback onRefresh,
 ) {
   showModalBottomSheet(
     context: context,
@@ -692,7 +671,7 @@ void _showTransferOwnershipSheet(
       trip: trip,
       members: members,
       currentUserId: currentUserId,
-      onTransferred: () => TripState.refresh(context),
+      onTransferred: onRefresh,
     ),
   );
 }

@@ -1,16 +1,17 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../core/auth/profile_state.dart';
+import '../../core/providers/profile_provider.dart';
+import '../../core/providers/trip_provider.dart';
 import '../../core/supabase/client.dart';
 import '../../core/supabase/doc_service.dart';
 import '../../core/supabase/money_service.dart';
 import '../../core/supabase/plan_service.dart';
 import '../../core/supabase/travel_service.dart';
 import '../../core/supabase/trip_service.dart';
-import '../../core/trip/trip_state.dart';
 import '../../data/docs_data.dart';
 import '../../data/money_data.dart';
 import '../../data/plan_data.dart';
@@ -25,11 +26,11 @@ import '../money/add_receipt_sheet.dart';
 
 // ── Member name helper ────────────────────────────────────────────────────────
 
-String _uploaderName(BuildContext context, String userId) {
+String _uploaderName(WidgetRef ref, String userId) {
   final myId =
-      supabase.auth.currentUser?.id ?? ProfileState.maybeOf(context)?.id;
+      supabase.auth.currentUser?.id ?? ref.read(profileProvider)?.id;
   if (myId != null && userId == myId) return 'You';
-  final members = TripState.membersOf(context);
+  final members = ref.read(tripMembersProvider);
   final match = members.where((m) => m.userId == userId).firstOrNull;
   if (match != null) return match.profile.displayName;
   return userId.length >= 8 ? userId.substring(0, 8) : userId;
@@ -161,7 +162,7 @@ class _DocDetailContentState extends State<DocDetailContent> {
     if (_links.any((l) => l.type == type && l.linkedId == linkedId)) return;
     // Capture context-dependent values before the async gap.
     final userId =
-        supabase.auth.currentUser?.id ?? ProfileState.of(context).id;
+        supabase.auth.currentUser?.id ?? '';
     setState(() => _linkLoading = true);
     try {
       await DocService.addLink(
@@ -342,12 +343,12 @@ class _DocHeader extends StatelessWidget {
 
 // ── File metadata card ────────────────────────────────────────────────────────
 
-class _FileMetaCard extends StatelessWidget {
+class _FileMetaCard extends ConsumerWidget {
   const _FileMetaCard({required this.doc});
   final TripDocument doc;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       decoration: BoxDecoration(
         color: kColorPaper,
@@ -361,7 +362,7 @@ class _FileMetaCard extends StatelessWidget {
           WabwayMetaRow(
             icon: Icons.person_outline_rounded,
             label: 'Uploaded by',
-            value: _uploaderName(context, doc.uploadedById),
+            value: _uploaderName(ref, doc.uploadedById),
           ),
           _divider(),
           WabwayMetaRow(

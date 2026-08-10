@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../core/auth/profile_state.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/providers/profile_provider.dart';
 import '../core/supabase/auth_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
@@ -7,8 +8,8 @@ import '../theme/app_text_theme.dart';
 import '../widgets/wabway_button.dart';
 import '../widgets/wabway_text_field.dart';
 
-void showEditNameSheet(BuildContext context) {
-  final profile = ProfileState.maybeOf(context);
+void showEditNameSheet(BuildContext context, WidgetRef ref) {
+  final profile = ref.read(profileProvider);
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -16,7 +17,7 @@ void showEditNameSheet(BuildContext context) {
     backgroundColor: Colors.transparent,
     builder: (_) => _EditNameSheet(
       initialName: profile?.displayName ?? '',
-      onSaved: () => ProfileState.refresh(context),
+      onSaved: () => ref.read(profileProvider.notifier).refresh(),
     ),
   );
 }

@@ -6,10 +6,11 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/providers/trip_provider.dart';
 import '../core/supabase/accommodation_service.dart';
 import '../core/supabase/client.dart';
 import '../core/supabase/spot_service.dart';
-import '../core/trip/trip_state.dart';
 import '../data/accommodation_data.dart';
 import '../data/spot_data.dart';
 import '../theme/app_colors.dart';
@@ -19,14 +20,14 @@ import '../widgets/widgets.dart';
 import 'spots/spot_detail.dart';
 import 'spots/add_spot_sheet.dart';
 
-class MapScreen extends StatefulWidget {
+class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
 
   @override
-  State<MapScreen> createState() => _MapScreenState();
+  ConsumerState<MapScreen> createState() => _MapScreenState();
 }
 
-class _MapScreenState extends State<MapScreen> {
+class _MapScreenState extends ConsumerState<MapScreen> {
   List<Spot> _spots = [];
   List<Accommodation> _accommodations = [];
   bool _loading = true;
@@ -41,14 +42,14 @@ class _MapScreenState extends State<MapScreen> {
   bool _needsFit = true;   // fit-to-bounds on first successful load only
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final tripId = TripState.tripOf(context).id;
-    if (tripId != _activeTripId) {
-      _activeTripId = tripId;
-      _load(tripId);
-      _subscribeRealtime(tripId);
-    }
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _activeTripId = ref.read(activeTripIdProvider);
+      _load(_activeTripId!);
+      _subscribeRealtime(_activeTripId!);
+    });
   }
 
   @override
@@ -197,7 +198,7 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _addSpotAtLatLng(LatLng point) async {
-    final tripId = TripState.tripOf(context).id;
+    final tripId = ref.read(activeTripIdProvider);
     final userId = supabase.auth.currentUser?.id ?? '';
     final spot = await showAddSpotSheet(
       context,
@@ -258,6 +259,13 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<String>(activeTripIdProvider, (prev, next) {
+      if (next != _activeTripId) {
+        _activeTripId = next;
+        _load(next);
+        _subscribeRealtime(next);
+      }
+    });
     return Scaffold(
       backgroundColor: kColorCream,
       appBar: AppBar(

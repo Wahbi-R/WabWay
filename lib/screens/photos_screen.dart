@@ -3,10 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
-import '../core/auth/profile_state.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/providers/profile_provider.dart';
+import '../core/providers/trip_provider.dart';
 import '../core/supabase/client.dart';
 import '../core/supabase/photo_album_service.dart';
-import '../core/trip/trip_state.dart';
 import '../data/photo_album_data.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
@@ -14,14 +15,14 @@ import '../theme/app_text_theme.dart';
 import '../widgets/widgets.dart';
 import 'photos/add_album_sheet.dart';
 
-class PhotosScreen extends StatefulWidget {
+class PhotosScreen extends ConsumerStatefulWidget {
   const PhotosScreen({super.key});
 
   @override
-  State<PhotosScreen> createState() => _PhotosScreenState();
+  ConsumerState<PhotosScreen> createState() => _PhotosScreenState();
 }
 
-class _PhotosScreenState extends State<PhotosScreen> {
+class _PhotosScreenState extends ConsumerState<PhotosScreen> {
   List<TripPhotoAlbum> _albums = [];
   bool _loading = true;
   bool _error   = false;
@@ -31,14 +32,14 @@ class _PhotosScreenState extends State<PhotosScreen> {
   Timer? _debounce;
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final tripId = TripState.tripOf(context).id;
-    if (tripId != _activeTripId) {
-      _activeTripId = tripId;
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _activeTripId = ref.read(activeTripIdProvider);
       _load();
-      _subscribe(tripId);
-    }
+      _subscribe(_activeTripId!);
+    });
   }
 
   @override
@@ -90,7 +91,7 @@ class _PhotosScreenState extends State<PhotosScreen> {
   }
 
   Future<void> _addAlbum() async {
-    final userId = ProfileState.of(context).id;
+    final userId = ref.read(profileProvider)?.id ?? '';
     final album  = await showAddAlbumSheet(
       context,
       tripId: _activeTripId!,
@@ -137,8 +138,15 @@ class _PhotosScreenState extends State<PhotosScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final currentUserId = ProfileState.maybeOf(context)?.id;
-    final members = TripState.membersOf(context);
+    ref.listen<String>(activeTripIdProvider, (prev, next) {
+      if (next != _activeTripId) {
+        _activeTripId = next;
+        _load();
+        _subscribe(next);
+      }
+    });
+    final currentUserId = ref.watch(profileProvider)?.id;
+    final members = ref.watch(tripMembersProvider);
 
     final scaffold = Scaffold(
       backgroundColor: kColorCream,

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../core/providers/trip_provider.dart';
 import '../../core/trip/app_trip_member.dart';
-import '../../core/trip/trip_state.dart';
 import '../../data/money_data.dart' show fmtAmount;
 import '../../data/plan_data.dart';
 import '../../theme/app_colors.dart';
@@ -632,7 +633,7 @@ class _DayCostFooter extends StatelessWidget {
 
 // Shows which members are present on a given day, based on their arrival/
 // departure dates. Hidden when no member has dates set (avoid noise).
-class _MemberPresenceRow extends StatelessWidget {
+class _MemberPresenceRow extends ConsumerWidget {
   const _MemberPresenceRow({required this.date});
   final DateTime date;
 
@@ -650,8 +651,8 @@ class _MemberPresenceRow extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final members = TripState.membersOf(context);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final members = ref.watch(tripMembersProvider);
     // Only show when at least one member has travel dates configured.
     final anyHasDates = members.any((m) => m.hasDates);
     if (!anyHasDates) return const SizedBox.shrink();

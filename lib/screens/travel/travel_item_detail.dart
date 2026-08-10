@@ -6,7 +6,8 @@ import '../../core/supabase/client.dart';
 import '../../core/supabase/doc_service.dart';
 import '../../core/supabase/plan_service.dart';
 import '../../core/supabase/travel_service.dart';
-import '../../core/trip/trip_state.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/providers/trip_provider.dart';
 import '../../data/travel_data.dart';
 import '../../data/docs_data.dart';
 import '../../data/plan_data.dart';
@@ -607,7 +608,7 @@ class _NotesSection extends StatelessWidget {
 
 // ─── Actions section ──────────────────────────────────────────────────────────
 
-class _ActionsSection extends StatefulWidget {
+class _ActionsSection extends ConsumerStatefulWidget {
   const _ActionsSection({
     required this.item,
     this.docs = const [],
@@ -622,10 +623,10 @@ class _ActionsSection extends StatefulWidget {
   final ValueChanged<TravelItem>? onUpdated;
 
   @override
-  State<_ActionsSection> createState() => _ActionsSectionState();
+  ConsumerState<_ActionsSection> createState() => _ActionsSectionState();
 }
 
-class _ActionsSectionState extends State<_ActionsSection> {
+class _ActionsSectionState extends ConsumerState<_ActionsSection> {
   bool _itineraryLoading = false;
 
   ItineraryItemType get _planItemType => switch (widget.item.type) {
@@ -653,7 +654,7 @@ class _ActionsSectionState extends State<_ActionsSection> {
         ? '${timeOfDay.hour.toString().padLeft(2, '0')}:${timeOfDay.minute.toString().padLeft(2, '0')}'
         : widget.item.time;
 
-    final tripId = TripState.tripOf(context).id;
+    final tripId = ref.read(activeTripIdProvider);
     final userId = supabase.auth.currentUser?.id ?? '';
 
     setState(() => _itineraryLoading = true);

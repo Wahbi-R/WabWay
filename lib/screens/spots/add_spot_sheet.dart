@@ -1,9 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/maps_import_service.dart';
 import '../../core/place_search_service.dart';
+import '../../core/providers/trip_provider.dart';
 import '../../core/supabase/spot_service.dart';
-import '../../core/trip/trip_state.dart';
 import '../../data/spot_data.dart';
 import '../../core/notifications/push_notifier.dart';
 import '../notification_settings_screen.dart';
@@ -125,7 +126,7 @@ class _AddSpotSheet extends StatelessWidget {
 
 // ─── Shared form content ──────────────────────────────────────────────────────
 
-class _AddSpotContent extends StatefulWidget {
+class _AddSpotContent extends ConsumerStatefulWidget {
   const _AddSpotContent({
     required this.tripId,
     required this.userId,
@@ -149,10 +150,10 @@ class _AddSpotContent extends StatefulWidget {
   bool get isEditing => initialSpot != null;
 
   @override
-  State<_AddSpotContent> createState() => _AddSpotContentState();
+  ConsumerState<_AddSpotContent> createState() => _AddSpotContentState();
 }
 
-class _AddSpotContentState extends State<_AddSpotContent> {
+class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
   final _formKey      = GlobalKey<FormState>();
   final _nameCtrl     = TextEditingController();
   final _cityCtrl     = TextEditingController();
@@ -454,7 +455,7 @@ class _AddSpotContentState extends State<_AddSpotContent> {
             hint: 'Senso-ji, Hinoya Curry Tokyo…',
             onSelected: _applySuggestion,
             locationBias: () {
-              final d = TripState.maybeOf(context)?.trip.destination ?? '';
+              final d = ref.watch(activeTripProvider)?.destination ?? '';
               return d.isNotEmpty ? d : null;
             }(),
           ),

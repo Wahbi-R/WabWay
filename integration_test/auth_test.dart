@@ -117,9 +117,13 @@ void main() {
       await tapFirst(t, find.text('Use a password instead'));
       await t.pumpAndSettle();
 
-      final fields = find.byType(EditableText);
-      await t.enterText(fields.at(0), kTestEmail);
-      await t.enterText(fields.at(1), 'definitely-wrong-password-9999');
+      final emailField = find.byType(EditableText).first;
+      await t.ensureVisible(emailField);
+      await t.enterText(emailField, kTestEmail);
+      await t.pumpAndSettle();
+      final pwField = find.byType(EditableText).last;
+      await t.ensureVisible(pwField);
+      await t.enterText(pwField, 'definitely-wrong-password-9999');
       await tapFirst(t, find.text('Sign in'));
       await t.pumpAndSettle(const Duration(seconds: 6));
 
@@ -136,11 +140,17 @@ void main() {
     testWidgets('correct credentials navigate to the app', (t) async {
       await pumpApp(t);
       await tapFirst(t, find.text('Use a password instead'));
+      await t.pumpAndSettle(const Duration(seconds: 2));
+
+      // Email is always the first EditableText; password is always last.
+      final emailField = find.byType(EditableText).first;
+      await t.ensureVisible(emailField);
+      await t.enterText(emailField, kTestEmail);
       await t.pumpAndSettle();
 
-      final fields = find.byType(EditableText);
-      await t.enterText(fields.at(0), kTestEmail);
-      await t.enterText(fields.at(1), kTestPassword);
+      final pwField = find.byType(EditableText).last;
+      await t.ensureVisible(pwField);
+      await t.enterText(pwField, kTestPassword);
       await tapFirst(t, find.text('Sign in'));
       await t.pumpAndSettle(const Duration(seconds: 8));
 
@@ -157,7 +167,7 @@ void main() {
     testWidgets('"New here? Create account" switches to sign-up form', (t) async {
       await pumpApp(t);
       await tapFirst(t, find.text('Use a password instead'));
-      await t.pumpAndSettle();
+      await t.pumpAndSettle(const Duration(seconds: 2));
       await tapFirst(t, find.text('New here? Create account'));
       await t.pumpAndSettle();
       expect(find.text('Create account'), findsWidgets);
@@ -169,7 +179,7 @@ void main() {
     testWidgets('empty name shows validation error', (t) async {
       await pumpApp(t);
       await tapFirst(t, find.text('Use a password instead'));
-      await t.pumpAndSettle();
+      await t.pumpAndSettle(const Duration(seconds: 2));
       await tapFirst(t, find.text('New here? Create account'));
       await t.pumpAndSettle();
 
@@ -187,7 +197,7 @@ void main() {
     testWidgets('empty email shows validation error', (t) async {
       await pumpApp(t);
       await tapFirst(t, find.text('Use a password instead'));
-      await t.pumpAndSettle();
+      await t.pumpAndSettle(const Duration(seconds: 2));
       await tapFirst(t, find.text('New here? Create account'));
       await t.pumpAndSettle();
 
@@ -203,7 +213,7 @@ void main() {
     testWidgets('"Already have an account" switches back to sign-in', (t) async {
       await pumpApp(t);
       await tapFirst(t, find.text('Use a password instead'));
-      await t.pumpAndSettle();
+      await t.pumpAndSettle(const Duration(seconds: 2));
       await tapFirst(t, find.text('New here? Create account'));
       await t.pumpAndSettle();
       await tapFirst(t, find.text('Already have an account? Sign in'));
@@ -219,7 +229,7 @@ void main() {
     testWidgets('"Forgot password?" opens forgot-password form', (t) async {
       await pumpApp(t);
       await tapFirst(t, find.text('Use a password instead'));
-      await t.pumpAndSettle();
+      await t.pumpAndSettle(const Duration(seconds: 2));
       await tapFirst(t, find.text('Forgot password?'));
       await t.pumpAndSettle();
       expect(find.text('Forgot password?'), findsWidgets);
@@ -232,7 +242,7 @@ void main() {
     testWidgets('empty email on forgot-password shows error', (t) async {
       await pumpApp(t);
       await tapFirst(t, find.text('Use a password instead'));
-      await t.pumpAndSettle();
+      await t.pumpAndSettle(const Duration(seconds: 2));
       await tapFirst(t, find.text('Forgot password?'));
       await t.pumpAndSettle();
       await tapFirst(t, find.text('Send reset link'));
@@ -245,7 +255,7 @@ void main() {
     testWidgets('valid email shows "Check your inbox" reset sent state', (t) async {
       await pumpApp(t);
       await tapFirst(t, find.text('Use a password instead'));
-      await t.pumpAndSettle();
+      await t.pumpAndSettle(const Duration(seconds: 2));
       await tapFirst(t, find.text('Forgot password?'));
       await t.pumpAndSettle();
 
@@ -262,7 +272,7 @@ void main() {
     testWidgets('"Back to sign in" returns to password form', (t) async {
       await pumpApp(t);
       await tapFirst(t, find.text('Use a password instead'));
-      await t.pumpAndSettle();
+      await t.pumpAndSettle(const Duration(seconds: 2));
       await tapFirst(t, find.text('Forgot password?'));
       await t.pumpAndSettle();
       await tapFirst(t, find.text('Back to sign in'));

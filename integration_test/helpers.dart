@@ -69,8 +69,17 @@ Future<void> tapTab(WidgetTester t, String label, {Duration settle = const Durat
 }
 
 /// Taps the first widget found by [finder] and settles.
+/// Scrolls the widget into view first so off-screen or partially-covered
+/// widgets (e.g. those below the soft keyboard) are reliably tappable.
 Future<void> tapFirst(WidgetTester t, Finder finder, {Duration settle = const Duration(seconds: 2)}) async {
-  await t.tap(finder.first);
+  final target = finder.first;
+  try {
+    await t.ensureVisible(target);
+    await t.pumpAndSettle();
+  } catch (_) {
+    // ensureVisible throws if the widget is not in a Scrollable; ignore.
+  }
+  await t.tap(target);
   await t.pumpAndSettle(settle);
 }
 

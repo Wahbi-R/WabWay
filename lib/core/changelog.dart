@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 190,
+    label: 'Under the hood — automated tests',
+    changes: [
+      'Added automated integration tests that verify every screen loads without crashing',
+      'Two-client sync tests confirm packing list and crew chat update in real-time between mobile and browser',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 189,
     label: 'Under the hood — stability improvements',
     changes: [

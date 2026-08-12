@@ -19,7 +19,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'package:wabway/theme/wabway_theme.dart';
 import 'package:wabway/screens/auth/auth_gate.dart';
 
 const _supabaseUrl = String.fromEnvironment('SUPABASE_URL');
@@ -40,21 +39,6 @@ Future<void> _pumpApp(WidgetTester tester) async {
       ),
     ),
   );
-}
-
-/// Waits up to [timeout] for a condition to be true, pumping frames in between.
-Future<void> _waitFor(
-  WidgetTester tester,
-  bool Function() condition, {
-  Duration timeout = const Duration(seconds: 8),
-}) async {
-  final deadline = DateTime.now().add(timeout);
-  while (!condition()) {
-    if (DateTime.now().isAfter(deadline)) {
-      throw TimeoutException('Condition not met within $timeout');
-    }
-    await tester.pump(const Duration(milliseconds: 200));
-  }
 }
 
 /// Taps the bottom nav tab labelled [label] and waits for the screen to settle.
@@ -106,12 +90,6 @@ void main() {
   // ── Screen smoke ──────────────────────────────────────────────────────────
 
   group('Bottom nav screens', () {
-    late WidgetTester _t;
-
-    setUp(() async {
-      // Each test in this group shares state; just ensure we start on Home.
-    });
-
     testWidgets('all tabs load without crashing', (tester) async {
       await _pumpApp(tester);
       await tester.pumpAndSettle(const Duration(seconds: 6));

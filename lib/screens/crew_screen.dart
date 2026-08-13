@@ -373,6 +373,16 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
         data: {'screen': 'crew', 'trip_id': _tripId!},
         highPriority: true,
       );
+      // Auto-start live location sharing so the crew's map pin stays current.
+      final mgr = LocationSharingManager.instance;
+      if (!mgr.isSharing.value && mounted) {
+        await mgr.start(
+          tripId: _tripId!,
+          userId: _userId!,
+          settings: _buildLocationSettings(),
+          onError: (_) {},
+        );
+      }
     } catch (_) {
       _showError('Could not send SOS — check your connection');
     } finally {

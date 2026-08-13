@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 195,
+    label: 'Find Me auto-shares location',
+    changes: [
+      'Tapping Find Me now automatically turns on live location sharing, so your crew\'s map pin stays up to date while they navigate to you',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 194,
     label: 'Web fixes & date picker improvements',
     changes: [

@@ -32,6 +32,7 @@ dependencies:
   dio: ^5.7.0
   path_provider: ^2.1.4
   flutter_riverpod: ^2.6.1
+  lucide_icons_flutter: ^3.1.15
 
 dev_dependencies:
   flutter_test:

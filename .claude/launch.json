@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "WabWay Web",
-      "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8080", "--directory", "build/web"],
+      "runtimeExecutable": "flutter",
+      "runtimeArgs": ["run", "-d", "web-server", "--web-port=8080", "--dart-define-from-file=.env"],
       "port": 8080
     }
   ]

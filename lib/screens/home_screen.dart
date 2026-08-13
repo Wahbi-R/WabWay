@@ -41,6 +41,7 @@ import 'pins_screen.dart';
 import '../core/supabase/pins_service.dart';
 import '../data/pins_data.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show RealtimeChannel;
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 // ─── Loaded data ──────────────────────────────────────────────────────────────
 
@@ -242,7 +243,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   List<Widget> _appBarActions(BuildContext context) => [
     IconButton(
-      icon: const Icon(Icons.chat_rounded),
+      icon: const Icon(LucideIcons.messageSquare),
       color: kColorInkSoft,
       tooltip: 'Crew chat',
       onPressed: () => _openCrewScreen(context),
@@ -254,7 +255,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       onPressed: () => showImportScreen(context, ref),
     ),
     IconButton(
-      icon: const Icon(Icons.search_rounded),
+      icon: const Icon(LucideIcons.search),
       color: kColorInkSoft,
       tooltip: 'Search',
       onPressed: () {
@@ -270,7 +271,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       },
     ),
     IconButton(
-      icon: const Icon(Icons.notifications_outlined),
+      icon: const Icon(LucideIcons.bell),
       color: kColorInkSoft,
       onPressed: () => Navigator.push<void>(
         context,

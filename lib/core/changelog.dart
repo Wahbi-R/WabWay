@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 250,
+    label: 'Tappable First Up & spot dots',
+    changes: [
+      'Tap a First Up item on the home screen to jump straight to the travel or plan item detail',
+      'Spots now show a small colored dot by category — terracotta for food, sage for nature & landmarks, gold for experiences & shopping',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 249,
     label: 'UI polish',
     changes: [

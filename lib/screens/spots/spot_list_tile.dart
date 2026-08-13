@@ -72,6 +72,15 @@ class SpotListTile extends StatelessWidget {
                   const SizedBox(height: kSpace1),
                   Row(
                     children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(
+                          color: spot.category.color,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 5),
                       Icon(
                         Icons.place_rounded,
                         size: 12,

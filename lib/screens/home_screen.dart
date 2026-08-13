@@ -631,6 +631,18 @@ class _TripHero extends StatelessWidget {
                       color: nextTravel.type.color,
                       title: nextTravel.title,
                       sub: nextTravel.time ?? fmtDate(nextTravel.date!),
+                      onTap: data != null
+                          ? () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => TravelItemDetailScreen(
+                                    item: nextTravel!,
+                                    docs: data!.docs,
+                                    days: data!.days,
+                                  ),
+                                ),
+                              )
+                          : null,
                     ),
                   if (nextDay != null && nextDay.sortedItems.isNotEmpty) ...[
                     if (nextTravel != null) const SizedBox(height: kSpace2),
@@ -639,6 +651,20 @@ class _TripHero extends StatelessWidget {
                       color: nextDay.sortedItems.first.type.color,
                       title: nextDay.sortedItems.first.title,
                       sub: nextDay.sortedItems.first.time ?? 'Day ${nextDay.dayNumber}',
+                      onTap: data != null
+                          ? () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ItemDetailScreen(
+                                    item: nextDay!.sortedItems.first,
+                                    day: nextDay!,
+                                    docs: data!.docs,
+                                    spots: data!.spots,
+                                    days: data!.days,
+                                  ),
+                                ),
+                              )
+                          : null,
                     ),
                   ],
                 ],
@@ -683,15 +709,17 @@ class _FirstUpRow extends StatelessWidget {
     required this.color,
     required this.title,
     required this.sub,
+    this.onTap,
   });
   final IconData icon;
   final Color color;
   final String title;
   final String sub;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    Widget row = Row(
       children: [
         Container(
           width: 28,
@@ -712,7 +740,16 @@ class _FirstUpRow extends StatelessWidget {
             ],
           ),
         ),
+        if (onTap != null)
+          Icon(Icons.chevron_right_rounded, size: 16, color: kColorInkSoft.withValues(alpha: 0.5)),
       ],
+    );
+
+    if (onTap == null) return row;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: row,
     );
   }
 }

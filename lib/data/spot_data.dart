@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_colors.dart';
 import '../widgets/wabway_badge.dart';
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
@@ -60,6 +61,15 @@ enum SpotCategory {
     SpotCategory.experience => Icons.local_activity_rounded,
     SpotCategory.shopping   => Icons.shopping_bag_rounded,
     SpotCategory.nightlife  => Icons.local_bar_rounded,
+  };
+
+  Color get color => switch (this) {
+    SpotCategory.food       => kColorPrimary,
+    SpotCategory.landmark   => kColorSecondary,
+    SpotCategory.nature     => kColorSecondary,
+    SpotCategory.experience => kColorAccent,
+    SpotCategory.shopping   => kColorAccent,
+    SpotCategory.nightlife  => const Color(0xFF7C6EA0),
   };
 }
 

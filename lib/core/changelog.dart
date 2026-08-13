@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 252,
+    label: 'Per-person packing',
+    changes: [
+      'Packing list now lets every crew member check off their own copy of each item — tap your checkbox, see everyone else\'s dots fill in as they pack',
+      'Each item shows a row of small avatar circles so you can see at a glance who\'s packed and who hasn\'t',
+      'Progress bar tracks your personal count, not a shared one',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 251,
     label: 'Smarter "Add to itinerary"',
     changes: [

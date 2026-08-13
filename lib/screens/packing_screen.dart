@@ -29,18 +29,13 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
 
   String _tripId = '';
   String _myId   = '';
-
   String _search = '';
-  bool   _mineOnly = false;
   final _searchCtrl = TextEditingController();
 
-  List<PackingItem> _getFiltered(String myId) {
+  List<PackingItem> _getFiltered() {
     final q = _search.toLowerCase().trim();
-    return _items.where((i) {
-      if (q.isNotEmpty && !i.title.toLowerCase().contains(q)) return false;
-      if (_mineOnly && i.assignedTo != myId) return false;
-      return true;
-    }).toList();
+    if (q.isEmpty) return _items;
+    return _items.where((i) => i.title.toLowerCase().contains(q)).toList();
   }
 
   @override
@@ -68,7 +63,7 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
     final items = await PackingService.fetchAll(_tripId);
     if (!mounted) return;
     setState(() {
-      _items = items;
+      _items   = items;
       _loading = false;
     });
   }
@@ -76,7 +71,8 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
   void _subscribe() {
     _channel = PackingService.subscribe(_tripId, () {
       _debounce?.cancel();
-      _debounce = Timer(const Duration(milliseconds: 400), () => _load(silent: true));
+      _debounce = Timer(
+          const Duration(milliseconds: 400), () => _load(silent: true));
     });
   }
 
@@ -99,22 +95,34 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
               decoration: InputDecoration(
                 hintText: 'Passport, charger, adapter…',
                 hintStyle: TextStyle(color: kColorInkSoft.withAlpha(120)),
-                border: OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorBorder)),
-                focusedBorder: OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorPrimary, width: 1.5)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                border: OutlineInputBorder(
+                    borderRadius: kRadiusMd,
+                    borderSide: BorderSide(color: kColorBorder)),
+                focusedBorder: OutlineInputBorder(
+                    borderRadius: kRadiusMd,
+                    borderSide:
+                        BorderSide(color: kColorPrimary, width: 1.5)),
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 10),
               ),
               onSubmitted: (_) => Navigator.pop(ctx, true),
             ),
             const SizedBox(height: 6),
             Text(
               'Separate multiple items with commas',
-              style: kStyleCaption.copyWith(color: kColorInkSoft, fontSize: 11),
+              style: kStyleCaption.copyWith(
+                  color: kColorInkSoft, fontSize: 11),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text('Add', style: TextStyle(color: kColorPrimary))),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text('Add',
+                  style: TextStyle(color: kColorPrimary))),
         ],
       ),
     );
@@ -141,43 +149,19 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
   }
 
   Future<void> _toggle(PackingItem item) async {
-    final userId = _myId;
-    setState(() {
-      final idx = _items.indexWhere((i) => i.id == item.id);
-      if (idx >= 0) _items[idx] = item.copyWith(isPacked: !item.isPacked, packedBy: userId);
-    });
-    await PackingService.setPackedState(item.id, !item.isPacked, userId);
-  }
-
-  Future<void> _assign(PackingItem item) async {
-    final members = ref.read(tripMembersProvider);
-    final myId    = _myId;
-    final result  = await showDialog<({String? userId})>(
-      context: context,
-      builder: (_) => _AssignDialog(
-        members:  members,
-        myId:     myId,
-        current:  item.assignedTo,
-      ),
-    );
-    if (result == null || !mounted) return;
-    final newAssignee = result.userId;
+    final myId      = _myId;
+    final wasChecked = item.isPackedBy(myId);
     setState(() {
       final idx = _items.indexWhere((i) => i.id == item.id);
       if (idx >= 0) {
-        _items[idx] = PackingItem(
-          id:         item.id,
-          tripId:     item.tripId,
-          title:      item.title,
-          isPacked:   item.isPacked,
-          createdBy:  item.createdBy,
-          assignedTo: newAssignee,
-          packedBy:   item.packedBy,
-          sortOrder:  item.sortOrder,
-        );
+        final cur = _items[idx];
+        final newChecks = wasChecked
+            ? cur.checks.where((c) => c.userId != myId).toList()
+            : [...cur.checks, PackingCheck(userId: myId, checkedAt: DateTime.now())];
+        _items[idx] = cur.copyWith(checks: newChecks);
       }
     });
-    await PackingService.assignItem(item.id, newAssignee);
+    await PackingService.toggleCheck(item.id, _tripId, myId, wasChecked);
   }
 
   Future<void> _rename(PackingItem item) async {
@@ -195,19 +179,32 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
           decoration: InputDecoration(
             hintText: 'Item name',
             hintStyle: TextStyle(color: kColorInkSoft.withAlpha(120)),
-            border: OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorBorder)),
-            focusedBorder: OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorPrimary, width: 1.5)),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            border: OutlineInputBorder(
+                borderRadius: kRadiusMd,
+                borderSide: BorderSide(color: kColorBorder)),
+            focusedBorder: OutlineInputBorder(
+                borderRadius: kRadiusMd,
+                borderSide: BorderSide(color: kColorPrimary, width: 1.5)),
+            contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12, vertical: 10),
           ),
           onSubmitted: (_) => Navigator.pop(ctx, true),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text('Save', style: TextStyle(color: kColorPrimary))),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text('Save',
+                  style: TextStyle(color: kColorPrimary))),
         ],
       ),
     );
-    if (confirmed != true || !mounted || ctrl.text.trim().isEmpty || ctrl.text.trim() == item.title) return;
+    if (confirmed != true ||
+        !mounted ||
+        ctrl.text.trim().isEmpty ||
+        ctrl.text.trim() == item.title) return;
     setState(() {
       final idx = _items.indexWhere((i) => i.id == item.id);
       if (idx >= 0) _items[idx] = item.copyWith(title: ctrl.text.trim());
@@ -221,42 +218,52 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
   }
 
   Future<void> _packAll() async {
-    final unpacked = _items.where((i) => !i.isPacked).toList();
-    if (unpacked.isEmpty) return;
-    final tripId = _tripId;
-    final userId = _myId;
+    final myId    = _myId;
+    final tripId  = _tripId;
+    final now     = DateTime.now();
     setState(() {
-      _items = _items.map((i) => i.isPacked ? i : i.copyWith(isPacked: true, packedBy: userId)).toList();
+      _items = _items.map((i) {
+        if (i.isPackedBy(myId)) return i;
+        return i.copyWith(
+            checks: [...i.checks, PackingCheck(userId: myId, checkedAt: now)]);
+      }).toList();
     });
-    PackingService.packAllItems(tripId, userId).catchError((_) => _load(silent: true));
+    PackingService.checkAll(tripId, myId)
+        .catchError((_) => _load(silent: true));
   }
 
-  Future<void> _clearPacked() async {
-    final packed = _items.where((i) => i.isPacked).toList();
-    if (packed.isEmpty) return;
+  Future<void> _clearMyChecks() async {
+    final myId     = _myId;
+    final myPacked = _items.where((i) => i.isPackedBy(myId)).length;
+    if (myPacked == 0) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Clear packed items?'),
+        title: const Text('Unpack all your items?'),
         content: Text(
-          '${packed.length} packed ${packed.length == 1 ? 'item' : 'items'} will be permanently removed from the list.',
+          '$myPacked ${myPacked == 1 ? 'item' : 'items'} you packed will be unchecked. '
+          'Other crew members\' checks are not affected.',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Clear'),
+            child: const Text('Unpack'),
           ),
         ],
       ),
     );
     if (confirmed != true || !mounted) return;
-    setState(() => _items.removeWhere((i) => i.isPacked));
-    PackingService.clearPackedItems(_tripId).catchError((_) => _load(silent: true));
+    setState(() {
+      _items = _items.map((i) => i.copyWith(
+            checks: i.checks.where((c) => c.userId != myId).toList(),
+          )).toList();
+    });
+    PackingService.clearMyChecks(_tripId, myId)
+        .catchError((_) => _load(silent: true));
   }
 
   Future<void> _addFromTemplate() async {
@@ -271,10 +278,12 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
     );
     if (result == null || result.isEmpty || !mounted) return;
 
-    final tripId = _tripId;
-    final userId = _myId;
+    final tripId   = _tripId;
+    final userId   = _myId;
     final existing = _items.map((i) => i.title.toLowerCase()).toSet();
-    final toAdd = result.where((t) => !existing.contains(t.toLowerCase())).toList();
+    final toAdd    = result
+        .where((t) => !existing.contains(t.toLowerCase()))
+        .toList();
     if (toAdd.isEmpty) return;
 
     for (final title in toAdd) {
@@ -285,12 +294,13 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
 
   void _shareList() {
     if (_items.isEmpty) return;
+    final myId     = _myId;
     final tripName = ref.read(activeTripProvider)?.name ?? 'Trip';
-    final buf = StringBuffer();
+    final buf      = StringBuffer();
     buf.writeln('$tripName — Packing List');
     buf.writeln();
-    final unpacked = _items.where((i) => !i.isPacked).toList();
-    final packed   = _items.where((i) => i.isPacked).toList();
+    final unpacked = _items.where((i) => !i.isPackedBy(myId)).toList();
+    final packed   = _items.where((i) => i.isPackedBy(myId)).toList();
     for (final item in unpacked) buf.writeln('□ ${item.title}');
     if (packed.isNotEmpty) {
       buf.writeln();
@@ -304,25 +314,29 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
     if (newIndex > oldIndex) newIndex -= 1;
     final moved = unpacked.removeAt(oldIndex);
     unpacked.insert(newIndex, moved);
-    final packed = _items.where((i) => i.isPacked).toList();
+    final myId  = _myId;
+    final packed = _items.where((i) => i.isPackedBy(myId)).toList();
     setState(() => _items = [...unpacked, ...packed]);
-    PackingService.reorderItems(unpacked).catchError((_) => _load(silent: true));
+    PackingService.reorderItems(unpacked)
+        .catchError((_) => _load(silent: true));
   }
 
-  Widget _buildList(List<PackingItem> filtered) {
-    final visible     = filtered;
-    final canReorder  = _search.isEmpty && !_mineOnly;
-    final unpacked    = canReorder
-        ? _items.where((i) => !i.isPacked).toList()
-        : visible.where((i) => !i.isPacked).toList();
-    final packed      = visible.where((i) => i.isPacked).toList();
+  Widget _buildList(List<PackingItem> filtered, String myId,
+      List<AppTripMember> members) {
+    final canReorder = _search.isEmpty;
+    final unpacked   = canReorder
+        ? _items.where((i) => !i.isPackedBy(myId)).toList()
+        : filtered.where((i) => !i.isPackedBy(myId)).toList();
+    final packed     = filtered.where((i) => i.isPackedBy(myId)).toList();
 
-    Widget tile(PackingItem entry, {int? index, bool showHandle = false}) =>
+    Widget tile(PackingItem entry,
+            {int? index, bool showHandle = false}) =>
         _PackingTile(
           key: ValueKey(entry.id),
           item: entry,
+          members: members,
+          myId: myId,
           onToggle: () => _toggle(entry),
-          onAssign: () => _assign(entry),
           onRename: () => _rename(entry),
           onDelete: () => _delete(entry),
           index: index,
@@ -336,7 +350,7 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
           sliver: SliverReorderableList(
             itemCount: unpacked.length,
             itemBuilder: (_, i) {
-              final entry = unpacked[i];
+              final entry  = unpacked[i];
               final isLast = i == unpacked.length - 1;
               return KeyedSubtree(
                 key: ValueKey(entry.id),
@@ -366,9 +380,10 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
         if (packed.isNotEmpty) ...[
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(kSpace4, kSpace4, kSpace4, kSpace2),
+              padding: const EdgeInsets.fromLTRB(
+                  kSpace4, kSpace4, kSpace4, kSpace2),
               child: Text(
-                'Packed (${packed.length})',
+                'Packed by you (${packed.length})',
                 style: kStyleCaptionMedium.copyWith(color: kColorInkSoft),
               ),
             ),
@@ -376,7 +391,7 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
           SliverList(
             delegate: SliverChildBuilderDelegate(
               (_, i) {
-                final entry = packed[i];
+                final entry  = packed[i];
                 final isLast = i == packed.length - 1;
                 return Column(
                   children: [
@@ -411,10 +426,11 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
     });
     if (_loading) return const WabwayLoadingScaffold();
 
-    final myId  = _myId;
-    final filtered = _getFiltered(myId);
-    final packed = _items.where((i) => i.isPacked).length;
-    final total = _items.length;
+    final myId     = _myId;
+    final members  = ref.watch(tripMembersProvider);
+    final filtered = _getFiltered();
+    final myPacked = _items.where((i) => i.isPackedBy(myId)).length;
+    final total    = _items.length;
 
     return Scaffold(
       backgroundColor: kColorCream,
@@ -426,9 +442,11 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
               padding: const EdgeInsets.only(right: 8),
               child: Center(
                 child: Text(
-                  '$packed / $total',
+                  '$myPacked / $total',
                   style: kStyleCaptionMedium.copyWith(
-                    color: packed == total && total > 0 ? kColorSuccess : kColorInkSoft,
+                    color: myPacked == total && total > 0
+                        ? kColorSuccess
+                        : kColorInkSoft,
                   ),
                 ),
               ),
@@ -443,7 +461,7 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
             iconColor: kColorInkSoft,
             onSelected: (v) {
               if (v == 'template') _addFromTemplate();
-              if (v == 'clear_packed') _clearPacked();
+              if (v == 'clear_packed') _clearMyChecks();
               if (v == 'share') _shareList();
               if (v == 'pack_all') _packAll();
             },
@@ -456,13 +474,13 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                   Text('Add from template'),
                 ]),
               ),
-              if (total > packed)
+              if (total > myPacked)
                 const PopupMenuItem(
                   value: 'pack_all',
                   child: Row(children: [
                     Icon(Icons.check_circle_rounded, size: 16),
                     SizedBox(width: 10),
-                    Text('Pack all items'),
+                    Text('Pack all (for me)'),
                   ]),
                 ),
               if (!kIsWeb && total > 0)
@@ -471,16 +489,17 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                   child: Row(children: [
                     Icon(Icons.ios_share_rounded, size: 16),
                     SizedBox(width: 10),
-                    Text('Share list'),
+                    Text('Share my list'),
                   ]),
                 ),
-              if (packed > 0)
+              if (myPacked > 0)
                 const PopupMenuItem(
                   value: 'clear_packed',
                   child: Row(children: [
-                    Icon(Icons.delete_sweep_rounded, size: 16, color: Colors.red),
+                    Icon(Icons.undo_rounded, size: 16, color: Colors.red),
                     SizedBox(width: 10),
-                    Text('Clear packed items', style: TextStyle(color: Colors.red)),
+                    Text('Unpack all my items',
+                        style: TextStyle(color: Colors.red)),
                   ]),
                 ),
             ],
@@ -499,50 +518,17 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                     hint: 'Search items…',
                     onChanged: (v) => setState(() => _search = v),
                   ),
-                  if (_items.any((i) => i.assignedTo != null))
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(kSpace4, 0, kSpace4, kSpace2),
-                      child: Row(
-                        children: [
-                          FilterChip(
-                            label: const Text('Mine only'),
-                            selected: _mineOnly,
-                            onSelected: (v) => setState(() => _mineOnly = v),
-                            selectedColor: kColorPrimarySoft,
-                            checkmarkColor: kColorPrimary,
-                            side: BorderSide(
-                              color: _mineOnly
-                                  ? kColorPrimarySoftBorder
-                                  : kColorBorder,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: kRadiusPill,
-                            ),
-                            labelStyle: kStyleCaption.copyWith(
-                              color: _mineOnly ? kColorPrimary : kColorInk,
-                              fontWeight: _mineOnly ? FontWeight.w600 : FontWeight.w400,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  _PackingProgress(packed: packed, total: total),
+                  _PackingProgress(packed: myPacked, total: total),
                   Expanded(
                     child: filtered.isEmpty
                         ? Center(
                             child: WabwayEmptyState(
-                              icon: _mineOnly
-                                  ? Icons.person_off_rounded
-                                  : Icons.search_off_rounded,
-                              title: _mineOnly
-                                  ? 'No items assigned to you'
-                                  : 'No results for "$_search"',
-                              description: _mineOnly
-                                  ? 'Ask a crew member to assign you some items.'
-                                  : 'Try a different search term.',
+                              icon: Icons.search_off_rounded,
+                              title: 'No results for "$_search"',
+                              description: 'Try a different search term.',
                             ),
                           )
-                        : _buildList(filtered),
+                        : _buildList(filtered, myId, members),
                   ),
                 ],
               ),
@@ -568,20 +554,23 @@ class _EmptyState extends StatelessWidget {
           const SizedBox(height: 16),
           Text('Nothing to pack yet', style: kStyleBodyMedium),
           const SizedBox(height: 8),
-          Text('Add items your group needs to bring.', style: kStyleCaption),
+          Text('Add items your group needs to bring.',
+              style: kStyleCaption),
           const SizedBox(height: 20),
           FilledButton.icon(
             onPressed: onAdd,
             icon: const Icon(Icons.add_rounded, size: 18),
             label: const Text('Add item'),
-            style: FilledButton.styleFrom(backgroundColor: kColorPrimary),
+            style:
+                FilledButton.styleFrom(backgroundColor: kColorPrimary),
           ),
           const SizedBox(height: 10),
           OutlinedButton.icon(
             onPressed: onTemplate,
             icon: const Icon(Icons.list_alt_rounded, size: 18),
             label: const Text('Add from template'),
-            style: OutlinedButton.styleFrom(foregroundColor: kColorPrimary),
+            style:
+                OutlinedButton.styleFrom(foregroundColor: kColorPrimary),
           ),
         ],
       ),
@@ -623,7 +612,7 @@ class _PackingProgress extends StatelessWidget {
               ),
               const SizedBox(width: kSpace3),
               Text(
-                allDone ? 'All packed!' : '$packed of $total packed',
+                allDone ? 'All packed!' : 'You: $packed of $total',
                 style: kStyleCaption.copyWith(color: color),
               ),
             ],
@@ -637,36 +626,91 @@ class _PackingProgress extends StatelessWidget {
 
 // ─── Template sheet ───────────────────────────────────────────────────────────
 
-const _kTemplates = <({String category, IconData icon, List<String> items})>[
+const _kTemplates =
+    <({String category, IconData icon, List<String> items})>[
   (
     category: 'Documents',
     icon: Icons.badge_rounded,
-    items: ['Passport', 'Travel insurance', 'Flight tickets', 'Hotel bookings', 'Visa / entry docs', 'Driver\'s licence', 'Credit cards', 'Emergency contacts'],
+    items: [
+      'Passport',
+      'Travel insurance',
+      'Flight tickets',
+      'Hotel bookings',
+      'Visa / entry docs',
+      'Driver\'s licence',
+      'Credit cards',
+      'Emergency contacts'
+    ],
   ),
   (
     category: 'Toiletries',
     icon: Icons.soap_rounded,
-    items: ['Toothbrush', 'Toothpaste', 'Shampoo', 'Conditioner', 'Body wash', 'Deodorant', 'Sunscreen', 'Razor', 'Lip balm', 'Hand sanitiser'],
+    items: [
+      'Toothbrush',
+      'Toothpaste',
+      'Shampoo',
+      'Conditioner',
+      'Body wash',
+      'Deodorant',
+      'Sunscreen',
+      'Razor',
+      'Lip balm',
+      'Hand sanitiser'
+    ],
   ),
   (
     category: 'Clothes',
     icon: Icons.checkroom_rounded,
-    items: ['T-shirts', 'Underwear', 'Socks', 'Jeans / trousers', 'Jacket', 'Pyjamas', 'Swimwear', 'Comfortable shoes', 'Sandals', 'Hat / cap'],
+    items: [
+      'T-shirts',
+      'Underwear',
+      'Socks',
+      'Jeans / trousers',
+      'Jacket',
+      'Pyjamas',
+      'Swimwear',
+      'Comfortable shoes',
+      'Sandals',
+      'Hat / cap'
+    ],
   ),
   (
     category: 'Electronics',
     icon: Icons.devices_rounded,
-    items: ['Phone charger', 'Power bank', 'Adapter / converter', 'Earphones / AirPods', 'Camera', 'Laptop', 'Laptop charger', 'E-reader'],
+    items: [
+      'Phone charger',
+      'Power bank',
+      'Adapter / converter',
+      'Earphones / AirPods',
+      'Camera',
+      'Laptop',
+      'Laptop charger',
+      'E-reader'
+    ],
   ),
   (
     category: 'Health & Meds',
     icon: Icons.medical_services_rounded,
-    items: ['Prescription medication', 'Pain reliever', 'Antihistamine', 'Band-aids / plasters', 'Insect repellent', 'Motion sickness pills'],
+    items: [
+      'Prescription medication',
+      'Pain reliever',
+      'Antihistamine',
+      'Band-aids / plasters',
+      'Insect repellent',
+      'Motion sickness pills'
+    ],
   ),
   (
     category: 'Comfort & Entertainment',
     icon: Icons.headphones_rounded,
-    items: ['Neck pillow', 'Eye mask', 'Earplugs', 'Snacks', 'Book / magazine', 'Playing cards'],
+    items: [
+      'Neck pillow',
+      'Eye mask',
+      'Earplugs',
+      'Snacks',
+      'Book / magazine',
+      'Playing cards'
+    ],
   ),
 ];
 
@@ -678,7 +722,7 @@ class _TemplateSheet extends StatefulWidget {
 }
 
 class _TemplateSheetState extends State<_TemplateSheet> {
-  final _selected = <String>{};
+  final _selected      = <String>{};
   int? _expandedCategory;
 
   @override
@@ -691,16 +735,21 @@ class _TemplateSheetState extends State<_TemplateSheet> {
       builder: (_, ctrl) => Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(kSpace4, kSpace3, kSpace4, 0),
+            padding:
+                const EdgeInsets.fromLTRB(kSpace4, kSpace3, kSpace4, 0),
             child: Row(
               children: [
-                Expanded(child: Text('Add from template', style: kStyleTitle)),
+                Expanded(
+                    child: Text('Add from template',
+                        style: kStyleTitle)),
                 if (_selected.isNotEmpty)
                   FilledButton(
-                    onPressed: () => Navigator.pop(context, _selected.toList()),
+                    onPressed: () =>
+                        Navigator.pop(context, _selected.toList()),
                     style: FilledButton.styleFrom(
                       backgroundColor: kColorPrimary,
-                      padding: const EdgeInsets.symmetric(horizontal: kSpace4, vertical: kSpace2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: kSpace4, vertical: kSpace2),
                     ),
                     child: Text('Add ${_selected.length}'),
                   ),
@@ -708,7 +757,8 @@ class _TemplateSheetState extends State<_TemplateSheet> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: kSpace4, vertical: kSpace2),
+            padding: const EdgeInsets.symmetric(
+                horizontal: kSpace4, vertical: kSpace2),
             child: Text(
               'Tap items to select, then tap Add.',
               style: kStyleCaption.copyWith(color: kColorInkSoft),
@@ -720,28 +770,41 @@ class _TemplateSheetState extends State<_TemplateSheet> {
               controller: ctrl,
               itemCount: _kTemplates.length,
               itemBuilder: (_, i) {
-                final cat = _kTemplates[i];
-                final expanded = _expandedCategory == i;
-                final selectedInCat = cat.items.where(_selected.contains).length;
+                final cat          = _kTemplates[i];
+                final expanded     = _expandedCategory == i;
+                final selectedInCat =
+                    cat.items.where(_selected.contains).length;
                 return Column(
                   children: [
                     ListTile(
-                      leading: Icon(cat.icon, color: kColorPrimary, size: 20),
-                      title: Text(cat.category, style: kStyleBodySemibold),
+                      leading: Icon(cat.icon,
+                          color: kColorPrimary, size: 20),
+                      title: Text(cat.category,
+                          style: kStyleBodySemibold),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           if (selectedInCat > 0)
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(color: kColorPrimary, borderRadius: kRadiusPill),
-                              child: Text('$selectedInCat', style: kStyleCaption.copyWith(color: Colors.white)),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                  color: kColorPrimary,
+                                  borderRadius: kRadiusPill),
+                              child: Text('$selectedInCat',
+                                  style: kStyleCaption.copyWith(
+                                      color: Colors.white)),
                             ),
                           const SizedBox(width: kSpace2),
-                          Icon(expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded, color: kColorInkSoft),
+                          Icon(
+                              expanded
+                                  ? Icons.expand_less_rounded
+                                  : Icons.expand_more_rounded,
+                              color: kColorInkSoft),
                         ],
                       ),
-                      onTap: () => setState(() => _expandedCategory = expanded ? null : i),
+                      onTap: () => setState(() =>
+                          _expandedCategory = expanded ? null : i),
                     ),
                     if (expanded)
                       ...cat.items.map((item) {
@@ -749,12 +812,17 @@ class _TemplateSheetState extends State<_TemplateSheet> {
                         return CheckboxListTile(
                           value: sel,
                           onChanged: (_) => setState(() {
-                            if (sel) _selected.remove(item); else _selected.add(item);
+                            if (sel)
+                              _selected.remove(item);
+                            else
+                              _selected.add(item);
                           }),
                           title: Text(item, style: kStyleBody),
                           activeColor: kColorPrimary,
-                          controlAffinity: ListTileControlAffinity.leading,
-                          contentPadding: const EdgeInsets.only(left: kSpace10, right: kSpace4),
+                          controlAffinity:
+                              ListTileControlAffinity.leading,
+                          contentPadding: const EdgeInsets.only(
+                              left: kSpace10, right: kSpace4),
                           dense: true,
                         );
                       }),
@@ -773,16 +841,22 @@ class _TemplateSheetState extends State<_TemplateSheet> {
                 child: FilledButton(
                   onPressed: _selected.isEmpty
                       ? null
-                      : () => Navigator.pop(context, _selected.toList()),
+                      : () =>
+                          Navigator.pop(context, _selected.toList()),
                   style: FilledButton.styleFrom(
                     backgroundColor: kColorPrimary,
                     disabledBackgroundColor: kColorBorder,
-                    padding: const EdgeInsets.symmetric(vertical: kSpace3),
-                    shape: const RoundedRectangleBorder(borderRadius: kRadiusMd),
+                    padding: const EdgeInsets.symmetric(
+                        vertical: kSpace3),
+                    shape: const RoundedRectangleBorder(
+                        borderRadius: kRadiusMd),
                   ),
                   child: Text(
-                    _selected.isEmpty ? 'Select items to add' : 'Add ${_selected.length} item${_selected.length == 1 ? '' : 's'}',
-                    style: kStyleBodySemibold.copyWith(color: Colors.white),
+                    _selected.isEmpty
+                        ? 'Select items to add'
+                        : 'Add ${_selected.length} item${_selected.length == 1 ? '' : 's'}',
+                    style: kStyleBodySemibold.copyWith(
+                        color: Colors.white),
                   ),
                 ),
               ),
@@ -796,59 +870,37 @@ class _TemplateSheetState extends State<_TemplateSheet> {
 
 // ─── Packing tile ─────────────────────────────────────────────────────────────
 
-enum _TileAction { assign, rename, delete }
+enum _TileAction { rename, delete }
 
-class _PackingTile extends ConsumerWidget {
+class _PackingTile extends StatelessWidget {
   const _PackingTile({
     super.key,
     required this.item,
+    required this.members,
+    required this.myId,
     required this.onToggle,
-    required this.onAssign,
     required this.onRename,
     required this.onDelete,
     this.index,
     this.showHandle = false,
   });
 
-  final PackingItem item;
-  final VoidCallback onToggle;
-  final VoidCallback onAssign;
-  final VoidCallback onRename;
-  final VoidCallback onDelete;
-  final int? index;
-  final bool showHandle;
+  final PackingItem         item;
+  final List<AppTripMember> members;
+  final String              myId;
+  final VoidCallback        onToggle;
+  final VoidCallback        onRename;
+  final VoidCallback        onDelete;
+  final int?                index;
+  final bool                showHandle;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final myId   = ref.watch(profileProvider)?.id;
-    final members = ref.watch(tripMembersProvider);
-
-    // Resolve packedBy to a display name (shown when packed).
-    String? packedByName;
-    if (item.isPacked && item.packedBy != null) {
-      packedByName = item.packedBy == myId
-          ? 'you'
-          : members.where((m) => m.userId == item.packedBy).firstOrNull?.profile.displayName;
-    }
-
-    // Resolve assignedTo to a display name (shown when not packed).
-    String? assignedToName;
-    if (!item.isPacked && item.assignedTo != null) {
-      assignedToName = item.assignedTo == myId
-          ? 'you'
-          : members.where((m) => m.userId == item.assignedTo).firstOrNull?.profile.displayName;
-    }
-
-    final subtitleText = packedByName != null
-        ? 'Packed by $packedByName'
-        : assignedToName != null
-            ? 'Assigned to $assignedToName'
-            : null;
-
-    final alreadyAssigned = item.assignedTo != null;
+  Widget build(BuildContext context) {
+    final iPackedIt = item.isPackedBy(myId);
 
     final tile = ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: kSpace4, vertical: 2),
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: kSpace4, vertical: 2),
       leading: GestureDetector(
         onTap: onToggle,
         child: AnimatedContainer(
@@ -856,56 +908,57 @@ class _PackingTile extends ConsumerWidget {
           width: 24,
           height: 24,
           decoration: BoxDecoration(
-            color: item.isPacked ? kColorPrimary : Colors.transparent,
+            color: iPackedIt ? kColorPrimary : Colors.transparent,
             border: Border.all(
-              color: item.isPacked ? kColorPrimary : kColorBorder,
+              color: iPackedIt ? kColorPrimary : kColorBorder,
               width: 1.5,
             ),
             borderRadius: BorderRadius.circular(6),
           ),
-          child: item.isPacked
-              ? const Icon(Icons.check_rounded, size: 16, color: Colors.white)
+          child: iPackedIt
+              ? const Icon(Icons.check_rounded,
+                  size: 16, color: Colors.white)
               : null,
         ),
       ),
       title: Text(
         item.title,
         style: kStyleBodyMedium.copyWith(
-          decoration: item.isPacked ? TextDecoration.lineThrough : null,
-          color: item.isPacked ? kColorInkSoft : kColorInk,
+          decoration:
+              iPackedIt ? TextDecoration.lineThrough : null,
+          color: iPackedIt ? kColorInkSoft : kColorInk,
         ),
       ),
-      subtitle: subtitleText != null
+      subtitle: members.length > 1
           ? Padding(
-              padding: const EdgeInsets.only(top: 1),
-              child: Text(
-                subtitleText,
-                style: kStyleCaption.copyWith(color: kColorInkSoft),
-              ),
+              padding: const EdgeInsets.only(top: 4),
+              child: _MemberDots(
+                  item: item, members: members, myId: myId),
             )
           : null,
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           PopupMenuButton<_TileAction>(
-            icon: const Icon(Icons.more_vert_rounded, size: 18, color: kColorInkSoft),
+            icon: const Icon(Icons.more_vert_rounded,
+                size: 18, color: kColorInkSoft),
             padding: EdgeInsets.zero,
             itemBuilder: (_) => [
-              PopupMenuItem(
-                value: _TileAction.assign,
-                child: Text(alreadyAssigned ? 'Reassign' : 'Assign to...'),
-              ),
-              const PopupMenuItem(value: _TileAction.rename, child: Text('Rename')),
+              const PopupMenuItem(
+                  value: _TileAction.rename,
+                  child: Text('Rename')),
               PopupMenuItem(
                 value: _TileAction.delete,
-                child: Text('Delete', style: TextStyle(color: kColorDanger)),
+                child: Text('Delete',
+                    style: TextStyle(color: kColorDanger)),
               ),
             ],
             onSelected: (action) {
               switch (action) {
-                case _TileAction.assign: onAssign();
-                case _TileAction.rename: onRename();
-                case _TileAction.delete: onDelete();
+                case _TileAction.rename:
+                  onRename();
+                case _TileAction.delete:
+                  onDelete();
               }
             },
           ),
@@ -914,7 +967,8 @@ class _PackingTile extends ConsumerWidget {
               index: index!,
               child: const Padding(
                 padding: EdgeInsets.only(left: 4),
-                child: Icon(Icons.drag_handle_rounded, size: 18, color: kColorInkSoft),
+                child: Icon(Icons.drag_handle_rounded,
+                    size: 18, color: kColorInkSoft),
               ),
             ),
         ],
@@ -933,12 +987,12 @@ class _PackingTile extends ConsumerWidget {
         duration: const Duration(milliseconds: 150),
         alignment: Alignment.centerLeft,
         padding: const EdgeInsets.only(left: kSpace5),
-        color: item.isPacked
+        color: iPackedIt
             ? kColorSurfaceSunken
             : kColorPrimary.withValues(alpha: 0.1),
         child: Icon(
-          item.isPacked ? Icons.undo_rounded : Icons.check_rounded,
-          color: item.isPacked ? kColorInkSoft : kColorPrimary,
+          iPackedIt ? Icons.undo_rounded : Icons.check_rounded,
+          color: iPackedIt ? kColorInkSoft : kColorPrimary,
           size: 20,
         ),
       ),
@@ -947,74 +1001,92 @@ class _PackingTile extends ConsumerWidget {
   }
 }
 
-// ─── Assign dialog ────────────────────────────────────────────────────────────
+// ─── Member dots ──────────────────────────────────────────────────────────────
 
-class _AssignDialog extends StatefulWidget {
-  const _AssignDialog({
+class _MemberDots extends StatelessWidget {
+  const _MemberDots({
+    required this.item,
     required this.members,
     required this.myId,
-    this.current,
   });
+
+  final PackingItem         item;
   final List<AppTripMember> members;
-  final String myId;
-  final String? current;
+  final String              myId;
 
-  @override
-  State<_AssignDialog> createState() => _AssignDialogState();
-}
+  static const _palette = [
+    Color(0xFFC96F4A),
+    Color(0xFF7D9A75),
+    Color(0xFFD6A84F),
+    Color(0xFF5C7AEA),
+    Color(0xFF9B6EA0),
+  ];
 
-class _AssignDialogState extends State<_AssignDialog> {
-  late String? _selected;
-
-  @override
-  void initState() {
-    super.initState();
-    _selected = widget.current;
+  Color _colorFor(String name) {
+    final hash = name.codeUnits.fold(0, (a, b) => a + b);
+    return _palette[hash % _palette.length];
   }
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: kColorPaper,
-      shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
-      title: Text('Assign to', style: kStyleBodySemibold),
-      contentPadding: const EdgeInsets.symmetric(vertical: kSpace2),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            RadioListTile<String?>(
-              title: Text('No one', style: kStyleBody),
-              value: null,
-              groupValue: _selected,
-              activeColor: kColorPrimary,
-              onChanged: (v) => setState(() => _selected = v),
+    return Row(
+      children: [
+        for (final m in members) ...[
+          _Dot(
+            initial: m.profile.displayName.isNotEmpty
+                ? m.profile.displayName[0].toUpperCase()
+                : '?',
+            color: _colorFor(m.profile.displayName),
+            packed: item.isPackedBy(m.userId),
+            isMe: m.userId == myId,
+          ),
+          const SizedBox(width: 4),
+        ],
+      ],
+    );
+  }
+}
+
+class _Dot extends StatelessWidget {
+  const _Dot({
+    required this.initial,
+    required this.color,
+    required this.packed,
+    required this.isMe,
+  });
+
+  final String initial;
+  final Color  color;
+  final bool   packed;
+  final bool   isMe;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: packed ? 'Packed' : 'Not packed yet',
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: 18,
+        height: 18,
+        decoration: BoxDecoration(
+          color: packed ? color : Colors.transparent,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: packed ? color : kColorBorder,
+            width: packed ? 0 : 1.5,
+          ),
+        ),
+        child: Center(
+          child: Text(
+            initial,
+            style: TextStyle(
+              fontSize: 8,
+              fontWeight: FontWeight.w700,
+              color: packed ? Colors.white : kColorInkSoft,
             ),
-            ...widget.members.map((m) {
-              final name = m.userId == widget.myId
-                  ? '${m.profile.displayName} (you)'
-                  : m.profile.displayName;
-              return RadioListTile<String?>(
-                title: Text(name, style: kStyleBody),
-                value: m.userId,
-                groupValue: _selected,
-                activeColor: kColorPrimary,
-                onChanged: (v) => setState(() => _selected = v),
-              );
-            }),
-          ],
+          ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text('Cancel', style: kStyleBody.copyWith(color: kColorInkSoft)),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(context, (userId: _selected)),
-          child: Text('Assign', style: kStyleBodyMedium.copyWith(color: kColorPrimary)),
-        ),
-      ],
     );
   }
 }

@@ -136,10 +136,10 @@ class ItineraryItemTile extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Padding(
-                            padding: const EdgeInsets.only(top: 1, right: 6),
+                            padding: const EdgeInsets.only(right: 6),
                             child: Icon(
                               item.type.icon,
                               size: 14,

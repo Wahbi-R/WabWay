@@ -3,45 +3,86 @@ import '../../data/packing_data.dart';
 import 'client.dart';
 
 abstract final class PackingService {
-  static PackingItem _fromRow(Map<String, dynamic> r) => PackingItem(
-        id: r['id'] as String,
-        tripId: r['trip_id'] as String,
-        title: r['title'] as String,
-        isPacked: r['is_packed'] as bool? ?? false,
-        createdBy: r['created_by'] as String,
-        assignedTo: r['assigned_to'] as String?,
-        packedBy: r['packed_by'] as String?,
-        sortOrder: r['sort_order'] as int? ?? 0,
-      );
+  static PackingItem _fromRow(Map<String, dynamic> r) {
+    final checksJson = r['packing_checks'] as List? ?? [];
+    final checks = checksJson
+        .map((c) => PackingCheck(
+              userId: c['user_id'] as String,
+              checkedAt: DateTime.parse(c['checked_at'] as String),
+            ))
+        .toList();
+    return PackingItem(
+      id: r['id'] as String,
+      tripId: r['trip_id'] as String,
+      title: r['title'] as String,
+      checks: checks,
+      createdBy: r['created_by'] as String,
+      sortOrder: r['sort_order'] as int? ?? 0,
+    );
+  }
 
   static Future<List<PackingItem>> fetchAll(String tripId) async {
     final rows = await supabase
         .from('packing_items')
-        .select()
+        .select('*, packing_checks(*)')
         .eq('trip_id', tripId)
         .order('sort_order')
         .order('created_at');
     return rows.map(_fromRow).toList();
   }
 
-  static Future<PackingItem> addItem(String tripId, String title, String userId) async {
+  static Future<PackingItem> addItem(
+      String tripId, String title, String userId) async {
     final row = await supabase
         .from('packing_items')
-        .insert({
-          'trip_id': tripId,
-          'title': title,
-          'created_by': userId,
-        })
-        .select()
+        .insert({'trip_id': tripId, 'title': title, 'created_by': userId})
+        .select('*, packing_checks(*)')
         .single();
     return _fromRow(row);
   }
 
-  static Future<void> setPackedState(String itemId, bool packed, String userId) async {
-    await supabase.from('packing_items').update({
-      'is_packed': packed,
-      'packed_by': packed ? userId : null,
-    }).eq('id', itemId);
+  static Future<void> toggleCheck(
+      String itemId, String tripId, String userId, bool currentlyChecked) async {
+    if (currentlyChecked) {
+      await supabase
+          .from('packing_checks')
+          .delete()
+          .eq('item_id', itemId)
+          .eq('user_id', userId);
+    } else {
+      await supabase.from('packing_checks').insert({
+        'item_id': itemId,
+        'trip_id': tripId,
+        'user_id': userId,
+      });
+    }
+  }
+
+  static Future<void> checkAll(String tripId, String userId) async {
+    final rows = await supabase
+        .from('packing_items')
+        .select('id')
+        .eq('trip_id', tripId);
+    if (rows.isEmpty) return;
+    await supabase.from('packing_checks').upsert(
+      rows
+          .map((r) => {
+                'item_id': r['id'] as String,
+                'trip_id': tripId,
+                'user_id': userId,
+              })
+          .toList(),
+      onConflict: 'item_id,user_id',
+      ignoreDuplicates: true,
+    );
+  }
+
+  static Future<void> clearMyChecks(String tripId, String userId) async {
+    await supabase
+        .from('packing_checks')
+        .delete()
+        .eq('trip_id', tripId)
+        .eq('user_id', userId);
   }
 
   static Future<void> renameItem(String itemId, String title) async {
@@ -51,40 +92,18 @@ abstract final class PackingService {
         .eq('id', itemId);
   }
 
-  static Future<void> assignItem(String itemId, String? userId) async {
-    await supabase
-        .from('packing_items')
-        .update({'assigned_to': userId})
-        .eq('id', itemId);
-  }
-
   static Future<void> deleteItem(String itemId) async {
     await supabase.from('packing_items').delete().eq('id', itemId);
-  }
-
-  static Future<void> clearPackedItems(String tripId) async {
-    await supabase
-        .from('packing_items')
-        .delete()
-        .eq('trip_id', tripId)
-        .eq('is_packed', true);
-  }
-
-  static Future<void> packAllItems(String tripId, String userId) async {
-    await supabase
-        .from('packing_items')
-        .update({'is_packed': true, 'packed_by': userId})
-        .eq('trip_id', tripId)
-        .eq('is_packed', false);
   }
 
   static Future<void> reorderItems(List<PackingItem> ordered) async {
     if (ordered.isEmpty) return;
     await supabase.from('packing_items').upsert(
-      ordered.asMap().entries.map((e) => {
-        'id': e.value.id,
-        'sort_order': e.key,
-      }).toList(),
+      ordered
+          .asMap()
+          .entries
+          .map((e) => {'id': e.value.id, 'sort_order': e.key})
+          .toList(),
       onConflict: 'id',
     );
   }
@@ -94,11 +113,22 @@ abstract final class PackingService {
     void Function() onChanged,
   ) {
     return supabase
-        .channel('packing_items:$tripId')
+        .channel('packing:$tripId')
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'packing_items',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'trip_id',
+            value: tripId,
+          ),
+          callback: (_) => onChanged(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'packing_checks',
           filter: PostgresChangeFilter(
             type: PostgresChangeFilterType.eq,
             column: 'trip_id',

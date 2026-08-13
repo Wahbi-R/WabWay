@@ -1,32 +1,34 @@
+class PackingCheck {
+  const PackingCheck({required this.userId, required this.checkedAt});
+  final String userId;
+  final DateTime checkedAt;
+}
+
 class PackingItem {
   const PackingItem({
     required this.id,
     required this.tripId,
     required this.title,
-    required this.isPacked,
+    this.checks = const [],
     required this.createdBy,
-    this.assignedTo,
-    this.packedBy,
     this.sortOrder = 0,
   });
 
   final String id;
   final String tripId;
   final String title;
-  final bool isPacked;
+  final List<PackingCheck> checks;
   final String createdBy;
-  final String? assignedTo;  // userId
-  final String? packedBy;    // userId
   final int sortOrder;
 
-  PackingItem copyWith({String? title, bool? isPacked, String? packedBy}) => PackingItem(
+  bool isPackedBy(String userId) => checks.any((c) => c.userId == userId);
+
+  PackingItem copyWith({String? title, List<PackingCheck>? checks}) => PackingItem(
         id: id,
         tripId: tripId,
         title: title ?? this.title,
-        isPacked: isPacked ?? this.isPacked,
+        checks: checks ?? this.checks,
         createdBy: createdBy,
-        assignedTo: assignedTo,
-        packedBy: packedBy ?? this.packedBy,
         sortOrder: sortOrder,
       );
 }

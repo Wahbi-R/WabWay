@@ -1,0 +1,17 @@
+const kCurrencies = [
+  ('USD', '\$ US Dollar'),
+  ('EUR', '€ Euro'),
+  ('GBP', '£ British Pound'),
+  ('JPY', '¥ Japanese Yen'),
+  ('AUD', 'A\$ Australian Dollar'),
+  ('CAD', 'C\$ Canadian Dollar'),
+  ('SGD', 'S\$ Singapore Dollar'),
+  ('HKD', 'HK\$ Hong Kong Dollar'),
+  ('KRW', '₩ Korean Won'),
+  ('THB', '฿ Thai Baht'),
+  ('TWD', 'NT\$ Taiwan Dollar'),
+  ('MYR', 'RM Malaysian Ringgit'),
+  ('IDR', 'Rp Indonesian Rupiah'),
+  ('VND', '₫ Vietnamese Dong'),
+  ('PHP', '₱ Philippine Peso'),
+];

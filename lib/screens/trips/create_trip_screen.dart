@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/supabase/trip_service.dart';
+import '../../data/currencies.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
@@ -10,7 +11,6 @@ import '../../widgets/destination_autocomplete.dart';
 class CreateTripScreen extends StatefulWidget {
   const CreateTripScreen({super.key, required this.onCreated});
 
-  /// Called with the new trip ID after the RPC succeeds.
   final Future<void> Function(String tripId) onCreated;
 
   @override
@@ -20,7 +20,9 @@ class CreateTripScreen extends StatefulWidget {
 class _CreateTripScreenState extends State<CreateTripScreen> {
   final _nameCtrl = TextEditingController();
   final _destinationCtrl = TextEditingController();
-  final _currencyCtrl = TextEditingController(text: 'JPY');
+
+  String _spendingCurrency = 'JPY';
+  String _homeCurrency = 'CAD';
 
   DateTime? _startDate;
   DateTime? _endDate;
@@ -28,49 +30,35 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
   String? _error;
 
   @override
-  void initState() {
-    super.initState();
-    _currencyCtrl.addListener(_autoUppercaseCurrency);
-  }
-
-  void _autoUppercaseCurrency() {
-    final text = _currencyCtrl.text;
-    final upper = text.toUpperCase();
-    if (text != upper) {
-      _currencyCtrl.value = TextEditingValue(
-        text: upper,
-        selection: TextSelection.collapsed(offset: upper.length),
-      );
-    }
-  }
-
-  @override
   void dispose() {
     _nameCtrl.dispose();
     _destinationCtrl.dispose();
-    _currencyCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _pickDate({required bool isStart}) async {
-    final initial = isStart
-        ? (_startDate ?? DateTime.now())
-        : (_endDate ?? _startDate ?? DateTime.now());
-    final first = isStart ? DateTime(2000) : (_startDate ?? DateTime(2000));
-    final picked = await showDatePicker(
+  Future<void> _pickDateRange() async {
+    final now = DateTime.now();
+    final picked = await showDateRangePicker(
       context: context,
-      initialDate: initial,
-      firstDate: first,
+      initialDateRange: DateTimeRange(
+        start: _startDate ?? now,
+        end: _endDate ??
+            (_startDate?.add(const Duration(days: 7)) ??
+                now.add(const Duration(days: 7))),
+      ),
+      firstDate: DateTime(2000),
       lastDate: DateTime(2100),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.light(primary: kColorPrimary),
+        ),
+        child: child!,
+      ),
     );
     if (picked == null || !mounted) return;
     setState(() {
-      if (isStart) {
-        _startDate = picked;
-        if (_endDate != null && _endDate!.isBefore(picked)) _endDate = null;
-      } else {
-        _endDate = picked;
-      }
+      _startDate = picked.start;
+      _endDate = picked.end;
     });
   }
 
@@ -78,11 +66,6 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) {
       setState(() => _error = 'Trip name is required.');
-      return;
-    }
-    final currency = _currencyCtrl.text.trim().toUpperCase();
-    if (currency.length != 3 || !RegExp(r'^[A-Z]{3}$').hasMatch(currency)) {
-      setState(() => _error = 'Currency must be 3 letters (e.g. JPY, USD).');
       return;
     }
     setState(() { _loading = true; _error = null; });
@@ -94,9 +77,11 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
             : _destinationCtrl.text.trim(),
         startDate: _startDate,
         endDate: _endDate,
-        defaultCurrency: currency,
+        defaultCurrency: _spendingCurrency,
+        homeCurrency: _homeCurrency,
       );
       await widget.onCreated(tripId);
+      if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) setState(() { _loading = false; _error = e.toString(); });
     }
@@ -151,7 +136,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                                 child: _DateTile(
                                   label: 'Start date',
                                   date: _startDate,
-                                  onTap: () => _pickDate(isStart: true),
+                                  onTap: _pickDateRange,
                                 ),
                               ),
                               const SizedBox(width: kSpace3),
@@ -159,18 +144,24 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                                 child: _DateTile(
                                   label: 'End date',
                                   date: _endDate,
-                                  onTap: () => _pickDate(isStart: false),
+                                  onTap: _pickDateRange,
                                 ),
                               ),
                             ],
                           ),
                           const SizedBox(height: kSpace4),
-                          WabwayTextField(
-                            label: 'Default currency',
-                            hint: 'JPY',
-                            controller: _currencyCtrl,
-                            textInputAction: TextInputAction.done,
-                            onSubmitted: (_) => _submit(),
+                          _CurrencyField(
+                            label: 'Spending currency',
+                            description: 'The currency you\'ll use at your destination — receipts will be pre-filled with this.',
+                            value: _spendingCurrency,
+                            onChanged: (v) => setState(() => _spendingCurrency = v),
+                          ),
+                          const SizedBox(height: kSpace4),
+                          _CurrencyField(
+                            label: 'Settlement currency',
+                            description: 'The currency everyone pays each other back in (usually your home currency).',
+                            value: _homeCurrency,
+                            onChanged: (v) => setState(() => _homeCurrency = v),
                           ),
                           if (_error != null) ...[
                             const SizedBox(height: kSpace3),
@@ -197,6 +188,133 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ─── Currency field ───────────────────────────────────────────────────────────
+
+class _CurrencyField extends StatefulWidget {
+  const _CurrencyField({
+    required this.label,
+    required this.description,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String description;
+  final String value;
+  final ValueChanged<String> onChanged;
+
+  @override
+  State<_CurrencyField> createState() => _CurrencyFieldState();
+}
+
+class _CurrencyFieldState extends State<_CurrencyField> {
+  static const _kOther = '__other__';
+  late bool _isCustom;
+  late final TextEditingController _customCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _isCustom = !kCurrencies.any((c) => c.$1 == widget.value);
+    _customCtrl = TextEditingController(text: _isCustom ? widget.value : '');
+  }
+
+  @override
+  void dispose() {
+    _customCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onDropdownChanged(String? v) {
+    if (v == _kOther) {
+      setState(() { _isCustom = true; _customCtrl.clear(); });
+    } else if (v != null) {
+      setState(() => _isCustom = false);
+      widget.onChanged(v);
+    }
+  }
+
+  void _onCustomChanged(String raw) {
+    final upper = raw.toUpperCase();
+    if (upper != raw) {
+      _customCtrl.value = TextEditingValue(
+        text: upper,
+        selection: TextSelection.collapsed(offset: upper.length),
+      );
+    }
+    if (upper.length == 3 && RegExp(r'^[A-Z]{3}$').hasMatch(upper)) {
+      widget.onChanged(upper);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(widget.label, style: kStyleCaptionMedium.copyWith(color: kColorInk)),
+        const SizedBox(height: 2),
+        Text(widget.description, style: kStyleCaption.copyWith(color: kColorInkSoft)),
+        const SizedBox(height: kSpace2),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: kColorCream,
+            borderRadius: kRadiusMd,
+            border: Border.all(color: kColorBorder),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _isCustom ? _kOther : widget.value,
+              isExpanded: true,
+              padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: 2),
+              borderRadius: kRadiusMd,
+              items: [
+                ...kCurrencies.map((c) {
+                  final (code, lbl) = c;
+                  return DropdownMenuItem(
+                    value: code,
+                    child: Text(lbl, style: kStyleBodyMedium),
+                  );
+                }),
+                DropdownMenuItem(
+                  value: _kOther,
+                  child: Text(
+                    'Other (enter 3-letter code)',
+                    style: kStyleBodyMedium.copyWith(color: kColorInkSoft),
+                  ),
+                ),
+              ],
+              onChanged: _onDropdownChanged,
+            ),
+          ),
+        ),
+        if (_isCustom) ...[
+          const SizedBox(height: kSpace2),
+          TextField(
+            controller: _customCtrl,
+            textCapitalization: TextCapitalization.characters,
+            maxLength: 3,
+            style: kStyleBodyMedium,
+            onChanged: _onCustomChanged,
+            decoration: InputDecoration(
+              hintText: 'e.g. CHF',
+              hintStyle: TextStyle(color: kColorInkSoft.withAlpha(120)),
+              counterText: '',
+              filled: true,
+              fillColor: kColorCream,
+              border: OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorBorder)),
+              enabledBorder: OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorBorder)),
+              focusedBorder: OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorPrimary, width: 1.5)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              isDense: true,
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

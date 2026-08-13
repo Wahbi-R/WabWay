@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers/trip_provider.dart';
 import '../../core/supabase/trip_service.dart';
 import '../../core/trip/app_trip.dart';
+import '../../data/currencies.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
@@ -28,25 +29,6 @@ Future<void> showTripSettingsSheet(
   );
 }
 
-// ─── Currencies ───────────────────────────────────────────────────────────────
-
-const _kCurrencies = [
-  ('JPY', '¥ Japanese Yen'),
-  ('USD', '\$ US Dollar'),
-  ('EUR', '€ Euro'),
-  ('GBP', '£ British Pound'),
-  ('AUD', 'A\$ Australian Dollar'),
-  ('CAD', 'C\$ Canadian Dollar'),
-  ('SGD', 'S\$ Singapore Dollar'),
-  ('HKD', 'HK\$ Hong Kong Dollar'),
-  ('KRW', '₩ Korean Won'),
-  ('THB', '฿ Thai Baht'),
-  ('TWD', 'NT\$ Taiwan Dollar'),
-  ('MYR', 'RM Malaysian Ringgit'),
-  ('IDR', 'Rp Indonesian Rupiah'),
-  ('VND', '₫ Vietnamese Dong'),
-  ('PHP', '₱ Philippine Peso'),
-];
 
 // ─── Sheet ────────────────────────────────────────────────────────────────────
 
@@ -100,16 +82,18 @@ class _TripSettingsSheetState extends State<_TripSettingsSheet> {
     super.dispose();
   }
 
-  Future<void> _pickDate({required bool isStart}) async {
-    final initial  = isStart ? (_startDate ?? DateTime.now()) : (_endDate ?? DateTime.now());
-    final firstDate = isStart ? DateTime(2020) : (_startDate ?? DateTime(2020));
-    final lastDate  = DateTime(2040);
-
-    final picked = await showDatePicker(
+  Future<void> _pickDateRange() async {
+    final now = DateTime.now();
+    final picked = await showDateRangePicker(
       context: context,
-      initialDate: initial,
-      firstDate: firstDate,
-      lastDate: lastDate,
+      initialDateRange: DateTimeRange(
+        start: _startDate ?? now,
+        end: _endDate ??
+            (_startDate?.add(const Duration(days: 7)) ??
+                now.add(const Duration(days: 7))),
+      ),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2040),
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
           colorScheme: const ColorScheme.light(primary: kColorPrimary),
@@ -119,12 +103,8 @@ class _TripSettingsSheetState extends State<_TripSettingsSheet> {
     );
     if (picked == null || !mounted) return;
     setState(() {
-      if (isStart) {
-        _startDate = picked;
-        if (_endDate != null && _endDate!.isBefore(picked)) _endDate = null;
-      } else {
-        _endDate = picked;
-      }
+      _startDate = picked.start;
+      _endDate = picked.end;
     });
   }
 
@@ -200,16 +180,16 @@ class _TripSettingsSheetState extends State<_TripSettingsSheet> {
   @override
   Widget build(BuildContext context) {
     final bottomPad = MediaQuery.viewInsetsOf(context).bottom;
-    return DraggableScrollableSheet(
-      initialChildSize: 0.88,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      builder: (_, ctrl) => DecoratedBox(
+    final maxHeight = MediaQuery.sizeOf(context).height * 0.92;
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      child: DecoratedBox(
         decoration: const BoxDecoration(
           color: kColorPaper,
           borderRadius: kRadiusSheet,
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             const WabwayDragHandle(),
             Padding(
@@ -229,7 +209,6 @@ class _TripSettingsSheetState extends State<_TripSettingsSheet> {
             const Divider(height: kSpace5),
             Flexible(
               child: SingleChildScrollView(
-                controller: ctrl,
                 padding: EdgeInsets.fromLTRB(
                   kSpace5, 0, kSpace5, kSpace6 + bottomPad),
                 child: Column(
@@ -261,7 +240,7 @@ class _TripSettingsSheetState extends State<_TripSettingsSheet> {
                             label: 'Start',
                             value: _startDate != null ? _fmtDate(_startDate!) : null,
                             placeholder: 'Not set',
-                            onTap: () => _pickDate(isStart: true),
+                            onTap: _pickDateRange,
                             onClear: _startDate != null
                                 ? () => setState(() => _startDate = null)
                                 : null,
@@ -273,7 +252,7 @@ class _TripSettingsSheetState extends State<_TripSettingsSheet> {
                             label: 'End',
                             value: _endDate != null ? _fmtDate(_endDate!) : null,
                             placeholder: 'Not set',
-                            onTap: () => _pickDate(isStart: false),
+                            onTap: _pickDateRange,
                             onClear: _endDate != null
                                 ? () => setState(() => _endDate = null)
                                 : null,
@@ -406,7 +385,7 @@ class _TripSettingsSheetState extends State<_TripSettingsSheet> {
   }
 }
 
-// ─── Cover photo field ────────────────────────────────────────────────────────
+// ─── Cover photo field ───────────────────────────────────────────────────────
 
 class _CoverPhotoField extends StatelessWidget {
   const _CoverPhotoField({
@@ -513,7 +492,7 @@ class _CurrencyDropdown extends StatelessWidget {
           isExpanded: true,
           padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: 2),
           borderRadius: kRadiusMd,
-          items: _kCurrencies.map((c) {
+          items: kCurrencies.map((c) {
             final (code, label) = c;
             return DropdownMenuItem(
               value: code,

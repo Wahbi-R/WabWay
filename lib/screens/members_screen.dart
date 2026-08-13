@@ -207,27 +207,25 @@ class _MemberDatesSheetState extends State<_MemberDatesSheet> {
     _departure = widget.member.departureDate;
   }
 
-  Future<void> _pickDate({required bool isArrival}) async {
-    final initial = isArrival
-        ? (_arrival ?? DateTime.now())
-        : (_departure ?? _arrival ?? DateTime.now());
-    final picked = await showDatePicker(
+  Future<void> _pickDateRange() async {
+    final now = DateTime.now();
+    final picked = await showDateRangePicker(
       context: context,
-      initialDate: initial,
+      initialDateRange: DateTimeRange(
+        start: _arrival ?? now,
+        end: _departure ??
+            (_arrival?.add(const Duration(days: 7)) ??
+                now.add(const Duration(days: 7))),
+      ),
       firstDate: DateTime(2020),
       lastDate: DateTime(2030),
+      helpText: 'SELECT YOUR DATES',
+      saveText: 'Done',
     );
-    if (picked == null) return;
+    if (picked == null || !mounted) return;
     setState(() {
-      if (isArrival) {
-        _arrival = picked;
-        // Keep departure >= arrival
-        if (_departure != null && _departure!.isBefore(picked)) {
-          _departure = picked;
-        }
-      } else {
-        _departure = picked;
-      }
+      _arrival = picked.start;
+      _departure = picked.end;
     });
   }
 
@@ -278,7 +276,7 @@ class _MemberDatesSheetState extends State<_MemberDatesSheet> {
               icon: Icons.flight_land_rounded,
               label: 'Arrival date',
               date: _arrival,
-              onTap: () => _pickDate(isArrival: true),
+              onTap: _pickDateRange,
               onClear: _arrival != null ? () => setState(() => _arrival = null) : null,
             ),
             const SizedBox(height: kSpace3),
@@ -286,7 +284,7 @@ class _MemberDatesSheetState extends State<_MemberDatesSheet> {
               icon: Icons.flight_takeoff_rounded,
               label: 'Departure date',
               date: _departure,
-              onTap: () => _pickDate(isArrival: false),
+              onTap: _pickDateRange,
               onClear: _departure != null ? () => setState(() => _departure = null) : null,
             ),
 

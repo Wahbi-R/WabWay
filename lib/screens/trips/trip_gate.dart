@@ -123,11 +123,11 @@ class _NoTripsScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: kColorCream,
       body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 380),
-            child: Padding(
-              padding: const EdgeInsets.all(kSpace6),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(kSpace6),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 380),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,

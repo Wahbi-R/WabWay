@@ -119,16 +119,16 @@ class _InviteSheetState extends State<_InviteSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.7,
-      minChildSize: 0.4,
-      maxChildSize: 0.92,
-      builder: (_, ctrl) => DecoratedBox(
+    final maxHeight = MediaQuery.sizeOf(context).height * 0.92;
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      child: DecoratedBox(
         decoration: const BoxDecoration(
           color: kColorPaper,
           borderRadius: kRadiusSheet,
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const WabwayDragHandle(),
@@ -149,7 +149,6 @@ class _InviteSheetState extends State<_InviteSheet> {
             const Divider(height: kSpace5),
             Flexible(
               child: ListView(
-                controller: ctrl,
                 padding: EdgeInsets.fromLTRB(
                   kSpace5,
                   0,

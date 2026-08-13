@@ -22,6 +22,7 @@ abstract final class TripService {
     DateTime? startDate,
     DateTime? endDate,
     String defaultCurrency = 'JPY',
+    String homeCurrency = 'CAD',
   }) async {
     final tripId = await supabase.rpc('create_trip_with_owner', params: {
       'p_name': name.trim(),
@@ -30,8 +31,11 @@ abstract final class TripService {
       if (startDate != null) 'p_start_date': isoDate(startDate),
       if (endDate != null)   'p_end_date':   isoDate(endDate),
       'p_default_currency': defaultCurrency.toUpperCase(),
-    });
-    return tripId as String;
+    }) as String;
+    await supabase.from('trips').update({
+      'home_currency': homeCurrency.toUpperCase(),
+    }).eq('id', tripId);
+    return tripId;
   }
 
   static Future<List<AppTripMember>> loadTripMembers(String tripId) async {

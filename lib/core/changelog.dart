@@ -11,6 +11,18 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 194,
+    label: 'Web fixes & date picker improvements',
+    changes: [
+      'Creating a trip no longer gets stuck on a loading spinner — it navigates straight into the trip',
+      'Trip Settings and Invite codes sheets no longer scroll to infinity on web',
+      'Delete / Leave trip now appears in the desktop Settings panel, not just the mobile More tab',
+      'Picking trip dates, accommodation dates, and member arrival/departure now opens a single range picker so you choose both dates in one step',
+      'Create trip currency fields are now dropdowns with clear labels — Spending currency (what you\'ll spend abroad) and Settlement currency (what you pay each other back in); includes an "Other" option for any 3-letter code',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 193,
     label: 'Under the hood — stability fix',
     changes: [

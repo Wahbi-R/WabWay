@@ -244,26 +244,23 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
     });
   }
 
-  Future<void> _pickDate({required bool isCheckIn}) async {
-    final initial = isCheckIn
-        ? (_checkIn ?? DateTime.now())
-        : (_checkOut ?? _checkIn?.add(const Duration(days: 1)) ?? DateTime.now().add(const Duration(days: 1)));
-    final picked = await showDatePicker(
+  Future<void> _pickDateRange() async {
+    final now = DateTime.now();
+    final picked = await showDateRangePicker(
       context: context,
-      initialDate: initial,
+      initialDateRange: DateTimeRange(
+        start: _checkIn ?? now,
+        end: _checkOut ??
+            (_checkIn?.add(const Duration(days: 1)) ??
+                now.add(const Duration(days: 1))),
+      ),
       firstDate: DateTime(2020),
       lastDate: DateTime(2030),
     );
     if (picked == null || !mounted) return;
     setState(() {
-      if (isCheckIn) {
-        _checkIn = picked;
-        if (_checkOut != null && _checkOut!.isBefore(picked)) {
-          _checkOut = picked.add(const Duration(days: 1));
-        }
-      } else {
-        _checkOut = picked;
-      }
+      _checkIn = picked.start;
+      _checkOut = picked.end;
     });
   }
 
@@ -432,7 +429,7 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
                 child: _DateField(
                   label: 'Check-in',
                   date: _checkIn,
-                  onTap: () => _pickDate(isCheckIn: true),
+                  onTap: _pickDateRange,
                 ),
               ),
               const SizedBox(width: kSpace3),
@@ -440,7 +437,7 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
                 child: _DateField(
                   label: 'Check-out',
                   date: _checkOut,
-                  onTap: () => _pickDate(isCheckIn: false),
+                  onTap: _pickDateRange,
                 ),
               ),
             ],

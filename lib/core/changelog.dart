@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 193,
+    label: 'Under the hood — stability fix',
+    changes: [
+      'Fixed a startup timing issue where the app could log a provider error on the first frame',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 190,
     label: 'Under the hood — automated tests',
     changes: [

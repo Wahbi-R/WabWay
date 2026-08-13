@@ -27,7 +27,9 @@ class _TripGateState extends ConsumerState<TripGate> {
   @override
   void initState() {
     super.initState();
-    ref.read(tripNotifierProvider.notifier).load().then((_) {
+    // Defer past the current build frame — load() sets state= synchronously
+    // before its first await, which Riverpod forbids during initState.
+    Future(() => ref.read(tripNotifierProvider.notifier).load()).then((_) {
       if (!mounted) return;
       final tripId = ref.read(activeTripIdProvider);
       if (tripId.isNotEmpty) _subscribeToMembers(tripId);

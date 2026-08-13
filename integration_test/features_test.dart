@@ -33,6 +33,27 @@ Future<void> _goToMoreScreen(
   noException(t);
 }
 
+// ── Test-data helpers ────────────────────────────────────────────────────────
+
+/// Ensure test user is in at least one trip.
+/// Creates one via the same RPC the app uses if none exists.
+Future<void> _ensureTestTrip() async {
+  final userId = sb.auth.currentUser?.id;
+  if (userId == null) return;
+  final existing = await sb
+      .from('trip_members')
+      .select('trip_id')
+      .eq('user_id', userId)
+      .limit(1);
+  if ((existing as List).isNotEmpty) return;
+  print('[features] No trip found for test user — creating one');
+  await sb.rpc('create_trip_with_owner', params: {
+    'p_name': 'Test Trip',
+    'p_default_currency': 'USD',
+  });
+  print('[features] Test trip created');
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 void main() {
@@ -41,6 +62,7 @@ void main() {
   setUpAll(() async {
     await initSupabase();
     await signIn();
+    await _ensureTestTrip();
   });
 
   tearDownAll(signOut);

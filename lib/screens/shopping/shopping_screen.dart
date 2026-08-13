@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers/trip_provider.dart';
@@ -11,6 +12,31 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
+
+// Fetches the og:image meta tag from a URL. Returns null on error or CORS block.
+Future<String?> _fetchOgImage(String rawUrl) async {
+  try {
+    final uri = Uri.tryParse(rawUrl.trim());
+    if (uri == null || !uri.hasScheme) return null;
+    final resp = await http
+        .get(uri, headers: {'User-Agent': 'WabWayBot/1.0'})
+        .timeout(const Duration(seconds: 8));
+    final body = resp.body;
+    final patterns = [
+      RegExp(r'''property=["']og:image["'][^>]+content=["'](https?://[^"']+)["']'''),
+      RegExp(r'''content=["'](https?://[^"']+)["'][^>]+property=["']og:image["']'''),
+      RegExp(r'''name=["']twitter:image["'][^>]+content=["'](https?://[^"']+)["']'''),
+      RegExp(r'''content=["'](https?://[^"']+)["'][^>]+name=["']twitter:image["']'''),
+    ];
+    for (final p in patterns) {
+      final m = p.firstMatch(body);
+      if (m != null) return m.group(1);
+    }
+    return null;
+  } catch (_) {
+    return null;
+  }
+}
 
 class ShoppingScreen extends ConsumerStatefulWidget {
   const ShoppingScreen({super.key});
@@ -79,7 +105,7 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
 
   // ─── Mutations ───────────────────────────────────────────────────────────────
 
-  Future<void> _addItem(String name, {String? quantity, String? notes, String? spotId}) async {
+  Future<void> _addItem(String name, {String? quantity, String? notes, String? spotId, String? linkUrl, String? imageUrl}) async {
     final userId = _userId;
     if (userId == null || name.trim().isEmpty || _tripId.isEmpty) return;
     try {
@@ -91,6 +117,8 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
         notes:     notes,
         spotId:    spotId,
         sortOrder: _items.length,
+        linkUrl:   linkUrl,
+        imageUrl:  imageUrl,
       );
       if (!mounted) return;
       setState(() {
@@ -406,6 +434,22 @@ class _ShoppingItemTile extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (item.imageUrl != null) ...[
+                  const SizedBox(width: kSpace2),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: Image.network(
+                      item.imageUrl!,
+                      width: 48,
+                      height: 48,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    ),
+                  ),
+                ] else if (item.linkUrl != null) ...[
+                  const SizedBox(width: kSpace2),
+                  const Icon(Icons.link_rounded, size: 16, color: kColorInkSoft),
+                ],
                 const SizedBox(width: kSpace2),
                 const Icon(Icons.chevron_right_rounded,
                     size: 16, color: kColorInkSoft),
@@ -425,7 +469,7 @@ class _AddItemBar extends StatefulWidget {
 
   final String tripId;
   final Future<void> Function(String name,
-      {String? quantity, String? notes, String? spotId}) onAdd;
+      {String? quantity, String? notes, String? spotId, String? linkUrl, String? imageUrl}) onAdd;
 
   @override
   State<_AddItemBar> createState() => _AddItemBarState();
@@ -466,6 +510,8 @@ class _AddItemBarState extends State<_AddItemBar> {
             quantity: item.quantity,
             notes:    item.notes,
             spotId:   item.spotId,
+            linkUrl:  item.linkUrl,
+            imageUrl: item.imageUrl,
           );
         },
       ),
@@ -560,10 +606,14 @@ class _ItemSheetState extends State<_ItemSheet> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _qtyCtrl;
   late final TextEditingController _notesCtrl;
-  bool    _saving   = false;
-  bool    _deleting = false;
+  late final TextEditingController _linkCtrl;
+  late final FocusNode _linkFocus;
+  bool    _saving        = false;
+  bool    _deleting      = false;
+  bool    _fetchingImage = false;
   String? _spotId;
   String? _spotName;
+  String? _imageUrl;
 
   bool get _isEdit => widget.item != null;
 
@@ -574,8 +624,14 @@ class _ItemSheetState extends State<_ItemSheet> {
     _nameCtrl  = TextEditingController(text: item?.name  ?? widget.initialName);
     _qtyCtrl   = TextEditingController(text: item?.quantity ?? '');
     _notesCtrl = TextEditingController(text: item?.notes ?? '');
+    _linkCtrl  = TextEditingController(text: item?.linkUrl ?? '');
     _spotId    = item?.spotId;
     _spotName  = item?.spotName;
+    _imageUrl  = item?.imageUrl;
+    _linkFocus = FocusNode();
+    _linkFocus.addListener(() {
+      if (!_linkFocus.hasFocus) _onLinkUnfocused();
+    });
   }
 
   @override
@@ -583,13 +639,28 @@ class _ItemSheetState extends State<_ItemSheet> {
     _nameCtrl.dispose();
     _qtyCtrl.dispose();
     _notesCtrl.dispose();
+    _linkCtrl.dispose();
+    _linkFocus.dispose();
     super.dispose();
+  }
+
+  Future<void> _onLinkUnfocused() async {
+    final url = _linkCtrl.text.trim();
+    if (url.isEmpty || _imageUrl != null || _fetchingImage) return;
+    setState(() => _fetchingImage = true);
+    final found = await _fetchOgImage(url);
+    if (!mounted) return;
+    setState(() {
+      _imageUrl = found;
+      _fetchingImage = false;
+    });
   }
 
   Future<void> _save() async {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) return;
     setState(() => _saving = true);
+    final link = _linkCtrl.text.trim().isEmpty ? null : _linkCtrl.text.trim();
     final base = widget.item ?? ShoppingItem(
       id:        '',
       tripId:    widget.tripId,
@@ -603,6 +674,8 @@ class _ItemSheetState extends State<_ItemSheet> {
       notes:    _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
       spotId:   _spotId,
       spotName: _spotName,
+      linkUrl:  link,
+      imageUrl: _imageUrl,
     );
     await widget.onSave(updated);
     if (mounted) Navigator.pop(context);
@@ -696,6 +769,63 @@ class _ItemSheetState extends State<_ItemSheet> {
                     ),
                     const SizedBox(height: kSpace3),
                     _SpotLinkRow(spotName: _spotName, onTap: _pickSpot),
+                    const SizedBox(height: kSpace3),
+                    WabwayTextField(
+                      label: 'Link (optional)',
+                      hint: 'https://…',
+                      controller: _linkCtrl,
+                      textInputAction: TextInputAction.done,
+                      keyboardType: TextInputType.url,
+                      focusNode: _linkFocus,
+                    ),
+                    if (_fetchingImage) ...[
+                      const SizedBox(height: kSpace2),
+                      Row(
+                        children: [
+                          const SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(strokeWidth: 1.5),
+                          ),
+                          const SizedBox(width: kSpace2),
+                          Text('Fetching preview…',
+                              style: kStyleCaption.copyWith(color: kColorInkSoft)),
+                        ],
+                      ),
+                    ],
+                    if (_imageUrl != null) ...[
+                      const SizedBox(height: kSpace3),
+                      Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: kRadiusMd,
+                            child: Image.network(
+                              _imageUrl!,
+                              height: 160,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                            ),
+                          ),
+                          Positioned(
+                            top: kSpace2,
+                            right: kSpace2,
+                            child: GestureDetector(
+                              onTap: () => setState(() => _imageUrl = null),
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: const BoxDecoration(
+                                  color: Colors.black54,
+                                  borderRadius: kRadiusMd,
+                                ),
+                                child: const Icon(Icons.close_rounded,
+                                    size: 16, color: Colors.white),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: kSpace5),
                     WabwayButton(
                       label: _isEdit ? 'Save' : 'Add to list',

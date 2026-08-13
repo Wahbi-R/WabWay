@@ -16,6 +16,8 @@ class ShoppingItem {
     required this.createdBy,
     required this.createdAt,
     this.sortOrder = 0,
+    this.linkUrl,
+    this.imageUrl,
   });
 
   final String     id;
@@ -32,6 +34,8 @@ class ShoppingItem {
   final String     createdBy;
   final DateTime   createdAt;
   final int        sortOrder;
+  final String?    linkUrl;
+  final String?    imageUrl;
 
   ShoppingItem copyWith({
     String?   name,
@@ -44,6 +48,8 @@ class ShoppingItem {
     Object?   checkedBy   = _sentinel,
     Object?   checkedAt   = _sentinel,
     int?      sortOrder,
+    Object?   linkUrl     = _sentinel,
+    Object?   imageUrl    = _sentinel,
   }) => ShoppingItem(
     id:           id,
     tripId:       tripId,
@@ -59,6 +65,8 @@ class ShoppingItem {
     createdBy:    createdBy,
     createdAt:    createdAt,
     sortOrder:    sortOrder    ?? this.sortOrder,
+    linkUrl:      identical(linkUrl,      _sentinel) ? this.linkUrl      : linkUrl      as String?,
+    imageUrl:     identical(imageUrl,     _sentinel) ? this.imageUrl     : imageUrl     as String?,
   );
 }
 

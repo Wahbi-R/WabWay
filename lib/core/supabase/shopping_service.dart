@@ -23,6 +23,8 @@ abstract final class ShoppingService {
       createdBy:    row['created_by'] as String? ?? '',
       createdAt:    DateTime.parse(row['created_at'] as String),
       sortOrder:    row['sort_order'] as int? ?? 0,
+      linkUrl:      row['link_url']   as String?,
+      imageUrl:     row['image_url']  as String?,
     );
   }
 
@@ -47,15 +49,19 @@ abstract final class ShoppingService {
     String? notes,
     String? spotId,
     int     sortOrder = 0,
+    String? linkUrl,
+    String? imageUrl,
   }) async {
     final inserted = await supabase.from('shopping_items').insert({
       'trip_id':    tripId,
       'name':       name.trim(),
       'created_by': userId,
       'sort_order': sortOrder,
-      if (quantity != null && quantity.trim().isNotEmpty) 'quantity': quantity.trim(),
-      if (notes    != null && notes.trim().isNotEmpty)    'notes':    notes.trim(),
-      if (spotId   != null)                               'spot_id':  spotId,
+      if (quantity != null && quantity.trim().isNotEmpty) 'quantity':  quantity.trim(),
+      if (notes    != null && notes.trim().isNotEmpty)    'notes':     notes.trim(),
+      if (spotId   != null)                               'spot_id':   spotId,
+      if (linkUrl  != null && linkUrl.trim().isNotEmpty)  'link_url':  linkUrl.trim(),
+      if (imageUrl != null && imageUrl.trim().isNotEmpty) 'image_url': imageUrl.trim(),
     }).select('*, spots(id, name, category)').single();
     return _fromRow(inserted);
   }
@@ -68,6 +74,8 @@ abstract final class ShoppingService {
           'quantity':  item.quantity?.trim(),
           'notes':     item.notes?.trim(),
           'spot_id':   item.spotId,
+          'link_url':  item.linkUrl?.trim(),
+          'image_url': item.imageUrl?.trim(),
         })
         .eq('id', item.id)
         .select('*, spots(id, name, category)')

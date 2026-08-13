@@ -2325,10 +2325,11 @@ class _AddDayDialogState extends State<_AddDayDialog> {
         width: 360,
         child: Form(
           key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
               Text('Date',
                   style: kStyleCaptionMedium.copyWith(color: kColorInk)),
               const SizedBox(height: kSpace2),
@@ -2377,6 +2378,7 @@ class _AddDayDialogState extends State<_AddDayDialog> {
             ],
           ),
         ),
+      ),
       ),
       actions: [
         TextButton(

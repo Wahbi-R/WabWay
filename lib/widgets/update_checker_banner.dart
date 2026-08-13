@@ -27,6 +27,7 @@ class _UpdateCheckerBannerState extends State<UpdateCheckerBanner> {
   }
 
   Future<void> _check() async {
+    if (kDebugMode) return;
     final info = await UpdateChecker.check();
     if (mounted && info != null && info.hasUpdate) {
       setState(() => _info = info);

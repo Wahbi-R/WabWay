@@ -40,6 +40,12 @@ Checked items are done. Log the date and a one-liner when completing something.
 
 ---
 
+## Future / Considering
+
+- [ ] **FUTURE-1. Live flight tracking + push alerts** — when a flight travel item has a flight number + date, a Supabase Edge Function (pg_cron, runs every ~20 min) polls a flight status API (AeroDataBox on RapidAPI recommended; ~$10/month basic tier, 500 req/month free) for flights departing within 48h; compares to last known state stored in a `flight_status` table; sends push notification to all trip members on delay, gate change, or cancellation. Architecture: `flight_number` + `date` already stored on travel_items; need `AERODATA_API_KEY` in server env; Edge Function queries travel_items for upcoming flights, hits `/flights/{flightNumber}/departures?dateLocal={date}`, diffs status, calls existing push notifier. Gate info reliable ~24h out; delays real-time. Ongoing API cost is the main consideration.
+
+---
+
 ## Lower Priority / Later
 
 - [x] **17. Settle Up flow** — `settlements` table; suggested settlements; mark as paid; persist; Realtime updates (2026-07-04, see `docs/features/settle-up.md`)
@@ -115,6 +121,7 @@ Checked items are done. Log the date and a one-liner when completing something.
 - [x] **60. Multi-currency receipts** — `home_currency` on trips (default CAD, settable in Trip Settings); exchange rate auto-fetched from Frankfurter API at time of receipt creation and locked in; optional transaction fee field; `home_amount` stored once and never recalculated; ReceiptListTile shows original and home-currency amounts; migration `007_multi_currency_receipts.sql` applied via `supabase db push` (2026-07-09, see `docs/features/phase 3/multi-currency-receipts.md`).
 - [x] **61. Auto-fetch spot thumbnails** — on spots load, spots with `imageUrl == null` are queued for Wikipedia thumbnail lookup in background; `_thumbnailAttempted` set prevents re-fetching; results streamed into list and written back to DB (2026-07-09).
 - [x] **62. Plan item improvements** — spot picker at top of add-item sheet autofills title/address/city/country/mapsUrl and links the spot; location field now autocompletes via Photon; country field added to `ItineraryItem`; migration `008_itinerary_country.sql` (2026-07-09, see `docs/features/phase 3/plan-item-improvements.md`).
+- [x] **249. UI polish: Settle Up centering, crew chat avatars, More screen fix** — Settle Up empty state now centered when all balances are zero; desktop Settle Up tab spans full width instead of left column only; crew chat messages show circular avatars beside each bubble; More screen settings icon missing from mockup fixed (2026-08-13, build 249).
 - [x] **248. Travel: boarding pass scan + terminal/gate/seat fields** — "Scan boarding pass" button on flight form uses Gemini to extract terminal, gate, seat, boarding time, flight number, airports, and times and auto-fills the form; new departure terminal, arrival terminal, gate, seat, and boarding time fields added to all transit travel items; detail view shows them in the info card (2026-08-13, build 248).
 - [x] **247. Travel types revamp + plan progress bar + test data** — Travel types changed from {flight, hotel, train, ticket, reservation, other} to {flight, train, bus, ferry, car, other} with updated icons/colors; plan progress bar now always visible when items exist (not just when some are done); inserted test Stays/Links/Docs into test trip (2026-08-13, build 247).
 - [x] **246. UI parity: AppBar title weight, balance chip two-line layout, More screen explore grid** — AppBar title changed to `FontWeight.w800`; `_MemberBalanceChip` now stacks name above amount in a Column for clearer at-a-glance reading; More screen Explore section replaced vertical list with a 4×2 icon grid matching the mockup design (2026-08-13, build 246).

@@ -685,15 +685,25 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
             pendingSyncCount: _pendingSyncCount,
           ),
           Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(width: 380, child: _buildDesktopListPanel()),
-                const VerticalDivider(
-                    width: 1, thickness: 1, color: kColorBorder),
-                Expanded(child: _buildDesktopDetailPanel()),
-              ],
-            ),
+            child: _tab == _MoneyTab.settleUp
+                ? SettleUpPanel(
+                    balancesByCurrency:    _balancesByCurrency,
+                    suggestionsByCurrency: _suggestionsByCurrency,
+                    members:               _members,
+                    tripId:                _activeTripId ?? '',
+                    myId:                  _userId,
+                    existingSettlements:   _persistedSettlements,
+                    onSettled:             () => _loadAll(silent: true),
+                  )
+                : Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SizedBox(width: 380, child: _buildDesktopListPanel()),
+                      const VerticalDivider(
+                          width: 1, thickness: 1, color: kColorBorder),
+                      Expanded(child: _buildDesktopDetailPanel()),
+                    ],
+                  ),
           ),
         ],
       ),

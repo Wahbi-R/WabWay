@@ -19,6 +19,7 @@ import '../data/crew_data.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
+import '../widgets/wabway_avatar.dart';
 
 class CrewScreen extends ConsumerStatefulWidget {
   const CrewScreen({super.key});
@@ -723,55 +724,77 @@ class _MessageBubble extends StatelessWidget {
     final textColor = isMe ? Colors.white : kColorInk;
     final hasReactions = message.reactions.isNotEmpty;
 
+    final avatar = WabwayAvatar(
+      name: member?.profile.displayName ?? '?',
+      size: WabwayAvatarSize.xs,
+    );
+
     return Padding(
       padding: EdgeInsets.only(
-        left: isMe ? kSpace16 : kSpace4,
-        right: isMe ? kSpace4 : kSpace16,
+        left: kSpace3,
+        right: kSpace3,
         top: showSender ? kSpace3 : kSpace1,
         bottom: kSpace1,
       ),
-      child: Column(
-        crossAxisAlignment:
-            isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      child: Row(
+        mainAxisAlignment:
+            isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          if (showSender && member != null)
-            Padding(
-              padding: const EdgeInsets.only(left: kSpace1, bottom: kSpace1),
-              child: Text(
-                member!.profile.displayName,
-                style: kStyleCaption.copyWith(
-                    fontWeight: FontWeight.w600, color: kColorInkSoft),
-              ),
-            ),
-          GestureDetector(
-            onLongPress: () => _showEmojiPicker(context),
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: kSpace3, vertical: kSpace2 + 2),
-              decoration: BoxDecoration(
-                color: bubbleColor,
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(16),
-                  topRight: const Radius.circular(16),
-                  bottomLeft: Radius.circular(isMe ? 16 : 4),
-                  bottomRight: Radius.circular(isMe ? 4 : 16),
+          if (!isMe) ...[
+            avatar,
+            const SizedBox(width: kSpace2),
+          ],
+          Flexible(
+            child: Column(
+              crossAxisAlignment:
+                  isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              children: [
+                if (showSender && member != null && !isMe)
+                  Padding(
+                    padding: const EdgeInsets.only(left: kSpace1, bottom: kSpace1),
+                    child: Text(
+                      member!.profile.displayName,
+                      style: kStyleCaption.copyWith(
+                          fontWeight: FontWeight.w600, color: kColorInkSoft),
+                    ),
+                  ),
+                GestureDetector(
+                  onLongPress: () => _showEmojiPicker(context),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: kSpace3, vertical: kSpace2 + 2),
+                    decoration: BoxDecoration(
+                      color: bubbleColor,
+                      borderRadius: BorderRadius.only(
+                        topLeft: const Radius.circular(16),
+                        topRight: const Radius.circular(16),
+                        bottomLeft: Radius.circular(isMe ? 16 : 4),
+                        bottomRight: Radius.circular(isMe ? 4 : 16),
+                      ),
+                      border: isMe ? null : Border.all(color: kColorBorder),
+                      boxShadow: kShadowXs,
+                    ),
+                    child: Text(
+                      message.body,
+                      style: kStyleBody.copyWith(color: textColor),
+                    ),
+                  ),
                 ),
-                border: isMe ? null : Border.all(color: kColorBorder),
-                boxShadow: kShadowXs,
-              ),
-              child: Text(
-                message.body,
-                style: kStyleBody.copyWith(color: textColor),
-              ),
+                if (hasReactions) ...[
+                  const SizedBox(height: 4),
+                  _ReactionRow(
+                    reactions: message.reactions,
+                    currentUserId: currentUserId,
+                    onReact: onReact,
+                  ),
+                ],
+              ],
             ),
           ),
-          if (hasReactions) ...[
-            const SizedBox(height: 4),
-            _ReactionRow(
-              reactions: message.reactions,
-              currentUserId: currentUserId,
-              onReact: onReact,
-            ),
+          if (isMe) ...[
+            const SizedBox(width: kSpace2),
+            avatar,
           ],
         ],
       ),

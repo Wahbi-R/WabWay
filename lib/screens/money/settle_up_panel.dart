@@ -117,6 +117,16 @@ class _SettleUpPanelState extends State<SettleUpPanel> {
 
     final anyBalance = allBalances.any((b) => b.net.abs() > 0.5);
 
+    if (!anyBalance) {
+      return const Center(
+        child: WabwayEmptyState(
+          icon: Icons.check_circle_rounded,
+          title: 'All settled up',
+          description: 'No outstanding balances.',
+        ),
+      );
+    }
+
     return SingleChildScrollView(
       controller: widget.scrollController,
       padding: const EdgeInsets.all(kSpace4),
@@ -134,13 +144,6 @@ class _SettleUpPanelState extends State<SettleUpPanel> {
             ),
             const SizedBox(height: kSpace3),
           ],
-
-          if (!anyBalance)
-            const WabwayEmptyState(
-              icon: Icons.check_circle_rounded,
-              title: 'All settled up',
-              description: 'No outstanding balances.',
-            ),
 
           // Suggested settlements
           if (allSuggestions.isNotEmpty) ...[

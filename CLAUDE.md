@@ -1,9 +1,9 @@
 # WabWay — Claude instructions
 
-## After every feature commit
+## After every commit (features AND bug fixes)
 
 1. **Update `docs/TODO.md`** — add a checked `[x]` item with date and build number.
-2. **Update `lib/core/changelog.dart`** — add a new `_Release(...)` entry at the **very top** of `_kChangelog` (newest first). Match the label and build number to the TODO entry. Write the bullet points from a user's perspective (what they can now do), not an implementation perspective.
+2. **Update `lib/core/changelog.dart`** — add a new `_Release(...)` entry at the **very top** of `_kChangelog` (newest first). Match the label and build number to the TODO entry. Write the bullet points from a user's perspective (what they can now do), not an implementation perspective. This applies to every commit — bug fixes, UX improvements, and refactors all get an entry.
 3. **Write a feature doc** in `docs/features/phase 3/<slug>.md` for non-trivial features.
 4. **Run `supabase db push`** (or apply via SQL Editor) for any new migrations.
 

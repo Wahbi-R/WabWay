@@ -259,63 +259,16 @@ class MoreScreen extends ConsumerWidget {
           // Screens not in the mobile bottom nav
           const _SectionHeader(title: 'Explore'),
           const SizedBox(height: kSpace3),
-          DecoratedBox(
-            decoration: kCardDecoration(),
-            child: Material(
-              color: Colors.transparent,
-              child: Column(
-                children: [
-                  _SettingsRow(
-                    icon: Icons.luggage_rounded,
-                    label: 'Packing List',
-                    onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const PackingScreen())),
-                  ),
-                  const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
-                  _SettingsRow(
-                    icon: Icons.map_rounded,
-                    label: 'Map',
-                    onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const MapScreen())),
-                  ),
-                  const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
-                  _SettingsRow(
-                    icon: Icons.flight_rounded,
-                    label: 'Travel',
-                    onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const TravelScreen())),
-                  ),
-                  const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
-                  _SettingsRow(
-                    icon: Icons.photo_library_rounded,
-                    label: 'Photos',
-                    onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const PhotosScreen())),
-                  ),
-                  const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
-                  _SettingsRow(
-                    icon: Icons.link_rounded,
-                    label: 'Links',
-                    onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const LinksScreen())),
-                  ),
-                  const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
-                  _SettingsRow(
-                    icon: Icons.hotel_rounded,
-                    label: 'Stays',
-                    onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const AccommodationsScreen())),
-                  ),
-                  const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
-                  _SettingsRow(
-                    icon: Icons.folder_rounded,
-                    label: 'Documents',
-                    onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const DocsScreen())),
-                  ),
-                  const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
-                  _SettingsRow(
-                    icon: Icons.shopping_cart_rounded,
-                    label: 'Shopping List',
-                    onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const ShoppingScreen())),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          _ExploreGrid(items: [
+            _ExploreItem(icon: Icons.map_rounded,           label: 'Map',       onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const MapScreen()))),
+            _ExploreItem(icon: Icons.flight_rounded,        label: 'Travel',    onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const TravelScreen()))),
+            _ExploreItem(icon: Icons.photo_library_rounded, label: 'Photos',    onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const PhotosScreen()))),
+            _ExploreItem(icon: Icons.link_rounded,          label: 'Links',     onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const LinksScreen()))),
+            _ExploreItem(icon: Icons.hotel_rounded,         label: 'Stays',     onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const AccommodationsScreen()))),
+            _ExploreItem(icon: Icons.folder_rounded,        label: 'Docs',      onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const DocsScreen()))),
+            _ExploreItem(icon: Icons.luggage_rounded,       label: 'Packing',   onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const PackingScreen()))),
+            _ExploreItem(icon: Icons.shopping_cart_rounded, label: 'Shopping',  onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const ShoppingScreen()))),
+          ]),
 
           const SizedBox(height: kSpace4),
 
@@ -872,3 +825,67 @@ class _SettingsRow extends StatelessWidget {
     );
   }
 }
+
+class _ExploreItem {
+  const _ExploreItem({required this.icon, required this.label, required this.onTap});
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+}
+
+class _ExploreGrid extends StatelessWidget {
+  const _ExploreGrid({required this.items});
+  final List<_ExploreItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: kCardDecoration(),
+      child: Padding(
+        padding: const EdgeInsets.all(kSpace2),
+        child: GridView.count(
+          crossAxisCount: 4,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 4,
+          crossAxisSpacing: 4,
+          childAspectRatio: 0.85,
+          children: items.map((item) => _ExploreGridItem(item: item)).toList(),
+        ),
+      ),
+    );
+  }
+}
+
+class _ExploreGridItem extends StatelessWidget {
+  const _ExploreGridItem({required this.item});
+  final _ExploreItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: item.onTap,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: kColorSurfaceSunken,
+              borderRadius: kRadiusSm,
+            ),
+            child: Icon(item.icon, size: 20, color: kColorInkSoft),
+          ),
+          const SizedBox(height: kSpace1),
+          Text(
+            item.label,
+            style: kStyleCaption.copyWith(fontWeight: FontWeight.w600, fontSize: 10),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
+

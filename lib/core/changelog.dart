@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 246,
+    label: 'UI polish',
+    changes: [
+      'Home screen title is bolder and easier to read at a glance',
+      'Balance chips now show name and amount on separate lines for clearer scanning',
+      'More screen Explore section is now a compact 4-column icon grid',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 245,
     label: 'Lucide icons in toolbar',
     changes: [

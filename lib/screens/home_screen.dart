@@ -292,7 +292,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       return Scaffold(
         backgroundColor: kColorCream,
         appBar: AppBar(
-          title: Text('Home', style: kStyleTitle),
+          title: Text('Home', style: kStyleTitle.copyWith(fontWeight: FontWeight.w800)),
           actions: _appBarActions(context),
           backgroundColor: kColorCream,
           scrolledUnderElevation: 0,
@@ -323,7 +323,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Scaffold(
       backgroundColor: kColorCream,
       appBar: AppBar(
-        title: Text('Home', style: kStyleTitle),
+        title: Text('Home', style: kStyleTitle.copyWith(fontWeight: FontWeight.w800)),
         actions: _appBarActions(context),
         backgroundColor: kColorCream,
         scrolledUnderElevation: 0,
@@ -846,9 +846,14 @@ class _MemberBalanceChip extends StatelessWidget {
               ),
             ),
             const SizedBox(width: kSpace2),
-            Text(name, style: kStyleCaptionMedium),
-            const SizedBox(width: kSpace1),
-            Text(label, style: kStyleCaption.copyWith(color: labelColor)),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(name, style: kStyleCaptionMedium),
+                Text(label, style: kStyleCaption.copyWith(color: labelColor, fontSize: 11)),
+              ],
+            ),
           ],
         ),
       ),

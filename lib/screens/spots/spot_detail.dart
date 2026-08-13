@@ -17,6 +17,7 @@ import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 import '../plan/day_picker_sheet.dart';
+import '../shared/connections_section.dart';
 import 'add_spot_sheet.dart';
 import 'spot_vote_chip.dart';
 
@@ -513,6 +514,17 @@ class _SpotDetailContentState extends ConsumerState<SpotDetailContent> {
                   ),
                 ],
               ],
+
+              const SizedBox(height: kSpace4),
+              const Divider(height: 1),
+              const SizedBox(height: kSpace4),
+
+              // ── Connections
+              ConnectionsSection(
+                entityType: EntityType.spot,
+                entityId:   widget.spot.id,
+                tripId:     ref.read(activeTripIdProvider),
+              ),
 
               const SizedBox(height: kSpace4),
               const Divider(height: 1),

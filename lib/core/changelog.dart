@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 254,
+    label: 'Cross-section linking',
+    changes: [
+      'Spots and travel items now have a "Connected" section — link them to documents, stays, plan items, links, and more',
+      'Tap any connection chip to jump straight to that item',
+      'Tap "Add" to open a picker and browse the trip\'s entities by type',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 252,
     label: 'Per-person packing',
     changes: [

@@ -18,6 +18,7 @@ import '../../widgets/widgets.dart';
 import 'add_travel_sheet.dart';
 import '../plan/day_picker_sheet.dart';
 import '../plan/doc_attach_sheet.dart';
+import '../shared/connections_section.dart';
 
 // ─── Mobile screen ────────────────────────────────────────────────────────────
 
@@ -129,6 +130,16 @@ class TravelItemDetailContent extends StatelessWidget {
                 const SizedBox(height: kSpace4),
                 _NotesSection(notes: item.notes!),
               ],
+
+              const SizedBox(height: kSpace4),
+              Consumer(
+                builder: (context, ref, _) => ConnectionsSection(
+                  entityType: EntityType.travel,
+                  entityId:   item.id,
+                  tripId:     ref.read(activeTripIdProvider),
+                  days:       days,
+                ),
+              ),
 
               const SizedBox(height: kSpace4),
               _ActionsSection(item: item, docs: docs, days: days, onDelete: onDelete, onUpdated: onUpdated),

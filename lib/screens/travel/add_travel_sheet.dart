@@ -1,4 +1,7 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import '../../core/ocr/boarding_pass_parser.dart';
 import '../../data/travel_data.dart';
 import '../../data/docs_data.dart';
 import '../../theme/app_colors.dart';
@@ -100,14 +103,18 @@ class _AddTravelContent extends StatefulWidget {
 }
 
 class _AddTravelContentState extends State<_AddTravelContent> {
-  final _formKey = GlobalKey<FormState>();
-  final _titleCtrl = TextEditingController();
-  final _locationCtrl = TextEditingController();
-  final _destinationCtrl = TextEditingController();
-  final _addressCtrl = TextEditingController();
-  final _confirmCtrl = TextEditingController();
-  final _urlCtrl = TextEditingController();
-  final _notesCtrl = TextEditingController();
+  final _formKey          = GlobalKey<FormState>();
+  final _titleCtrl        = TextEditingController();
+  final _locationCtrl     = TextEditingController();
+  final _destinationCtrl  = TextEditingController();
+  final _addressCtrl      = TextEditingController();
+  final _confirmCtrl      = TextEditingController();
+  final _urlCtrl          = TextEditingController();
+  final _notesCtrl        = TextEditingController();
+  final _depTerminalCtrl  = TextEditingController();
+  final _arrTerminalCtrl  = TextEditingController();
+  final _gateCtrl         = TextEditingController();
+  final _seatCtrl         = TextEditingController();
 
   TravelItemType _type = TravelItemType.flight;
   TravelBookingStatus _status = TravelBookingStatus.booked;
@@ -115,26 +122,35 @@ class _AddTravelContentState extends State<_AddTravelContent> {
   DateTime? _endDate;
   TimeOfDay? _time;
   TimeOfDay? _endTime;
+  TimeOfDay? _boardingTime;
   final Set<String> _linkedDocIds = {};
+
+  bool _scanningPass = false;
+  Uint8List? _boardingPassBytes;
 
   @override
   void initState() {
     super.initState();
     final item = widget.initialItem;
     if (item != null) {
-      _titleCtrl.text = item.title;
-      _locationCtrl.text = item.location ?? '';
+      _titleCtrl.text       = item.title;
+      _locationCtrl.text    = item.location ?? '';
       _destinationCtrl.text = item.destination ?? '';
-      _addressCtrl.text = item.address ?? '';
-      _confirmCtrl.text = item.confirmationNumber ?? '';
-      _urlCtrl.text = item.url ?? '';
-      _notesCtrl.text = item.notes ?? '';
-      _type   = item.type;
-      _status = item.status;
-      _date   = item.date;
-      _endDate = item.endDate;
-      _time = _parseTime(item.time);
-      _endTime = _parseTime(item.endTime);
+      _addressCtrl.text     = item.address ?? '';
+      _confirmCtrl.text     = item.confirmationNumber ?? '';
+      _urlCtrl.text         = item.url ?? '';
+      _notesCtrl.text       = item.notes ?? '';
+      _depTerminalCtrl.text = item.departureTerminal ?? '';
+      _arrTerminalCtrl.text = item.arrivalTerminal ?? '';
+      _gateCtrl.text        = item.gate ?? '';
+      _seatCtrl.text        = item.seat ?? '';
+      _type         = item.type;
+      _status       = item.status;
+      _date         = item.date;
+      _endDate      = item.endDate;
+      _time         = _parseTime(item.time);
+      _endTime      = _parseTime(item.endTime);
+      _boardingTime = _parseTime(item.boardingTime);
       _linkedDocIds.addAll(item.linkedDocIds);
     }
   }
@@ -158,29 +174,40 @@ class _AddTravelContentState extends State<_AddTravelContent> {
     _confirmCtrl.dispose();
     _urlCtrl.dispose();
     _notesCtrl.dispose();
+    _depTerminalCtrl.dispose();
+    _arrTerminalCtrl.dispose();
+    _gateCtrl.dispose();
+    _seatCtrl.dispose();
     super.dispose();
   }
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
     widget.onSubmit(TravelItem(
-      id: widget.initialItem?.id ?? 't_${DateTime.now().millisecondsSinceEpoch}',
-      title: _titleCtrl.text.trim(),
-      type: _type,
-      status: _status,
-      date: _date,
-      endDate: _endDate,
-      time: _fmt(_time),
-      endTime: _fmt(_endTime),
-      location: _locationCtrl.text.trim().isEmpty ? null : _locationCtrl.text.trim(),
-      destination: _destinationCtrl.text.trim().isEmpty ? null : _destinationCtrl.text.trim(),
-      address: _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim(),
-      confirmationNumber: _confirmCtrl.text.trim().isEmpty ? null : _confirmCtrl.text.trim(),
-      url: _urlCtrl.text.trim().isEmpty ? null : _urlCtrl.text.trim(),
-      notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
-      linkedDocIds: _linkedDocIds.toList(),
+      id:                 widget.initialItem?.id ?? 't_${DateTime.now().millisecondsSinceEpoch}',
+      title:              _titleCtrl.text.trim(),
+      type:               _type,
+      status:             _status,
+      date:               _date,
+      endDate:            _endDate,
+      time:               _fmt(_time),
+      endTime:            _fmt(_endTime),
+      boardingTime:       _fmt(_boardingTime),
+      location:           _nz(_locationCtrl.text),
+      destination:        _nz(_destinationCtrl.text),
+      address:            _nz(_addressCtrl.text),
+      confirmationNumber: _nz(_confirmCtrl.text),
+      url:                _nz(_urlCtrl.text),
+      notes:              _nz(_notesCtrl.text),
+      departureTerminal:  _nz(_depTerminalCtrl.text),
+      arrivalTerminal:    _nz(_arrTerminalCtrl.text),
+      gate:               _nz(_gateCtrl.text),
+      seat:               _nz(_seatCtrl.text),
+      linkedDocIds:       _linkedDocIds.toList(),
     ));
   }
+
+  String? _nz(String s) => s.trim().isEmpty ? null : s.trim();
 
   String? _fmt(TimeOfDay? t) => t == null
       ? null
@@ -212,6 +239,90 @@ class _AddTravelContentState extends State<_AddTravelContent> {
     if (picked != null) {
       setState(() => isEnd ? _endTime = picked : _time = picked);
     }
+  }
+
+  Future<void> _scanBoardingPass() async {
+    final source = await _pickImageSource();
+    if (source == null || !mounted) return;
+
+    final picker = ImagePicker();
+    final XFile? file = await picker.pickImage(source: source, imageQuality: 90);
+    if (file == null || !mounted) return;
+
+    final bytes = await file.readAsBytes();
+    final ext   = file.path.split('.').last;
+
+    setState(() {
+      _boardingPassBytes = bytes;
+      _scanningPass      = true;
+    });
+
+    try {
+      final data = await BoardingPassParser.parse(bytes, ext);
+      if (!mounted) return;
+      if (data == null || !data.hasUsefulData) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not read boarding pass — fill in manually.')),
+        );
+        return;
+      }
+      setState(() {
+        if (data.flightNumber != null && _titleCtrl.text.isEmpty) {
+          _titleCtrl.text = data.buildTitle().isNotEmpty
+              ? data.buildTitle()
+              : data.flightNumber!;
+        }
+        if (data.confirmationNumber != null && _confirmCtrl.text.isEmpty)
+          _confirmCtrl.text = data.confirmationNumber!;
+        if (data.buildLocationField().isNotEmpty && _locationCtrl.text.isEmpty)
+          _locationCtrl.text = data.buildLocationField();
+        if (data.buildDestinationField().isNotEmpty && _destinationCtrl.text.isEmpty)
+          _destinationCtrl.text = data.buildDestinationField();
+        if (data.departureTerminal != null && _depTerminalCtrl.text.isEmpty)
+          _depTerminalCtrl.text = data.departureTerminal!;
+        if (data.arrivalTerminal != null && _arrTerminalCtrl.text.isEmpty)
+          _arrTerminalCtrl.text = data.arrivalTerminal!;
+        if (data.gate != null && _gateCtrl.text.isEmpty)
+          _gateCtrl.text = data.gate!;
+        if (data.seat != null && _seatCtrl.text.isEmpty)
+          _seatCtrl.text = data.seat!;
+        if (data.date != null && _date == null) _date = data.date;
+        if (data.departureTime != null && _time == null)
+          _time = _parseTime(data.departureTime);
+        if (data.arrivalTime != null && _endTime == null)
+          _endTime = _parseTime(data.arrivalTime);
+        if (data.boardingTime != null && _boardingTime == null)
+          _boardingTime = _parseTime(data.boardingTime);
+        if (data.cabinClass != null && _notesCtrl.text.isEmpty)
+          _notesCtrl.text = data.cabinClass!;
+        _type = TravelItemType.flight;
+      });
+    } finally {
+      if (mounted) setState(() => _scanningPass = false);
+    }
+  }
+
+  Future<ImageSource?> _pickImageSource() async {
+    return showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_rounded),
+              title: const Text('Take a photo'),
+              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded),
+              title: const Text('Choose from gallery'),
+              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   bool get _isTransit => _type != TravelItemType.other;
@@ -287,7 +398,17 @@ class _AddTravelContentState extends State<_AddTravelContent> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: kSpace4),
+                  const SizedBox(height: kSpace3),
+
+                  // Boarding pass scan button (flights only, requires Gemini)
+                  if (_type == TravelItemType.flight && BoardingPassParser.isAvailable)
+                    _BoardingPassButton(
+                      scanning: _scanningPass,
+                      hasPass:  _boardingPassBytes != null,
+                      onTap:    _scanBoardingPass,
+                    ),
+                  if (_type == TravelItemType.flight && BoardingPassParser.isAvailable)
+                    const SizedBox(height: kSpace3),
 
                   WabwayTextField(
                     label: 'Title',
@@ -410,6 +531,72 @@ class _AddTravelContentState extends State<_AddTravelContent> {
                     textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: kSpace4),
+
+                  // Terminal / gate / seat (transit only)
+                  if (_isTransit) ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: WabwayTextField(
+                            label: 'Dep. terminal (optional)',
+                            hint: 'e.g. Terminal 1',
+                            controller: _depTerminalCtrl,
+                            textInputAction: TextInputAction.next,
+                          ),
+                        ),
+                        const SizedBox(width: kSpace3),
+                        Expanded(
+                          child: WabwayTextField(
+                            label: 'Arr. terminal (optional)',
+                            hint: 'e.g. Terminal 3',
+                            controller: _arrTerminalCtrl,
+                            textInputAction: TextInputAction.next,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: kSpace4),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: WabwayTextField(
+                            label: 'Gate (optional)',
+                            hint: 'e.g. A22',
+                            controller: _gateCtrl,
+                            textInputAction: TextInputAction.next,
+                          ),
+                        ),
+                        const SizedBox(width: kSpace3),
+                        Expanded(
+                          child: WabwayTextField(
+                            label: 'Seat (optional)',
+                            hint: 'e.g. 14C',
+                            controller: _seatCtrl,
+                            textInputAction: TextInputAction.next,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: kSpace4),
+                    if (_type == TravelItemType.flight)
+                      _TimePicker(
+                        label: 'Boarding time (optional)',
+                        time: _boardingTime,
+                        onTap: () async {
+                          final picked = await showTimePicker(
+                            context: context,
+                            initialTime: _boardingTime ?? TimeOfDay.now(),
+                            builder: (ctx, child) => MediaQuery(
+                              data: MediaQuery.of(ctx).copyWith(alwaysUse24HourFormat: true),
+                              child: child!,
+                            ),
+                          );
+                          if (picked != null) setState(() => _boardingTime = picked);
+                        },
+                        onClear: () => setState(() => _boardingTime = null),
+                      ),
+                    if (_type == TravelItemType.flight) const SizedBox(height: kSpace4),
+                  ],
 
                   WabwayTextField(
                     label: 'Booking URL (optional)',
@@ -631,6 +818,69 @@ class _DocsPicker extends StatelessWidget {
           );
         }),
       ],
+    );
+  }
+}
+
+// ─── Boarding pass button ─────────────────────────────────────────────────────
+
+class _BoardingPassButton extends StatelessWidget {
+  const _BoardingPassButton({
+    required this.scanning,
+    required this.hasPass,
+    required this.onTap,
+  });
+  final bool scanning;
+  final bool hasPass;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: scanning ? null : onTap,
+      child: Container(
+        height: 44,
+        decoration: BoxDecoration(
+          color: hasPass
+              ? kColorPrimary.withValues(alpha: 0.08)
+              : kColorSurfaceSunken,
+          borderRadius: kRadiusMd,
+          border: Border.all(
+            color: hasPass ? kColorPrimary : kColorBorder,
+          ),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: kSpace3),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (scanning)
+              const SizedBox(
+                width: 14, height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else
+              Icon(
+                hasPass
+                    ? Icons.airplane_ticket_rounded
+                    : Icons.document_scanner_rounded,
+                size: 16,
+                color: hasPass ? kColorPrimary : kColorInkSoft,
+              ),
+            const SizedBox(width: kSpace2),
+            Text(
+              scanning
+                  ? 'Reading boarding pass…'
+                  : hasPass
+                      ? 'Boarding pass scanned ✓  Tap to redo'
+                      : 'Scan boarding pass to auto-fill',
+              style: kStyleCaption.copyWith(
+                color: hasPass ? kColorPrimary : kColorInkSoft,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

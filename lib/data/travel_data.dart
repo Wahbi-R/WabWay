@@ -109,6 +109,11 @@ class TravelItem {
     this.url,
     this.address,
     this.notes,
+    this.departureTerminal,
+    this.arrivalTerminal,
+    this.gate,
+    this.seat,
+    this.boardingTime,
     this.linkedDocIds = const [],
     this.linkedItineraryItemId,
     this.linkedDayId,
@@ -119,27 +124,22 @@ class TravelItem {
   final TravelItemType type;
   final TravelBookingStatus status;
 
-  // Primary date (departure / check-in / event date)
   final DateTime? date;
-  // End date for multi-day items (check-out, pass expiry)
   final DateTime? endDate;
-  // "HH:MM" 24h — departure/start time
-  final String? time;
-  // "HH:MM" 24h — arrival/end time
-  final String? endTime;
-  // Origin city/airport/station, or property name for hotels
-  final String? location;
-  // Destination city/airport/station (transport only)
+  final String? time;       // "HH:MM" 24h — departure/start time
+  final String? endTime;    // "HH:MM" 24h — arrival/end time
+  final String? location;   // Origin city/airport/station
   final String? destination;
-  // Booking/confirmation reference code
   final String? confirmationNumber;
-  // Booking page URL (e.g. airline manage-booking, hotel reservation page)
   final String? url;
-  // Street address (hotels, venues)
   final String? address;
   final String? notes;
+  final String? departureTerminal; // e.g. "Terminal 1"
+  final String? arrivalTerminal;
+  final String? gate;              // e.g. "A22"
+  final String? seat;              // e.g. "14C"
+  final String? boardingTime;      // "HH:MM" 24h
   final List<String> linkedDocIds;
-  // Links to itinerary (plan_data.dart)
   final String? linkedItineraryItemId;
   final String? linkedDayId;
 

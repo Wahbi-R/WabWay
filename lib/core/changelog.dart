@@ -11,6 +11,17 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 248,
+    label: 'Boarding pass scan',
+    changes: [
+      'Scan your boarding pass on a flight to auto-fill terminal, gate, seat, and departure time',
+      'Departure and arrival terminal fields on all transport items',
+      'Gate and seat number fields so everything is in one place',
+      'Boarding time shown separately from departure time so you never miss boarding',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 247,
     label: 'Travel types & plan progress',
     changes: [

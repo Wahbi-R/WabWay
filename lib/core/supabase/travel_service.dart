@@ -26,10 +26,11 @@ abstract final class TravelService {
   // ── Row → model ──────────────────────────────────────────────────────────────
 
   static TravelItem _fromRow(Map<String, dynamic> row, List<String> docIds) {
-    final rawDate    = row['date'] as String?;
-    final rawEndDate = row['end_date'] as String?;
-    final rawTime    = row['time'] as String?;
-    final rawEndTime = row['end_time'] as String?;
+    final rawDate         = row['date']          as String?;
+    final rawEndDate      = row['end_date']      as String?;
+    final rawTime         = row['time']          as String?;
+    final rawEndTime      = row['end_time']      as String?;
+    final rawBoardingTime = row['boarding_time'] as String?;
     return TravelItem(
       id:                     row['id'] as String,
       title:                  row['title'] as String,
@@ -45,6 +46,11 @@ abstract final class TravelService {
       url:                    row['url'] as String?,
       address:                row['address'] as String?,
       notes:                  row['notes'] as String?,
+      departureTerminal:      row['departure_terminal'] as String?,
+      arrivalTerminal:        row['arrival_terminal'] as String?,
+      gate:                   row['gate'] as String?,
+      seat:                   row['seat'] as String?,
+      boardingTime:           rawBoardingTime?.substring(0, 5),
       linkedDocIds:           docIds,
       linkedItineraryItemId:  row['linked_itinerary_item_id'] as String?,
       linkedDayId:            row['linked_day_id'] as String?,
@@ -97,6 +103,11 @@ abstract final class TravelService {
     String? url,
     String? address,
     String? notes,
+    String? departureTerminal,
+    String? arrivalTerminal,
+    String? gate,
+    String? seat,
+    String? boardingTime,
     String? linkedItineraryItemId,
     String? linkedDayId,
     List<String> linkedDocIds = const [],
@@ -117,16 +128,19 @@ abstract final class TravelService {
         'destination': destination.trim(),
       if (confirmationNumber != null && confirmationNumber.trim().isNotEmpty)
         'confirmation_number': confirmationNumber.trim(),
-      if (url != null && url.trim().isNotEmpty)
-        'url': url.trim(),
-      if (address != null && address.trim().isNotEmpty)
-        'address': address.trim(),
-      if (notes != null && notes.trim().isNotEmpty)
-        'notes': notes.trim(),
+      if (url != null && url.trim().isNotEmpty) 'url': url.trim(),
+      if (address != null && address.trim().isNotEmpty) 'address': address.trim(),
+      if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+      if (departureTerminal != null && departureTerminal.trim().isNotEmpty)
+        'departure_terminal': departureTerminal.trim(),
+      if (arrivalTerminal != null && arrivalTerminal.trim().isNotEmpty)
+        'arrival_terminal': arrivalTerminal.trim(),
+      if (gate != null && gate.trim().isNotEmpty) 'gate': gate.trim(),
+      if (seat != null && seat.trim().isNotEmpty) 'seat': seat.trim(),
+      if (boardingTime != null) 'boarding_time': boardingTime,
       if (linkedItineraryItemId != null)
         'linked_itinerary_item_id': linkedItineraryItemId,
-      if (linkedDayId != null)
-        'linked_day_id': linkedDayId,
+      if (linkedDayId != null) 'linked_day_id': linkedDayId,
     }).select().single();
 
     final itemId = row['id'] as String;
@@ -162,6 +176,11 @@ abstract final class TravelService {
       'url':                 item.url,
       'address':             item.address,
       'notes':               item.notes,
+      'departure_terminal':  item.departureTerminal,
+      'arrival_terminal':    item.arrivalTerminal,
+      'gate':                item.gate,
+      'seat':                item.seat,
+      'boarding_time':       item.boardingTime,
     }).eq('id', item.id);
   }
 

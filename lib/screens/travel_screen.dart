@@ -238,6 +238,11 @@ class _TravelScreenState extends ConsumerState<TravelScreen> {
         confirmationNumber: formItem.confirmationNumber,
         address:            formItem.address,
         notes:              formItem.notes,
+        departureTerminal:  formItem.departureTerminal,
+        arrivalTerminal:    formItem.arrivalTerminal,
+        gate:               formItem.gate,
+        seat:               formItem.seat,
+        boardingTime:       formItem.boardingTime,
         linkedDocIds:       formItem.linkedDocIds,
       );
       if (!mounted) return;

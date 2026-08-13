@@ -278,6 +278,9 @@ class _MetaCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final rows = <(IconData, String, String)>[];
 
+    if (item.boardingTime != null) {
+      rows.add((Icons.timer_rounded, 'Boards', item.boardingTime!));
+    }
     if (item.time != null) {
       final timeLabel = item.type == TravelItemType.car ? 'Pick-up' : 'Departs';
       rows.add((Icons.schedule_rounded, timeLabel, item.time!));
@@ -288,10 +291,19 @@ class _MetaCard extends StatelessWidget {
     }
     if (item.isTransit) {
       if (item.location != null) rows.add((Icons.flight_takeoff_rounded, 'From', item.location!));
+      if (item.departureTerminal != null)
+        rows.add((Icons.sensors_rounded, 'Dep. terminal', item.departureTerminal!));
+      if (item.gate != null)
+        rows.add((Icons.door_sliding_rounded, 'Gate', item.gate!));
       if (item.destination != null) rows.add((Icons.flight_land_rounded, 'To', item.destination!));
+      if (item.arrivalTerminal != null)
+        rows.add((Icons.sensors_rounded, 'Arr. terminal', item.arrivalTerminal!));
     } else {
       if (item.location != null) rows.add((Icons.place_rounded, 'Location', item.location!));
       if (item.address != null) rows.add((Icons.pin_drop_rounded, 'Address', item.address!));
+    }
+    if (item.seat != null) {
+      rows.add((Icons.airline_seat_recline_extra_rounded, 'Seat', item.seat!));
     }
     if (item.confirmationNumber != null) {
       rows.add((Icons.confirmation_number_rounded, 'Confirmation', item.confirmationNumber!));
@@ -317,13 +329,17 @@ class _MetaCard extends StatelessWidget {
               label: rows[i].$2,
               value: rows[i].$3,
               isMono: rows[i].$2 == 'Confirmation' ||
-                  rows[i].$2 == 'Departs' ||
-                  rows[i].$2 == 'Arrives' ||
-                  rows[i].$2 == 'Time' ||
-                  rows[i].$2 == 'Check-in' ||
+                  rows[i].$2 == 'Departs'      ||
+                  rows[i].$2 == 'Arrives'      ||
+                  rows[i].$2 == 'Boards'       ||
+                  rows[i].$2 == 'Pick-up'      ||
+                  rows[i].$2 == 'Return'       ||
+                  rows[i].$2 == 'Time'         ||
+                  rows[i].$2 == 'Check-in'     ||
                   rows[i].$2 == 'Check-out',
               copyable: rows[i].$2 == 'Confirmation' ||
-                  rows[i].$2 == 'Address',
+                  rows[i].$2 == 'Address'      ||
+                  rows[i].$2 == 'Seat',
             ),
           ],
         ],

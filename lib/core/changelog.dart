@@ -11,6 +11,17 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 197,
+    label: 'Scan & split receipt items',
+    changes: [
+      'Add Receipt now has a "Scan receipt" button — snap a photo and the app reads the line items automatically',
+      'Tap each person\'s name on the item list to show who had what; tax and tip are split proportionally',
+      'The total and per-person amounts fill in automatically — works with any currency',
+      'If the server is unavailable the form still works exactly as before, nothing breaks',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 196,
     label: 'Shopping: links & image previews',
     changes: [

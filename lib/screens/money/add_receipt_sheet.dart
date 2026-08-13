@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/notifications/push_notifier.dart';
+import '../../core/receipt_scan_service.dart';
 import '../../core/supabase/client.dart';
 import '../../core/supabase/doc_service.dart';
 import '../../core/supabase/exchange_rate_service.dart';
@@ -178,6 +179,8 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
   bool            _fetchingRate = false;
   bool            _showFee      = false;
   bool            _homeOverride = false; // user typed home amount directly
+  bool            _scanning     = false;
+  ReceiptScanResult? _scanResult;
   String?         _error;
 
   bool get _needsConversion => _currency != widget.homeCurrency;
@@ -293,6 +296,58 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
       c.dispose();
     }
     super.dispose();
+  }
+
+  Future<void> _scanAndSplit() async {
+    if (_photoBytes == null) return;
+    setState(() => _scanning = true);
+
+    final mt = 'image/${_photoExt ?? 'jpeg'}';
+    final result = await ReceiptScanService.scan(_photoBytes!, mt);
+    if (!mounted) return;
+    setState(() => _scanning = false);
+
+    if (result == null || result.items.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Scan unavailable — fill in manually')),
+      );
+      return;
+    }
+
+    // Show item-level split sheet
+    final fractions = await showModalBottomSheet<Map<String, double>>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _ItemSplitSheet(
+        result:   result,
+        members:  widget.members,
+        currency: _currency,
+      ),
+    );
+    if (fractions == null || !mounted) return;
+
+    // Pre-fill amount from scan total (local currency)
+    if (result.total > 0) {
+      final decimals = (_currency == 'JPY' || _currency == 'KRW') ? 0 : 2;
+      _amountCtrl.text = result.total.toStringAsFixed(decimals);
+      _recomputeHome();
+    }
+
+    // Apply per-person splits as fractions of the effective home total
+    final homeTotal = _effectiveHomeAmount;
+    setState(() {
+      _scanResult = result;
+      _splitMode  = _SplitMode.custom;
+      for (final m in widget.members) {
+        final frac   = fractions[m.id] ?? 0;
+        final amount = homeTotal * frac;
+        _customCtrls[m.id]?.text = amount > 0.005
+            ? amount.toStringAsFixed(2)
+            : '';
+      }
+    });
   }
 
   Future<void> _submit() async {
@@ -640,15 +695,25 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
                     photoBytes:          _photoBytes,
                     existingStoragePath: _existingStoragePath,
                     onPicked: (bytes, ext) => setState(() {
-                      _photoBytes = bytes;
-                      _photoExt   = ext;
+                      _photoBytes  = bytes;
+                      _photoExt    = ext;
+                      _scanResult  = null; // reset if photo replaced
                     }),
                     onRemoved: () => setState(() {
                       _photoBytes          = null;
                       _photoExt            = null;
                       _existingStoragePath = null;
+                      _scanResult          = null;
                     }),
                   ),
+                  if (_photoBytes != null) ...[
+                    const SizedBox(height: kSpace2),
+                    _ScanItemsButton(
+                      scanning:      _scanning,
+                      hasResult:     _scanResult != null,
+                      onScan:        _scanAndSplit,
+                    ),
+                  ],
                   const SizedBox(height: kSpace4),
 
                   if (widget.tripId != null)
@@ -1287,6 +1352,332 @@ class _CustomSplitPicker extends StatelessWidget {
           ),
         );
       }).toList(),
+    );
+  }
+}
+
+// ─── Scan items button ────────────────────────────────────────────────────────
+
+class _ScanItemsButton extends StatelessWidget {
+  const _ScanItemsButton({
+    required this.scanning,
+    required this.hasResult,
+    required this.onScan,
+  });
+  final bool scanning;
+  final bool hasResult;
+  final VoidCallback onScan;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: scanning ? null : onScan,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+            horizontal: kSpace3, vertical: kSpace2 + 2),
+        decoration: BoxDecoration(
+          color: kColorPrimarySoft,
+          borderRadius: kRadiusMd,
+          border: Border.all(color: kColorPrimary.withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (scanning)
+              const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: kColorPrimary),
+              )
+            else
+              Icon(
+                hasResult
+                    ? Icons.edit_note_rounded
+                    : Icons.document_scanner_rounded,
+                size: 16,
+                color: kColorPrimary,
+              ),
+            const SizedBox(width: kSpace2),
+            Text(
+              scanning
+                  ? 'Scanning…'
+                  : hasResult
+                      ? 'Re-scan & re-split'
+                      : 'Scan receipt & split items',
+              style: kStyleCaptionMedium.copyWith(color: kColorPrimary),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Item split sheet ─────────────────────────────────────────────────────────
+
+class _ItemSplitSheet extends StatefulWidget {
+  const _ItemSplitSheet({
+    required this.result,
+    required this.members,
+    required this.currency,
+  });
+  final ReceiptScanResult result;
+  final List<TripMember> members;
+  final String currency;
+
+  @override
+  State<_ItemSplitSheet> createState() => _ItemSplitSheetState();
+}
+
+class _ItemSplitSheetState extends State<_ItemSplitSheet> {
+  late final Map<int, Set<String>> _assignments;
+
+  @override
+  void initState() {
+    super.initState();
+    final allIds = {for (final m in widget.members) m.id};
+    _assignments = {
+      for (var i = 0; i < widget.result.items.length; i++) i: Set.of(allIds),
+    };
+  }
+
+  /// Per-person amounts in receipt currency (proportional to total incl. tax/tip).
+  Map<String, double> get _personAmounts {
+    final subtotals = <String, double>{
+      for (final m in widget.members) m.id: 0.0,
+    };
+
+    for (var i = 0; i < widget.result.items.length; i++) {
+      final item     = widget.result.items[i];
+      final assigned = _assignments[i]!;
+      final pool     = assigned.isEmpty
+          ? {for (final m in widget.members) m.id}
+          : assigned;
+      final share    = item.totalPrice / pool.length;
+      for (final id in pool) {
+        subtotals[id] = (subtotals[id] ?? 0) + share;
+      }
+    }
+
+    // Scale up proportionally to include tax/tip/discount
+    final itemsTotal = widget.result.itemsTotal;
+    final scanTotal  = widget.result.total > 0
+        ? widget.result.total
+        : itemsTotal;
+
+    if (itemsTotal > 0 && scanTotal != itemsTotal) {
+      final scale = scanTotal / itemsTotal;
+      for (final id in subtotals.keys) {
+        subtotals[id] = subtotals[id]! * scale;
+      }
+    }
+    return subtotals;
+  }
+
+  /// Per-person fractions of the total (0.0–1.0).
+  Map<String, double> get _fractions {
+    final amounts   = _personAmounts;
+    final scanTotal = widget.result.total > 0 ? widget.result.total : 1;
+    return {for (final e in amounts.entries) e.key: e.value / scanTotal};
+  }
+
+  String _fmt(double amount) => fmtAmount(amount, widget.currency);
+
+  @override
+  Widget build(BuildContext context) {
+    final amounts    = _personAmounts;
+    final navBarPad  = MediaQuery.paddingOf(context).bottom;
+    final adjustment = widget.result.tax + widget.result.tip - widget.result.discount;
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.87,
+      minChildSize: 0.5,
+      maxChildSize: 0.97,
+      builder: (_, ctrl) => DecoratedBox(
+        decoration: const BoxDecoration(
+          color: kColorPaper,
+          borderRadius: kRadiusSheet,
+        ),
+        child: Column(
+          children: [
+            const WabwayDragHandle(),
+            Padding(
+              padding:
+                  const EdgeInsets.fromLTRB(kSpace4, 0, kSpace4, kSpace3),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Split items', style: kStyleTitle),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Tap to toggle who had each item',
+                          style: kStyleCaption,
+                        ),
+                      ],
+                    ),
+                  ),
+                  WabwayIconButton(
+                    icon: Icons.close_rounded,
+                    label: 'Cancel',
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+
+            Expanded(
+              child: ListView.separated(
+                controller: ctrl,
+                padding: const EdgeInsets.symmetric(vertical: kSpace2),
+                itemCount: widget.result.items.length,
+                separatorBuilder: (_, __) =>
+                    const Divider(height: 1, indent: kSpace4, endIndent: kSpace4),
+                itemBuilder: (_, i) {
+                  final item     = widget.result.items[i];
+                  final assigned = _assignments[i]!;
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: kSpace4, vertical: kSpace3),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                item.quantity > 1
+                                    ? '${item.quantity}× ${item.name}'
+                                    : item.name,
+                                style: kStyleBodyMedium,
+                              ),
+                            ),
+                            const SizedBox(width: kSpace3),
+                            Text(
+                              _fmt(item.totalPrice),
+                              style: kStyleBodySemibold,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: kSpace2),
+                        Wrap(
+                          spacing: kSpace2,
+                          runSpacing: kSpace2,
+                          children: widget.members.map((m) {
+                            final sel = assigned.contains(m.id);
+                            return GestureDetector(
+                              onTap: () => setState(() {
+                                if (sel) {
+                                  assigned.remove(m.id);
+                                } else {
+                                  assigned.add(m.id);
+                                }
+                              }),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 120),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: kSpace2, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: sel
+                                      ? kColorPrimary
+                                      : kColorSurfaceSunken,
+                                  borderRadius: kRadiusPill,
+                                  border: Border.all(
+                                    color: sel ? kColorPrimary : kColorBorder,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    WabwayAvatar(
+                                      name: m.isYou ? 'You' : m.name,
+                                      size: WabwayAvatarSize.xs,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      m.isYou
+                                          ? 'You'
+                                          : m.name.split(' ').first,
+                                      style: kStyleCaption.copyWith(
+                                        color: sel
+                                            ? kColorTextOnPrimary
+                                            : kColorInk,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            const Divider(height: 1),
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                  kSpace4, kSpace3, kSpace4, kSpace3 + navBarPad),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Each person owes',
+                    style: kStyleCaptionMedium.copyWith(color: kColorInk),
+                  ),
+                  const SizedBox(height: kSpace2),
+                  ...widget.members.map((m) => Padding(
+                    padding: const EdgeInsets.only(bottom: kSpace2),
+                    child: Row(
+                      children: [
+                        WabwayAvatar(
+                          name: m.isYou ? 'You' : m.name,
+                          size: WabwayAvatarSize.sm,
+                        ),
+                        const SizedBox(width: kSpace2),
+                        Expanded(
+                          child: Text(
+                            m.isYou ? 'You' : m.name,
+                            style: kStyleBodyMedium,
+                          ),
+                        ),
+                        Text(
+                          _fmt(amounts[m.id] ?? 0),
+                          style: kStyleBodySemibold.copyWith(
+                              color: kColorPrimary),
+                        ),
+                      ],
+                    ),
+                  )),
+                  if (adjustment.abs() > 0.01)
+                    Padding(
+                      padding: const EdgeInsets.only(top: kSpace1, bottom: kSpace2),
+                      child: Text(
+                        'Incl. ${_fmt(adjustment)} tax/tip distributed proportionally',
+                        style: kStyleCaption.copyWith(color: kColorInkSoft),
+                      ),
+                    ),
+                  const SizedBox(height: kSpace2),
+                  WabwayButton(
+                    label: 'Apply splits',
+                    icon: Icons.check_rounded,
+                    fullWidth: true,
+                    size: WabwayButtonSize.lg,
+                    onPressed: () => Navigator.pop(context, _fractions),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

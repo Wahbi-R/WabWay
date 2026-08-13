@@ -214,10 +214,8 @@ class _AddTravelContentState extends State<_AddTravelContent> {
     }
   }
 
-  bool get _isTransit =>
-      _type == TravelItemType.flight || _type == TravelItemType.train;
-  bool get _isMultiDay =>
-      _type == TravelItemType.hotel || _type == TravelItemType.train;
+  bool get _isTransit => _type != TravelItemType.other;
+  bool get _isMultiDay => _type == TravelItemType.car;
 
   @override
   Widget build(BuildContext context) {
@@ -295,13 +293,15 @@ class _AddTravelContentState extends State<_AddTravelContent> {
                     label: 'Title',
                     hint: _type == TravelItemType.flight
                         ? 'e.g. JAL JL723 — Outbound flight'
-                        : _type == TravelItemType.hotel
-                            ? 'e.g. Hotel Shinjuku'
-                            : _type == TravelItemType.train
-                                ? 'e.g. Shinkansen — Tokyo → Kyoto'
-                                : _type == TravelItemType.ticket
-                                    ? 'e.g. teamLab Borderless — 4 tickets'
-                                    : 'e.g. Dinner reservation',
+                        : _type == TravelItemType.train
+                            ? 'e.g. Shinkansen — Tokyo → Kyoto'
+                            : _type == TravelItemType.bus
+                                ? 'e.g. JR Bus — Kyoto → Hiroshima'
+                                : _type == TravelItemType.ferry
+                                    ? 'e.g. Ferry — Hiroshima → Miyajima'
+                                    : _type == TravelItemType.car
+                                        ? 'e.g. Toyota Rental — Hokkaido road trip'
+                                        : 'e.g. teamLab Borderless tickets',
                     controller: _titleCtrl,
                     textInputAction: TextInputAction.next,
                     validator: (v) =>
@@ -314,9 +314,7 @@ class _AddTravelContentState extends State<_AddTravelContent> {
                     children: [
                       Expanded(
                         child: _DatePicker(
-                          label: _type == TravelItemType.hotel
-                              ? 'Check-in date'
-                              : 'Date',
+                          label: _type == TravelItemType.car ? 'Pick-up date' : 'Date',
                           date: _date,
                           onTap: () => _pickDate(false),
                           onClear: () => setState(() => _date = null),
@@ -326,9 +324,7 @@ class _AddTravelContentState extends State<_AddTravelContent> {
                         const SizedBox(width: kSpace3),
                         Expanded(
                           child: _DatePicker(
-                            label: _type == TravelItemType.hotel
-                                ? 'Check-out date'
-                                : 'End date',
+                            label: _type == TravelItemType.car ? 'Return date' : 'End date',
                             date: _endDate,
                             onTap: () => _pickDate(true),
                             onClear: () => setState(() => _endDate = null),
@@ -344,23 +340,17 @@ class _AddTravelContentState extends State<_AddTravelContent> {
                     children: [
                       Expanded(
                         child: _TimePicker(
-                          label: _type == TravelItemType.hotel
-                              ? 'Check-in time'
-                              : _type == TravelItemType.reservation
-                                  ? 'Time'
-                                  : 'Departs',
+                          label: _type == TravelItemType.car ? 'Pick-up time' : 'Departs',
                           time: _time,
                           onTap: () => _pickTime(false),
                           onClear: () => setState(() => _time = null),
                         ),
                       ),
-                      if (_isTransit || _type == TravelItemType.hotel) ...[
+                      if (_isTransit) ...[
                         const SizedBox(width: kSpace3),
                         Expanded(
                           child: _TimePicker(
-                            label: _type == TravelItemType.hotel
-                                ? 'Check-out time'
-                                : 'Arrives',
+                            label: _type == TravelItemType.car ? 'Return time' : 'Arrives',
                             time: _endTime,
                             onTap: () => _pickTime(true),
                             onClear: () => setState(() => _endTime = null),
@@ -377,9 +367,13 @@ class _AddTravelContentState extends State<_AddTravelContent> {
                         ? 'e.g. London Heathrow (LHR)'
                         : _type == TravelItemType.train
                             ? 'e.g. Tokyo Station'
-                            : _type == TravelItemType.hotel
-                                ? 'e.g. Shinjuku, Tokyo'
-                                : 'e.g. Azabudai Hills, Tokyo',
+                            : _type == TravelItemType.bus
+                                ? 'e.g. Kyoto Station Bus Terminal'
+                                : _type == TravelItemType.ferry
+                                    ? 'e.g. Hiroshima Port'
+                                    : _type == TravelItemType.car
+                                        ? 'e.g. Sapporo Airport'
+                                        : 'e.g. Azabudai Hills, Tokyo',
                     controller: _locationCtrl,
                     textInputAction: TextInputAction.next,
                   ),
@@ -390,7 +384,11 @@ class _AddTravelContentState extends State<_AddTravelContent> {
                       label: 'To (destination)',
                       hint: _type == TravelItemType.flight
                           ? 'e.g. Narita International Airport (NRT)'
-                          : 'e.g. Kyoto Station',
+                          : _type == TravelItemType.ferry
+                              ? 'e.g. Miyajima Island'
+                              : _type == TravelItemType.car
+                                  ? 'e.g. Hakodate'
+                                  : 'e.g. Kyoto Station',
                       controller: _destinationCtrl,
                       textInputAction: TextInputAction.next,
                     ),

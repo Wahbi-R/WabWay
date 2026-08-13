@@ -844,11 +844,11 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
 
   static TravelItemType _travelItemType(String? raw) => switch (raw) {
         'flight' => TravelItemType.flight,
-        'hotel' => TravelItemType.hotel,
-        'train' => TravelItemType.train,
-        'ticket' => TravelItemType.ticket,
-        'reservation' => TravelItemType.reservation,
-        _ => TravelItemType.other,
+        'train'  => TravelItemType.train,
+        'bus'    => TravelItemType.bus,
+        'ferry'  => TravelItemType.ferry,
+        'car'    => TravelItemType.car,
+        _        => TravelItemType.other,
       };
 
   static ReceiptCategory _receiptCategory(String? raw) => switch (raw) {

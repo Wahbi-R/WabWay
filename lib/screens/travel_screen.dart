@@ -8,11 +8,9 @@ import '../core/notifications/push_notifier.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/providers/trip_provider.dart';
 import '../core/supabase/client.dart';
-import '../core/supabase/accommodation_service.dart';
 import '../core/supabase/travel_service.dart';
 import '../core/supabase/doc_service.dart';
 import '../core/supabase/plan_service.dart';
-import '../data/accommodation_data.dart';
 import 'notification_settings_screen.dart';
 import '../data/date_utils.dart';
 import '../data/travel_data.dart';
@@ -257,55 +255,6 @@ class _TravelScreenState extends ConsumerState<TravelScreen> {
         prefKey: kPrefNotifItinerary,
       );
 
-      // Prompt to also save a Hotel to Stays.
-      if (created.type == TravelItemType.hotel && mounted) {
-        final tripId = _activeTripId;
-        final userId = _userId;
-        final item   = created;
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text('Hotel added — save to Stays too?',
-                style: kStyleBody.copyWith(color: Colors.white)),
-            backgroundColor: kColorInk,
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 6),
-            action: SnackBarAction(
-              label: 'Save',
-              textColor: kColorAccent,
-              onPressed: () async {
-                try {
-                  await AccommodationService.create(
-                    tripId:   tripId,
-                    userId:   userId,
-                    name:     item.title,
-                    city:     item.location ?? item.destination ?? '',
-                    checkIn:  item.date,
-                    checkOut: item.endDate,
-                    status:   AccommodationStatus.booked,
-                  );
-                  if (mounted) {
-                    messenger.showSnackBar(SnackBar(
-                      content: Text('Saved to Stays ✓',
-                          style: kStyleBody.copyWith(color: Colors.white)),
-                      backgroundColor: kColorSuccess,
-                      behavior: SnackBarBehavior.floating,
-                    ));
-                  }
-                } catch (_) {
-                  if (mounted) {
-                    messenger.showSnackBar(SnackBar(
-                      content: Text('Could not save to Stays.',
-                          style: kStyleBody.copyWith(color: Colors.white)),
-                      backgroundColor: kColorDanger,
-                      behavior: SnackBarBehavior.floating,
-                    ));
-                  }
-                }
-              },
-            ),
-          ),
-        );
-      }
     } catch (e) {
       if (!mounted) return;
       messenger.showSnackBar(SnackBar(

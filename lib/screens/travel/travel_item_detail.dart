@@ -279,15 +279,11 @@ class _MetaCard extends StatelessWidget {
     final rows = <(IconData, String, String)>[];
 
     if (item.time != null) {
-      final timeLabel = item.type == TravelItemType.hotel
-          ? 'Check-in'
-          : item.type == TravelItemType.reservation
-              ? 'Time'
-              : 'Departs';
+      final timeLabel = item.type == TravelItemType.car ? 'Pick-up' : 'Departs';
       rows.add((Icons.schedule_rounded, timeLabel, item.time!));
     }
     if (item.endTime != null) {
-      final endLabel = item.type == TravelItemType.hotel ? 'Check-out' : 'Arrives';
+      final endLabel = item.type == TravelItemType.car ? 'Return' : 'Arrives';
       rows.add((Icons.schedule_rounded, endLabel, item.endTime!));
     }
     if (item.isTransit) {
@@ -630,10 +626,12 @@ class _ActionsSectionState extends ConsumerState<_ActionsSection> {
   bool _itineraryLoading = false;
 
   ItineraryItemType get _planItemType => switch (widget.item.type) {
-    TravelItemType.flight      => ItineraryItemType.travel,
-    TravelItemType.train       => ItineraryItemType.transport,
-    TravelItemType.ticket      => ItineraryItemType.activity,
-    _                          => ItineraryItemType.other,
+    TravelItemType.flight => ItineraryItemType.travel,
+    TravelItemType.train  => ItineraryItemType.transport,
+    TravelItemType.bus    => ItineraryItemType.transport,
+    TravelItemType.ferry  => ItineraryItemType.transport,
+    TravelItemType.car    => ItineraryItemType.transport,
+    _                     => ItineraryItemType.other,
   };
 
   Future<void> _addToItinerary() async {

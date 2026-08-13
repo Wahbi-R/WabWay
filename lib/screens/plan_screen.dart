@@ -731,7 +731,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
                                       ),
                                       if (_search.isEmpty && _budgetSummary != null)
                                         _PlanBudgetBar(summary: _budgetSummary!),
-                                      if (_search.isEmpty && _completedCount > 0)
+                                      if (_search.isEmpty && _totalItemCount > 0)
                                         _PlanProgressBar(
                                           done: _completedCount,
                                           total: _totalItemCount,
@@ -978,7 +978,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
                         ),
                         if (_search.isEmpty && _budgetSummary != null)
                           _PlanBudgetBar(summary: _budgetSummary!),
-                        if (_search.isEmpty && _completedCount > 0)
+                        if (_search.isEmpty && _totalItemCount > 0)
                           _PlanProgressBar(
                             done: _completedCount,
                             total: _totalItemCount,

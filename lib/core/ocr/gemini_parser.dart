@@ -96,11 +96,12 @@ If nothing is found return an empty array [].
       final notes   = j['notes'] as String? ?? '';
 
       final itemType = switch (type) {
-        'flight'      => TravelItemType.flight,
-        'hotel'       => TravelItemType.hotel,
-        'train'       => TravelItemType.train,
-        'reservation' => TravelItemType.reservation,
-        _             => TravelItemType.other,
+        'flight' => TravelItemType.flight,
+        'train'  => TravelItemType.train,
+        'bus'    => TravelItemType.bus,
+        'ferry'  => TravelItemType.ferry,
+        'car'    => TravelItemType.car,
+        _        => TravelItemType.other,
       };
 
       return ParsedBooking(

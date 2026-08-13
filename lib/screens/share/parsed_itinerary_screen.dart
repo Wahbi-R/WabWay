@@ -61,10 +61,7 @@ class _ParsedItineraryScreenState extends State<ParsedItineraryScreen> {
   }
 
   static bool _defaultAddToPlan(ParsedBooking b) =>
-      b.itemType == TravelItemType.flight ||
-      b.itemType == TravelItemType.train  ||
-      b.itemType == TravelItemType.hotel  ||
-      b.itemType == TravelItemType.reservation;
+      b.itemType != TravelItemType.other;
 
   Future<void> _loadRemaining() async {
     final r = await ParseCounter.remaining();
@@ -205,12 +202,12 @@ class _ParsedItineraryScreenState extends State<ParsedItineraryScreen> {
   }
 
   static ItineraryItemType _planType(TravelItemType t) => switch (t) {
-        TravelItemType.flight      => ItineraryItemType.travel,
-        TravelItemType.train       => ItineraryItemType.travel,
-        TravelItemType.hotel       => ItineraryItemType.other,
-        TravelItemType.reservation => ItineraryItemType.activity,
-        TravelItemType.ticket      => ItineraryItemType.activity,
-        _                          => ItineraryItemType.other,
+        TravelItemType.flight => ItineraryItemType.travel,
+        TravelItemType.train  => ItineraryItemType.transport,
+        TravelItemType.bus    => ItineraryItemType.transport,
+        TravelItemType.ferry  => ItineraryItemType.transport,
+        TravelItemType.car    => ItineraryItemType.transport,
+        _                     => ItineraryItemType.other,
       };
 
   @override

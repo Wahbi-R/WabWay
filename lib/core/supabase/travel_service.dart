@@ -6,21 +6,21 @@ abstract final class TravelService {
   // ── Enum converters ──────────────────────────────────────────────────────────
 
   static TravelItemType _typeFrom(String s) => switch (s) {
-        'flight'      => TravelItemType.flight,
-        'hotel'       => TravelItemType.hotel,
-        'train'       => TravelItemType.train,
-        'ticket'      => TravelItemType.ticket,
-        'reservation' => TravelItemType.reservation,
-        _             => TravelItemType.other,
+        'flight' => TravelItemType.flight,
+        'train'  => TravelItemType.train,
+        'bus'    => TravelItemType.bus,
+        'ferry'  => TravelItemType.ferry,
+        'car'    => TravelItemType.car,
+        _        => TravelItemType.other, // includes legacy: hotel, ticket, reservation
       };
 
   static String _typeToDb(TravelItemType t) => switch (t) {
-        TravelItemType.flight      => 'flight',
-        TravelItemType.hotel       => 'hotel',
-        TravelItemType.train       => 'train',
-        TravelItemType.ticket      => 'ticket',
-        TravelItemType.reservation => 'reservation',
-        TravelItemType.other       => 'other',
+        TravelItemType.flight => 'flight',
+        TravelItemType.train  => 'train',
+        TravelItemType.bus    => 'bus',
+        TravelItemType.ferry  => 'ferry',
+        TravelItemType.car    => 'car',
+        TravelItemType.other  => 'other',
       };
 
   // ── Row → model ──────────────────────────────────────────────────────────────

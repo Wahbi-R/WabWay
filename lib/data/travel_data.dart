@@ -48,46 +48,46 @@ enum TravelBookingStatus {
 
 enum TravelItemType {
   flight,
-  hotel,
   train,
-  ticket,
-  reservation,
+  bus,
+  ferry,
+  car,
   other;
 
   String get label => switch (this) {
         TravelItemType.flight => 'Flight',
-        TravelItemType.hotel => 'Hotel',
-        TravelItemType.train => 'Train',
-        TravelItemType.ticket => 'Ticket',
-        TravelItemType.reservation => 'Reservation',
-        TravelItemType.other => 'Other',
+        TravelItemType.train  => 'Train',
+        TravelItemType.bus    => 'Bus',
+        TravelItemType.ferry  => 'Ferry',
+        TravelItemType.car    => 'Car',
+        TravelItemType.other  => 'Other',
       };
 
   IconData get icon => switch (this) {
         TravelItemType.flight => Icons.flight_rounded,
-        TravelItemType.hotel => Icons.hotel_rounded,
-        TravelItemType.train => Icons.train_rounded,
-        TravelItemType.ticket => Icons.confirmation_number_rounded,
-        TravelItemType.reservation => Icons.event_note_rounded,
-        TravelItemType.other => Icons.circle_outlined,
+        TravelItemType.train  => Icons.train_rounded,
+        TravelItemType.bus    => Icons.directions_bus_rounded,
+        TravelItemType.ferry  => Icons.directions_boat_rounded,
+        TravelItemType.car    => Icons.directions_car_rounded,
+        TravelItemType.other  => Icons.circle_outlined,
       };
 
   Color get color => switch (this) {
         TravelItemType.flight => const Color(0xFF4A7AB5),
-        TravelItemType.hotel => const Color(0xFFD6A84F),
-        TravelItemType.train => const Color(0xFF7D9A75),
-        TravelItemType.ticket => const Color(0xFFA97BB5),
-        TravelItemType.reservation => const Color(0xFF4A9B8A),
-        TravelItemType.other => const Color(0xFF6F665D),
+        TravelItemType.train  => const Color(0xFF7D9A75),
+        TravelItemType.bus    => const Color(0xFFC96F4A),
+        TravelItemType.ferry  => const Color(0xFF4A9B8A),
+        TravelItemType.car    => const Color(0xFFA97BB5),
+        TravelItemType.other  => const Color(0xFF6F665D),
       };
 
   Color get softColor => switch (this) {
         TravelItemType.flight => const Color(0xFFE8EEF6),
-        TravelItemType.hotel => const Color(0xFFF8F0E2),
-        TravelItemType.train => const Color(0xFFEEF4EC),
-        TravelItemType.ticket => const Color(0xFFF5EEF7),
-        TravelItemType.reservation => const Color(0xFFE8F4F2),
-        TravelItemType.other => const Color(0xFFEEEAE3),
+        TravelItemType.train  => const Color(0xFFEEF4EC),
+        TravelItemType.bus    => const Color(0xFFF7EDE8),
+        TravelItemType.ferry  => const Color(0xFFE8F4F2),
+        TravelItemType.car    => const Color(0xFFF5EEF7),
+        TravelItemType.other  => const Color(0xFFEEEAE3),
       };
 }
 
@@ -146,8 +146,7 @@ class TravelItem {
   bool get hasDate => date != null;
   bool get hasEndDate => endDate != null;
   bool get hasConfirmation => confirmationNumber != null;
-  bool get isTransit =>
-      type == TravelItemType.flight || type == TravelItemType.train;
+  bool get isTransit => type != TravelItemType.other;
 }
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
@@ -188,7 +187,7 @@ final kMockTravelItems = <TravelItem>[
   TravelItem(
     id: 't3',
     title: 'Hotel Shinjuku',
-    type: TravelItemType.hotel,
+    type: TravelItemType.other,
     date: DateTime(2024, 11, 11),
     endDate: DateTime(2024, 11, 14),
     time: '15:00',
@@ -205,7 +204,7 @@ final kMockTravelItems = <TravelItem>[
   TravelItem(
     id: 't4',
     title: 'Kyoto Ryokan',
-    type: TravelItemType.hotel,
+    type: TravelItemType.other,
     date: DateTime(2024, 11, 14),
     endDate: DateTime(2024, 11, 18),
     time: '15:00',
@@ -265,7 +264,7 @@ final kMockTravelItems = <TravelItem>[
   TravelItem(
     id: 't8',
     title: 'teamLab Borderless — 4 tickets',
-    type: TravelItemType.ticket,
+    type: TravelItemType.other,
     date: DateTime(2024, 11, 14),
     time: '10:00',
     location: 'Azabudai Hills, Minato City, Tokyo',
@@ -280,7 +279,7 @@ final kMockTravelItems = <TravelItem>[
   TravelItem(
     id: 't9',
     title: 'Thermae-yu Onsen — day pass × 4',
-    type: TravelItemType.reservation,
+    type: TravelItemType.other,
     date: DateTime(2024, 11, 13),
     time: '19:00',
     location: 'Kabukicho, Shinjuku, Tokyo',
@@ -293,7 +292,7 @@ final kMockTravelItems = <TravelItem>[
   TravelItem(
     id: 't10',
     title: 'Izakaya group dinner reservation',
-    type: TravelItemType.reservation,
+    type: TravelItemType.other,
     date: DateTime(2024, 11, 16),
     time: '20:00',
     location: 'Gion area, Kyoto',

@@ -11,6 +11,17 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 247,
+    label: 'Travel types & plan progress',
+    changes: [
+      'Travel now has Flight, Train, Bus, Ferry, and Car — more ways to log how you\'re getting around',
+      'Plan progress bar shows at the top of your itinerary so you always know how many items are done',
+      'Bus and ferry journeys show departure/arrival fields just like flights and trains',
+      'Car rentals show pick-up and return date/time fields',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 246,
     label: 'UI polish',
     changes: [

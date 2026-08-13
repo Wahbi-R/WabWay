@@ -107,10 +107,11 @@ class _HomeData {
   // Days are sorted chronologically by PlanService, so the first match is correct.
   TripDay? get nextDay {
     final today = _today();
-    for (final d in days) {
-      if (!d.date.isBefore(today) && d.items.isNotEmpty) return d;
-    }
-    return null;
+    final future = days
+        .where((d) => !d.date.isBefore(today) && d.items.isNotEmpty)
+        .toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
+    return future.isEmpty ? null : future.first;
   }
 
   // Nearest upcoming travel booking by departure date.
@@ -292,6 +293,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         appBar: AppBar(
           title: Text('Home', style: kStyleTitle),
           actions: _appBarActions(context),
+          backgroundColor: kColorCream,
+          scrolledUnderElevation: 0,
         ),
         body: Center(
           child: Column(
@@ -321,6 +324,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       appBar: AppBar(
         title: Text('Home', style: kStyleTitle),
         actions: _appBarActions(context),
+        backgroundColor: kColorCream,
+        scrolledUnderElevation: 0,
       ),
       bottomNavigationBar: const AndroidDownloadBanner(),
       floatingActionButton: FloatingActionButton(
@@ -359,7 +364,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
             const SizedBox(height: kSpace4),
-            _QuickBalanceCard(data: data),
+            _BalanceChips(data: data, myId: myId),
             if (data != null && trip?.budget != null) ...[
               const SizedBox(height: kSpace3),
               _BudgetProgressBar(
@@ -587,7 +592,7 @@ class _TripHero extends StatelessWidget {
                   children: [
                     Expanded(
                       child: _HeroStat(
-                        label: isPreTrip ? 'Spots saved' : 'Spots visited',
+                        label: isPreTrip ? 'Saved' : 'Visited',
                         value: data != null
                             ? isPreTrip
                                 ? '${data!.spotCount}'
@@ -599,13 +604,13 @@ class _TripHero extends StatelessWidget {
                     ),
                     Expanded(
                       child: _HeroStat(
-                        label: 'Days planned',
+                        label: 'Days',
                         value: data != null ? '${data!.days.length}' : '—',
                       ),
                     ),
                     Expanded(
                       child: _HeroStat(
-                        label: 'Total spent',
+                        label: 'Spent',
                         value: data != null
                             ? fmtAmount(data!.totalSpent, data!.homeCurrency)
                             : '—',
@@ -711,98 +716,141 @@ class _FirstUpRow extends StatelessWidget {
   }
 }
 
-// ─── Balance card ─────────────────────────────────────────────────────────────
+// ─── Balance chips ────────────────────────────────────────────────────────────
 
-class _QuickBalanceCard extends StatelessWidget {
-  const _QuickBalanceCard({required this.data});
+class _BalanceChips extends StatelessWidget {
+  const _BalanceChips({required this.data, required this.myId});
   final _HomeData? data;
+  final String myId;
 
   @override
   Widget build(BuildContext context) {
+    final d = data;
+    if (d == null || d.members.isEmpty || d.receipts.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: kColorPrimarySoft,
+        color: kColorPaper,
         borderRadius: kRadiusLg,
-        border: Border.all(color: kColorPrimarySoftBorder),
+        border: Border.all(color: kColorBorder),
       ),
       child: Padding(
         padding: const EdgeInsets.all(kSpace4),
-        child: Row(
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(
-              Icons.account_balance_wallet_rounded,
-              color: kColorPrimary,
-              size: 20,
-            ),
-            const SizedBox(width: kSpace3),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Your balance', style: kStyleCaption),
-                  const SizedBox(height: kSpace1),
-                  _buildContent(),
-                ],
-              ),
+            Text('Balances', style: kStyleOverline),
+            const SizedBox(height: kSpace3),
+            Wrap(
+              spacing: kSpace2,
+              runSpacing: kSpace2,
+              children: d.members.map((m) {
+                final memberId = m.userId;
+                final memberName = m.profile.displayName;
+                // Find the largest imbalance across currencies for this member.
+                String? mainCurrency;
+                double mainNet = 0;
+                bool settled = true;
+                for (final entry in d.balancesByCurrency.entries) {
+                  final mb = entry.value.firstWhere(
+                    (b) => b.member.id == memberId,
+                    orElse: () => MemberBalance(
+                      member: TripMember(id: memberId, name: memberName),
+                      net: 0,
+                    ),
+                  );
+                  if (mb.net.abs() >= 0.5) settled = false;
+                  if (mb.net.abs() > mainNet.abs()) {
+                    mainNet = mb.net;
+                    mainCurrency = entry.key;
+                  }
+                }
+                return _MemberBalanceChip(
+                  name: memberId == myId ? 'You' : memberName,
+                  settled: settled,
+                  net: mainNet,
+                  currency: mainCurrency ?? d.homeCurrency,
+                );
+              }).toList(),
             ),
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _buildContent() {
-    if (data == null) {
-      return const SizedBox(
-        height: 16,
-        width: 120,
-        child: LinearProgressIndicator(backgroundColor: Colors.transparent),
-      );
-    }
+class _MemberBalanceChip extends StatelessWidget {
+  const _MemberBalanceChip({
+    required this.name,
+    required this.settled,
+    required this.net,
+    required this.currency,
+  });
+  final String name;
+  final bool settled;
+  final double net;
+  final String currency;
 
-    final byCurrency = data!.balancesByCurrency;
+  // Consistent pastel color per first letter — avoids needing an index.
+  static Color _avatarColor(String name) {
+    const colors = [
+      Color(0xFFC96F4A), Color(0xFF4A7AB5), Color(0xFF7D9A75),
+      Color(0xFFD6A84F), Color(0xFF8A6BAE), Color(0xFF5B8FA8),
+    ];
+    if (name.isEmpty) return colors[0];
+    return colors[name.codeUnitAt(0) % colors.length];
+  }
 
-    // Gather the most significant debt and credit across all currencies.
-    // Multi-currency trips can have debts in e.g. JPY and USD simultaneously.
-    final lines = <Widget>[];
-    bool anyBalance = false;
+  @override
+  Widget build(BuildContext context) {
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+    final avatarColor = _avatarColor(name);
+    final label = settled
+        ? 'Settled ✓'
+        : (net > 0
+            ? '+${fmtAmount(net.abs(), currency)}'
+            : '–${fmtAmount(net.abs(), currency)}');
+    final labelColor = settled
+        ? kColorSuccess
+        : (net > 0 ? kColorSuccess : kColorDanger);
 
-    for (final entry in byCurrency.entries) {
-      final currency = entry.key;
-      final balances = entry.value;
-
-      final owes = balances.where((b) => b.net < -0.5).toList()
-        ..sort((a, b) => a.net.compareTo(b.net));
-      final owed = balances.where((b) => b.net > 0.5).toList()
-        ..sort((a, b) => b.net.compareTo(a.net));
-
-      if (owes.isNotEmpty) {
-        anyBalance = true;
-        lines.add(Text(
-          'You owe ${owes.first.member.name}: ${fmtAmount(-owes.first.net, currency)}',
-          style: kStyleBodySemibold.copyWith(color: kColorPrimaryDark),
-        ));
-      }
-      if (owed.isNotEmpty) {
-        anyBalance = true;
-        lines.add(Text(
-          '${owed.first.member.name} owes you ${fmtAmount(owed.first.net, currency)}',
-          style: kStyleBodySemibold.copyWith(color: kColorSuccess),
-        ));
-      }
-    }
-
-    if (!anyBalance) {
-      return Text(
-        data!.receipts.isEmpty ? 'No expenses yet' : 'All settled up',
-        style: kStyleBodySemibold.copyWith(color: kColorInkSoft),
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: lines,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: kColorSurfaceSunken,
+        borderRadius: kRadiusPill,
+        border: Border.all(color: kColorBorder),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(kSpace1, kSpace1, kSpace3, kSpace1),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 26,
+              height: 26,
+              decoration: BoxDecoration(
+                color: avatarColor,
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                initial,
+                style: kStyleCaptionMedium.copyWith(
+                  color: Colors.white,
+                  fontSize: 11,
+                ),
+              ),
+            ),
+            const SizedBox(width: kSpace2),
+            Text(name, style: kStyleCaptionMedium),
+            const SizedBox(width: kSpace1),
+            Text(label, style: kStyleCaption.copyWith(color: labelColor)),
+          ],
+        ),
+      ),
     );
   }
 }

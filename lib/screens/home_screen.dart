@@ -311,6 +311,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final data = _data;
     final myId    = ref.watch(profileProvider)?.id ?? '';
     final isOwner = members.any((m) => m.userId == myId && m.isOwner);
+    final tripStart = trip?.startDate;
+    final isPreTrip = tripStart != null &&
+        DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day)
+            .isBefore(tripStart);
 
     return Scaffold(
       backgroundColor: kColorCream,
@@ -372,7 +376,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 day: data.todayDay!,
                 travelItems: data.todayTravelItems,
               ),
-            ] else if (data != null &&
+            ] else if (!isPreTrip && data != null &&
                 (data.nextDay != null || data.nextTravelItem != null)) ...[
               const SizedBox(height: kSpace4),
               _UpcomingCard(data: data),
@@ -468,6 +472,13 @@ class _TripHero extends StatelessWidget {
     final countdown  = _tripCountdown(trip.startDate, trip.endDate);
     final memberLabel = memberCount == 1 ? '1 member' : '$memberCount members';
     final metaLine   = [if (dateLabel.isNotEmpty) dateLabel, memberLabel].join('  ·  ');
+    final now        = DateTime.now();
+    final todayOnly  = DateTime(now.year, now.month, now.day);
+    final isPreTrip  = trip.startDate != null && todayOnly.isBefore(trip.startDate!);
+    final nextDay    = data?.nextDay;
+    final nextTravel = data?.nextTravelItem;
+    final showFirstUp = isPreTrip && data != null &&
+        (nextDay != null || nextTravel != null);
 
     final hasCover = trip.coverImageUrl != null;
 
@@ -576,11 +587,13 @@ class _TripHero extends StatelessWidget {
                   children: [
                     Expanded(
                       child: _HeroStat(
-                        label: 'Spots visited',
+                        label: isPreTrip ? 'Spots saved' : 'Spots visited',
                         value: data != null
-                            ? (data!.spotCount == 0
-                                ? '0'
-                                : '${data!.visitedCount}/${data!.spotCount}')
+                            ? isPreTrip
+                                ? '${data!.spotCount}'
+                                : (data!.spotCount == 0
+                                    ? '0'
+                                    : '${data!.visitedCount}/${data!.spotCount}')
                             : '—',
                       ),
                     ),
@@ -600,6 +613,29 @@ class _TripHero extends StatelessWidget {
                     ),
                   ],
                 ),
+                if (showFirstUp) ...[
+                  const SizedBox(height: kSpace4),
+                  const Divider(height: 1, color: kColorBorder),
+                  const SizedBox(height: kSpace3),
+                  Text('First up', style: kStyleOverline),
+                  const SizedBox(height: kSpace2),
+                  if (nextTravel != null)
+                    _FirstUpRow(
+                      icon: nextTravel.type.icon,
+                      color: nextTravel.type.color,
+                      title: nextTravel.title,
+                      sub: nextTravel.time ?? fmtDate(nextTravel.date!),
+                    ),
+                  if (nextDay != null && nextDay.sortedItems.isNotEmpty) ...[
+                    if (nextTravel != null) const SizedBox(height: kSpace2),
+                    _FirstUpRow(
+                      icon: nextDay.sortedItems.first.type.icon,
+                      color: nextDay.sortedItems.first.type.color,
+                      title: nextDay.sortedItems.first.title,
+                      sub: nextDay.sortedItems.first.time ?? 'Day ${nextDay.dayNumber}',
+                    ),
+                  ],
+                ],
               ],
             ),
           ),
@@ -628,6 +664,48 @@ class _HeroStat extends StatelessWidget {
           maxLines: 1,
         ),
         Text(label, style: kStyleCaption, overflow: TextOverflow.ellipsis, maxLines: 1),
+      ],
+    );
+  }
+}
+
+// ─── First-up row (pre-trip hero section) ────────────────────────────────────
+
+class _FirstUpRow extends StatelessWidget {
+  const _FirstUpRow({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.sub,
+  });
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String sub;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: kRadiusSm,
+          ),
+          child: Icon(icon, size: 14, color: color),
+        ),
+        const SizedBox(width: kSpace3),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: kStyleBodyMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
+              Text(sub, style: kStyleCaption, maxLines: 1, overflow: TextOverflow.ellipsis),
+            ],
+          ),
+        ),
       ],
     );
   }

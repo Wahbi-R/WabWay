@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 198,
+    label: 'Home: smarter pre-trip view',
+    changes: [
+      'The trip card now shows a "First up" preview — your next travel booking and first planned itinerary item — before the trip starts',
+      'Spots stat on the home card changes from "Spots visited" to "Spots saved" in the planning phase',
+      'The separate "Coming up" card is hidden pre-trip since that info now lives inside the trip card itself',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 197,
     label: 'Scan & split receipt items',
     changes: [

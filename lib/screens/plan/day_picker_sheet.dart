@@ -8,18 +8,30 @@ import '../../widgets/widgets.dart';
 Future<(String dayId, TimeOfDay? time)?> showDayPickerSheet(
   BuildContext context, {
   required List<TripDay> days,
+  String? suggestedDayId,
+  TimeOfDay? suggestedTime,
 }) {
   return showModalBottomSheet<(String, TimeOfDay?)>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => _DayPickerSheet(days: days),
+    builder: (_) => _DayPickerSheet(
+      days: days,
+      suggestedDayId: suggestedDayId,
+      suggestedTime: suggestedTime,
+    ),
   );
 }
 
 class _DayPickerSheet extends StatefulWidget {
-  const _DayPickerSheet({required this.days});
+  const _DayPickerSheet({
+    required this.days,
+    this.suggestedDayId,
+    this.suggestedTime,
+  });
   final List<TripDay> days;
+  final String? suggestedDayId;
+  final TimeOfDay? suggestedTime;
 
   @override
   State<_DayPickerSheet> createState() => _DayPickerSheetState();
@@ -28,6 +40,13 @@ class _DayPickerSheet extends StatefulWidget {
 class _DayPickerSheetState extends State<_DayPickerSheet> {
   String? _selectedDayId;
   TimeOfDay? _time;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDayId = widget.suggestedDayId;
+    _time = widget.suggestedTime;
+  }
 
   Future<void> _pickTime() async {
     final picked = await showTimePicker(
@@ -123,6 +142,20 @@ class _DayPickerSheetState extends State<_DayPickerSheet> {
                               ],
                             ),
                           ),
+                          if (day.id == widget.suggestedDayId && !selected)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: kColorSecondarySoft,
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
+                                    color: kColorSecondarySoftBorder),
+                              ),
+                              child: Text('Suggested',
+                                  style: kStyleOverline.copyWith(
+                                      color: kColorSecondary)),
+                            ),
                           if (selected)
                             const Icon(Icons.check_circle_rounded,
                                 size: 18, color: kColorPrimary),

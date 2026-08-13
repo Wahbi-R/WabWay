@@ -650,6 +650,16 @@ class _ActionsSectionState extends ConsumerState<_ActionsSection> {
     _                     => ItineraryItemType.other,
   };
 
+  TimeOfDay? _parseTime(String? t) {
+    if (t == null) return null;
+    final parts = t.split(':');
+    if (parts.length < 2) return null;
+    final h = int.tryParse(parts[0]);
+    final m = int.tryParse(parts[1]);
+    if (h == null || m == null) return null;
+    return TimeOfDay(hour: h, minute: m);
+  }
+
   Future<void> _addToItinerary() async {
     if (_itineraryLoading) return;
     if (widget.days.isEmpty) {
@@ -657,7 +667,17 @@ class _ActionsSectionState extends ConsumerState<_ActionsSection> {
       return;
     }
 
-    final result = await showDayPickerSheet(context, days: widget.days);
+    final suggestedDay = widget.item.date != null
+        ? widget.days.where((d) => d.date == widget.item.date).firstOrNull
+        : null;
+    final suggestedTime = _parseTime(widget.item.time);
+
+    final result = await showDayPickerSheet(
+      context,
+      days: widget.days,
+      suggestedDayId: suggestedDay?.id,
+      suggestedTime: suggestedTime,
+    );
     if (result == null || !mounted) return;
 
     final (dayId, timeOfDay) = result;

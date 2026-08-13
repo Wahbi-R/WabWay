@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 251,
+    label: 'Smarter "Add to itinerary"',
+    changes: [
+      '"Add to itinerary" on a travel item now pre-selects the plan day that matches the item\'s date',
+      'Departure time is pre-filled so you don\'t have to set it manually',
+      'If you want a different day, the suggested one is still badged so it\'s easy to spot',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 250,
     label: 'Tappable First Up & spot dots',
     changes: [

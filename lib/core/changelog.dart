@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 244,
+    label: 'Home screen polish',
+    changes: [
+      'Balances now shows a chip per person — tap into Money for the full breakdown',
+      'Stats row no longer truncates — labels are shorter and cleaner',
+      '"First up" always shows the correct next day's first item',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 243,
     label: 'Bug fixes',
     changes: [

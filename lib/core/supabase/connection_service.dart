@@ -54,6 +54,61 @@ abstract final class ConnectionService {
     await supabase.from('trip_connections').delete().eq('id', connectionId);
   }
 
+  /// Remove a connection between two specific entities (order-insensitive).
+  static Future<void> removeForEntityPair(String idA, String idB) async {
+    await supabase
+        .from('trip_connections')
+        .delete()
+        .eq('entity_a_id', idA)
+        .eq('entity_b_id', idB);
+    await supabase
+        .from('trip_connections')
+        .delete()
+        .eq('entity_a_id', idB)
+        .eq('entity_b_id', idA);
+  }
+
+  /// Load the spot id linked to a plan item via trip_connections, or null.
+  static Future<String?> fetchSpotForPlanItem(String itemId) async {
+    final rows = await supabase
+        .from('trip_connections')
+        .select('entity_a_id, entity_a_type, entity_b_id, entity_b_type')
+        .or('entity_a_id.eq.$itemId,entity_b_id.eq.$itemId');
+    for (final r in rows) {
+      if (r['entity_a_type'] == 'plan_item' && r['entity_b_type'] == 'spot') {
+        return r['entity_b_id'] as String;
+      }
+      if (r['entity_b_type'] == 'plan_item' && r['entity_a_type'] == 'spot') {
+        return r['entity_a_id'] as String;
+      }
+    }
+    return null;
+  }
+
+  /// Batch-load spot connections for a list of plan item ids.
+  /// Returns a map of itemId → spotId.
+  static Future<Map<String, String>> fetchSpotMapForItems(
+      List<String> itemIds) async {
+    if (itemIds.isEmpty) return {};
+    final rows = await supabase
+        .from('trip_connections')
+        .select('entity_a_id, entity_a_type, entity_b_id, entity_b_type')
+        .or('entity_a_type.eq.plan_item,entity_b_type.eq.plan_item');
+    final map = <String, String>{};
+    for (final r in rows) {
+      final aType = r['entity_a_type'] as String;
+      final bType = r['entity_b_type'] as String;
+      final aId   = r['entity_a_id'] as String;
+      final bId   = r['entity_b_id'] as String;
+      if (aType == 'plan_item' && bType == 'spot' && itemIds.contains(aId)) {
+        map[aId] = bId;
+      } else if (bType == 'plan_item' && aType == 'spot' && itemIds.contains(bId)) {
+        map[bId] = aId;
+      }
+    }
+    return map;
+  }
+
   static RealtimeChannel subscribe(
     String tripId,
     void Function() onChanged,

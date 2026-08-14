@@ -99,7 +99,7 @@ class ItineraryItem {
   bool get hasTime => time != null;
   bool get hasLinks => linkedSpotId != null || linkedDocIds.isNotEmpty;
 
-  ItineraryItem copyWith({bool? isDone, double? plannedCost, String? currency}) =>
+  ItineraryItem copyWith({bool? isDone, double? plannedCost, String? currency, String? linkedSpotId}) =>
       ItineraryItem(
         id:              id,
         dayId:           dayId,
@@ -112,7 +112,7 @@ class ItineraryItem {
         mapsUrl:         mapsUrl,
         confirmationUrl: confirmationUrl,
         notes:           notes,
-        linkedSpotId:    linkedSpotId,
+        linkedSpotId:    linkedSpotId ?? this.linkedSpotId,
         linkedDocIds:    linkedDocIds,
         sortOrder:       sortOrder,
         isDone:          isDone ?? this.isDone,

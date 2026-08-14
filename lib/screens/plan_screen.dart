@@ -10,9 +10,11 @@ import 'package:supabase_flutter/supabase_flutter.dart'
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/providers/trip_provider.dart';
 import '../core/supabase/client.dart';
+import '../core/supabase/connection_service.dart';
 import '../core/supabase/plan_service.dart';
 import '../core/supabase/spot_service.dart';
 import '../core/supabase/doc_service.dart';
+import '../data/connection_data.dart';
 import '../data/money_data.dart' show fmtAmount;
 import '../data/plan_data.dart';
 import '../data/spot_data.dart';
@@ -275,6 +277,13 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
   }
 
   void _updateItem(ItineraryItem updated) {
+    // Detect spot connection changes before updating local state.
+    String? oldSpotId;
+    for (final day in _days) {
+      final old = day.items.where((i) => i.id == updated.id).firstOrNull;
+      if (old != null) { oldSpotId = old.linkedSpotId; break; }
+    }
+
     setState(() {
       for (final day in _days) {
         final idx = day.items.indexWhere((i) => i.id == updated.id);
@@ -286,6 +295,24 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
       _selectedItemId = updated.id;
     });
     PlanService.updateItem(updated).catchError((_) => _loadAll(silent: true));
+
+    // Sync spot connection in trip_connections.
+    final newSpotId = updated.linkedSpotId;
+    if (oldSpotId != newSpotId) {
+      if (oldSpotId != null) {
+        ConnectionService.removeForEntityPair(updated.id, oldSpotId);
+      }
+      if (newSpotId != null) {
+        ConnectionService.add(
+          tripId: _activeTripId,
+          userId: _userId,
+          typeA:  EntityType.planItem,
+          idA:    updated.id,
+          typeB:  EntityType.spot,
+          idB:    newSpotId,
+        );
+      }
+    }
   }
 
   // Optimistically flips isDone and persists with a lightweight update.
@@ -338,13 +365,24 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
         mapsUrl:         draft.mapsUrl,
         confirmationUrl: draft.confirmationUrl,
         notes:           draft.notes,
-        linkedSpotId:    draft.linkedSpotId,
         linkedDocIds:    draft.linkedDocIds,
         sortOrder:       day.items.length,
       );
       if (!mounted) return;
+      // Write spot connection to trip_connections if one was picked.
+      if (draft.linkedSpotId != null) {
+        await ConnectionService.add(
+          tripId: _activeTripId,
+          userId: _userId,
+          typeA:  EntityType.planItem,
+          idA:    item.id,
+          typeB:  EntityType.spot,
+          idB:    draft.linkedSpotId!,
+        );
+      }
+      if (!mounted) return;
       setState(() {
-        day.items.add(item);
+        day.items.add(item.copyWith(linkedSpotId: draft.linkedSpotId));
         _selectedItemId = item.id;
       });
     } catch (e) {
@@ -388,12 +426,20 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
         city:         spot.city.isNotEmpty ? spot.city : spot.area,
         location:     (spot.address?.isNotEmpty == true) ? spot.address : spot.name,
         mapsUrl:      spot.mapsUrl,
-        linkedSpotId: spot.id,
         sortOrder:    day.items.length,
       );
       if (!mounted) return;
+      await ConnectionService.add(
+        tripId: _activeTripId,
+        userId: _userId,
+        typeA:  EntityType.planItem,
+        idA:    item.id,
+        typeB:  EntityType.spot,
+        idB:    spot.id,
+      );
+      if (!mounted) return;
       setState(() {
-        day.items.add(item);
+        day.items.add(item.copyWith(linkedSpotId: spot.id));
         _selectedItemId = item.id;
       });
     } catch (e) {

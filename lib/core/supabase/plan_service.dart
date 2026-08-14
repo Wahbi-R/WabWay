@@ -1,6 +1,7 @@
 import '../../data/date_utils.dart';
 import '../../data/plan_data.dart';
 import 'client.dart';
+import 'connection_service.dart';
 
 abstract final class PlanService {
   // ── Enum converters ──────────────────────────────────────────────────────────
@@ -27,7 +28,11 @@ abstract final class PlanService {
 
   // ── Row → model ──────────────────────────────────────────────────────────────
 
-  static ItineraryItem _itemFromRow(Map<String, dynamic> row, List<String> docIds) {
+  static ItineraryItem _itemFromRow(
+    Map<String, dynamic> row,
+    List<String> docIds, {
+    String? spotId,
+  }) {
     // Postgres returns time as "HH:MM:SS"; the model uses "HH:MM".
     final rawTime = row['time'] as String?;
     final time = rawTime?.substring(0, 5);
@@ -43,7 +48,7 @@ abstract final class PlanService {
       mapsUrl:         row['maps_url'] as String?,
       confirmationUrl: row['confirmation_url'] as String?,
       notes:           row['notes'] as String?,
-      linkedSpotId:    row['linked_spot_id'] as String?,
+      linkedSpotId:    spotId,
       linkedDocIds:    docIds,
       sortOrder:       (row['sort_order'] as num?)?.toInt() ?? 0,
       isDone:          (row['is_done'] as bool?) ?? false,
@@ -96,8 +101,17 @@ abstract final class PlanService {
       }
     }
 
+    // Load spot connections from trip_connections for all items.
+    final spotMap = itemIds.isNotEmpty
+        ? await ConnectionService.fetchSpotMapForItems(itemIds)
+        : <String, String>{};
+
     final allItems = itemsData
-        .map((r) => _itemFromRow(r, itemDocIds[r['id'] as String] ?? []))
+        .map((r) => _itemFromRow(
+              r,
+              itemDocIds[r['id'] as String] ?? [],
+              spotId: spotMap[r['id'] as String],
+            ))
         .toList();
 
     // Group items by dayId
@@ -166,7 +180,6 @@ abstract final class PlanService {
       if (confirmationUrl != null && confirmationUrl.trim().isNotEmpty)
         'confirmation_url': confirmationUrl.trim(),
       if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
-      if (linkedSpotId != null) 'linked_spot_id': linkedSpotId,
       if (plannedCost != null) 'planned_cost': plannedCost,
       if (currency != null) 'currency': currency,
     }).select().single();
@@ -200,7 +213,6 @@ abstract final class PlanService {
       'maps_url':         item.mapsUrl,
       'confirmation_url': item.confirmationUrl,
       'notes':            item.notes,
-      'linked_spot_id':   item.linkedSpotId,
       'is_done':          item.isDone,
       'planned_cost':     item.plannedCost,
       'currency':         item.currency,

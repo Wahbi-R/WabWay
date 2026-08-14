@@ -17,7 +17,6 @@ import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 import '../../data/connection_data.dart';
 import '../shared/connections_section.dart';
-import '../spots/spot_detail.dart';
 import 'add_item_sheet.dart';
 import 'doc_attach_sheet.dart';
 
@@ -163,9 +162,6 @@ class _ItemDetailContentState extends ConsumerState<ItemDetailContent> {
 
   @override
   Widget build(BuildContext context) {
-    final linkedSpot = widget.item.linkedSpotId != null
-        ? widget.spots.where((s) => s.id == widget.item.linkedSpotId).firstOrNull
-        : null;
     final linkedDocs = widget.item.linkedDocIds
         .map((id) => widget.docs.where((d) => d.id == id).firstOrNull)
         .whereType<TripDocument>()
@@ -182,11 +178,6 @@ class _ItemDetailContentState extends ConsumerState<ItemDetailContent> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _MetaCard(item: widget.item),
-
-              if (linkedSpot != null) ...[
-                const SizedBox(height: kSpace4),
-                _SpotSection(spot: linkedSpot, docs: widget.docs),
-              ],
 
               if (linkedDocs.isNotEmpty) ...[
                 const SizedBox(height: kSpace4),
@@ -451,64 +442,6 @@ class _LinkRow extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-// ─── Linked spot section ──────────────────────────────────────────────────────
-
-class _SpotSection extends StatelessWidget {
-  const _SpotSection({required this.spot, this.docs = const []});
-  final Spot spot;
-  final List<TripDocument> docs;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Linked Spot', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
-        const SizedBox(height: kSpace2),
-        WabwayCard(
-          hoverable: true,
-          padding: const EdgeInsets.all(kSpace3),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => SpotDetailScreen(spot: spot, docs: docs),
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: const BoxDecoration(
-                  color: kColorPrimarySoft,
-                  borderRadius: kRadiusMd,
-                ),
-                child: const Icon(Icons.place_rounded,
-                    size: 18, color: kColorPrimary),
-              ),
-              const SizedBox(width: kSpace3),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(spot.name, style: kStyleBodyMedium),
-                    Text(
-                      spot.city,
-                      style: kStyleCaption.copyWith(fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.chevron_right_rounded,
-                  size: 18, color: kColorInkSoft),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }

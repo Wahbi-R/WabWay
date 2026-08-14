@@ -23,6 +23,8 @@ import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 import 'doc_card.dart';
 import '../money/add_receipt_sheet.dart';
+import '../../data/connection_data.dart';
+import '../shared/connections_section.dart';
 
 // ── Member name helper ────────────────────────────────────────────────────────
 
@@ -279,6 +281,14 @@ class _DocDetailContentState extends State<DocDetailContent> {
                     setState(() => _links = [..._links, DocumentLink(type: type, linkedId: linkedId)]);
                   }
                 },
+              ),
+              const SizedBox(height: kSpace4),
+              const Divider(height: 1),
+              const SizedBox(height: kSpace4),
+              ConnectionsSection(
+                entityType: EntityType.doc,
+                entityId: widget.doc.id,
+                tripId: widget.tripId,
               ),
               const SizedBox(height: kSpace8),
             ],

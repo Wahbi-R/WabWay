@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 255,
+    label: 'Connections everywhere',
+    changes: [
+      'Plan items now have a "Connected" section — link them to spots, docs, travel, stays, and links',
+      'Documents now have a "Connected" section — link them to other trip entities',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 254,
     label: 'Cross-section linking',
     changes: [

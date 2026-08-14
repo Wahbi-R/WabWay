@@ -108,10 +108,10 @@ Already-linked items are shown with a checkmark and can be tapped to unlink.
 - [x] Wire into spot_detail.dart — ConnectionsSection added before Comments
 - [x] Wire into travel_item_detail.dart — ConnectionsSection added via Consumer before ActionsSection
 - [x] Build 254 committed (2026-08-13)
-- [ ] Wire into plan item_detail — lib/screens/plan/item_detail.dart
-- [ ] Wire into stay detail — find accommodation detail screen path
-- [ ] Wire into doc detail — find doc detail screen path
-- [ ] Wire into links detail — find links detail screen path
+- [x] Wire into plan item_detail — lib/screens/plan/item_detail.dart (build 255)
+- [x] Wire into doc detail — lib/screens/docs/doc_detail.dart (build 255)
+- [n/a] Stay detail — no dedicated detail screen; accommodations use an edit-only bottom sheet
+- [n/a] Links detail — no dedicated detail screen; links open directly in browser
 - [ ] TODO #253 logged for future cleanup of scattered foreign keys ✓
 
 ## TODO for future cleanup (Build 253+ placeholder)

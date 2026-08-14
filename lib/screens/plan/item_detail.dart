@@ -15,6 +15,8 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
+import '../../data/connection_data.dart';
+import '../shared/connections_section.dart';
 import '../spots/spot_detail.dart';
 import 'add_item_sheet.dart';
 import 'doc_attach_sheet.dart';
@@ -202,6 +204,26 @@ class _ItemDetailContentState extends ConsumerState<ItemDetailContent> {
                 onDelete: widget.onDelete, onUpdated: widget.onUpdated,
                 onMove: widget.onMove, onDuplicate: widget.onDuplicate,
               ),
+
+              // ── Connections ───────────────────────────────────────────────────
+              Builder(builder: (context) {
+                final tripId = ref.read(activeTripProvider)?.id;
+                if (tripId == null) return const SizedBox.shrink();
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: kSpace4),
+                    const Divider(height: 1),
+                    const SizedBox(height: kSpace4),
+                    ConnectionsSection(
+                      entityType: EntityType.planItem,
+                      entityId: widget.item.id,
+                      tripId: tripId,
+                      days: widget.days,
+                    ),
+                  ],
+                );
+              }),
 
               // ── Comments ─────────────────────────────────────────────────────
               const SizedBox(height: kSpace4),

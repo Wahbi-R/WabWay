@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/maps_import_service.dart';
 import '../../core/place_search_service.dart';
 import '../../core/providers/trip_provider.dart';
@@ -169,8 +170,10 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
   bool          _loading   = false;
   bool          _mapsLoading = false;
   bool          _classifying = false;
+  bool          _notifyOnAdd = true;
   String?       _error;
 
+  static const _kPrefSpotNotify = 'spot_add_notify';
   final _categoryKey = GlobalKey();
 
   // Location from suggestion or Maps URL
@@ -209,6 +212,10 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
       _longitude = widget.initialLongitude;
     }
     _mapsCtrl.addListener(_onMapsUrlChanged);
+    SharedPreferences.getInstance().then((p) {
+      if (!mounted) return;
+      setState(() => _notifyOnAdd = p.getBool(_kPrefSpotNotify) ?? true);
+    });
   }
 
   @override
@@ -439,7 +446,7 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
         );
       }
       widget.onSubmit(spot);
-      if (!widget.isEditing) {
+      if (!widget.isEditing && _notifyOnAdd) {
         pushNotify(
           tripId: widget.tripId,
           title: 'New spot added',
@@ -682,7 +689,38 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
                     ),
                   ],
 
-                  const SizedBox(height: kSpace6),
+                  if (!widget.isEditing) ...[
+                    const SizedBox(height: kSpace5),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Notify crew', style: kStyleBodyMedium),
+                              Text(
+                                _notifyOnAdd
+                                    ? 'Crew will get a push notification'
+                                    : 'No notification will be sent',
+                                style: kStyleCaption.copyWith(color: kColorInkSoft),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Switch.adaptive(
+                          value: _notifyOnAdd,
+                          activeColor: kColorPrimary,
+                          onChanged: (v) {
+                            setState(() => _notifyOnAdd = v);
+                            SharedPreferences.getInstance()
+                                .then((p) => p.setBool(_kPrefSpotNotify, v));
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+
+                  const SizedBox(height: kSpace4),
 
                   WabwayButton(
                     label: widget.isEditing ? 'Save changes' : 'Add spot',

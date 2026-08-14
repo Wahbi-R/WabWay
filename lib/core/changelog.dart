@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 258,
+    label: 'Spot notification toggle',
+    changes: [
+      'Adding a spot now has a "Notify crew" switch — turn it off to add spots in bulk without pinging everyone',
+      'The toggle remembers your last choice across adds',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 257,
     label: 'Smarter spot category',
     changes: [

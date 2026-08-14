@@ -18,6 +18,7 @@ import '../../widgets/widgets.dart';
 import 'add_travel_sheet.dart';
 import '../plan/day_picker_sheet.dart';
 import '../plan/doc_attach_sheet.dart';
+import '../../data/connection_data.dart';
 import '../shared/connections_section.dart';
 
 // ─── Mobile screen ────────────────────────────────────────────────────────────

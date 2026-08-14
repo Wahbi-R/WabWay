@@ -354,7 +354,7 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
         out.add(_Result(
           kind:     _ResultKind.packing,
           title:    p.title,
-          subtitle: p.isPacked ? 'Packed ✓' : 'Not yet packed',
+          subtitle: p.checks.isNotEmpty ? 'Packed by ${p.checks.length}' : 'Not yet packed',
           icon:     Icons.luggage_rounded,
           onTap: (_) {},
         ));

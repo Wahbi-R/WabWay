@@ -17,6 +17,7 @@ import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 import '../plan/day_picker_sheet.dart';
+import '../../data/connection_data.dart';
 import '../shared/connections_section.dart';
 import 'add_spot_sheet.dart';
 import 'spot_vote_chip.dart';

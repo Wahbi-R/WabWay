@@ -222,12 +222,15 @@ class _DayHeader extends StatelessWidget {
                             style:
                                 kStyleCaption.copyWith(color: kColorInkSoft)),
                         const SizedBox(width: kSpace2),
-                        Text(
-                          fmtDate(day.date),
-                          style: GoogleFonts.ibmPlexMono(
-                            fontSize: kTextSm,
-                            fontWeight: FontWeight.w500,
-                            color: kColorInkSoft,
+                        Flexible(
+                          child: Text(
+                            fmtDate(day.date),
+                            style: GoogleFonts.ibmPlexMono(
+                              fontSize: kTextSm,
+                              fontWeight: FontWeight.w500,
+                              color: kColorInkSoft,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -237,9 +240,12 @@ class _DayHeader extends StatelessWidget {
                         const Icon(Icons.location_city_rounded,
                             size: 11, color: kColorInkSoft),
                         const SizedBox(width: 3),
-                        Text(
-                          day.city,
-                          style: kStyleCaption.copyWith(fontSize: 12),
+                        Flexible(
+                          child: Text(
+                            day.city,
+                            style: kStyleCaption.copyWith(fontSize: 12),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                         // Inline truncated notes (hidden when expanded)
                         if (hasNotes && !expanded) ...[
@@ -277,12 +283,15 @@ class _DayHeader extends StatelessWidget {
                           children: [
                             const Icon(Icons.schedule_rounded, size: 11, color: kColorInkSoft),
                             const SizedBox(width: 3),
-                            Text(
-                              '${timed.first.time} → ${timed.last.time}',
-                              style: GoogleFonts.ibmPlexMono(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w400,
-                                color: kColorInkSoft,
+                            Flexible(
+                              child: Text(
+                                '${timed.first.time} → ${timed.last.time}',
+                                style: GoogleFonts.ibmPlexMono(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w400,
+                                  color: kColorInkSoft,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],

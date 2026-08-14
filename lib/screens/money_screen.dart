@@ -1486,9 +1486,11 @@ class _SpendingSummaryCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Text('Spending by category',
-                    style: kStyleCaption.copyWith(color: kColorInkSoft)),
-                const Spacer(),
+                Expanded(
+                  child: Text('Spending by category',
+                      style: kStyleCaption.copyWith(color: kColorInkSoft),
+                      overflow: TextOverflow.ellipsis),
+                ),
                 if (avgPerDay != null) ...[
                   Text(
                     '~${fmtAmount(avgPerDay, homeCurrency)}/day',

@@ -26,6 +26,27 @@ abstract final class PlaceSearchService {
     return searchPhoton(query, limit: limit);
   }
 
+  /// Ask wabway-server to classify a place name + address using Claude Haiku.
+  /// Returns null when the server is unavailable or classification fails.
+  static Future<SpotCategory?> classifyPlace(String name, String address) async {
+    if (_kServerUrl.isEmpty) return null;
+    try {
+      final body = <String, dynamic>{'name': name};
+      if (address.isNotEmpty) body['address'] = address;
+      final response = await http.post(
+        Uri.parse('$_kServerUrl/places/classify'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      ).timeout(_kTimeout);
+      if (response.statusCode != 200) return null;
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      final slug = (json['category'] as String?)?.trim() ?? '';
+      return slug.isNotEmpty ? _categoryFromSlug(slug) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Fetch a CDN photo URL for a Google Places place_id via wabway-server.
   /// Returns null when the server is unavailable or has no photo for the place.
   static Future<String?> fetchPhotoUrl(String placeId) async {

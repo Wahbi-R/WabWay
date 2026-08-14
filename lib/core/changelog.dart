@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 257,
+    label: 'Smarter spot category',
+    changes: [
+      'Category now auto-fills correctly when you pick a place from search',
+      'When the category can\'t be determined from the place type, AI suggests the best match in the background',
+      'Submitting without a category selected now scrolls you directly to the category field',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 256,
     label: 'Unified connections',
     changes: [

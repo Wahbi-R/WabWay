@@ -168,7 +168,10 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
   SpotStatus    _status    = SpotStatus.idea;
   bool          _loading   = false;
   bool          _mapsLoading = false;
+  bool          _classifying = false;
   String?       _error;
+
+  final _categoryKey = GlobalKey();
 
   // Location from suggestion or Maps URL
   double? _latitude;
@@ -280,18 +283,36 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
     _addressCtrl.text = place.address;
     _countryCtrl.text = place.country;
     _mapsCtrl.text    = place.mapsUrl;
+
+    // If the search returned no specific category (defaulted to landmark),
+    // try to infer one from the place name for better auto-selection.
+    final inferred = place.category != SpotCategory.landmark
+        ? place.category
+        : _inferCategoryFromName(place.name);
+
     setState(() {
-      // If the search returned no specific category (defaulted to landmark),
-      // try to infer one from the place name for better auto-selection.
-      _category    = place.category != SpotCategory.landmark
-          ? place.category
-          : _inferCategoryFromName(place.name);
-      _latitude    = place.latitude;
-      _longitude   = place.longitude;
-      _placeSource = 'place_search';
-      _placeId     = place.placeId;
+      _category        = inferred;
+      _latitude        = place.latitude;
+      _longitude       = place.longitude;
+      _placeSource     = 'place_search';
+      _placeId         = place.placeId;
       _showAddrResults = false;
       _addrResults     = [];
+    });
+
+    // When the category is still uncertain (landmark default), ask Claude.
+    if (inferred == SpotCategory.landmark) {
+      _classifyWithAI(place.name, place.address);
+    }
+  }
+
+  Future<void> _classifyWithAI(String name, String address) async {
+    setState(() => _classifying = true);
+    final category = await PlaceSearchService.classifyPlace(name, address);
+    if (!mounted) return;
+    setState(() {
+      _classifying = false;
+      if (category != null) _category = category;
     });
   }
 
@@ -355,7 +376,20 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      if (_category == null) {
+        final ctx = _categoryKey.currentContext;
+        if (ctx != null) {
+          Scrollable.ensureVisible(
+            ctx,
+            duration: const Duration(milliseconds: 350),
+            curve: Curves.easeInOut,
+            alignment: 0.3,
+          );
+        }
+      }
+      return;
+    }
     setState(() { _loading = true; _error = null; });
     try {
       final Spot spot;
@@ -560,6 +594,7 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
                   const SizedBox(height: kSpace4),
 
                   WabwaySelectField<SpotCategory>(
+                    key: _categoryKey,
                     label: 'Category',
                     hint: 'Pick a category',
                     value: _category,
@@ -569,6 +604,20 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
                         .toList(),
                     validator: (v) => v == null ? 'Pick a category' : null,
                   ),
+                  if (_classifying) ...[
+                    const SizedBox(height: kSpace2),
+                    Row(
+                      children: [
+                        const SizedBox(
+                          width: 12, height: 12,
+                          child: CircularProgressIndicator(strokeWidth: 1.5),
+                        ),
+                        const SizedBox(width: kSpace2),
+                        Text('AI is suggesting a category…',
+                            style: kStyleCaption.copyWith(color: kColorInkSoft)),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: kSpace4),
 
                   WabwaySelectField<SpotStatus>(

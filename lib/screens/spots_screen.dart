@@ -63,6 +63,10 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
   _SpotSort _sortBy = _SpotSort.newest;
   final _searchCtrl = TextEditingController();
 
+  // Multi-select / bulk-delete
+  bool _selectionMode = false;
+  Set<String> _selectedIds = {};
+
   int get _advancedFilterCount =>
       _filterStatuses.length + (_filterCity != null ? 1 : 0);
 
@@ -327,6 +331,107 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
     }
   }
 
+  // ─── Multi-select ────────────────────────────────────────────────────────────
+
+  void _enterSelectionMode(String spotId) {
+    setState(() {
+      _selectionMode = true;
+      _selectedIds = {spotId};
+    });
+  }
+
+  void _exitSelectionMode() {
+    setState(() {
+      _selectionMode = false;
+      _selectedIds = {};
+    });
+  }
+
+  void _toggleSelection(String spotId) {
+    setState(() {
+      if (_selectedIds.contains(spotId)) {
+        _selectedIds = {..._selectedIds}..remove(spotId);
+      } else {
+        _selectedIds = {..._selectedIds, spotId};
+      }
+      if (_selectedIds.isEmpty) {
+        _selectionMode = false;
+      }
+    });
+  }
+
+  Future<void> _deleteSelected() async {
+    final ids = List<String>.from(_selectedIds);
+    final deletable = ids.where((id) {
+      final spot = _spots.firstWhere((s) => s.id == id, orElse: () => _spots.first);
+      return _canDelete(spot);
+    }).toList();
+
+    final count = deletable.length;
+    final skipped = ids.length - count;
+    if (count == 0) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text("You don't have permission to delete the selected spots.",
+              style: kStyleBody.copyWith(color: Colors.white)),
+          backgroundColor: kColorDanger,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Delete $count ${count == 1 ? 'spot' : 'spots'}?',
+            style: kStyleBodyBold),
+        content: Text(
+          skipped > 0
+              ? 'This will permanently delete $count ${count == 1 ? 'spot' : 'spots'}. ($skipped skipped — you don\'t have permission to delete those.)'
+              : 'This will permanently delete $count ${count == 1 ? 'spot' : 'spots'}. This can\'t be undone.',
+          style: kStyleBody,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Delete', style: TextStyle(color: kColorDanger)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    int failed = 0;
+    for (final id in deletable) {
+      try {
+        await SpotService.deleteSpot(id);
+        if (mounted) {
+          setState(() {
+            _spots.removeWhere((s) => s.id == id);
+            if (_selectedId == id) _selectedId = null;
+          });
+        }
+      } catch (_) {
+        failed++;
+      }
+    }
+    if (!mounted) return;
+    _exitSelectionMode();
+    if (failed > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('$failed ${failed == 1 ? 'spot' : 'spots'} could not be deleted.',
+            style: kStyleBody.copyWith(color: Colors.white)),
+        backgroundColor: kColorDanger,
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
+  }
+
   // ─── Export ──────────────────────────────────────────────────────────────────
 
   // Shares the currently visible spots (after filter + sort) as a CSV.
@@ -545,6 +650,8 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
             showSearch: _showSearch,
             sortBy: _sortBy,
             canDelete: _canDelete,
+            selectionMode: _selectionMode,
+            selectedIds: _selectedIds,
             onSelectSpot: (s) => setState(() => _selectedId = s?.id),
             onFilterCategory: (c) => setState(() => _filterCategory = c),
             onToggleStatus: (s) => setState(() {
@@ -569,6 +676,10 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
             onEdit: _onEditSpot,
             onAdd: () => _addSpot(context),
             onOpenStay: (a) => _openStayDetailMobile(context, a),
+            onLongPressSpot: _enterSelectionMode,
+            onToggleSelection: _toggleSelection,
+            onExitSelectionMode: _exitSelectionMode,
+            onDeleteSelected: _deleteSelected,
           )
         : _MobileLayout(
             spots: _filtered,
@@ -582,9 +693,14 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
             searchCtrl: _searchCtrl,
             showSearch: _showSearch,
             sortBy: _sortBy,
+            selectionMode: _selectionMode,
+            selectedIds: _selectedIds,
             onOpenSpot: (s) => _openDetailMobile(context, s),
             onOpenStay: (a) => _openStayDetailMobile(context, a),
-            onLongPress: (s) => _quickStatusSheet(context, s),
+            onLongPress: _enterSelectionMode,
+            onToggleSelection: _toggleSelection,
+            onExitSelectionMode: _exitSelectionMode,
+            onDeleteSelected: _deleteSelected,
             onFilterCategory: (c) => setState(() => _filterCategory = c),
             onToggleStatus: (s) => setState(() {
               if (_filterStatuses.contains(s)) {
@@ -654,9 +770,14 @@ class _MobileLayout extends StatelessWidget {
     required this.searchCtrl,
     required this.showSearch,
     required this.sortBy,
+    required this.selectionMode,
+    required this.selectedIds,
     required this.onOpenSpot,
     required this.onOpenStay,
     required this.onLongPress,
+    required this.onToggleSelection,
+    required this.onExitSelectionMode,
+    required this.onDeleteSelected,
     required this.onFilterCategory,
     required this.onToggleStatus,
     required this.onSearch,
@@ -678,9 +799,14 @@ class _MobileLayout extends StatelessWidget {
   final TextEditingController searchCtrl;
   final bool showSearch;
   final _SpotSort sortBy;
+  final bool selectionMode;
+  final Set<String> selectedIds;
   final ValueChanged<Spot> onOpenSpot;
   final ValueChanged<Accommodation> onOpenStay;
-  final ValueChanged<Spot> onLongPress;
+  final ValueChanged<String> onLongPress;
+  final ValueChanged<String> onToggleSelection;
+  final VoidCallback onExitSelectionMode;
+  final Future<void> Function() onDeleteSelected;
   final ValueChanged<SpotCategory?> onFilterCategory;
   final ValueChanged<SpotStatus> onToggleStatus;
   final ValueChanged<String> onSearch;
@@ -697,76 +823,98 @@ class _MobileLayout extends StatelessWidget {
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
-            title: showSearch
-                ? _SearchField(controller: searchCtrl, onChanged: onSearch)
-                : Text('Spots', style: kStyleTitle),
+            leading: selectionMode
+                ? IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    color: kColorInkSoft,
+                    onPressed: onExitSelectionMode,
+                  )
+                : null,
+            title: selectionMode
+                ? Text(
+                    '${selectedIds.length} selected',
+                    style: kStyleTitle,
+                  )
+                : showSearch
+                    ? _SearchField(controller: searchCtrl, onChanged: onSearch)
+                    : Text('Spots', style: kStyleTitle),
             pinned: true,
-            actions: [
-              IconButton(
-                icon: Icon(
-                  showSearch ? Icons.close_rounded : Icons.search_rounded,
-                ),
-                color: kColorInkSoft,
-                onPressed: onToggleSearch,
-              ),
-              // Share the filtered list as a CSV
-              if (!showSearch && spots.isNotEmpty)
-                IconButton(
-                  icon: const Icon(Icons.ios_share_rounded),
-                  color: kColorInkSoft,
-                  tooltip: 'Export spots as CSV',
-                  onPressed: onExport,
-                ),
-              // Sort popup — icon is highlighted when a non-default sort is active
-              PopupMenuButton<_SpotSort>(
-                icon: Icon(
-                  Icons.sort_rounded,
-                  color: sortBy != _SpotSort.newest ? kColorPrimary : kColorInkSoft,
-                ),
-                tooltip: 'Sort',
-                onSelected: onSortChange,
-                itemBuilder: (_) => [
-                  _sortMenuItem(_SpotSort.newest,       'Newest first', sortBy),
-                  _sortMenuItem(_SpotSort.alphabetical, 'A – Z',        sortBy),
-                  _sortMenuItem(_SpotSort.mostVoted,    'Most voted',   sortBy),
-                  _sortMenuItem(_SpotSort.byCity,       'By city',      sortBy),
-                ],
-              ),
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.tune_rounded),
-                    color: advancedFilterCount > 0 ? kColorPrimary : kColorInkSoft,
-                    onPressed: onFilter,
-                  ),
-                  if (advancedFilterCount > 0)
-                    Positioned(
-                      right: 6,
-                      top: 6,
-                      child: Container(
-                        width: 14,
-                        height: 14,
-                        decoration: const BoxDecoration(
-                          color: kColorPrimary,
-                          shape: BoxShape.circle,
+            actions: selectionMode
+                ? [
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline_rounded),
+                      color: kColorDanger,
+                      tooltip: 'Delete selected',
+                      onPressed: selectedIds.isEmpty ? null : onDeleteSelected,
+                    ),
+                    const SizedBox(width: kSpace2),
+                  ]
+                : [
+                    IconButton(
+                      icon: Icon(
+                        showSearch ? Icons.close_rounded : Icons.search_rounded,
+                      ),
+                      color: kColorInkSoft,
+                      onPressed: onToggleSearch,
+                    ),
+                    // Share the filtered list as a CSV
+                    if (!showSearch && spots.isNotEmpty)
+                      IconButton(
+                        icon: const Icon(Icons.ios_share_rounded),
+                        color: kColorInkSoft,
+                        tooltip: 'Export spots as CSV',
+                        onPressed: onExport,
+                      ),
+                    // Sort popup — icon is highlighted when a non-default sort is active
+                    PopupMenuButton<_SpotSort>(
+                      icon: Icon(
+                        Icons.sort_rounded,
+                        color: sortBy != _SpotSort.newest ? kColorPrimary : kColorInkSoft,
+                      ),
+                      tooltip: 'Sort',
+                      onSelected: onSortChange,
+                      itemBuilder: (_) => [
+                        _sortMenuItem(_SpotSort.newest,       'Newest first', sortBy),
+                        _sortMenuItem(_SpotSort.alphabetical, 'A – Z',        sortBy),
+                        _sortMenuItem(_SpotSort.mostVoted,    'Most voted',   sortBy),
+                        _sortMenuItem(_SpotSort.byCity,       'By city',      sortBy),
+                      ],
+                    ),
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.tune_rounded),
+                          color: advancedFilterCount > 0 ? kColorPrimary : kColorInkSoft,
+                          onPressed: onFilter,
                         ),
-                        child: Center(
-                          child: Text(
-                            '$advancedFilterCount',
-                            style: kStyleCaption.copyWith(
-                              color: Colors.white,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
+                        if (advancedFilterCount > 0)
+                          Positioned(
+                            right: 6,
+                            top: 6,
+                            child: Container(
+                              width: 14,
+                              height: 14,
+                              decoration: const BoxDecoration(
+                                color: kColorPrimary,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  '$advancedFilterCount',
+                                  style: kStyleCaption.copyWith(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
+                      ],
                     ),
-                ],
-              ),
-              const SizedBox(width: kSpace2),
-            ],
+                    const SizedBox(width: kSpace2),
+                  ],
           ),
           SliverToBoxAdapter(
             child: _CategoryFilterStrip(
@@ -831,12 +979,21 @@ class _MobileLayout extends StatelessWidget {
                 itemCount: spots.length,
                 separatorBuilder: (_, __) =>
                     const SizedBox(height: kSpace3),
-                itemBuilder: (_, i) => SpotListTile(
-                  spot: spots[i],
-                  myVote: myVotes[spots[i].id],
-                  onTap: () => onOpenSpot(spots[i]),
-                  onLongPress: () => onLongPress(spots[i]),
-                ),
+                itemBuilder: (_, i) {
+                  final s = spots[i];
+                  return SpotListTile(
+                    spot: s,
+                    myVote: myVotes[s.id],
+                    inSelectionMode: selectionMode,
+                    checkedForDelete: selectedIds.contains(s.id),
+                    onTap: selectionMode
+                        ? () => onToggleSelection(s.id)
+                        : () => onOpenSpot(s),
+                    onLongPress: selectionMode
+                        ? () => onToggleSelection(s.id)
+                        : () => onLongPress(s.id),
+                  );
+                },
               ),
             ),
           if (stays.isNotEmpty)
@@ -846,15 +1003,17 @@ class _MobileLayout extends StatelessWidget {
           const SliverToBoxAdapter(child: SizedBox(height: kSpace16)),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'spots_fab',
-        onPressed: onAdd,
-        icon: const Icon(Icons.add_rounded),
-        label: Text(
-          'Add a spot',
-          style: kStyleButtonMd.copyWith(color: kColorTextOnPrimary),
-        ),
-      ),
+      floatingActionButton: selectionMode
+          ? null
+          : FloatingActionButton.extended(
+              heroTag: 'spots_fab',
+              onPressed: onAdd,
+              icon: const Icon(Icons.add_rounded),
+              label: Text(
+                'Add a spot',
+                style: kStyleButtonMd.copyWith(color: kColorTextOnPrimary),
+              ),
+            ),
     );
   }
 }
@@ -876,6 +1035,8 @@ class _DesktopLayout extends StatelessWidget {
     required this.showSearch,
     required this.sortBy,
     required this.canDelete,
+    required this.selectionMode,
+    required this.selectedIds,
     required this.onSelectSpot,
     required this.onFilterCategory,
     required this.onToggleStatus,
@@ -888,6 +1049,10 @@ class _DesktopLayout extends StatelessWidget {
     required this.onEdit,
     required this.onAdd,
     required this.onOpenStay,
+    required this.onLongPressSpot,
+    required this.onToggleSelection,
+    required this.onExitSelectionMode,
+    required this.onDeleteSelected,
   });
 
   final List<Spot> spots;
@@ -903,6 +1068,8 @@ class _DesktopLayout extends StatelessWidget {
   final bool showSearch;
   final _SpotSort sortBy;
   final bool Function(Spot) canDelete;
+  final bool selectionMode;
+  final Set<String> selectedIds;
   final ValueChanged<Spot?> onSelectSpot;
   final ValueChanged<SpotCategory?> onFilterCategory;
   final ValueChanged<SpotStatus> onToggleStatus;
@@ -915,6 +1082,10 @@ class _DesktopLayout extends StatelessWidget {
   final ValueChanged<Spot> onEdit;
   final VoidCallback onAdd;
   final ValueChanged<Accommodation> onOpenStay;
+  final ValueChanged<String> onLongPressSpot;
+  final ValueChanged<String> onToggleSelection;
+  final VoidCallback onExitSelectionMode;
+  final Future<void> Function() onDeleteSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -927,11 +1098,15 @@ class _DesktopLayout extends StatelessWidget {
             searchCtrl: searchCtrl,
             sortBy: sortBy,
             hasSpots: spots.isNotEmpty,
+            selectionMode: selectionMode,
+            selectedCount: selectedIds.length,
             onSearch: onSearch,
             onToggleSearch: onToggleSearch,
             onSortChange: onSortChange,
             onExport: onExport,
             onAdd: onAdd,
+            onExitSelectionMode: onExitSelectionMode,
+            onDeleteSelected: onDeleteSelected,
           ),
 
           Expanded(
@@ -995,11 +1170,18 @@ class _DesktopLayout extends StatelessWidget {
                                                 : 0),
                                         child: SpotListTile(
                                           spot: s,
-                                          selected: selected?.id == s.id,
+                                          selected: !selectionMode && selected?.id == s.id,
                                           myVote: myVotes[s.id],
-                                          onTap: () => onSelectSpot(
-                                            selected?.id == s.id ? null : s,
-                                          ),
+                                          inSelectionMode: selectionMode,
+                                          checkedForDelete: selectedIds.contains(s.id),
+                                          onTap: selectionMode
+                                              ? () => onToggleSelection(s.id)
+                                              : () => onSelectSpot(
+                                                  selected?.id == s.id ? null : s,
+                                                ),
+                                          onLongPress: selectionMode
+                                              ? () => onToggleSelection(s.id)
+                                              : () => onLongPressSpot(s.id),
                                         ),
                                       );
                                     }),
@@ -1055,22 +1237,30 @@ class _DesktopTopBar extends StatelessWidget {
     required this.searchCtrl,
     required this.sortBy,
     required this.hasSpots,
+    required this.selectionMode,
+    required this.selectedCount,
     required this.onSearch,
     required this.onToggleSearch,
     required this.onSortChange,
     required this.onExport,
     required this.onAdd,
+    required this.onExitSelectionMode,
+    required this.onDeleteSelected,
   });
 
   final bool showSearch;
   final TextEditingController searchCtrl;
   final _SpotSort sortBy;
   final bool hasSpots;
+  final bool selectionMode;
+  final int selectedCount;
   final ValueChanged<String> onSearch;
   final VoidCallback onToggleSearch;
   final ValueChanged<_SpotSort> onSortChange;
   final VoidCallback onExport;
   final VoidCallback onAdd;
+  final VoidCallback onExitSelectionMode;
+  final Future<void> Function() onDeleteSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -1081,54 +1271,74 @@ class _DesktopTopBar extends StatelessWidget {
         color: kColorPaper,
         border: Border(bottom: BorderSide(color: kColorBorder)),
       ),
-      child: Row(
-        children: [
-          Text('Spots', style: kStyleTitle),
-          const SizedBox(width: kSpace4),
-          if (showSearch)
-            Expanded(
-              child: _SearchField(controller: searchCtrl, onChanged: onSearch),
+      child: selectionMode
+          ? Row(
+              children: [
+                WabwayIconButton(
+                  icon: Icons.close_rounded,
+                  label: 'Cancel',
+                  onPressed: onExitSelectionMode,
+                ),
+                const SizedBox(width: kSpace3),
+                Text('$selectedCount selected', style: kStyleTitle),
+                const Spacer(),
+                WabwayButton(
+                  label: 'Delete',
+                  icon: Icons.delete_outline_rounded,
+                  size: WabwayButtonSize.sm,
+                  variant: WabwayButtonVariant.danger,
+                  onPressed: selectedCount == 0 ? null : onDeleteSelected,
+                ),
+              ],
             )
-          else
-            const Spacer(),
-          WabwayIconButton(
-            icon: showSearch ? Icons.close_rounded : Icons.search_rounded,
-            label: showSearch ? 'Close search' : 'Search',
-            onPressed: onToggleSearch,
-          ),
-          const SizedBox(width: kSpace2),
-          if (hasSpots)
-            WabwayIconButton(
-              icon: Icons.ios_share_rounded,
-              label: 'Export CSV',
-              onPressed: onExport,
+          : Row(
+              children: [
+                Text('Spots', style: kStyleTitle),
+                const SizedBox(width: kSpace4),
+                if (showSearch)
+                  Expanded(
+                    child: _SearchField(controller: searchCtrl, onChanged: onSearch),
+                  )
+                else
+                  const Spacer(),
+                WabwayIconButton(
+                  icon: showSearch ? Icons.close_rounded : Icons.search_rounded,
+                  label: showSearch ? 'Close search' : 'Search',
+                  onPressed: onToggleSearch,
+                ),
+                const SizedBox(width: kSpace2),
+                if (hasSpots)
+                  WabwayIconButton(
+                    icon: Icons.ios_share_rounded,
+                    label: 'Export CSV',
+                    onPressed: onExport,
+                  ),
+                const SizedBox(width: kSpace2),
+                // Sort popup for desktop
+                PopupMenuButton<_SpotSort>(
+                  icon: Icon(
+                    Icons.sort_rounded,
+                    color: sortBy != _SpotSort.newest ? kColorPrimary : kColorInkSoft,
+                    size: 20,
+                  ),
+                  tooltip: 'Sort',
+                  onSelected: onSortChange,
+                  itemBuilder: (_) => [
+                    _sortMenuItem(_SpotSort.newest,       'Newest first', sortBy),
+                    _sortMenuItem(_SpotSort.alphabetical, 'A – Z',        sortBy),
+                    _sortMenuItem(_SpotSort.mostVoted,    'Most voted',   sortBy),
+                    _sortMenuItem(_SpotSort.byCity,       'By city',      sortBy),
+                  ],
+                ),
+                const SizedBox(width: kSpace2),
+                WabwayButton(
+                  label: 'Add a spot',
+                  icon: Icons.add_rounded,
+                  size: WabwayButtonSize.sm,
+                  onPressed: onAdd,
+                ),
+              ],
             ),
-          const SizedBox(width: kSpace2),
-          // Sort popup for desktop
-          PopupMenuButton<_SpotSort>(
-            icon: Icon(
-              Icons.sort_rounded,
-              color: sortBy != _SpotSort.newest ? kColorPrimary : kColorInkSoft,
-              size: 20,
-            ),
-            tooltip: 'Sort',
-            onSelected: onSortChange,
-            itemBuilder: (_) => [
-              _sortMenuItem(_SpotSort.newest,       'Newest first', sortBy),
-              _sortMenuItem(_SpotSort.alphabetical, 'A – Z',        sortBy),
-              _sortMenuItem(_SpotSort.mostVoted,    'Most voted',   sortBy),
-              _sortMenuItem(_SpotSort.byCity,       'By city',      sortBy),
-            ],
-          ),
-          const SizedBox(width: kSpace2),
-          WabwayButton(
-            label: 'Add a spot',
-            icon: Icons.add_rounded,
-            size: WabwayButtonSize.sm,
-            onPressed: onAdd,
-          ),
-        ],
-      ),
     );
   }
 }

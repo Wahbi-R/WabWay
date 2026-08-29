@@ -14,6 +14,8 @@ class SpotListTile extends StatelessWidget {
     this.myVote,
     this.onTap,
     this.onLongPress,
+    this.inSelectionMode = false,
+    this.checkedForDelete = false,
   });
 
   final Spot spot;
@@ -21,6 +23,8 @@ class SpotListTile extends StatelessWidget {
   final VoteType? myVote;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
+  final bool inSelectionMode;
+  final bool checkedForDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -45,6 +49,8 @@ class SpotListTile extends StatelessWidget {
                           : isSkipped ? Icons.cancel_rounded
                           : null,
               overlayColor: isVisited ? kColorSuccess : kColorInkSoft,
+              inSelectionMode: inSelectionMode,
+              checkedForDelete: checkedForDelete,
             ),
             const SizedBox(width: kSpace4),
             Expanded(
@@ -166,11 +172,15 @@ class _PhotoSlot extends StatelessWidget {
     this.imageUrl,
     this.overlayIcon,
     this.overlayColor,
+    this.inSelectionMode = false,
+    this.checkedForDelete = false,
   });
   final SpotCategory category;
   final String?      imageUrl;
   final IconData?    overlayIcon;
   final Color?       overlayColor;
+  final bool         inSelectionMode;
+  final bool         checkedForDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -218,6 +228,27 @@ class _PhotoSlot extends StatelessWidget {
                   size: 16,
                   color: overlayColor,
                 ),
+              ),
+            ),
+          if (inSelectionMode)
+            Positioned(
+              top: 4,
+              left: 4,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: checkedForDelete ? kColorPrimary : Colors.white.withValues(alpha: 0.85),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: checkedForDelete ? kColorPrimary : kColorBorder,
+                    width: 1.5,
+                  ),
+                ),
+                child: checkedForDelete
+                    ? const Icon(Icons.check_rounded, size: 14, color: Colors.white)
+                    : null,
               ),
             ),
         ],

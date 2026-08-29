@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 261,
+    label: 'Multi-select delete on Spots',
+    changes: [
+      'Long-press any spot to enter selection mode — then tap others to add them to the selection',
+      'Tap the delete button in the toolbar to remove all selected spots at once',
+      'Works on both mobile and desktop',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 260,
     label: 'CSV import — spots now get photos',
     changes: [

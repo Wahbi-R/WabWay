@@ -3,6 +3,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../../core/images/wikipedia_image_service.dart';
+import '../../core/place_search_service.dart';
 import '../../core/places/google_maps_parser.dart';
 import '../../core/places/takeout_parser.dart';
 import '../../core/supabase/spot_service.dart';
@@ -199,9 +200,23 @@ class _MapsImportScreenState extends State<MapsImportScreen> {
         final batch = selectedIndices.skip(b).take(batchSize).toList();
         await Future.wait(batch.map((i) async {
           final p        = _places[i];
-          final imageUrl = kIsWeb
-              ? null
-              : await WikipediaImageService.fetchThumbnailUrl(p.name);
+          // Try Google Places photo first (works on web + native, good for
+          // specific shops/restaurants that Wikipedia won't have).
+          String? imageUrl;
+          final suggestions = await PlaceSearchService.search(
+            p.name,
+            latitude:  p.hasCoords ? p.lat : null,
+            longitude: p.hasCoords ? p.lon : null,
+            limit: 1,
+          );
+          final placeId = suggestions.isNotEmpty ? suggestions.first.placeId : null;
+          if (placeId != null) {
+            imageUrl = await PlaceSearchService.fetchPhotoUrl(placeId);
+          }
+          // Fall back to Wikipedia on native (web blocks custom User-Agent).
+          if (imageUrl == null && !kIsWeb) {
+            imageUrl = await WikipediaImageService.fetchThumbnailUrl(p.name);
+          }
           await SpotService.createSpot(
             tripId:      widget.tripId,
             name:        p.name,

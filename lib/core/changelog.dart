@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 259,
+    label: 'Documents — any member can rename',
+    changes: [
+      'Any trip member can now rename a shared document, not just the person who uploaded it',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 258,
     label: 'Spot notification toggle',
     changes: [

@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 260,
+    label: 'CSV import — spots now get photos',
+    changes: [
+      'Spots imported from a Google Maps CSV now pick up photos, just like manually added spots',
+      'Photos come from Google Places (via wabway-server), with Wikipedia as a fallback on the Android app',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 259,
     label: 'Documents — any member can rename',
     changes: [

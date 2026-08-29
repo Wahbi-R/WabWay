@@ -363,8 +363,8 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
   Future<void> _deleteSelected() async {
     final ids = List<String>.from(_selectedIds);
     final deletable = ids.where((id) {
-      final spot = _spots.firstWhere((s) => s.id == id, orElse: () => _spots.first);
-      return _canDelete(spot);
+      final spot = _spots.where((s) => s.id == id).firstOrNull;
+      return spot != null && _canDelete(spot);
     }).toList();
 
     final count = deletable.length;

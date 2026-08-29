@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 262,
+    label: 'Bug fix: multi-select delete',
+    changes: [
+      'Fixed a rare crash that could occur when deleting spots that had been removed by another trip member during your session',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 261,
     label: 'Multi-select delete on Spots',
     changes: [

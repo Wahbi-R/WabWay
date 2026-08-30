@@ -21,6 +21,13 @@ Use `supabase db push` for migrations. If there is a duplicate migration prefix 
 - **Push to wabway-server** immediately after every commit to the `wabway-server/` sub-repo, no need to ask.
 - Build command: `flutter build apk --debug --dart-define-from-file=.env` (omitting `.env` causes a black screen on launch).
 
+## wabway-server feature tracking
+
+Before every commit+push to `wabway-server/`, update `wabway-server/FEATURES.md`:
+- Add a dated section at the top describing what the commit adds or changes.
+- Keep entries brief but endpoint-specific (what the endpoint does, what changed).
+- This file is served by the `/version` endpoint so the user can check what's live on the phone vs what's on GitHub.
+
 ## TripState / ProfileState in routes
 
 These InheritedWidgets are not available inside a pushed `MaterialPageRoute`. Pass required data as explicit constructor parameters instead.

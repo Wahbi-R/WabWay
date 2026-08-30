@@ -402,6 +402,11 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
       final Spot spot;
       if (widget.isEditing) {
         final addrInput = _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim();
+        // Fetch a photo if we have a placeId and the spot currently has no image.
+        String? imageUrl;
+        if (_placeId != null && (widget.initialSpot!.imageUrl == null || widget.initialSpot!.imageUrl!.trim().isEmpty)) {
+          imageUrl = await PlaceSearchService.fetchPhotoUrl(_placeId!);
+        }
         spot = await SpotService.updateSpot(
           spotId:      widget.initialSpot!.id,
           name:        _nameCtrl.text.trim(),
@@ -417,6 +422,7 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
           latitude:    _latitude,
           longitude:   _longitude,
           placeSource: _placeSource,
+          imageUrl:    imageUrl,
         );
       } else {
         final addrInput = _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim();

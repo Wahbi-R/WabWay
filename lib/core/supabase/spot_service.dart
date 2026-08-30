@@ -199,6 +199,7 @@ abstract final class SpotService {
     double? latitude,
     double? longitude,
     String? placeSource,
+    String? imageUrl,
   }) async {
     final updated = await supabase
         .from('spots')
@@ -216,6 +217,7 @@ abstract final class SpotService {
           'latitude':     latitude,
           'longitude':    longitude,
           'place_source': placeSource,
+          if (imageUrl != null && imageUrl.trim().isNotEmpty) 'image_url': imageUrl.trim(),
         })
         .eq('id', spotId)
         .select('*, spot_votes(*), spot_comments(*)')

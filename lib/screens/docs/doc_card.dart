@@ -1,5 +1,7 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/image_cache_manager.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/providers/profile_provider.dart';
 import '../../core/providers/trip_provider.dart';
@@ -57,15 +59,13 @@ class DocGridCard extends ConsumerWidget {
                           return Stack(
                             fit: StackFit.expand,
                             children: [
-                              Image.network(
-                                snap.data!,
+                              CachedNetworkImage(
+                                imageUrl: snap.data!,
+                                cacheManager: WabwayImageCache.instance,
                                 fit: BoxFit.cover,
-                                frameBuilder: (ctx, child, frame, _) => AnimatedOpacity(
-                                  opacity: frame == null ? 0 : 1,
-                                  duration: const Duration(milliseconds: 200),
-                                  child: child,
-                                ),
-                                errorBuilder: (_, __, ___) => _IconArea(doc: doc),
+                                fadeInDuration: const Duration(milliseconds: 200),
+                                errorWidget: (_, __, ___) => _IconArea(doc: doc),
+                                placeholder: (_, __) => _IconArea(doc: doc),
                               ),
                               Positioned(
                                 top: kSpace2,
@@ -163,15 +163,13 @@ class DocListRow extends StatelessWidget {
                       future: DocService.getThumbnailUrl(doc.storagePath!, doc.ext),
                       builder: (context, snap) {
                         if (snap.hasData && snap.data != null) {
-                          return Image.network(
-                            snap.data!,
+                          return CachedNetworkImage(
+                            imageUrl: snap.data!,
+                            cacheManager: WabwayImageCache.instance,
                             fit: BoxFit.cover,
-                            frameBuilder: (ctx, child, frame, _) => AnimatedOpacity(
-                              opacity: frame == null ? 0 : 1,
-                              duration: const Duration(milliseconds: 200),
-                              child: child,
-                            ),
-                            errorBuilder: (_, __, ___) => _SmallIconBox(doc: doc),
+                            fadeInDuration: const Duration(milliseconds: 200),
+                            errorWidget: (_, __, ___) => _SmallIconBox(doc: doc),
+                            placeholder: (_, __) => _SmallIconBox(doc: doc),
                           );
                         }
                         return _SmallIconBox(doc: doc);

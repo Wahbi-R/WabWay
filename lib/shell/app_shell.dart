@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/providers/profile_provider.dart';
 import '../core/providers/trip_provider.dart';
+import '../widgets/offline_banner.dart';
 import '../core/share/share_handler.dart';
 import '../screens/share/incoming_share_screen.dart';
 import '../theme/app_colors.dart';
@@ -278,10 +279,11 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   @override
   Widget build(BuildContext context) {
+    final offline = ref.watch(tripNotifierProvider).offline;
     return LayoutBuilder(
       builder: (context, constraints) {
         final isDesktop = constraints.maxWidth >= kDesktopBreakpoint;
-        return isDesktop ? _DesktopShell(
+        final shell = isDesktop ? _DesktopShell(
           destinations: _desktopDestinations,
           selectedIndex: _desktopIndex,
           onDestinationSelected: (i) => setState(() => _desktopIndex = i),
@@ -289,6 +291,21 @@ class _AppShellState extends ConsumerState<AppShell> {
           destinations: _mobileDestinations,
           selectedIndex: _mobileIndex,
           onDestinationSelected: (i) => setState(() => _mobileIndex = i),
+        );
+        if (!offline) return shell;
+        return Stack(
+          children: [
+            shell,
+            Positioned(
+              bottom: isDesktop ? 0 : kBottomNavHeight,
+              left: 0,
+              right: 0,
+              child: OfflineBanner(
+                onRetry: () =>
+                    ref.read(tripNotifierProvider.notifier).load(),
+              ),
+            ),
+          ],
         );
       },
     );

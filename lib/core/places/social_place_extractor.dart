@@ -56,15 +56,23 @@ abstract final class SocialPlaceExtractor {
       final places = <NominatimPlace>[];
       final nominatimQueue = <String>[];
 
+      final nominatimSeen = <String>{};
+      void enqueue(String name) {
+        final key = name.toLowerCase();
+        if (name.isNotEmpty && nominatimSeen.add(key)) nominatimQueue.add(name);
+      }
+
       for (final entry in rawPlaces.take(8)) {
         final parts = entry.split('|').map((s) => s.trim()).toList();
         if (parts.length >= 6) {
           // Fully geocoded by server: name|lat|lon|city|country|category[|place_id]
+          final name = parts[0];
+          if (name.isEmpty) continue;
           final lat = double.tryParse(parts[1]);
           final lon = double.tryParse(parts[2]);
           if (lat != null && lon != null) {
             final place = NominatimPlace(
-              name:     parts[0],
+              name:     name,
               city:     parts[3],
               country:  parts[4],
               lat:      lat,
@@ -77,12 +85,11 @@ abstract final class SocialPlaceExtractor {
             }
           } else {
             // Malformed coords — fall back to Nominatim using the name field
-            if (parts[0].isNotEmpty) nominatimQueue.add(parts[0]);
+            enqueue(name);
           }
         } else {
-          // Raw name — queue for Nominatim (skip blank entries)
-          final trimmed = entry.trim();
-          if (trimmed.isNotEmpty) nominatimQueue.add(trimmed);
+          // Raw name — queue for Nominatim (skip blank/duplicate entries)
+          enqueue(entry.trim());
         }
       }
 

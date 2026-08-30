@@ -11,6 +11,60 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 279,
+    label: 'Map auto-fit fix',
+    changes: [
+      'Map now correctly fits to your spots on first open even when starting with an empty trip',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 276,
+    label: 'Add spot: better city & area fill',
+    changes: [
+      'Searching for a place now auto-fills the city and neighbourhood area fields',
+      'Existing city/area values are kept when the search result has no data for them',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 275,
+    label: 'Video spot import fixes',
+    changes: [
+      'Places from video with missing coordinates now still get looked up instead of disappearing',
+      'Spot photos from video sharing now load on web too',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 274,
+    label: 'Map spot improvements',
+    changes: [
+      'Spot details on the map no longer clip — everything scrolls fully',
+      'You can now delete a spot directly from the map bottom sheet',
+      'Spot detail has a "Show on map" button that opens the map centred on that spot',
+      '"Open in Maps" button renamed to "Open in Maps app" to be clearer',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 273,
+    label: 'Better spot photos from video',
+    changes: [
+      'Spots added from video sharing now use real Google Maps photos',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 272,
+    label: 'Smarter video spot import',
+    changes: [
+      'Video sharing now uses AI to identify restaurant and place names accurately',
+      'Spots found from videos are looked up via Google Maps for better results',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 271,
     label: 'Reliability fixes',
     changes: [

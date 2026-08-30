@@ -11,6 +11,7 @@ class NominatimPlace {
     required this.lon,
     required this.category,
     this.displayName = '',
+    this.placeId = '',
   });
 
   final String       name;
@@ -20,6 +21,8 @@ class NominatimPlace {
   final double       lon;
   final SpotCategory category;
   final String       displayName;
+  /// Google Places place_id — non-empty when geocoded via the wabway-server.
+  final String       placeId;
 }
 
 abstract final class NominatimService {

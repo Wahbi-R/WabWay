@@ -20,9 +20,11 @@ import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
 import '../widgets/widgets.dart';
+import 'package:latlong2/latlong.dart';
 import 'spots/spot_list_tile.dart';
 import 'spots/spot_detail.dart';
 import 'spots/add_spot_sheet.dart';
+import 'map_screen.dart';
 
 // Sort modes available on the spots list. Applied after filters and search.
 enum _SpotSort {
@@ -531,6 +533,19 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
           linkedStay: linkedStay,
           onOpenStay: linkedStay != null
               ? () => _openStayDetailMobile(context, linkedStay)
+              : null,
+          onShowOnMap: spot.isMapReady
+              ? () {
+                  Navigator.pop(context);
+                  Navigator.push<void>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => MapScreen(
+                        initialFocus: LatLng(spot.latitude!, spot.longitude!),
+                      ),
+                    ),
+                  );
+                }
               : null,
         ),
       ),

@@ -93,7 +93,7 @@ abstract final class PlaceSearchService {
           name:      (m['name']    as String?)?.trim() ?? '',
           address:   (m['address'] as String?)?.trim() ?? '',
           city:      city,
-          area:      '',
+          area:      (m['area']    as String?)?.trim() ?? '',
           country:   (m['country'] as String?)?.trim() ?? '',
           category:  _categoryFromSlug(m['category'] as String? ?? ''),
           latitude:  lat,

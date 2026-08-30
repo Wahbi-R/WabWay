@@ -46,6 +46,7 @@ class SpotDetailScreen extends ConsumerWidget {
     this.canDelete = false,
     this.onDelete,
     this.onEdit,
+    this.onShowOnMap,
     this.docs = const [],
     this.linkedStay,
     this.onOpenStay,
@@ -57,6 +58,7 @@ class SpotDetailScreen extends ConsumerWidget {
   final bool canDelete;
   final VoidCallback? onDelete;
   final ValueChanged<Spot>? onEdit;
+  final VoidCallback? onShowOnMap;
   final List<TripDocument> docs;
   final Accommodation? linkedStay;
   final VoidCallback? onOpenStay;
@@ -112,6 +114,7 @@ class SpotDetailScreen extends ConsumerWidget {
           docs: docs,
           linkedStay: linkedStay,
           onOpenStay: onOpenStay,
+          onShowOnMap: onShowOnMap,
         ),
       ),
     );
@@ -130,6 +133,7 @@ class SpotDetailContent extends ConsumerStatefulWidget {
     this.canDelete = false,
     this.onDelete,
     this.onEdit,
+    this.onShowOnMap,
     this.docs = const [],
     this.linkedStay,
     this.onOpenStay,
@@ -142,6 +146,7 @@ class SpotDetailContent extends ConsumerStatefulWidget {
   final bool canDelete;
   final VoidCallback? onDelete;
   final ValueChanged<Spot>? onEdit;
+  final VoidCallback? onShowOnMap;
   final List<TripDocument> docs;
   final Accommodation? linkedStay;
   final VoidCallback? onOpenStay;
@@ -357,7 +362,8 @@ class _SpotDetailContentState extends ConsumerState<SpotDetailContent> {
 
               // ── Links
               if (widget.spot.mapsUrl != null ||
-                  widget.spot.sourceUrl != null) ...[
+                  widget.spot.sourceUrl != null ||
+                  (widget.onShowOnMap != null && widget.spot.isMapReady)) ...[
                 Text('Links',
                     style: kStyleCaptionMedium.copyWith(color: kColorInk)),
                 const SizedBox(height: kSpace2),
@@ -365,9 +371,17 @@ class _SpotDetailContentState extends ConsumerState<SpotDetailContent> {
                   spacing: kSpace2,
                   runSpacing: kSpace2,
                   children: [
+                    if (widget.onShowOnMap != null && widget.spot.isMapReady)
+                      WabwayButton(
+                        label: 'Show on map',
+                        icon: Icons.location_on_rounded,
+                        variant: WabwayButtonVariant.ghost,
+                        size: WabwayButtonSize.sm,
+                        onPressed: widget.onShowOnMap,
+                      ),
                     if (widget.spot.mapsUrl != null)
                       WabwayButton(
-                        label: 'Open in Maps',
+                        label: 'Open in Maps app',
                         icon: Icons.map_rounded,
                         variant: WabwayButtonVariant.ghost,
                         size: WabwayButtonSize.sm,

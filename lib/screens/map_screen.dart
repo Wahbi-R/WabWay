@@ -23,7 +23,9 @@ import 'spots/spot_detail.dart';
 import 'spots/add_spot_sheet.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
-  const MapScreen({super.key});
+  const MapScreen({super.key, this.initialFocus});
+
+  final LatLng? initialFocus;
 
   @override
   ConsumerState<MapScreen> createState() => _MapScreenState();
@@ -156,9 +158,17 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   void _fitIfNeeded() {
     if (!_needsFit) return;
+    _needsFit = false;
+    final focus = widget.initialFocus;
+    if (focus != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _mapController.move(focus, 16);
+      });
+      return;
+    }
     final pts = _allMappedPoints;
     if (pts.isEmpty) return;
-    _needsFit = false;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (pts.length == 1) {
@@ -300,7 +310,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => DraggableScrollableSheet(
+      builder: (ctx) => DraggableScrollableSheet(
         initialChildSize: 0.7,
         minChildSize: 0.4,
         maxChildSize: 0.95,
@@ -311,6 +321,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           ),
           child: SingleChildScrollView(
             controller: ctrl,
+            padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(ctx).bottom),
             child: SpotDetailContent(
               spot: spot,
               myVote: _myVoteFor(spot, userId),
@@ -319,6 +330,15 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 final idx = _spots.indexWhere((s) => s.id == updated.id);
                 if (idx != -1) _spots[idx] = updated;
               }),
+              onDelete: spot.addedById == userId
+                  ? () async {
+                      final nav = Navigator.of(ctx);
+                      await SpotService.deleteSpot(spot.id);
+                      if (!mounted) return;
+                      setState(() => _spots.removeWhere((s) => s.id == spot.id));
+                      nav.pop();
+                    }
+                  : null,
             ),
           ),
         ),

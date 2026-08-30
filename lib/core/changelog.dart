@@ -11,6 +11,17 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 274,
+    label: 'Map spot improvements',
+    changes: [
+      'Spot details on the map no longer clip — everything scrolls fully',
+      'You can now delete a spot directly from the map bottom sheet',
+      'Spot detail has a "Show on map" button that opens the map centred on that spot',
+      '"Open in Maps" button renamed to "Open in Maps app" to be clearer',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 273,
     label: 'Better spot photos from video',
     changes: [

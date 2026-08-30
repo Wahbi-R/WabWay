@@ -1,4 +1,4 @@
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../../core/image_cache_manager.dart';
 import '../../core/places/listing_parser.dart';
@@ -384,7 +384,7 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
                 width: double.infinity,
                 height: 160,
                 fit: BoxFit.cover,
-                errorWidget: (_, __, ___) => const SizedBox.shrink(),
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
               ),
             ),
             const SizedBox(height: kSpace4),

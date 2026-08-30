@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../../core/image_cache_manager.dart';
@@ -447,7 +447,7 @@ class _AccommodationCard extends StatelessWidget {
                       width: 60,
                       height: 60,
                       fit: BoxFit.cover,
-                      errorWidget: (_, __, ___) => _ImagePlaceholder(source: source),
+                      errorBuilder: (_, __, ___) => _ImagePlaceholder(source: source),
                       placeholder: (_, __) => _ImagePlaceholder(source: source),
                     ),
                   ),

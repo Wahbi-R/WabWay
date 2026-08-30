@@ -1,4 +1,4 @@
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../core/image_cache_manager.dart';
@@ -446,7 +446,7 @@ class _ShoppingItemTile extends StatelessWidget {
                       width: 48,
                       height: 48,
                       fit: BoxFit.cover,
-                      errorWidget: (_, __, ___) => const SizedBox.shrink(),
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                     ),
                   ),
                 ] else if (item.linkUrl != null) ...[
@@ -808,7 +808,7 @@ class _ItemSheetState extends State<_ItemSheet> {
                               height: 160,
                               width: double.infinity,
                               fit: BoxFit.cover,
-                              errorWidget: (_, __, ___) => const SizedBox.shrink(),
+                              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                             ),
                           ),
                           Positioned(

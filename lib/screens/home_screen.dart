@@ -1,4 +1,4 @@
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -515,7 +515,7 @@ class _TripHero extends StatelessWidget {
                     cacheManager: WabwayImageCache.instance,
                     fit: BoxFit.cover,
                     fadeInDuration: const Duration(milliseconds: 300),
-                    errorWidget: (_, __, ___) => Container(color: kColorSurfaceSunken),
+                    errorBuilder: (_, __, ___) => Container(color: kColorSurfaceSunken),
                   ),
                   // Gradient overlay so text below stays readable
                   const DecoratedBox(

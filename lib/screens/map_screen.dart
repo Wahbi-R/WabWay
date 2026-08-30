@@ -209,6 +209,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Location services are off — enable them in Settings')),
           );
+          await Geolocator.openLocationSettings();
         }
         return;
       }
@@ -217,7 +218,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         permission = await Geolocator.requestPermission();
       }
       if (permission == LocationPermission.deniedForever) {
-        if (mounted) await Geolocator.openAppSettings();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location access is blocked — opening Settings')),
+          );
+          await Geolocator.openAppSettings();
+        }
         return;
       }
       if (permission == LocationPermission.denied) {
@@ -514,7 +520,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         // Current location button
         Positioned(
           right: kSpace4,
-          bottom: MediaQuery.paddingOf(context).bottom + kSpace3 + 72,
+          bottom: MediaQuery.paddingOf(context).bottom + kSpace3 + (totalUnmapped > 0 ? 72 : 0),
           child: FloatingActionButton.small(
             heroTag: 'map_location',
             backgroundColor: Colors.white,

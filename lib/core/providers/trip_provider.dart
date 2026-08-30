@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../offline_cache.dart';
 import '../trip/app_trip.dart';
 import '../trip/app_trip_member.dart';
 import '../supabase/trip_service.dart';
+import '../sync_queue.dart';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -12,6 +14,7 @@ class TripData {
     this.selectedIndex  = 0,
     this.loading        = true,
     this.error          = false,
+    this.offline        = false,
   });
 
   final List<AppTrip>       trips;
@@ -19,6 +22,8 @@ class TripData {
   final int                 selectedIndex;
   final bool                loading;
   final bool                error;
+  /// True when trips/members were loaded from local cache (no network).
+  final bool                offline;
 
   AppTrip? get activeTrip =>
       trips.isEmpty ? null : trips[selectedIndex];
@@ -29,12 +34,14 @@ class TripData {
     int?                 selectedIndex,
     bool?                loading,
     bool?                error,
+    bool?                offline,
   }) => TripData(
     trips:         trips         ?? this.trips,
     members:       members       ?? this.members,
     selectedIndex: selectedIndex ?? this.selectedIndex,
     loading:       loading       ?? this.loading,
     error:         error         ?? this.error,
+    offline:       offline       ?? this.offline,
   );
 }
 
@@ -43,25 +50,69 @@ class TripData {
 class TripNotifier extends StateNotifier<TripData> {
   TripNotifier() : super(const TripData());
 
-  Future<void> load() async {
-    state = state.copyWith(loading: true, error: false);
+  Future<void> load({bool silent = false}) async {
+    if (!silent) state = state.copyWith(loading: true, error: false, offline: false);
     try {
       final trips = await TripService.loadUserTrips();
+      await OfflineCache.write(
+        OfflineCache.userTripsKey,
+        trips.map((t) => t.toMap()).toList(),
+      );
       if (trips.isEmpty) {
-        state = state.copyWith(trips: [], members: [], loading: false);
+        state = state.copyWith(trips: [], members: [], loading: false, offline: false);
         return;
       }
       final idx     = state.selectedIndex.clamp(0, trips.length - 1);
       final members = await TripService.loadTripMembers(trips[idx].id);
+      await OfflineCache.write(
+        OfflineCache.membersKey(trips[idx].id),
+        members.map((m) => m.toMap()).toList(),
+      );
       state = state.copyWith(
         trips:        trips,
         members:      members,
         selectedIndex: idx,
         loading:      false,
+        offline:      false,
       );
     } catch (_) {
-      state = state.copyWith(loading: false, error: true);
+      if (silent) {
+        state = state.copyWith(offline: true);
+        return;
+      }
+      final cachedTrips = await OfflineCache.read<List<AppTrip>>(
+        OfflineCache.userTripsKey,
+        (json) => (json as List)
+            .map((m) => AppTrip.fromMap(m as Map<String, dynamic>))
+            .toList(),
+      );
+      if (cachedTrips != null && cachedTrips.isNotEmpty) {
+        final idx = state.selectedIndex.clamp(0, cachedTrips.length - 1);
+        final cachedMembers = await OfflineCache.read<List<AppTripMember>>(
+          OfflineCache.membersKey(cachedTrips[idx].id),
+          (json) => (json as List)
+              .map((m) => AppTripMember.fromMap(m as Map<String, dynamic>))
+              .toList(),
+        ) ?? const [];
+        state = state.copyWith(
+          trips:         cachedTrips,
+          members:       cachedMembers,
+          selectedIndex: idx,
+          loading:       false,
+          error:         false,
+          offline:       true,
+        );
+      } else {
+        state = state.copyWith(loading: false, error: true);
+      }
     }
+  }
+
+  /// Called when connectivity is restored. Reloads silently and drains queues.
+  Future<void> onReconnect(String userId) async {
+    await load(silent: true);
+    final tripId = state.activeTrip?.id;
+    if (tripId != null) await SyncQueue.drain(tripId, userId);
   }
 
   Future<void> switchTrip(AppTrip trip) async {
@@ -70,13 +121,28 @@ class TripNotifier extends StateNotifier<TripData> {
     state = state.copyWith(loading: true);
     try {
       final members = await TripService.loadTripMembers(trip.id);
+      await OfflineCache.write(
+        OfflineCache.membersKey(trip.id),
+        members.map((m) => m.toMap()).toList(),
+      );
       state = state.copyWith(
         selectedIndex: idx,
         members:       members,
         loading:       false,
       );
     } catch (_) {
-      state = state.copyWith(loading: false);
+      final cached = await OfflineCache.read<List<AppTripMember>>(
+        OfflineCache.membersKey(trip.id),
+        (json) => (json as List)
+            .map((e) => AppTripMember.fromMap(e as Map<String, dynamic>))
+            .toList(),
+      );
+      state = state.copyWith(
+        selectedIndex: idx,
+        members:       cached ?? [],
+        loading:       false,
+        offline:       true,
+      );
     }
   }
 

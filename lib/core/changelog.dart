@@ -11,6 +11,44 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 271,
+    label: 'Reliability fixes',
+    changes: [
+      'Sign-out now reliably works even if a network error occurs mid-logout',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 270,
+    label: 'Faster image loading',
+    changes: [
+      'Cached photos now load up to 8× faster thanks to a new storage engine',
+      'Your device can now cache up to 600 photos (up from 150)',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 269,
+    label: 'Full offline mode',
+    changes: [
+      'Photos now load from your device cache when you\'re offline',
+      'Your crew members are remembered offline so money splits still show everyone',
+      'Receipts saved while offline are automatically synced when you reconnect',
+      'The app reconnects silently in the background — no more manual retry needed',
+      'Offline banner now appears at the trip level, not just inside each screen',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 268,
+    label: 'Works offline',
+    changes: [
+      'The app no longer gets stuck on the splash screen when opened without internet',
+      'Your trips and profile load from cache so you can browse offline after your first online session',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 267,
     label: 'Map: current location button',
     changes: [

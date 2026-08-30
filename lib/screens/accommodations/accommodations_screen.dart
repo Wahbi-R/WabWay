@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import '../../core/image_cache_manager.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -439,12 +441,14 @@ class _AccommodationCard extends StatelessWidget {
                 if (hasImage) ...[
                   ClipRRect(
                     borderRadius: kRadiusSm,
-                    child: Image.network(
-                      item.imageUrl!,
+                    child: CachedNetworkImage(
+                      imageUrl: item.imageUrl!,
+                      cacheManager: WabwayImageCache.instance,
                       width: 60,
                       height: 60,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => _ImagePlaceholder(source: source),
+                      placeholder: (_, __) => _ImagePlaceholder(source: source),
                     ),
                   ),
                   const SizedBox(width: kSpace3),

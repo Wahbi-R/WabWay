@@ -43,5 +43,18 @@ class AppTrip {
         groupChatUrl:    map['group_chat_url'] as String?,
       );
 
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'name': name,
+        'default_currency': defaultCurrency,
+        'home_currency': homeCurrency,
+        'destination': destination,
+        'start_date': startDate?.toIso8601String(),
+        'end_date': endDate?.toIso8601String(),
+        'cover_image_url': coverImageUrl,
+        'budget': budget,
+        'group_chat_url': groupChatUrl,
+      };
+
   String get subtitle => destination ?? '';
 }

@@ -42,4 +42,6 @@ abstract final class OfflineCache {
   static String moneyWithdrawalsKey(String tripId)  => 'cache_money_withdrawals_$tripId';
   static String tripShellKey(String tripId)         => 'cache_trip_shell_$tripId';
   static String get userTripsKey                     => 'cache_user_trips';
+  static String get profileKey                       => 'cache_profile';
+  static String membersKey(String tripId)            => 'cache_members_$tripId';
 }

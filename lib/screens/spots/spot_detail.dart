@@ -1,6 +1,8 @@
+import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/image_cache_manager.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/providers/profile_provider.dart';
 import '../../core/providers/trip_provider.dart';
@@ -916,13 +918,13 @@ class _PhotoHeader extends StatelessWidget {
             ),
           ),
           if (imageUrl != null)
-            Image.network(
-              imageUrl!,
+            CachedNetworkImage(
+              imageUrl: imageUrl!,
+              cacheManager: WabwayImageCache.instance,
               fit: BoxFit.cover,
-              cacheWidth: 800,
+              memCacheWidth: 800,
               errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-              loadingBuilder: (_, child, progress) =>
-                  progress == null ? child : const SizedBox.shrink(),
+              placeholder: (_, __) => const SizedBox.shrink(),
             )
           else
             Center(

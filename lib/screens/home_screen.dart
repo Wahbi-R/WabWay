@@ -1,6 +1,8 @@
+import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/image_cache_manager.dart';
 import '../widgets/android_download_banner.dart';
 import '../widgets/update_checker_banner.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -508,14 +510,11 @@ class _TripHero extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.network(
-                    trip.coverImageUrl!,
+                  CachedNetworkImage(
+                    imageUrl: trip.coverImageUrl!,
+                    cacheManager: WabwayImageCache.instance,
                     fit: BoxFit.cover,
-                    frameBuilder: (ctx, child, frame, _) => AnimatedOpacity(
-                      opacity: frame == null ? 0 : 1,
-                      duration: const Duration(milliseconds: 300),
-                      child: child,
-                    ),
+                    fadeInDuration: const Duration(milliseconds: 300),
                     errorBuilder: (_, __, ___) => Container(color: kColorSurfaceSunken),
                   ),
                   // Gradient overlay so text below stays readable

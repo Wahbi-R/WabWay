@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/auth/app_profile.dart';
+import '../../core/connectivity_service.dart';
 import '../../core/debug/app_logger.dart';
+import '../../core/offline_cache.dart';
 import '../../core/providers/profile_provider.dart';
 import '../../core/supabase/auth_service.dart';
 import '../../core/supabase/client.dart';
@@ -41,13 +43,14 @@ class _AuthGateState extends ConsumerState<AuthGate> {
     }
   }
 
+
   @override
   void dispose() {
     _sub.cancel();
     super.dispose();
   }
 
-  void _onAuthChange(AuthState state) {
+  Future<void> _onAuthChange(AuthState state) async {
     AppLogger.instance.log(
         'authStateChange → ${state.event}  uid=${state.session?.user.id}',
         tag: 'AUTH');
@@ -58,6 +61,20 @@ class _AuthGateState extends ConsumerState<AuthGate> {
         final uid = state.session?.user.id;
         if (uid != null && _profile == null) _fetchProfile(uid);
       case AuthChangeEvent.signedOut:
+        // Suppress automatic sign-out (e.g. failed token refresh) when offline,
+        // but always honour an explicit user-initiated sign-out.
+        final isOnline = ref.read(connectivityProvider);
+        if (!isOnline && !AuthService.consumeUserInitiatedSignOut()) {
+          final cached = await OfflineCache.read<AppProfile>(
+            OfflineCache.profileKey,
+            (json) => AppProfile.fromMap(json as Map<String, dynamic>),
+          );
+          if (cached != null && mounted) {
+            ref.read(profileProvider.notifier).set(cached);
+            setState(() => _loading = false);
+            return;
+          }
+        }
         if (mounted) {
           ref.read(profileProvider.notifier).set(null);
           setState(() { _loading = false; _showPasswordRecovery = false; });
@@ -73,7 +90,8 @@ class _AuthGateState extends ConsumerState<AuthGate> {
           .from('profiles')
           .select()
           .eq('id', userId)
-          .maybeSingle();
+          .maybeSingle()
+          .timeout(const Duration(seconds: 6));
       if (!mounted) return;
       final profile = data != null
           ? AppProfile.fromMap(data)
@@ -87,10 +105,21 @@ class _AuthGateState extends ConsumerState<AuthGate> {
                   supabase.auth.currentUser?.userMetadata?['display_name'] != null,
               email: supabase.auth.currentUser?.email ?? '',
             );
+      await OfflineCache.write(OfflineCache.profileKey, profile.toMap());
       ref.read(profileProvider.notifier).set(profile);
       if (mounted) setState(() => _loading = false);
     } catch (_) {
-      if (mounted) setState(() => _loading = false);
+      // Network unavailable — fall back to cached profile so the user can
+      // browse their trips offline without being stuck on the splash screen.
+      final cached = await OfflineCache.read<AppProfile>(
+        OfflineCache.profileKey,
+        (json) => AppProfile.fromMap(json as Map<String, dynamic>),
+      );
+      if (!mounted) return;
+      if (cached != null) {
+        ref.read(profileProvider.notifier).set(cached);
+      }
+      setState(() => _loading = false);
     }
   }
 
@@ -102,14 +131,17 @@ class _AuthGateState extends ConsumerState<AuthGate> {
         current?.copyWith(displayName: name, displayNameIsSet: true));
   }
 
-  void _refreshProfile() {
-    final uid = _profile?.id ?? supabase.auth.currentUser?.id;
-    if (uid != null) _fetchProfile(uid);
-  }
-
   @override
   Widget build(BuildContext context) {
     final profile = ref.watch(profileProvider);
+
+    // When connectivity is restored, silently refresh the profile.
+    ref.listen<bool>(connectivityProvider, (prev, isOnline) {
+      if (isOnline && prev == false) {
+        final uid = _profile?.id ?? supabase.auth.currentUser?.id;
+        if (uid != null) _fetchProfile(uid);
+      }
+    });
 
     if (_loading) return const _SplashScreen();
 

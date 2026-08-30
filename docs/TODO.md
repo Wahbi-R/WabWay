@@ -2,6 +2,7 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **271. Fix sign-out flag not reset on exception** — `AuthService.signOut()` now resets `_userInitiatedSignOut` to `false` if `supabase.auth.signOut()` throws, preventing a stale flag from incorrectly suppressing a future offline sign-out (2026-08-30, build 271).
 - [x] **267. Map: current location button** — tapping the location button recenters the map on the user's current GPS position (2026-08-30).
 - [x] **266. Map labels in English** — switch tile provider to Esri World Street Map; all map labels now display in English worldwide (2026-08-30).
 - [x] **265. Add OSM attribution to map** — add `SimpleAttributionWidget` to map screen for OpenStreetMap tile compliance (2026-08-30).
@@ -127,6 +128,13 @@ Checked items are done. Log the date and a one-liner when completing something.
 - [x] **61. Auto-fetch spot thumbnails** — on spots load, spots with `imageUrl == null` are queued for Wikipedia thumbnail lookup in background; `_thumbnailAttempted` set prevents re-fetching; results streamed into list and written back to DB (2026-07-09).
 - [x] **62. Plan item improvements** — spot picker at top of add-item sheet autofills title/address/city/country/mapsUrl and links the spot; location field now autocompletes via Photon; country field added to `ItineraryItem`; migration `008_itinerary_country.sql` (2026-07-09, see `docs/features/phase 3/plan-item-improvements.md`).
 - [ ] **253. Trip connections cleanup** — migrate scattered `linked_spot_id`, `linked_doc_ids`, `linked_itinerary_item_id` columns into `trip_connections` and remove old columns + service methods (future sprint, after trip-connections feature is proven).
+- [x] **270. Swap to cached_network_image_ce** — replaced `cached_network_image` with `cached_network_image_ce` (Hive CE backend, 8× faster reads); bumped cache to 600 images, 14-day TTL; `DefaultCacheManager` replaces `CacheManager(Config(...))` API (2026-08-30, build 270).
+- [x] **269. Comprehensive offline support** — session-expiry sign-out suppressed when offline (cached profile kept); members now cached and restored offline; offline flag surfaced in AppShell with banner; SyncQueue wired for receipt saves; auto-reload + SyncQueue drain on reconnect; all Image.network replaced with CachedNetworkImage (600-file LRU, 14-day TTL cap) for photo offline access (2026-08-30, build 269).
+- [x] **268. Offline cold-start fix** — app no longer hangs on the splash screen when opened without internet; profile fetch now has a 6 s timeout and falls back to a cached profile; trip list also falls back to cache so users reach their trips offline (2026-08-30, build 268).
+- [x] **267. Map: current location button** — see remote build 267.
+- [x] **266. Map now shows English labels** — see remote build 266.
+- [x] **265. Fix: OSM attribution added to map** — see remote build 265.
+- [x] **264. Fix: map no longer shows API key watermark** — see remote build 264.
 - [x] **263. Spots: editing a spot now fetches a photo if one is missing** — when editing a spot that has no image and the place search resolves a placeId, the Google Places photo is fetched and saved alongside the other edits (2026-08-29, build 263).
 - [x] **262. Fix multi-select delete crash when spot disappears mid-session** — `_deleteSelected` used `firstWhere(..., orElse: () => _spots.first)` which could return the wrong spot (or crash on an empty list) when a selected ID was no longer in the list; replaced with `.where(...).firstOrNull` so missing IDs are safely skipped (2026-08-29, build 262).
 - [x] **261. Multi-select delete on Spots page** — long-press a spot tile enters selection mode; tapping tiles toggles selection; app bar switches to "N selected" + delete button; delete confirms then removes all deletable selected spots; FAB hidden during selection; checkbox overlay on photo slot indicates selection state; works on both mobile and desktop (2026-08-29, build 261).

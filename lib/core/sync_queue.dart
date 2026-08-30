@@ -31,9 +31,33 @@ abstract final class SyncQueue {
     } catch (_) {}
   }
 
-  static Future<void> enqueueReceipt(String tripId, Map<String, dynamic> payload) async {
+  static Future<void> enqueueReceipt(String tripId, {
+    required String paidBy,
+    required String title,
+    required double amount,
+    required String currency,
+    required double homeAmount,
+    required double exchangeRate,
+    required double transactionFeePct,
+    required ReceiptCategory category,
+    required DateTime date,
+    required List<ReceiptSplit> splits,
+    String? notes,
+  }) async {
     final list = await _pending(tripId);
-    list.add(payload);
+    list.add({
+      'paidBy': paidBy,
+      'title': title,
+      'amount': amount,
+      'currency': currency,
+      'homeAmount': homeAmount,
+      'exchangeRate': exchangeRate,
+      'transactionFeePct': transactionFeePct,
+      'category': category.name,
+      'date': date.toIso8601String(),
+      'notes': notes,
+      'splits': splits.map((s) => {'memberId': s.memberId, 'amount': s.amount}).toList(),
+    });
     await _save(tripId, list);
   }
 
@@ -45,19 +69,37 @@ abstract final class SyncQueue {
     final failed = <Map<String, dynamic>>[];
     for (final item in list) {
       try {
-        final amt = (item['amount'] as num).toDouble();
+        final paidBy     = item['paidBy'] as String? ?? userId;
+        final homeAmount = (item['homeAmount'] as num?)?.toDouble()
+            ?? (item['amount'] as num).toDouble();
+        var rawSplits = (item['splits'] as List?)
+            ?.map((s) => ReceiptSplit(
+                  memberId: s['memberId'] as String,
+                  amount: (s['amount'] as num).toDouble(),
+                ))
+            .toList() ?? [];
+        // Guard against empty splits (older payloads or corrupted cache) by
+        // falling back to a single split covering the full amount for the payer.
+        if (rawSplits.isEmpty) {
+          rawSplits = [ReceiptSplit(memberId: paidBy, amount: homeAmount)];
+        }
+        final category = ReceiptCategory.values.firstWhere(
+          (c) => c.name == item['category'],
+          orElse: () => ReceiptCategory.other,
+        );
         await MoneyService.createReceipt(
           tripId:            tripId,
-          paidBy:            userId,
+          paidBy:            paidBy,
           title:             item['title'] as String,
-          amount:            amt,
+          amount:            (item['amount'] as num).toDouble(),
           currency:          item['currency'] as String? ?? 'USD',
-          homeAmount:        amt,
-          exchangeRate:      1.0,
-          transactionFeePct: 0.0,
-          category:          ReceiptCategory.other,
+          homeAmount:        homeAmount,
+          exchangeRate:      (item['exchangeRate'] as num?)?.toDouble() ?? 1.0,
+          transactionFeePct: (item['transactionFeePct'] as num?)?.toDouble() ?? 0.0,
+          category:          category,
           date:              DateTime.tryParse(item['date'] as String? ?? '') ?? DateTime.now(),
-          splits:            [ReceiptSplit(memberId: userId, amount: amt)],
+          splits:            rawSplits,
+          notes:             item['notes'] as String?,
         );
       } catch (_) {
         failed.add(item);

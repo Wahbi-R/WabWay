@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/connectivity_service.dart';
 import '../../core/invite/invite_link_handler.dart';
+import '../../core/providers/profile_provider.dart';
 import '../../core/providers/trip_provider.dart';
 import '../../core/supabase/client.dart';
 import '../../core/supabase/invite_service.dart';
@@ -92,6 +94,16 @@ class _TripGateState extends ConsumerState<TripGate> {
   @override
   Widget build(BuildContext context) {
     final tripData = ref.watch(tripNotifierProvider);
+
+    // Auto-reload and drain queued writes when connectivity is restored.
+    ref.listen<bool>(connectivityProvider, (prev, isOnline) {
+      if (isOnline && prev == false) {
+        final userId = ref.read(profileProvider)?.id;
+        if (userId != null && userId.isNotEmpty) {
+          ref.read(tripNotifierProvider.notifier).onReconnect(userId);
+        }
+      }
+    });
 
     if (tripData.loading) return const _TripLoadingScreen();
     if (tripData.error)   return _ErrorScreen(onRetry: _reload);

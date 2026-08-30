@@ -11,6 +11,22 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 267,
+    label: 'Map: current location button',
+    changes: [
+      'Tap the location button on the map to instantly jump to where you are',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 266,
+    label: 'Map now shows English labels',
+    changes: [
+      'Map labels now appear in English worldwide instead of the local language',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 265,
     label: 'Fix: OSM attribution added to map',
     changes: [

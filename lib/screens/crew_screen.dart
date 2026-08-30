@@ -1528,11 +1528,11 @@ class _MapTab extends StatelessWidget {
           ),
           children: [
             TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              urlTemplate: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
               userAgentPackageName: 'ca.wabble.wabway',
             ),
             const SimpleAttributionWidget(
-              source: Text('© OpenStreetMap contributors'),
+              source: Text('Tiles © Esri'),
             ),
             MarkerLayer(
               markers: locations.map((loc) {

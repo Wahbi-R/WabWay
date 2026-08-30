@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:math' show min, max;
 import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
@@ -40,6 +42,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   final _mapController = MapController();
   bool _needsFit = true;   // fit-to-bounds on first successful load only
+  bool _locating = false;
 
   @override
   void initState() {
@@ -195,6 +198,72 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     if (spot.votes.maybe.contains(userId)) return VoteType.maybe;
     if (spot.votes.skip.contains(userId)) return VoteType.skip;
     return null;
+  }
+
+  Future<void> _goToMyLocation() async {
+    if (_locating) return;
+    setState(() => _locating = true);
+    try {
+      if (kIsWeb) {
+        // On web the browser handles the permission prompt directly.
+        final pos = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.medium,
+            timeLimit: Duration(seconds: 15),
+          ),
+        );
+        if (mounted) _mapController.move(LatLng(pos.latitude, pos.longitude), 15);
+        return;
+      }
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location services are off — enable them in Settings')),
+          );
+          await Geolocator.openLocationSettings();
+        }
+        return;
+      }
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location access is blocked — opening Settings')),
+          );
+          await Geolocator.openAppSettings();
+        }
+        return;
+      }
+      if (permission == LocationPermission.denied) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location permission denied')),
+          );
+        }
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 15),
+        ),
+      );
+      if (mounted) {
+        _mapController.move(LatLng(pos.latitude, pos.longitude), 15);
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not get location')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
   }
 
   Future<void> _addSpotAtLatLng(LatLng point) async {
@@ -421,13 +490,14 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           ),
           children: [
             TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              // Esri World Street Map — English labels worldwide, no API key required
+              urlTemplate: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
               userAgentPackageName: 'ca.wabble.wabway',
               maxNativeZoom: 19,
               maxZoom: 22,
             ),
             const SimpleAttributionWidget(
-              source: Text('© OpenStreetMap contributors'),
+              source: Text('Tiles © Esri'),
             ),
             MarkerLayer(
               markers: visible.map((spot) {
@@ -459,45 +529,67 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         ),
         _categoryFilterStrip(),
 
-        // Unmapped count banner
-        if (totalUnmapped > 0)
-          Positioned(
-            bottom: MediaQuery.paddingOf(context).bottom + kSpace3,
-            left: kSpace4,
-            right: kSpace4,
-            child: DecoratedBox(
-              decoration: kCardDecoration(),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: kSpace4, vertical: kSpace3),
-                child: Row(
-                  children: [
-                    const Icon(Icons.info_outline_rounded,
-                        size: 16, color: kColorInkSoft),
-                    const SizedBox(width: kSpace2),
-                    Expanded(
-                      child: Text(
-                        '$totalUnmapped item${totalUnmapped == 1 ? '' : 's'} without coordinates — switch to List to see all.',
-                        style: kStyleCaption.copyWith(color: kColorInkSoft),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () => setState(() => _showMap = false),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: kSpace2, vertical: 0),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      child: Text('See all',
-                          style: kStyleCaptionMedium.copyWith(
-                              color: kColorPrimary)),
-                    ),
-                  ],
-                ),
+        // FAB + unmapped banner stacked in a column at the bottom
+        Positioned(
+          bottom: MediaQuery.paddingOf(context).bottom + kSpace3,
+          left: kSpace4,
+          right: kSpace4,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              FloatingActionButton.small(
+                heroTag: 'map_location',
+                backgroundColor: Colors.white,
+                foregroundColor: kColorPrimary,
+                elevation: 2,
+                tooltip: 'Go to my location',
+                onPressed: _locating ? null : _goToMyLocation,
+                child: _locating
+                    ? const SizedBox(
+                        width: 18, height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.my_location),
               ),
-            ),
+              if (totalUnmapped > 0) ...[
+                const SizedBox(height: kSpace3),
+                DecoratedBox(
+                  decoration: kCardDecoration(),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: kSpace4, vertical: kSpace3),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.info_outline_rounded,
+                            size: 16, color: kColorInkSoft),
+                        const SizedBox(width: kSpace2),
+                        Expanded(
+                          child: Text(
+                            '$totalUnmapped item${totalUnmapped == 1 ? '' : 's'} without coordinates — switch to List to see all.',
+                            style: kStyleCaption.copyWith(color: kColorInkSoft),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () => setState(() => _showMap = false),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: kSpace2, vertical: 0),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: Text('See all',
+                              style: kStyleCaptionMedium.copyWith(
+                                  color: kColorPrimary)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
+        ),
       ],
     );
   }

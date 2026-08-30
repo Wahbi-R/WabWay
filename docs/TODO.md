@@ -2,7 +2,7 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
-- [x] **264. Fix map tiles** — switch map screen from Carto Voyager (requires API key) to OpenStreetMap tiles; removes "API KEY REQUIRED" watermark (2026-08-30).
+- [x] **265. Fix map tiles + OSM attribution** — switch map screen from Carto Voyager (requires API key) to OpenStreetMap; add `SimpleAttributionWidget` for OSM compliance; removes "API KEY REQUIRED" watermark (2026-08-30).
 
 ---
 

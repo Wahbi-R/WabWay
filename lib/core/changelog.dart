@@ -11,10 +11,11 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
-    build: 264,
-    label: 'Fix: map no longer shows API key watermark',
+    build: 265,
+    label: 'Fix: map tiles and OSM attribution',
     changes: [
       'The map now loads cleanly without the "API KEY REQUIRED" watermark',
+      'OpenStreetMap attribution is shown in the corner of the map as required',
     ],
   ),
   _Release(

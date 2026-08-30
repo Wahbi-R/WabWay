@@ -426,6 +426,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               maxNativeZoom: 19,
               maxZoom: 22,
             ),
+            const SimpleAttributionWidget(
+              source: Text('© OpenStreetMap contributors'),
+            ),
             MarkerLayer(
               markers: visible.map((spot) {
                 return Marker(

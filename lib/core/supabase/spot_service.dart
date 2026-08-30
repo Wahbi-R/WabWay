@@ -217,7 +217,7 @@ abstract final class SpotService {
           'latitude':     latitude,
           'longitude':    longitude,
           'place_source': placeSource,
-          if (imageUrl != null) 'image_url': imageUrl,
+          if (imageUrl != null && imageUrl.trim().isNotEmpty) 'image_url': imageUrl.trim(),
         })
         .eq('id', spotId)
         .select('*, spot_votes(*), spot_comments(*)')

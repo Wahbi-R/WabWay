@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../../data/spot_data.dart';
 import 'nominatim_service.dart';
 import 'oembed_service.dart';
 
@@ -49,17 +50,47 @@ abstract final class SocialPlaceExtractor {
 
       if (transcript.isEmpty) return null;
 
-      // Geocode each server-extracted place name via Nominatim
+      // Server returns either pipe-delimited geocoded strings (Google Places)
+      // or raw names (when no Google Places key). Parse geocoded ones directly;
+      // fall back to Nominatim for raw names.
       final places = <NominatimPlace>[];
-      for (final name in rawPlaces.take(8)) {
-        final results = await NominatimService.search(name);
+      final nominatimQueue = <String>[];
+
+      for (final entry in rawPlaces.take(8)) {
+        final parts = entry.split('|');
+        if (parts.length == 6) {
+          // Fully geocoded by server: name|lat|lon|city|country|category
+          final lat = double.tryParse(parts[1]);
+          final lon = double.tryParse(parts[2]);
+          if (lat != null && lon != null) {
+            final place = NominatimPlace(
+              name:     parts[0],
+              city:     parts[3],
+              country:  parts[4],
+              lat:      lat,
+              lon:      lon,
+              category: _categoryFromSlug(parts[5]),
+            );
+            if (!places.any((p) => p.name.toLowerCase() == place.name.toLowerCase())) {
+              places.add(place);
+            }
+          }
+        } else {
+          // Raw name — queue for Nominatim
+          nominatimQueue.add(entry);
+        }
+      }
+
+      // Nominatim fallback for any raw names (rate-limited to 1 req/s)
+      for (int i = 0; i < nominatimQueue.length; i++) {
+        final results = await NominatimService.search(nominatimQueue[i]);
         if (results.isNotEmpty) {
           final best = results.first;
           if (!places.any((p) => p.name.toLowerCase() == best.name.toLowerCase())) {
             places.add(best);
           }
         }
-        if (rawPlaces.indexOf(name) < rawPlaces.length - 1) {
+        if (i < nominatimQueue.length - 1) {
           await Future<void>.delayed(const Duration(milliseconds: 1100));
         }
       }
@@ -121,6 +152,19 @@ abstract final class SocialPlaceExtractor {
     }
 
     return SocialPlaceResult(caption: caption, places: places);
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  static SpotCategory _categoryFromSlug(String slug) {
+    switch (slug) {
+      case 'food':       return SpotCategory.food;
+      case 'nature':     return SpotCategory.nature;
+      case 'experience': return SpotCategory.experience;
+      case 'shopping':   return SpotCategory.shopping;
+      case 'nightlife':  return SpotCategory.nightlife;
+      default:           return SpotCategory.landmark;
+    }
   }
 
   // ── Candidate extraction ──────────────────────────────────────────────────

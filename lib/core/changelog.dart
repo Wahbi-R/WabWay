@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 272,
+    label: 'Smarter video spot import',
+    changes: [
+      'Video sharing now uses AI to identify restaurant and place names accurately',
+      'Spots found from videos are looked up via Google Maps for better results',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 271,
     label: 'Reliability fixes',
     changes: [

@@ -1531,6 +1531,9 @@ class _MapTab extends StatelessWidget {
               urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
               userAgentPackageName: 'ca.wabble.wabway',
             ),
+            const SimpleAttributionWidget(
+              source: Text('© OpenStreetMap contributors'),
+            ),
             MarkerLayer(
               markers: locations.map((loc) {
                 final member = _memberById(loc.userId);

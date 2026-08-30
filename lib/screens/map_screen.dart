@@ -421,13 +421,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           ),
           children: [
             TileLayer(
-              // Carto Voyager — English/Latin labels worldwide
-              urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-              subdomains: const ['a', 'b', 'c', 'd'],
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
               userAgentPackageName: 'ca.wabble.wabway',
               maxNativeZoom: 19,
               maxZoom: 22,
-              additionalOptions: const {'lang': 'en'},
+            ),
+            const SimpleAttributionWidget(
+              source: Text('© OpenStreetMap contributors'),
             ),
             MarkerLayer(
               markers: visible.map((spot) {

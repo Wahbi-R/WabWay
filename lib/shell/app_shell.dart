@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/providers/profile_provider.dart';
+import '../core/connectivity_service.dart';
 import '../core/providers/trip_provider.dart';
 import '../widgets/offline_banner.dart';
 import '../core/share/share_handler.dart';
@@ -279,7 +280,8 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    final offline = ref.watch(tripNotifierProvider).offline;
+    final offline = ref.watch(tripNotifierProvider).offline ||
+        !ref.watch(connectivityProvider);
     return LayoutBuilder(
       builder: (context, constraints) {
         final isDesktop = constraints.maxWidth >= kDesktopBreakpoint;

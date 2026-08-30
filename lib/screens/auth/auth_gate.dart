@@ -105,7 +105,7 @@ class _AuthGateState extends ConsumerState<AuthGate> {
                   supabase.auth.currentUser?.userMetadata?['display_name'] != null,
               email: supabase.auth.currentUser?.email ?? '',
             );
-      OfflineCache.write(OfflineCache.profileKey, profile.toMap());
+      await OfflineCache.write(OfflineCache.profileKey, profile.toMap());
       ref.read(profileProvider.notifier).set(profile);
       if (mounted) setState(() => _loading = false);
     } catch (_) {

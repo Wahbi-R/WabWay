@@ -54,7 +54,7 @@ class TripNotifier extends StateNotifier<TripData> {
     if (!silent) state = state.copyWith(loading: true, error: false, offline: false);
     try {
       final trips = await TripService.loadUserTrips();
-      OfflineCache.write(
+      await OfflineCache.write(
         OfflineCache.userTripsKey,
         trips.map((t) => t.toMap()).toList(),
       );
@@ -64,7 +64,7 @@ class TripNotifier extends StateNotifier<TripData> {
       }
       final idx     = state.selectedIndex.clamp(0, trips.length - 1);
       final members = await TripService.loadTripMembers(trips[idx].id);
-      OfflineCache.write(
+      await OfflineCache.write(
         OfflineCache.membersKey(trips[idx].id),
         members.map((m) => m.toMap()).toList(),
       );

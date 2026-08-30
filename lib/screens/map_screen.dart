@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' show min, max;
 import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -203,6 +204,17 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     if (_locating) return;
     setState(() => _locating = true);
     try {
+      if (kIsWeb) {
+        // On web the browser handles the permission prompt directly.
+        final pos = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.medium,
+            timeLimit: Duration(seconds: 15),
+          ),
+        );
+        if (mounted) _mapController.move(LatLng(pos.latitude, pos.longitude), 15);
+        return;
+      }
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         if (mounted) {
@@ -517,65 +529,67 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         ),
         _categoryFilterStrip(),
 
-        // Current location button
+        // FAB + unmapped banner stacked in a column at the bottom
         Positioned(
+          bottom: MediaQuery.paddingOf(context).bottom + kSpace3,
+          left: kSpace4,
           right: kSpace4,
-          bottom: MediaQuery.paddingOf(context).bottom + kSpace3 + (totalUnmapped > 0 ? 72 : 0),
-          child: FloatingActionButton.small(
-            heroTag: 'map_location',
-            backgroundColor: Colors.white,
-            foregroundColor: kColorPrimary,
-            elevation: 2,
-            tooltip: 'Go to my location',
-            onPressed: _locating ? null : _goToMyLocation,
-            child: _locating
-                ? const SizedBox(
-                    width: 18, height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.my_location),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              FloatingActionButton.small(
+                heroTag: 'map_location',
+                backgroundColor: Colors.white,
+                foregroundColor: kColorPrimary,
+                elevation: 2,
+                tooltip: 'Go to my location',
+                onPressed: _locating ? null : _goToMyLocation,
+                child: _locating
+                    ? const SizedBox(
+                        width: 18, height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.my_location),
+              ),
+              if (totalUnmapped > 0) ...[
+                const SizedBox(height: kSpace3),
+                DecoratedBox(
+                  decoration: kCardDecoration(),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: kSpace4, vertical: kSpace3),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.info_outline_rounded,
+                            size: 16, color: kColorInkSoft),
+                        const SizedBox(width: kSpace2),
+                        Expanded(
+                          child: Text(
+                            '$totalUnmapped item${totalUnmapped == 1 ? '' : 's'} without coordinates — switch to List to see all.',
+                            style: kStyleCaption.copyWith(color: kColorInkSoft),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () => setState(() => _showMap = false),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: kSpace2, vertical: 0),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: Text('See all',
+                              style: kStyleCaptionMedium.copyWith(
+                                  color: kColorPrimary)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
-
-        // Unmapped count banner
-        if (totalUnmapped > 0)
-          Positioned(
-            bottom: MediaQuery.paddingOf(context).bottom + kSpace3,
-            left: kSpace4,
-            right: kSpace4,
-            child: DecoratedBox(
-              decoration: kCardDecoration(),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: kSpace4, vertical: kSpace3),
-                child: Row(
-                  children: [
-                    const Icon(Icons.info_outline_rounded,
-                        size: 16, color: kColorInkSoft),
-                    const SizedBox(width: kSpace2),
-                    Expanded(
-                      child: Text(
-                        '$totalUnmapped item${totalUnmapped == 1 ? '' : 's'} without coordinates — switch to List to see all.',
-                        style: kStyleCaption.copyWith(color: kColorInkSoft),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () => setState(() => _showMap = false),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: kSpace2, vertical: 0),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      child: Text('See all',
-                          style: kStyleCaptionMedium.copyWith(
-                              color: kColorPrimary)),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
       ],
     );
   }

@@ -2,9 +2,11 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../core/notifications/push_notifier.dart';
 import '../../core/receipt_scan_service.dart';
 import '../../core/supabase/client.dart';
+import '../../core/sync_queue.dart';
 import '../../core/supabase/doc_service.dart';
 import '../../core/supabase/exchange_rate_service.dart';
 import '../../core/supabase/money_service.dart';
@@ -493,6 +495,37 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
         );
       }
     } catch (_) {
+      // If offline and this is a new receipt (not an edit), queue it for replay.
+      if (!_isEditing && widget.tripId != null) {
+        final connectivity = await Connectivity().checkConnectivity();
+        final isOffline = connectivity.every((r) => r == ConnectivityResult.none);
+        if (isOffline) {
+          await SyncQueue.enqueueReceipt(
+            widget.tripId!,
+            paidBy:            _paidById,
+            title:             title,
+            amount:            total,
+            currency:          _currency,
+            homeAmount:        homeTotal,
+            exchangeRate:      exchangeRate,
+            transactionFeePct: feePct,
+            category:          _category,
+            date:              DateTime.now(),
+            splits:            splits,
+            notes:             notes,
+          );
+          if (mounted) {
+            Navigator.of(context).pop();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Saved offline — will sync when you reconnect'),
+                duration: Duration(seconds: 4),
+              ),
+            );
+          }
+          return;
+        }
+      }
       if (mounted) setState(() { _loading = false; _error = 'Could not save receipt.'; });
     }
   }

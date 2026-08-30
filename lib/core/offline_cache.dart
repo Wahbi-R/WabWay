@@ -43,4 +43,5 @@ abstract final class OfflineCache {
   static String tripShellKey(String tripId)         => 'cache_trip_shell_$tripId';
   static String get userTripsKey                     => 'cache_user_trips';
   static String get profileKey                       => 'cache_profile';
+  static String membersKey(String tripId)            => 'cache_members_$tripId';
 }

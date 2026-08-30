@@ -1,5 +1,7 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../../core/image_cache_manager.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers/trip_provider.dart';
@@ -438,12 +440,13 @@ class _ShoppingItemTile extends StatelessWidget {
                   const SizedBox(width: kSpace2),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(6),
-                    child: Image.network(
-                      item.imageUrl!,
+                    child: CachedNetworkImage(
+                      imageUrl: item.imageUrl!,
+                      cacheManager: WabwayImageCache.instance,
                       width: 48,
                       height: 48,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                      errorWidget: (_, __, ___) => const SizedBox.shrink(),
                     ),
                   ),
                 ] else if (item.linkUrl != null) ...[
@@ -799,12 +802,13 @@ class _ItemSheetState extends State<_ItemSheet> {
                         children: [
                           ClipRRect(
                             borderRadius: kRadiusMd,
-                            child: Image.network(
-                              _imageUrl!,
+                            child: CachedNetworkImage(
+                              imageUrl: _imageUrl!,
+                              cacheManager: WabwayImageCache.instance,
                               height: 160,
                               width: double.infinity,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                              errorWidget: (_, __, ___) => const SizedBox.shrink(),
                             ),
                           ),
                           Positioned(

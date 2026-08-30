@@ -1,6 +1,8 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/image_cache_manager.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -834,10 +836,11 @@ class _ImagePreviewState extends State<_ImagePreview> {
                 ),
               )
             : _url != null
-                ? Image.network(
-                    _url!,
+                ? CachedNetworkImage(
+                    imageUrl: _url!,
+                    cacheManager: WabwayImageCache.instance,
                     fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const SizedBox(
+                    errorWidget: (_, __, ___) => const SizedBox(
                       height: 80,
                       child: Center(
                         child: Icon(Icons.broken_image_rounded, color: kColorInkSoft, size: 32),

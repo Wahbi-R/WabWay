@@ -11,6 +11,18 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 269,
+    label: 'Full offline mode',
+    changes: [
+      'Photos now load from your device cache when you\'re offline',
+      'Your crew members are remembered offline so money splits still show everyone',
+      'Receipts saved while offline are automatically synced when you reconnect',
+      'The app reconnects silently in the background — no more manual retry needed',
+      'Offline banner now appears at the trip level, not just inside each screen',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 268,
     label: 'Works offline',
     changes: [

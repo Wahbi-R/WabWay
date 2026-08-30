@@ -28,4 +28,12 @@ class AppTripMember {
       departureDate: map['departure_date'] != null ? DateTime.parse(map['departure_date'] as String) : null,
     );
   }
+
+  Map<String, dynamic> toMap() => {
+        'user_id': userId,
+        'role': role,
+        'arrival_date': arrivalDate?.toIso8601String(),
+        'departure_date': departureDate?.toIso8601String(),
+        'profiles': profile.toMap(),
+      };
 }

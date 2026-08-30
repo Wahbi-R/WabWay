@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/auth/app_profile.dart';
+import '../../core/connectivity_service.dart';
 import '../../core/debug/app_logger.dart';
 import '../../core/offline_cache.dart';
 import '../../core/providers/profile_provider.dart';
@@ -42,13 +43,14 @@ class _AuthGateState extends ConsumerState<AuthGate> {
     }
   }
 
+
   @override
   void dispose() {
     _sub.cancel();
     super.dispose();
   }
 
-  void _onAuthChange(AuthState state) {
+  Future<void> _onAuthChange(AuthState state) async {
     AppLogger.instance.log(
         'authStateChange → ${state.event}  uid=${state.session?.user.id}',
         tag: 'AUTH');
@@ -59,6 +61,20 @@ class _AuthGateState extends ConsumerState<AuthGate> {
         final uid = state.session?.user.id;
         if (uid != null && _profile == null) _fetchProfile(uid);
       case AuthChangeEvent.signedOut:
+        // If we're offline the sign-out was likely a failed token refresh, not
+        // a real sign-out. Keep the cached profile so the user stays in the app.
+        final isOnline = ref.read(connectivityProvider);
+        if (!isOnline) {
+          final cached = await OfflineCache.read<AppProfile>(
+            OfflineCache.profileKey,
+            (json) => AppProfile.fromMap(json as Map<String, dynamic>),
+          );
+          if (cached != null && mounted) {
+            ref.read(profileProvider.notifier).set(cached);
+            setState(() => _loading = false);
+            return;
+          }
+        }
         if (mounted) {
           ref.read(profileProvider.notifier).set(null);
           setState(() { _loading = false; _showPasswordRecovery = false; });
@@ -115,14 +131,17 @@ class _AuthGateState extends ConsumerState<AuthGate> {
         current?.copyWith(displayName: name, displayNameIsSet: true));
   }
 
-  void _refreshProfile() {
-    final uid = _profile?.id ?? supabase.auth.currentUser?.id;
-    if (uid != null) _fetchProfile(uid);
-  }
-
   @override
   Widget build(BuildContext context) {
     final profile = ref.watch(profileProvider);
+
+    // When connectivity is restored, silently refresh the profile.
+    ref.listen<bool>(connectivityProvider, (prev, isOnline) {
+      if (isOnline && prev == false) {
+        final uid = _profile?.id ?? supabase.auth.currentUser?.id;
+        if (uid != null) _fetchProfile(uid);
+      }
+    });
 
     if (_loading) return const _SplashScreen();
 

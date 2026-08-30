@@ -1,4 +1,6 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import '../../core/image_cache_manager.dart';
 import '../../data/spot_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
@@ -200,15 +202,15 @@ class _PhotoSlot extends StatelessWidget {
               border: Border.all(color: kColorBorder),
             ),
             child: imageUrl != null
-                ? Image.network(
-                    imageUrl!,
+                ? CachedNetworkImage(
+                    imageUrl: imageUrl!,
+                    cacheManager: WabwayImageCache.instance,
                     fit: BoxFit.cover,
                     width: 76,
                     height: 76,
-                    cacheWidth: 152,
-                    errorBuilder: (_, __, ___) => _icon,
-                    loadingBuilder: (_, child, progress) =>
-                        progress == null ? child : _icon,
+                    memCacheWidth: 152,
+                    errorWidget: (_, __, ___) => _icon,
+                    placeholder: (_, __) => _icon,
                   )
                 : _icon,
           ),

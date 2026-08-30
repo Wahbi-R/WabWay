@@ -1,5 +1,7 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../../core/image_cache_manager.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -412,7 +414,10 @@ class _CoverPhotoField extends StatelessWidget {
           border: Border.all(color: kColorBorder),
           image: imageUrl != null
               ? DecorationImage(
-                  image: NetworkImage(imageUrl!),
+                  image: CachedNetworkImageProvider(
+                    imageUrl!,
+                    cacheManager: WabwayImageCache.instance,
+                  ),
                   fit: BoxFit.cover,
                 )
               : null,

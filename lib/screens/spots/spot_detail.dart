@@ -1,4 +1,4 @@
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -923,7 +923,7 @@ class _PhotoHeader extends StatelessWidget {
               cacheManager: WabwayImageCache.instance,
               fit: BoxFit.cover,
               memCacheWidth: 800,
-              errorWidget: (_, __, ___) => const SizedBox.shrink(),
+              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
               placeholder: (_, __) => const SizedBox.shrink(),
             )
           else

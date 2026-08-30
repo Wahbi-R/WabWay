@@ -1,4 +1,4 @@
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/image_cache_manager.dart';
@@ -64,7 +64,7 @@ class DocGridCard extends ConsumerWidget {
                                 cacheManager: WabwayImageCache.instance,
                                 fit: BoxFit.cover,
                                 fadeInDuration: const Duration(milliseconds: 200),
-                                errorWidget: (_, __, ___) => _IconArea(doc: doc),
+                                errorBuilder: (_, __, ___) => _IconArea(doc: doc),
                                 placeholder: (_, __) => _IconArea(doc: doc),
                               ),
                               Positioned(
@@ -168,7 +168,7 @@ class DocListRow extends StatelessWidget {
                             cacheManager: WabwayImageCache.instance,
                             fit: BoxFit.cover,
                             fadeInDuration: const Duration(milliseconds: 200),
-                            errorWidget: (_, __, ___) => _SmallIconBox(doc: doc),
+                            errorBuilder: (_, __, ___) => _SmallIconBox(doc: doc),
                             placeholder: (_, __) => _SmallIconBox(doc: doc),
                           );
                         }

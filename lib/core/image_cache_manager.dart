@@ -1,16 +1,9 @@
-import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:cached_network_image_ce/cached_network_image.dart';
 
-/// Shared image cache: max 150 files, 14-day TTL, LRU eviction.
-/// ~45 MB ceiling at 300 KB average — covers avatars, trip covers, and photos
-/// without burning unreasonable storage.
+/// Shared image cache: max 600 files, 14-day TTL, LRU eviction.
 class WabwayImageCache {
-  static const _key = 'wabwayImages';
-
-  static final CacheManager instance = CacheManager(
-    Config(
-      _key,
-      stalePeriod: const Duration(days: 14),
-      maxNrOfCacheObjects: 150,
-    ),
+  static final DefaultCacheManager instance = DefaultCacheManager(
+    stalePeriod: const Duration(days: 14),
+    maxNrOfCacheObjects: 600,
   );
 }

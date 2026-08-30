@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 270,
+    label: 'Faster image loading',
+    changes: [
+      'Cached photos now load up to 8× faster thanks to a new storage engine',
+      'Your device can now cache up to 600 photos (up from 150)',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 269,
     label: 'Full offline mode',
     changes: [

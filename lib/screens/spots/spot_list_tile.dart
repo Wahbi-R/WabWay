@@ -1,4 +1,4 @@
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../../core/image_cache_manager.dart';
 import '../../data/spot_data.dart';
@@ -209,7 +209,7 @@ class _PhotoSlot extends StatelessWidget {
                     width: 76,
                     height: 76,
                     memCacheWidth: 152,
-                    errorWidget: (_, __, ___) => _icon,
+                    errorBuilder: (_, __, ___) => _icon,
                     placeholder: (_, __) => _icon,
                   )
                 : _icon,

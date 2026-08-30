@@ -2,6 +2,7 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **271. Fix sign-out flag not reset on exception** — `AuthService.signOut()` now resets `_userInitiatedSignOut` to `false` if `supabase.auth.signOut()` throws, preventing a stale flag from incorrectly suppressing a future offline sign-out (2026-08-30, build 271).
 - [x] **267. Map: current location button** — tapping the location button recenters the map on the user's current GPS position (2026-08-30).
 - [x] **266. Map labels in English** — switch tile provider to Esri World Street Map; all map labels now display in English worldwide (2026-08-30).
 - [x] **265. Add OSM attribution to map** — add `SimpleAttributionWidget` to map screen for OpenStreetMap tile compliance (2026-08-30).

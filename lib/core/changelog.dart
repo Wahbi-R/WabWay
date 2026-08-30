@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 271,
+    label: 'Reliability fixes',
+    changes: [
+      'Sign-out now reliably works even if a network error occurs mid-logout',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 270,
     label: 'Faster image loading',
     changes: [

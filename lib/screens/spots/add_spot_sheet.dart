@@ -285,10 +285,10 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
 
   void _applySuggestion(PlaceSuggestion place) {
     _nameCtrl.text    = place.name;
-    _cityCtrl.text    = place.city;
-    _areaCtrl.text    = place.area;
-    _addressCtrl.text = place.address;
-    _countryCtrl.text = place.country;
+    if (place.city.isNotEmpty)    _cityCtrl.text    = place.city;
+    if (place.area.isNotEmpty)    _areaCtrl.text    = place.area;
+    if (place.address.isNotEmpty) _addressCtrl.text = place.address;
+    if (place.country.isNotEmpty) _countryCtrl.text = place.country;
     _mapsCtrl.text    = place.mapsUrl;
 
     // If the search returned no specific category (defaulted to landmark),

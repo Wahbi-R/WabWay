@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../offline_cache.dart';
 import '../trip/app_trip.dart';
 import '../trip/app_trip_member.dart';
 import '../supabase/trip_service.dart';
@@ -47,6 +48,10 @@ class TripNotifier extends StateNotifier<TripData> {
     state = state.copyWith(loading: true, error: false);
     try {
       final trips = await TripService.loadUserTrips();
+      OfflineCache.write(
+        OfflineCache.userTripsKey,
+        trips.map((t) => t.toMap()).toList(),
+      );
       if (trips.isEmpty) {
         state = state.copyWith(trips: [], members: [], loading: false);
         return;
@@ -60,7 +65,24 @@ class TripNotifier extends StateNotifier<TripData> {
         loading:      false,
       );
     } catch (_) {
-      state = state.copyWith(loading: false, error: true);
+      final cached = await OfflineCache.read<List<AppTrip>>(
+        OfflineCache.userTripsKey,
+        (json) => (json as List)
+            .map((m) => AppTrip.fromMap(m as Map<String, dynamic>))
+            .toList(),
+      );
+      if (cached != null && cached.isNotEmpty) {
+        final idx = state.selectedIndex.clamp(0, cached.length - 1);
+        state = state.copyWith(
+          trips:         cached,
+          members:       const [],
+          selectedIndex: idx,
+          loading:       false,
+          error:         false,
+        );
+      } else {
+        state = state.copyWith(loading: false, error: true);
+      }
     }
   }
 

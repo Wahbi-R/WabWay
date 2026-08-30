@@ -34,6 +34,13 @@ class AppProfile {
     );
   }
 
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'display_name': displayName,
+        'email': email,
+        'avatar_url': avatarUrl,
+      };
+
   AppProfile copyWith({String? displayName, bool? displayNameIsSet}) => AppProfile(
         id: id,
         displayName: displayName ?? this.displayName,

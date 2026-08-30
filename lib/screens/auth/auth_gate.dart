@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/auth/app_profile.dart';
 import '../../core/debug/app_logger.dart';
+import '../../core/offline_cache.dart';
 import '../../core/providers/profile_provider.dart';
 import '../../core/supabase/auth_service.dart';
 import '../../core/supabase/client.dart';
@@ -73,7 +74,8 @@ class _AuthGateState extends ConsumerState<AuthGate> {
           .from('profiles')
           .select()
           .eq('id', userId)
-          .maybeSingle();
+          .maybeSingle()
+          .timeout(const Duration(seconds: 6));
       if (!mounted) return;
       final profile = data != null
           ? AppProfile.fromMap(data)
@@ -87,10 +89,21 @@ class _AuthGateState extends ConsumerState<AuthGate> {
                   supabase.auth.currentUser?.userMetadata?['display_name'] != null,
               email: supabase.auth.currentUser?.email ?? '',
             );
+      OfflineCache.write(OfflineCache.profileKey, profile.toMap());
       ref.read(profileProvider.notifier).set(profile);
       if (mounted) setState(() => _loading = false);
     } catch (_) {
-      if (mounted) setState(() => _loading = false);
+      // Network unavailable — fall back to cached profile so the user can
+      // browse their trips offline without being stuck on the splash screen.
+      final cached = await OfflineCache.read<AppProfile>(
+        OfflineCache.profileKey,
+        (json) => AppProfile.fromMap(json as Map<String, dynamic>),
+      );
+      if (!mounted) return;
+      if (cached != null) {
+        ref.read(profileProvider.notifier).set(cached);
+      }
+      setState(() => _loading = false);
     }
   }
 

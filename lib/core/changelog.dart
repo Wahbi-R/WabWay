@@ -12,10 +12,17 @@ const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
     build: 265,
-    label: 'Fix: map tiles and OSM attribution',
+    label: 'Fix: OSM attribution added to map',
+    changes: [
+      'OpenStreetMap attribution is shown in the corner of the map as required',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 264,
+    label: 'Fix: map no longer shows API key watermark',
     changes: [
       'The map now loads cleanly without the "API KEY REQUIRED" watermark',
-      'OpenStreetMap attribution is shown in the corner of the map as required',
     ],
   ),
   _Release(

@@ -158,9 +158,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   void _fitIfNeeded() {
     if (!_needsFit) return;
-    _needsFit = false;
     final focus = widget.initialFocus;
     if (focus != null) {
+      _needsFit = false;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         _mapController.move(focus, 16);
@@ -168,7 +168,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       return;
     }
     final pts = _allMappedPoints;
-    if (pts.isEmpty) return;
+    if (pts.isEmpty) return; // leave _needsFit=true so we retry when spots load
+    _needsFit = false;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (pts.length == 1) {

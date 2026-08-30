@@ -2,6 +2,9 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **279. Fix map auto-fit for empty trip** — `_needsFit` is no longer cleared when there are no mapped spots; auto-fit now retries correctly when spots are added later (2026-08-30, build 279).
+- [x] **278. Fix Copilot review: skip empty place names, dedupe Nominatim queue** — pipe-delimited entries with a blank name are skipped; a `nominatimSeen` set prevents duplicate queries (and their 1.1s delays) (2026-08-30, build 278).
+- [x] **277. Fix Copilot review: URL empty-string guard, delete error handling, Nominatim trim** — Links section hides buttons when `mapsUrl`/`sourceUrl` is `''`; map sheet delete catches errors and shows SnackBar; raw Nominatim queue entries trimmed before queuing (2026-08-30, build 277).
 - [x] **276. Add spot: city & area auto-fill from search** — `/places/search` now returns an `area` field (from Google Places `sublocality_level_1`/`neighborhood`); Flutter parses it and guards `_applySuggestion` from overwriting non-empty fields with blanks (2026-08-30, build 276).
 - [x] **275. Fix video spot import edge cases** — pipe-delimited entries with malformed coords now fall back to Nominatim instead of being silently dropped; parts are trimmed of whitespace; Google Places photo fetch now runs on web too (Wikipedia fallback remains native-only) (2026-08-30, build 275).
 - [x] **274. Map spot improvements: fix bottom cutoff, delete from map sheet, show-on-map from spots, rename button** — bottom sheet on map no longer clips content; delete button now appears and works from map sheet; Spots detail has a "Show on map" button that opens the map focused on that spot; "Open in Maps" renamed to "Open in Maps app" (2026-08-30, build 274).

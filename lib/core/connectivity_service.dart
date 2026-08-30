@@ -3,7 +3,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class ConnectivityNotifier extends StateNotifier<bool> {
-  ConnectivityNotifier() : super(false) {
+  ConnectivityNotifier() : super(true) {
     _init();
   }
 

@@ -68,5 +68,17 @@ abstract final class AuthService {
     ]);
   }
 
-  static Future<void> signOut() => supabase.auth.signOut();
+  static bool _userInitiatedSignOut = false;
+
+  static Future<void> signOut() {
+    _userInitiatedSignOut = true;
+    return supabase.auth.signOut();
+  }
+
+  /// Consumes and returns whether the last sign-out was user-initiated.
+  static bool consumeUserInitiatedSignOut() {
+    final v = _userInitiatedSignOut;
+    _userInitiatedSignOut = false;
+    return v;
+  }
 }

@@ -61,10 +61,10 @@ class _AuthGateState extends ConsumerState<AuthGate> {
         final uid = state.session?.user.id;
         if (uid != null && _profile == null) _fetchProfile(uid);
       case AuthChangeEvent.signedOut:
-        // If we're offline the sign-out was likely a failed token refresh, not
-        // a real sign-out. Keep the cached profile so the user stays in the app.
+        // Suppress automatic sign-out (e.g. failed token refresh) when offline,
+        // but always honour an explicit user-initiated sign-out.
         final isOnline = ref.read(connectivityProvider);
-        if (!isOnline) {
+        if (!isOnline && !AuthService.consumeUserInitiatedSignOut()) {
           final cached = await OfflineCache.read<AppProfile>(
             OfflineCache.profileKey,
             (json) => AppProfile.fromMap(json as Map<String, dynamic>),

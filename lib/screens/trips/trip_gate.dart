@@ -98,8 +98,10 @@ class _TripGateState extends ConsumerState<TripGate> {
     // Auto-reload and drain queued writes when connectivity is restored.
     ref.listen<bool>(connectivityProvider, (prev, isOnline) {
       if (isOnline && prev == false) {
-        final userId = ref.read(profileProvider)?.id ?? '';
-        ref.read(tripNotifierProvider.notifier).onReconnect(userId);
+        final userId = ref.read(profileProvider)?.id;
+        if (userId != null && userId.isNotEmpty) {
+          ref.read(tripNotifierProvider.notifier).onReconnect(userId);
+        }
       }
     });
 

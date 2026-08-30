@@ -121,13 +121,28 @@ class TripNotifier extends StateNotifier<TripData> {
     state = state.copyWith(loading: true);
     try {
       final members = await TripService.loadTripMembers(trip.id);
+      await OfflineCache.write(
+        OfflineCache.membersKey(trip.id),
+        members.map((m) => m.toMap()).toList(),
+      );
       state = state.copyWith(
         selectedIndex: idx,
         members:       members,
         loading:       false,
       );
     } catch (_) {
-      state = state.copyWith(loading: false);
+      final cached = await OfflineCache.read<List<AppTripMember>>(
+        OfflineCache.membersKey(trip.id),
+        (json) => (json as List)
+            .map((e) => AppTripMember.fromMap(e as Map<String, dynamic>))
+            .toList(),
+      );
+      state = state.copyWith(
+        selectedIndex: idx,
+        members:       cached ?? [],
+        loading:       false,
+        offline:       true,
+      );
     }
   }
 

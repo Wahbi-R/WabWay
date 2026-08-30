@@ -80,8 +80,9 @@ abstract final class SocialPlaceExtractor {
             if (parts[0].isNotEmpty) nominatimQueue.add(parts[0]);
           }
         } else {
-          // Raw name — queue for Nominatim
-          nominatimQueue.add(entry);
+          // Raw name — queue for Nominatim (skip blank entries)
+          final trimmed = entry.trim();
+          if (trimmed.isNotEmpty) nominatimQueue.add(trimmed);
         }
       }
 

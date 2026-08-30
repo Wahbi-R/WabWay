@@ -333,10 +333,17 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               onDelete: spot.addedById == userId
                   ? () async {
                       final nav = Navigator.of(ctx);
-                      await SpotService.deleteSpot(spot.id);
-                      if (!mounted) return;
-                      setState(() => _spots.removeWhere((s) => s.id == spot.id));
-                      nav.pop();
+                      try {
+                        await SpotService.deleteSpot(spot.id);
+                        if (!mounted) return;
+                        setState(() => _spots.removeWhere((s) => s.id == spot.id));
+                        nav.pop();
+                      } catch (_) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Could not delete spot. Try again.')),
+                        );
+                      }
                     }
                   : null,
             ),

@@ -361,8 +361,8 @@ class _SpotDetailContentState extends ConsumerState<SpotDetailContent> {
               const SizedBox(height: kSpace4),
 
               // ── Links
-              if (widget.spot.mapsUrl != null ||
-                  widget.spot.sourceUrl != null ||
+              if ((widget.spot.mapsUrl?.isNotEmpty ?? false) ||
+                  (widget.spot.sourceUrl?.isNotEmpty ?? false) ||
                   (widget.onShowOnMap != null && widget.spot.isMapReady)) ...[
                 Text('Links',
                     style: kStyleCaptionMedium.copyWith(color: kColorInk)),
@@ -379,7 +379,7 @@ class _SpotDetailContentState extends ConsumerState<SpotDetailContent> {
                         size: WabwayButtonSize.sm,
                         onPressed: widget.onShowOnMap,
                       ),
-                    if (widget.spot.mapsUrl != null)
+                    if (widget.spot.mapsUrl?.isNotEmpty ?? false)
                       WabwayButton(
                         label: 'Open in Maps app',
                         icon: Icons.map_rounded,
@@ -388,7 +388,7 @@ class _SpotDetailContentState extends ConsumerState<SpotDetailContent> {
                         onPressed: () =>
                             _openLink(context, widget.spot.mapsUrl!),
                       ),
-                    if (widget.spot.sourceUrl != null)
+                    if (widget.spot.sourceUrl?.isNotEmpty ?? false)
                       WabwayButton(
                         label: 'View source',
                         icon: Icons.link_rounded,

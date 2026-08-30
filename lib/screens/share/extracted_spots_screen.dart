@@ -54,11 +54,11 @@ class _ExtractedSpotsScreenState extends State<ExtractedSpotsScreen> {
         // Prefer Google Places photo (needs place_id from server geocoding),
         // fall back to Wikipedia thumbnail for Nominatim-geocoded results.
         String? imageUrl;
-        if (!kIsWeb) {
-          if (p.placeId.isNotEmpty) {
-            imageUrl = await PlaceSearchService.fetchPhotoUrl(p.placeId);
-          }
-          imageUrl ??= await WikipediaImageService.fetchThumbnailUrl(p.name);
+        if (p.placeId.isNotEmpty) {
+          imageUrl = await PlaceSearchService.fetchPhotoUrl(p.placeId);
+        }
+        if (imageUrl == null && !kIsWeb) {
+          imageUrl = await WikipediaImageService.fetchThumbnailUrl(p.name);
         }
         await SpotService.createSpot(
           tripId:      widget.tripId,

@@ -57,7 +57,7 @@ abstract final class SocialPlaceExtractor {
       final nominatimQueue = <String>[];
 
       for (final entry in rawPlaces.take(8)) {
-        final parts = entry.split('|');
+        final parts = entry.split('|').map((s) => s.trim()).toList();
         if (parts.length >= 6) {
           // Fully geocoded by server: name|lat|lon|city|country|category[|place_id]
           final lat = double.tryParse(parts[1]);
@@ -75,6 +75,9 @@ abstract final class SocialPlaceExtractor {
             if (!places.any((p) => p.name.toLowerCase() == place.name.toLowerCase())) {
               places.add(place);
             }
+          } else {
+            // Malformed coords — fall back to Nominatim using the name field
+            if (parts[0].isNotEmpty) nominatimQueue.add(parts[0]);
           }
         } else {
           // Raw name — queue for Nominatim

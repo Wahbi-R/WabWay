@@ -69,23 +69,31 @@ abstract final class SyncQueue {
     final failed = <Map<String, dynamic>>[];
     for (final item in list) {
       try {
-        final rawSplits = (item['splits'] as List?)
+        final paidBy     = item['paidBy'] as String? ?? userId;
+        final homeAmount = (item['homeAmount'] as num?)?.toDouble()
+            ?? (item['amount'] as num).toDouble();
+        var rawSplits = (item['splits'] as List?)
             ?.map((s) => ReceiptSplit(
                   memberId: s['memberId'] as String,
                   amount: (s['amount'] as num).toDouble(),
                 ))
             .toList() ?? [];
+        // Guard against empty splits (older payloads or corrupted cache) by
+        // falling back to a single split covering the full amount for the payer.
+        if (rawSplits.isEmpty) {
+          rawSplits = [ReceiptSplit(memberId: paidBy, amount: homeAmount)];
+        }
         final category = ReceiptCategory.values.firstWhere(
           (c) => c.name == item['category'],
           orElse: () => ReceiptCategory.other,
         );
         await MoneyService.createReceipt(
           tripId:            tripId,
-          paidBy:            item['paidBy'] as String? ?? userId,
+          paidBy:            paidBy,
           title:             item['title'] as String,
           amount:            (item['amount'] as num).toDouble(),
           currency:          item['currency'] as String? ?? 'USD',
-          homeAmount:        (item['homeAmount'] as num?)?.toDouble() ?? (item['amount'] as num).toDouble(),
+          homeAmount:        homeAmount,
           exchangeRate:      (item['exchangeRate'] as num?)?.toDouble() ?? 1.0,
           transactionFeePct: (item['transactionFeePct'] as num?)?.toDouble() ?? 0.0,
           category:          category,

@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 268,
+    label: 'Works offline',
+    changes: [
+      'The app no longer gets stuck on the splash screen when opened without internet',
+      'Your trips and profile load from cache so you can browse offline after your first online session',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 267,
     label: 'Map: current location button',
     changes: [

@@ -2,6 +2,7 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **273. Google Places photos for video-imported spots** — `extracted_spots_screen.dart` now tries `PlaceSearchService.fetchPhotoUrl(place_id)` first (Google Places CDN photo) and falls back to Wikipedia only when no `place_id` is available (Nominatim-geocoded results) (2026-08-30, build 273).
 - [x] **272. AI-powered place extraction from Instagram/TikTok video audio** — `/transcribe` now uses Claude Haiku NER instead of regex to extract real restaurant/landmark names (e.g. "Coco Ichibanya") rather than sentence fragments; geocoding uses Google Places API (better for businesses) with Nominatim fallback; Flutter parses pipe-delimited geocoded results directly without an extra round-trip (2026-08-30, build 272).
 - [x] **271. Fix sign-out flag not reset on exception** — `AuthService.signOut()` now resets `_userInitiatedSignOut` to `false` if `supabase.auth.signOut()` throws, preventing a stale flag from incorrectly suppressing a future offline sign-out (2026-08-30, build 271).
 - [x] **267. Map: current location button** — tapping the location button recenters the map on the user's current GPS position (2026-08-30).

@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 273,
+    label: 'Better spot photos from video',
+    changes: [
+      'Spots added from video sharing now use real Google Maps photos',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 272,
     label: 'Smarter video spot import',
     changes: [

@@ -126,13 +126,17 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
   Future<void> _load({bool silent = false}) async {
     if (!silent) setState(() { _loading = true; _error = false; });
     try {
-      final results = await Future.wait([
-        LinksService.loadLinks(_activeTripId!),
-        AutoLinksService.load(_activeTripId!),
-      ]);
+      final links = await LinksService.loadLinks(_activeTripId!);
+      // Auto-links are best-effort — a failure here doesn't block manual links.
+      Map<AutoLinkSource, List<AutoLink>> autoLinks;
+      try {
+        autoLinks = await AutoLinksService.load(_activeTripId!);
+      } catch (_) {
+        autoLinks = {};
+      }
       if (mounted) setState(() {
-        _links     = results[0] as List<TripLink>;
-        _autoLinks = results[1] as Map<AutoLinkSource, List<AutoLink>>;
+        _links     = links;
+        _autoLinks = autoLinks;
         _loading   = false;
         _error     = false;
         _offline   = false;
@@ -412,28 +416,36 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
                             ),
                           ],
                           // ── Auto sections from other features ─────────────
-                          for (final entry in _filteredAutoLinks.entries) ...[
-                            _SectionHeader(
-                              label: entry.key.label,
-                              icon: entry.key.icon,
-                              color: entry.key.color,
-                            ),
-                            SliverPadding(
-                              padding: EdgeInsets.fromLTRB(
-                                kSpace4, kSpace3, kSpace4,
-                                entry.key == _filteredAutoLinks.keys.last
-                                    ? kSpace8 + MediaQuery.paddingOf(context).bottom
-                                    : kSpace2,
-                              ),
-                              sliver: SliverList.separated(
-                                itemCount: entry.value.length,
-                                separatorBuilder: (_, __) =>
-                                    const SizedBox(height: kSpace3),
-                                itemBuilder: (_, i) =>
-                                    _AutoLinkCard(link: entry.value[i]),
-                              ),
-                            ),
-                          ],
+                          Builder(builder: (context) {
+                            final autoSections = _filteredAutoLinks;
+                            final lastKey = autoSections.isEmpty ? null : autoSections.keys.last;
+                            return SliverMainAxisGroup(
+                              slivers: [
+                                for (final entry in autoSections.entries) ...[
+                                  _SectionHeader(
+                                    label: entry.key.label,
+                                    icon: entry.key.icon,
+                                    color: entry.key.color,
+                                  ),
+                                  SliverPadding(
+                                    padding: EdgeInsets.fromLTRB(
+                                      kSpace4, kSpace3, kSpace4,
+                                      entry.key == lastKey
+                                          ? kSpace8 + MediaQuery.paddingOf(context).bottom
+                                          : kSpace2,
+                                    ),
+                                    sliver: SliverList.separated(
+                                      itemCount: entry.value.length,
+                                      separatorBuilder: (_, __) =>
+                                          const SizedBox(height: kSpace3),
+                                      itemBuilder: (_, i) =>
+                                          _AutoLinkCard(link: entry.value[i]),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            );
+                          }),
                         ],
                       ),
                     ),

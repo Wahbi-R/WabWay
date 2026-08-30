@@ -24,7 +24,8 @@ class AutoLinksService {
         .from('spots')
         .select('id, name, source_url')
         .eq('trip_id', tripId)
-        .not('source_url', 'is', null);
+        .not('source_url', 'is', null)
+        .neq('source_url', '');
     return (rows as List)
         .map((r) => AutoLink(
               source: AutoLinkSource.spot,
@@ -40,7 +41,8 @@ class AutoLinksService {
         .from('shopping_items')
         .select('id, name, link_url')
         .eq('trip_id', tripId)
-        .not('link_url', 'is', null);
+        .not('link_url', 'is', null)
+        .neq('link_url', '');
     return (rows as List)
         .map((r) => AutoLink(
               source: AutoLinkSource.shopping,
@@ -56,7 +58,8 @@ class AutoLinksService {
         .from('itinerary_items')
         .select('id, title, confirmation_url')
         .eq('trip_id', tripId)
-        .not('confirmation_url', 'is', null);
+        .not('confirmation_url', 'is', null)
+        .neq('confirmation_url', '');
     return (rows as List)
         .map((r) => AutoLink(
               source: AutoLinkSource.itinerary,
@@ -72,7 +75,8 @@ class AutoLinksService {
         .from('travel_items')
         .select('id, title, url')
         .eq('trip_id', tripId)
-        .not('url', 'is', null);
+        .not('url', 'is', null)
+        .neq('url', '');
     return (rows as List)
         .map((r) => AutoLink(
               source: AutoLinkSource.travel,
@@ -88,7 +92,8 @@ class AutoLinksService {
         .from('accommodations')
         .select('id, name, url')
         .eq('trip_id', tripId)
-        .not('url', 'is', null);
+        .not('url', 'is', null)
+        .neq('url', '');
     return (rows as List)
         .map((r) => AutoLink(
               source: AutoLinkSource.accommodation,

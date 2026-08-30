@@ -203,12 +203,24 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     if (_locating) return;
     setState(() => _locating = true);
     try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location services are off — enable them in Settings')),
+          );
+        }
+        return;
+      }
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
       }
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
+      if (permission == LocationPermission.deniedForever) {
+        if (mounted) await Geolocator.openAppSettings();
+        return;
+      }
+      if (permission == LocationPermission.denied) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Location permission denied')),
@@ -217,7 +229,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         return;
       }
       final pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 15),
+        ),
       );
       if (mounted) {
         _mapController.move(LatLng(pos.latitude, pos.longitude), 15);
@@ -505,7 +520,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             backgroundColor: Colors.white,
             foregroundColor: kColorPrimary,
             elevation: 2,
-            onPressed: _goToMyLocation,
+            tooltip: 'Go to my location',
+            onPressed: _locating ? null : _goToMyLocation,
             child: _locating
                 ? const SizedBox(
                     width: 18, height: 18,

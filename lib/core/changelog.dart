@@ -12,7 +12,7 @@ const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
     build: 267,
-    label: 'Map: go to current location button',
+    label: 'Map: current location button',
     changes: [
       'Tap the location button on the map to instantly jump to where you are',
     ],

@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 276,
+    label: 'Add spot: better city & area fill',
+    changes: [
+      'Searching for a place now auto-fills the city and neighbourhood area fields',
+      'Existing city/area values are kept when the search result has no data for them',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 275,
     label: 'Video spot import fixes',
     changes: [

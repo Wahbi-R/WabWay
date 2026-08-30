@@ -2,6 +2,7 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **276. Add spot: city & area auto-fill from search** — `/places/search` now returns an `area` field (from Google Places `sublocality_level_1`/`neighborhood`); Flutter parses it and guards `_applySuggestion` from overwriting non-empty fields with blanks (2026-08-30, build 276).
 - [x] **275. Fix video spot import edge cases** — pipe-delimited entries with malformed coords now fall back to Nominatim instead of being silently dropped; parts are trimmed of whitespace; Google Places photo fetch now runs on web too (Wikipedia fallback remains native-only) (2026-08-30, build 275).
 - [x] **274. Map spot improvements: fix bottom cutoff, delete from map sheet, show-on-map from spots, rename button** — bottom sheet on map no longer clips content; delete button now appears and works from map sheet; Spots detail has a "Show on map" button that opens the map focused on that spot; "Open in Maps" renamed to "Open in Maps app" (2026-08-30, build 274).
 - [x] **273. Google Places photos for video-imported spots** — `extracted_spots_screen.dart` now tries `PlaceSearchService.fetchPhotoUrl(place_id)` first (Google Places CDN photo) and falls back to Wikipedia only when no `place_id` is available (Nominatim-geocoded results) (2026-08-30, build 273).

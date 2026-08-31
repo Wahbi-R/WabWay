@@ -204,8 +204,8 @@ class MoreScreen extends ConsumerWidget {
 
           const SizedBox(height: kSpace4),
 
-          // Invite section — owner only
-          if (isOwner) ...[
+          // Invite section — any trip member
+          ...[
             const _SectionHeader(title: 'Invite'),
             const SizedBox(height: kSpace3),
             DecoratedBox(

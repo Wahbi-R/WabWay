@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 282,
+    label: 'Anyone can invite trip members',
+    changes: [
+      'Any trip member (not just the owner) can now create and share invite codes',
+      'The Invite section is now visible in the More screen for all members',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 281,
     label: 'Spot city & area from all import flows',
     changes: [

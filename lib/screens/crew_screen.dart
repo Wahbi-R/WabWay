@@ -445,12 +445,18 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
     if (file == null || !mounted) return;
     setState(() => _sendingImage = true);
     try {
-      final imageUrl = await CrewService.uploadChatImage(_tripId!, file);
-      await CrewService.sendImageMessage(
-        tripId: _tripId!,
-        authorId: _userId!,
-        imageUrl: imageUrl,
-      );
+      final (:path, :url) = await CrewService.uploadChatImage(_tripId!, file);
+      try {
+        await CrewService.sendImageMessage(
+          tripId: _tripId!,
+          authorId: _userId!,
+          imageUrl: url,
+        );
+      } catch (_) {
+        // Insert failed — delete the orphaned storage object before surfacing error.
+        await CrewService.deleteChatImage(path);
+        rethrow;
+      }
       await _onNewMessage();
     } catch (_) {
       _showError('Failed to send image');
@@ -850,6 +856,8 @@ class _MessageBubble extends StatelessWidget {
                             cacheManager: WabwayImageCache.instance,
                             width: 220,
                             height: 220,
+                            memCacheWidth: (220 * MediaQuery.devicePixelRatioOf(context)).round(),
+                            memCacheHeight: (220 * MediaQuery.devicePixelRatioOf(context)).round(),
                             fit: BoxFit.cover,
                             placeholder: (_, __) => Container(
                               width: 220,

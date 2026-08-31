@@ -99,7 +99,7 @@ abstract final class CrewService {
     });
   }
 
-  static Future<String> uploadChatImage(String tripId, XFile file) async {
+  static Future<({String path, String url})> uploadChatImage(String tripId, XFile file) async {
     final bytes = await file.readAsBytes();
     final ext = file.name.contains('.') ? file.name.split('.').last.toLowerCase() : 'jpg';
     final mime = switch (ext) {
@@ -116,7 +116,12 @@ abstract final class CrewService {
       bytes,
       fileOptions: FileOptions(contentType: mime, upsert: false),
     );
-    return supabase.storage.from('trip-chat').getPublicUrl(path);
+    final url = supabase.storage.from('trip-chat').getPublicUrl(path);
+    return (path: path, url: url);
+  }
+
+  static Future<void> deleteChatImage(String path) async {
+    await supabase.storage.from('trip-chat').remove([path]);
   }
 
   static Future<void> sendImageMessage({

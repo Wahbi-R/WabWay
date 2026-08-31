@@ -177,7 +177,7 @@ class SettingsScreen extends ConsumerWidget {
                     _SettingsTile(
                       icon: Icons.person_add_rounded,
                       label: 'Invite members',
-                      onTap: () => showInviteSheet(ctx, tripId: trip.id),
+                      onTap: () => showInviteSheet(ctx, tripId: trip.id, canRevoke: isOwner),
                     ),
                     const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
                     _SettingsTile(

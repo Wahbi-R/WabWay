@@ -10,21 +10,26 @@ import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 
-Future<void> showInviteSheet(BuildContext context, {required String tripId}) {
+Future<void> showInviteSheet(
+  BuildContext context, {
+  required String tripId,
+  bool canRevoke = false,
+}) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => _InviteSheet(tripId: tripId),
+    builder: (_) => _InviteSheet(tripId: tripId, canRevoke: canRevoke),
   );
 }
 
 // ─── Sheet ────────────────────────────────────────────────────────────────────
 
 class _InviteSheet extends StatefulWidget {
-  const _InviteSheet({required this.tripId});
+  const _InviteSheet({required this.tripId, required this.canRevoke});
   final String tripId;
+  final bool canRevoke;
 
   @override
   State<_InviteSheet> createState() => _InviteSheetState();
@@ -185,7 +190,7 @@ class _InviteSheetState extends State<_InviteSheet> {
                       copied: _copied,
                       onCopy: _copy,
                       onShareLink: _shareLink,
-                      onRevoke: _revoke,
+                      onRevoke: widget.canRevoke ? _revoke : null,
                     ),
 
                   WabwayButton(

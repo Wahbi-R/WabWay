@@ -264,7 +264,7 @@ class MoreScreen extends ConsumerWidget {
                       ),
                       trailing: Icon(Icons.chevron_right_rounded,
                           color: kColorTextTertiary()),
-                      onTap: () => showInviteSheet(context, tripId: trip?.id ?? ''),
+                      onTap: () => showInviteSheet(context, tripId: trip.id, canRevoke: isOwner),
                     ),
                   ],
                 ),

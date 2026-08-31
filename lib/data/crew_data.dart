@@ -1,4 +1,4 @@
-enum MessageType { text, locationPing, findMe, meetupPoint }
+enum MessageType { text, locationPing, findMe, meetupPoint, image }
 
 class LocationShare {
   const LocationShare({
@@ -40,6 +40,7 @@ class TripMessage {
     required this.createdAt,
     this.lat,
     this.lng,
+    this.imageUrl,
     this.reactions = const {},
   });
 
@@ -50,6 +51,7 @@ class TripMessage {
   final MessageType type;
   final double? lat;
   final double? lng;
+  final String? imageUrl;
   final DateTime createdAt;
   // emoji → list of userIds who reacted with that emoji
   final Map<String, List<String>> reactions;
@@ -66,15 +68,17 @@ class TripMessage {
       id:        m['id'] as String,
       tripId:    m['trip_id'] as String,
       authorId:  m['author_id'] as String,
-      body:      m['body'] as String,
+      body:      m['body'] as String? ?? '',
       type: switch (m['message_type'] as String?) {
         'location_ping' => MessageType.locationPing,
         'find_me'       => MessageType.findMe,
         'meetup_point'  => MessageType.meetupPoint,
+        'image'         => MessageType.image,
         _               => MessageType.text,
       },
       lat:       (m['lat'] as num?)?.toDouble(),
       lng:       (m['lng'] as num?)?.toDouble(),
+      imageUrl:  m['image_url'] as String?,
       createdAt: DateTime.parse(m['created_at'] as String),
       reactions: reactions,
     );
@@ -84,6 +88,6 @@ class TripMessage {
       TripMessage(
         id: id, tripId: tripId, authorId: authorId, body: body,
         type: type, createdAt: createdAt, lat: lat, lng: lng,
-        reactions: reactions,
+        imageUrl: imageUrl, reactions: reactions,
       );
 }

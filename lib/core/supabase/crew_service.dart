@@ -1,3 +1,4 @@
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/crew_data.dart';
 import 'client.dart';
@@ -95,6 +96,32 @@ abstract final class CrewService {
       'message_type': 'meetup_point',
       'lat': lat,
       'lng': lng,
+    });
+  }
+
+  static Future<String> uploadChatImage(String tripId, XFile file) async {
+    final bytes = await file.readAsBytes();
+    final ext = file.name.contains('.') ? file.name.split('.').last.toLowerCase() : 'jpg';
+    final path = '$tripId/${DateTime.now().millisecondsSinceEpoch}.$ext';
+    await supabase.storage.from('trip-chat').uploadBinary(
+      path,
+      bytes,
+      fileOptions: FileOptions(contentType: 'image/$ext', upsert: false),
+    );
+    return supabase.storage.from('trip-chat').getPublicUrl(path);
+  }
+
+  static Future<void> sendImageMessage({
+    required String tripId,
+    required String authorId,
+    required String imageUrl,
+  }) async {
+    await supabase.from('trip_messages').insert({
+      'trip_id': tripId,
+      'author_id': authorId,
+      'body': '',
+      'message_type': 'image',
+      'image_url': imageUrl,
     });
   }
 

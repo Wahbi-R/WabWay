@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show RealtimeChannel;
@@ -38,6 +40,7 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
   bool _sendingPing = false;
   bool _sendingFindMe = false;
   bool _sending = false;
+  bool _sendingImage = false;
 
   RealtimeChannel? _messageChannel;
   RealtimeChannel? _locationChannel;
@@ -391,6 +394,65 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
     }
   }
 
+  void _showImageSourceSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(kSpace4, kSpace3, kSpace4, kSpace4),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: kColorPaper,
+              borderRadius: kRadiusXl,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.camera_alt_rounded),
+                  title: Text('Camera', style: kStyleBodyMedium),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _pickAndSendImage(ImageSource.camera);
+                  },
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.photo_library_rounded),
+                  title: Text('Photo library', style: kStyleBodyMedium),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _pickAndSendImage(ImageSource.gallery);
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickAndSendImage(ImageSource source) async {
+    final file = await ImagePicker().pickImage(source: source, imageQuality: 80);
+    if (file == null || !mounted) return;
+    setState(() => _sendingImage = true);
+    try {
+      final imageUrl = await CrewService.uploadChatImage(_tripId!, file);
+      await CrewService.sendImageMessage(
+        tripId: _tripId!,
+        authorId: _userId!,
+        imageUrl: imageUrl,
+      );
+      await _onNewMessage();
+    } catch (_) {
+      _showError('Failed to send image');
+    } finally {
+      if (mounted) setState(() => _sendingImage = false);
+    }
+  }
+
   Future<void> _onSetMeetupPoint(LatLng point) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -499,9 +561,11 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
             sending: _sending,
             sendingPing: _sendingPing,
             sendingFindMe: _sendingFindMe,
+            sendingImage: _sendingImage,
             onSend: _sendMessage,
             onLinkUp: _sendLocationPing,
             onFindMe: _sendFindMe,
+            onSendImage: _showImageSourceSheet,
             onReact: _onReact,
           ),
           _MapTab(
@@ -575,9 +639,11 @@ class _ChatTab extends StatelessWidget {
     required this.sending,
     required this.sendingPing,
     required this.sendingFindMe,
+    required this.sendingImage,
     required this.onSend,
     required this.onLinkUp,
     required this.onFindMe,
+    required this.onSendImage,
     required this.onReact,
   });
 
@@ -590,9 +656,11 @@ class _ChatTab extends StatelessWidget {
   final bool sending;
   final bool sendingPing;
   final bool sendingFindMe;
+  final bool sendingImage;
   final VoidCallback onSend;
   final VoidCallback onLinkUp;
   final VoidCallback onFindMe;
+  final VoidCallback onSendImage;
   final Future<void> Function(String messageId, String emoji) onReact;
 
   AppTripMember? _memberById(String userId) {
@@ -678,9 +746,11 @@ class _ChatTab extends StatelessWidget {
           sending: sending,
           sendingPing: sendingPing,
           sendingFindMe: sendingFindMe,
+          sendingImage: sendingImage,
           onSend: onSend,
           onLinkUp: onLinkUp,
           onFindMe: onFindMe,
+          onSendImage: onSendImage,
         ),
       ],
     );
@@ -761,25 +831,56 @@ class _MessageBubble extends StatelessWidget {
                   ),
                 GestureDetector(
                   onLongPress: () => _showEmojiPicker(context),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: kSpace3, vertical: kSpace2 + 2),
-                    decoration: BoxDecoration(
-                      color: bubbleColor,
-                      borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(16),
-                        topRight: const Radius.circular(16),
-                        bottomLeft: Radius.circular(isMe ? 16 : 4),
-                        bottomRight: Radius.circular(isMe ? 4 : 16),
-                      ),
-                      border: isMe ? null : Border.all(color: kColorBorder),
-                      boxShadow: kShadowXs,
-                    ),
-                    child: Text(
-                      message.body,
-                      style: kStyleBody.copyWith(color: textColor),
-                    ),
-                  ),
+                  child: message.type == MessageType.image && message.imageUrl != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.only(
+                            topLeft: const Radius.circular(16),
+                            topRight: const Radius.circular(16),
+                            bottomLeft: Radius.circular(isMe ? 16 : 4),
+                            bottomRight: Radius.circular(isMe ? 4 : 16),
+                          ),
+                          child: CachedNetworkImage(
+                            imageUrl: message.imageUrl!,
+                            width: 220,
+                            height: 220,
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) => Container(
+                              width: 220,
+                              height: 220,
+                              color: kColorSurfaceSunken,
+                              child: const Center(
+                                child: CircularProgressIndicator(
+                                    color: kColorPrimary, strokeWidth: 2),
+                              ),
+                            ),
+                            errorBuilder: (_, __, ___) => Container(
+                              width: 220,
+                              height: 220,
+                              color: kColorSurfaceSunken,
+                              child: const Icon(Icons.broken_image_rounded,
+                                  color: kColorInkSoft),
+                            ),
+                          ),
+                        )
+                      : Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: kSpace3, vertical: kSpace2 + 2),
+                          decoration: BoxDecoration(
+                            color: bubbleColor,
+                            borderRadius: BorderRadius.only(
+                              topLeft: const Radius.circular(16),
+                              topRight: const Radius.circular(16),
+                              bottomLeft: Radius.circular(isMe ? 16 : 4),
+                              bottomRight: Radius.circular(isMe ? 4 : 16),
+                            ),
+                            border: isMe ? null : Border.all(color: kColorBorder),
+                            boxShadow: kShadowXs,
+                          ),
+                          child: Text(
+                            message.body,
+                            style: kStyleBody.copyWith(color: textColor),
+                          ),
+                        ),
                 ),
                 if (hasReactions) ...[
                   const SizedBox(height: 4),
@@ -1189,18 +1290,22 @@ class _InputBar extends StatelessWidget {
     required this.sending,
     required this.sendingPing,
     required this.sendingFindMe,
+    required this.sendingImage,
     required this.onSend,
     required this.onLinkUp,
     required this.onFindMe,
+    required this.onSendImage,
   });
 
   final TextEditingController textController;
   final bool sending;
   final bool sendingPing;
   final bool sendingFindMe;
+  final bool sendingImage;
   final VoidCallback onSend;
   final VoidCallback onLinkUp;
   final VoidCallback onFindMe;
+  final VoidCallback onSendImage;
 
   @override
   Widget build(BuildContext context) {
@@ -1254,6 +1359,15 @@ class _InputBar extends StatelessWidget {
                     iconColor: kColorPrimary,
                     loading: sendingPing,
                     onTap: onLinkUp,
+                  ),
+                  const SizedBox(width: kSpace2),
+                  _CircleIconButton(
+                    tooltip: 'Send a photo',
+                    icon: Icons.image_rounded,
+                    color: kColorSurfaceSunken,
+                    iconColor: kColorInkSoft,
+                    loading: sendingImage,
+                    onTap: onSendImage,
                   ),
                   const SizedBox(width: kSpace2),
                   Expanded(

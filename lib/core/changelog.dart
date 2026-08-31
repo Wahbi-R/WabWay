@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 280,
+    label: 'Links: connected to the whole trip',
+    changes: [
+      'Spots, shopping items, itinerary, travel bookings, and accommodations with a link now appear as dedicated sections in the Links screen',
+      'Tap any entry to open its URL — sections only appear when items actually have links set',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 279,
     label: 'Map auto-fit fix',
     changes: [

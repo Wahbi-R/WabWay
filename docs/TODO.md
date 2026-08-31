@@ -2,6 +2,7 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **280. Links: auto-sections from other features** — Spots (source URL), Shopping (link URL), Itinerary (confirmation URL), Travel (booking URL), and Accommodations (booking URL) now appear as named read-only sections in the Links screen; sections only show when items have a URL set (2026-08-30, build 280).
 - [x] **279. Fix map auto-fit for empty trip** — `_needsFit` is no longer cleared when there are no mapped spots; auto-fit now retries correctly when spots are added later (2026-08-30, build 279).
 - [x] **278. Fix Copilot review: skip empty place names, dedupe Nominatim queue** — pipe-delimited entries with a blank name are skipped; a `nominatimSeen` set prevents duplicate queries (and their 1.1s delays) (2026-08-30, build 278).
 - [x] **277. Fix Copilot review: URL empty-string guard, delete error handling, Nominatim trim** — Links section hides buttons when `mapsUrl`/`sourceUrl` is `''`; map sheet delete catches errors and shows SnackBar; raw Nominatim queue entries trimmed before queuing (2026-08-30, build 277).

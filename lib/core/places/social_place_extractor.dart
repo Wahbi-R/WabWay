@@ -65,7 +65,7 @@ abstract final class SocialPlaceExtractor {
       for (final entry in rawPlaces.take(8)) {
         final parts = entry.split('|').map((s) => s.trim()).toList();
         if (parts.length >= 6) {
-          // Fully geocoded by server: name|lat|lon|city|country|category|place_id|area
+          // Fully geocoded by server: name|lat|lon|city|country|category[|place_id[|area]]
           final name = parts[0];
           if (name.isEmpty) continue;
           final lat = double.tryParse(parts[1]);

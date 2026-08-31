@@ -95,10 +95,10 @@ abstract final class NominatimService {
                    addr['town']         as String? ??
                    addr['village']      as String? ??
                    addr['municipality'] as String? ?? '';
-      final area = addr['suburb']       as String? ??
-                   addr['neighbourhood']as String? ??
-                   addr['quarter']      as String? ??
-                   addr['city_district']as String? ?? '';
+      final area = addr['suburb']        as String? ??
+                   addr['neighbourhood'] as String? ??
+                   addr['quarter']       as String? ??
+                   addr['city_district'] as String? ?? '';
       final country = addr['country'] as String? ?? '';
 
       return NominatimPlace(

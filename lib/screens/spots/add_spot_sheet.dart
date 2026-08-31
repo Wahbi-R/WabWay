@@ -268,6 +268,9 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
     if (info.city != null && _cityCtrl.text.trim().isEmpty) {
       _cityCtrl.text = info.city!;
     }
+    if (info.area != null && info.area!.isNotEmpty && _areaCtrl.text.trim().isEmpty) {
+      _areaCtrl.text = info.area!;
+    }
     if (info.country != null && _countryCtrl.text.trim().isEmpty) {
       _countryCtrl.text = info.country!;
     }

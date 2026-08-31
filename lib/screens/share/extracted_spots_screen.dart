@@ -64,7 +64,7 @@ class _ExtractedSpotsScreenState extends State<ExtractedSpotsScreen> {
           tripId:      widget.tripId,
           name:        p.name,
           city:        p.city.isNotEmpty ? p.city : p.country,
-          area:        '',
+          area:        p.area,
           category:    _categories[i],
           status:      SpotStatus.wantToGo,
           addedBy:     widget.userId,

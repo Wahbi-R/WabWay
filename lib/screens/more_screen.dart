@@ -204,8 +204,8 @@ class MoreScreen extends ConsumerWidget {
 
           const SizedBox(height: kSpace4),
 
-          // Invite section — any trip member
-          ...[
+          // Invite section — any trip member (hidden until trip data is loaded)
+          if (trip != null) ...[
             const _SectionHeader(title: 'Invite'),
             const SizedBox(height: kSpace3),
             DecoratedBox(

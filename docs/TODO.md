@@ -2,7 +2,7 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
-- [x] **283. Crew chat image upload** — crew chat now has an image button (camera icon) in the input bar; tapping it shows a Camera/Gallery picker; selected photos are uploaded to Supabase Storage (`trip-chat` bucket) and sent as image messages; images render in the chat bubble alongside existing text and location messages (2026-08-31, build 283).
+- [x] **283. Crew chat image upload** — crew chat now has an image button (image icon) in the input bar (native only, hidden on web); tapping it shows a Camera/Gallery picker; selected photos are uploaded to Supabase Storage (`trip-chat` bucket) and sent as image messages; images render as 220×220 thumbnails in the chat alongside text and location messages (2026-08-31, build 283).
 - [x] **282. Any trip member can create invite links** — removed owner-only gate from the More screen invite section; updated Supabase RLS policies and `create_trip_invite` RPC so any trip member (not just owner) can view and create invite codes (2026-08-31, build 282).
 - [x] **281. Fix spot city/area missing on import** — Video AI (`/transcribe`), Maps import, and Nominatim geocode paths now populate area (neighbourhood/suburb) alongside city; `NominatimPlace`, `MapsPlace`, and `MapsPlaceInfo` all carry an `area` field; server `/transcribe` adds area as 8th pipe segment, `/maps/enrich` adds area to response (2026-08-31, build 281).
 - [x] **280. Links: auto-sections from other features** — Spots (source URL), Shopping (link URL), Itinerary (confirmation URL), Travel (booking URL), and Accommodations (booking URL) now appear as named read-only sections in the Links screen; sections only show when items have a URL set (2026-08-30, build 280).

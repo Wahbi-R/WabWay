@@ -1378,7 +1378,6 @@ class _InputBar extends StatelessWidget {
                       onTap: onSendImage,
                     ),
                   if (!kIsWeb) const SizedBox(width: kSpace2),
-                  const SizedBox(width: kSpace2),
                   Expanded(
                     child: TextField(
                       controller: textController,

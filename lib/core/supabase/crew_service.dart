@@ -102,11 +102,19 @@ abstract final class CrewService {
   static Future<String> uploadChatImage(String tripId, XFile file) async {
     final bytes = await file.readAsBytes();
     final ext = file.name.contains('.') ? file.name.split('.').last.toLowerCase() : 'jpg';
+    final mime = switch (ext) {
+      'jpg' || 'jpeg' => 'image/jpeg',
+      'png'           => 'image/png',
+      'gif'           => 'image/gif',
+      'webp'          => 'image/webp',
+      'heic'          => 'image/heic',
+      _               => 'image/jpeg',
+    };
     final path = '$tripId/${DateTime.now().millisecondsSinceEpoch}.$ext';
     await supabase.storage.from('trip-chat').uploadBinary(
       path,
       bytes,
-      fileOptions: FileOptions(contentType: 'image/$ext', upsert: false),
+      fileOptions: FileOptions(contentType: mime, upsert: false),
     );
     return supabase.storage.from('trip-chat').getPublicUrl(path);
   }

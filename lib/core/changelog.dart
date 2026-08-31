@@ -15,7 +15,7 @@ const _kChangelog = <_Release>[
     label: 'Send photos in crew chat',
     changes: [
       'Tap the new image button in crew chat to share a photo from your camera or photo library',
-      'Images appear as full-size bubbles in the chat alongside text and location messages',
+      'Images appear as 220×220 thumbnails in the chat alongside text and location messages',
     ],
   ),
   _Release(

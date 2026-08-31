@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:cached_network_image_ce/cached_network_image.dart';
+import '../core/image_cache_manager.dart';
 import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
@@ -435,7 +436,12 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
   }
 
   Future<void> _pickAndSendImage(ImageSource source) async {
-    final file = await ImagePicker().pickImage(source: source, imageQuality: 80);
+    final file = await ImagePicker().pickImage(
+      source: source,
+      imageQuality: 80,
+      maxWidth: 1280,
+      maxHeight: 1280,
+    );
     if (file == null || !mounted) return;
     setState(() => _sendingImage = true);
     try {
@@ -841,6 +847,7 @@ class _MessageBubble extends StatelessWidget {
                           ),
                           child: CachedNetworkImage(
                             imageUrl: message.imageUrl!,
+                            cacheManager: WabwayImageCache.instance,
                             width: 220,
                             height: 220,
                             fit: BoxFit.cover,
@@ -1361,14 +1368,16 @@ class _InputBar extends StatelessWidget {
                     onTap: onLinkUp,
                   ),
                   const SizedBox(width: kSpace2),
-                  _CircleIconButton(
-                    tooltip: 'Send a photo',
-                    icon: Icons.image_rounded,
-                    color: kColorSurfaceSunken,
-                    iconColor: kColorInkSoft,
-                    loading: sendingImage,
-                    onTap: onSendImage,
-                  ),
+                  if (!kIsWeb)
+                    _CircleIconButton(
+                      tooltip: 'Send a photo',
+                      icon: Icons.image_rounded,
+                      color: kColorSurfaceSunken,
+                      iconColor: kColorInkSoft,
+                      loading: sendingImage,
+                      onTap: onSendImage,
+                    ),
+                  if (!kIsWeb) const SizedBox(width: kSpace2),
                   const SizedBox(width: kSpace2),
                   Expanded(
                     child: TextField(

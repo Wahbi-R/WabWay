@@ -2,6 +2,8 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **282. Any trip member can create invite links** — removed owner-only gate from the More screen invite section; updated Supabase RLS policies and `create_trip_invite` RPC so any trip member (not just owner) can view and create invite codes (2026-08-31, build 282).
+- [x] **281. Fix spot city/area missing on import** — Video AI (`/transcribe`), Maps import, and Nominatim geocode paths now populate area (neighbourhood/suburb) alongside city; `NominatimPlace`, `MapsPlace`, and `MapsPlaceInfo` all carry an `area` field; server `/transcribe` adds area as 8th pipe segment, `/maps/enrich` adds area to response (2026-08-31, build 281).
 - [x] **280. Links: auto-sections from other features** — Spots (source URL), Shopping (link URL), Itinerary (confirmation URL), Travel (booking URL), and Accommodations (booking URL) now appear as named read-only sections in the Links screen; sections only show when items have a URL set (2026-08-30, build 280).
 - [x] **279. Fix map auto-fit for empty trip** — `_needsFit` is no longer cleared when there are no mapped spots; auto-fit now retries correctly when spots are added later (2026-08-30, build 279).
 - [x] **278. Fix Copilot review: skip empty place names, dedupe Nominatim queue** — pipe-delimited entries with a blank name are skipped; a `nominatimSeen` set prevents duplicate queries (and their 1.1s delays) (2026-08-30, build 278).

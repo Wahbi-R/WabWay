@@ -15,6 +15,7 @@ class MapsPlaceInfo {
     required this.fullUrl,
     this.address,
     this.city,
+    this.area,
     this.country,
     this.category,
     this.website,
@@ -26,6 +27,8 @@ class MapsPlaceInfo {
   final String fullUrl;
   final String? address;
   final String? city;
+  /// Sub-city area (neighbourhood, district, suburb). Null when unavailable.
+  final String? area;
   final String? country;
   /// WabWay SpotCategory slug returned by the server ('food', 'landmark', etc.)
   final String? category;
@@ -72,6 +75,7 @@ abstract final class MapsImportService {
         fullUrl:   resolved,
         address:   geo?.address,
         city:      geo?.city,
+        area:      geo?.area,
         country:   geo?.country,
       );
     } catch (_) {
@@ -104,6 +108,7 @@ abstract final class MapsImportService {
         fullUrl:   '',
         address:   data['address'] as String?,
         city:      data['city'] as String?,
+        area:      data['area'] as String?,
         country:   data['country'] as String?,
         category:  data['category'] as String?,
         website:   data['website'] as String?,
@@ -175,6 +180,11 @@ abstract final class MapsImportService {
               _str(addr['municipality']) ??
               _str(addr['county']))
           ?.trim();
+      final area = (_str(addr['suburb']) ??
+              _str(addr['neighbourhood']) ??
+              _str(addr['quarter']) ??
+              _str(addr['city_district']))
+          ?.trim();
 
       final parts = <String>[];
       final house = _str(addr['house_number']);
@@ -188,6 +198,7 @@ abstract final class MapsImportService {
         displayName: displayName,
         address:     parts.isNotEmpty ? parts.join(' ') : null,
         city:        city,
+        area:        area,
         country:     _str(addr['country'])?.trim(),
       );
     } catch (_) {
@@ -202,10 +213,11 @@ abstract final class MapsImportService {
 }
 
 class _GeoResult {
-  const _GeoResult({this.displayName, this.address, this.city, this.country});
+  const _GeoResult({this.displayName, this.address, this.city, this.area, this.country});
   final String? displayName;
   final String? address;
   final String? city;
+  final String? area;
   final String? country;
 }
 
@@ -217,6 +229,7 @@ extension _MapsPlaceInfoX on MapsPlaceInfo {
         fullUrl:   url,
         address:   address,
         city:      city,
+        area:      area,
         country:   country,
         category:  category,
         website:   website,

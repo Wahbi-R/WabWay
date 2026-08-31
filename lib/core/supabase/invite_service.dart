@@ -26,7 +26,7 @@ abstract final class InviteService {
     return data.map(_fromRow).toList();
   }
 
-  /// Creates a new invite code for [tripId]. Caller must be the trip owner.
+  /// Creates a new invite code for [tripId]. Any trip member may call this.
   static Future<InviteCode> createInvite(String tripId) async {
     final code = await supabase.rpc(
       'create_trip_invite',

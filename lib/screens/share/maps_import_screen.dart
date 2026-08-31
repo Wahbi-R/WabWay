@@ -221,7 +221,7 @@ class _MapsImportScreenState extends State<MapsImportScreen> {
             tripId:      widget.tripId,
             name:        p.name,
             city:        p.city.isNotEmpty ? p.city : 'Unknown',
-            area:        '',
+            area:        p.area,
             category:    _categories[i],
             status:      SpotStatus.wantToGo,
             addedBy:     widget.userId,

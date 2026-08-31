@@ -10,12 +10,15 @@ class NominatimPlace {
     required this.lat,
     required this.lon,
     required this.category,
+    this.area = '',
     this.displayName = '',
     this.placeId = '',
   });
 
   final String       name;
   final String       city;
+  /// Sub-city area (neighbourhood, district, suburb). Empty when unavailable.
+  final String       area;
   final String       country;
   final double       lat;
   final double       lon;
@@ -92,11 +95,16 @@ abstract final class NominatimService {
                    addr['town']         as String? ??
                    addr['village']      as String? ??
                    addr['municipality'] as String? ?? '';
+      final area = addr['suburb']        as String? ??
+                   addr['neighbourhood'] as String? ??
+                   addr['quarter']       as String? ??
+                   addr['city_district'] as String? ?? '';
       final country = addr['country'] as String? ?? '';
 
       return NominatimPlace(
         name:        name,
         city:        city,
+        area:        area,
         country:     country,
         lat:         lat,
         lon:         lon,

@@ -65,7 +65,7 @@ abstract final class SocialPlaceExtractor {
       for (final entry in rawPlaces.take(8)) {
         final parts = entry.split('|').map((s) => s.trim()).toList();
         if (parts.length >= 6) {
-          // Fully geocoded by server: name|lat|lon|city|country|category[|place_id]
+          // Fully geocoded by server: name|lat|lon|city|country|category[|place_id[|area]]
           final name = parts[0];
           if (name.isEmpty) continue;
           final lat = double.tryParse(parts[1]);
@@ -79,6 +79,7 @@ abstract final class SocialPlaceExtractor {
               lon:      lon,
               category: _categoryFromSlug(parts[5]),
               placeId:  parts.length > 6 ? parts[6] : '',
+              area:     parts.length > 7 ? parts[7] : '',
             );
             if (!places.any((p) => p.name.toLowerCase() == place.name.toLowerCase())) {
               places.add(place);

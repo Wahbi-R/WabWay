@@ -204,8 +204,8 @@ class MoreScreen extends ConsumerWidget {
 
           const SizedBox(height: kSpace4),
 
-          // Invite section — owner only
-          if (isOwner) ...[
+          // Invite section — any trip member (hidden until trip data is loaded)
+          if (trip != null) ...[
             const _SectionHeader(title: 'Invite'),
             const SizedBox(height: kSpace3),
             DecoratedBox(
@@ -214,34 +214,36 @@ class MoreScreen extends ConsumerWidget {
                 color: Colors.transparent,
                 child: Column(
                   children: [
-                    ListTile(
-                      contentPadding: const EdgeInsets.all(kSpace4),
-                      leading: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: const BoxDecoration(
-                          color: kColorPrimarySoft,
-                          borderRadius: kRadiusMd,
+                    if (isOwner) ...[
+                      ListTile(
+                        contentPadding: const EdgeInsets.all(kSpace4),
+                        leading: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: const BoxDecoration(
+                            color: kColorPrimarySoft,
+                            borderRadius: kRadiusMd,
+                          ),
+                          child: const Icon(Icons.person_add_rounded,
+                              size: 20, color: kColorPrimary),
                         ),
-                        child: const Icon(Icons.person_add_rounded,
-                            size: 20, color: kColorPrimary),
+                        title: Text('Add a member', style: kStyleBodySemibold),
+                        subtitle: Padding(
+                          padding: const EdgeInsets.only(top: kSpace1),
+                          child: Text('Add an existing WabWay user by email',
+                              style: kStyleCaption),
+                        ),
+                        trailing: Icon(Icons.chevron_right_rounded,
+                            color: kColorTextTertiary()),
+                        onTap: () => showAddMemberSheet(
+                          context,
+                          tripId: trip?.id ?? '',
+                          existingMemberIds: members.map((m) => m.userId).toSet(),
+                          onMemberAdded: reload,
+                        ),
                       ),
-                      title: Text('Add a member', style: kStyleBodySemibold),
-                      subtitle: Padding(
-                        padding: const EdgeInsets.only(top: kSpace1),
-                        child: Text('Add an existing WabWay user by email',
-                            style: kStyleCaption),
-                      ),
-                      trailing: Icon(Icons.chevron_right_rounded,
-                          color: kColorTextTertiary()),
-                      onTap: () => showAddMemberSheet(
-                        context,
-                        tripId: trip?.id ?? '',
-                        existingMemberIds: members.map((m) => m.userId).toSet(),
-                        onMemberAdded: reload,
-                      ),
-                    ),
-                    const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
+                      const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
+                    ],
                     ListTile(
                       contentPadding: const EdgeInsets.all(kSpace4),
                       leading: Container(
@@ -262,7 +264,7 @@ class MoreScreen extends ConsumerWidget {
                       ),
                       trailing: Icon(Icons.chevron_right_rounded,
                           color: kColorTextTertiary()),
-                      onTap: () => showInviteSheet(context, tripId: trip?.id ?? ''),
+                      onTap: () => showInviteSheet(context, tripId: trip.id, canRevoke: isOwner),
                     ),
                   ],
                 ),

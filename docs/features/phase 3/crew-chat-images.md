@@ -24,7 +24,7 @@ Trip members can share photos directly in the crew chat — from the device came
 
 - Image picker is **unavailable on web** — the button is hidden when `kIsWeb` is true.
 - Images are rendered as fixed **220×220 thumbnails**; there is no full-screen viewer yet.
-- Upload and DB insert are two sequential calls — a failed insert after a successful upload will leave an orphaned file in the bucket (no automatic cleanup).
+- Upload and DB insert are two sequential calls — if the insert fails, the client attempts to delete the uploaded file (best-effort cleanup), but this secondary delete can itself fail, potentially leaving an orphaned object in the bucket.
 - The `trip-chat` bucket is public, meaning anyone with the direct URL can view an image, though the URL itself is only accessible to trip members via the `trip_messages` table RLS.
 
 ## Data model

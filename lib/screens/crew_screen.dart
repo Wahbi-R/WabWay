@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:cached_network_image_ce/cached_network_image.dart';
-import '../core/image_cache_manager.dart';
 import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
@@ -11,6 +10,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show RealtimeChannel;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/image_cache_manager.dart';
 import '../core/providers/profile_provider.dart';
 import '../core/providers/trip_provider.dart';
 import '../core/location/location_sharing_manager.dart';
@@ -436,12 +436,18 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
   }
 
   Future<void> _pickAndSendImage(ImageSource source) async {
-    final file = await ImagePicker().pickImage(
-      source: source,
-      imageQuality: 80,
-      maxWidth: 1280,
-      maxHeight: 1280,
-    );
+    XFile? file;
+    try {
+      file = await ImagePicker().pickImage(
+        source: source,
+        imageQuality: 80,
+        maxWidth: 1280,
+        maxHeight: 1280,
+      );
+    } catch (_) {
+      if (mounted) _showError('Could not access camera or photo library');
+      return;
+    }
     if (file == null || !mounted) return;
     setState(() => _sendingImage = true);
     try {
@@ -452,9 +458,11 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
           authorId: _userId!,
           imageUrl: url,
         );
-      } catch (_) {
-        // Insert failed — delete the orphaned storage object before surfacing error.
-        await CrewService.deleteChatImage(path);
+      } catch (e) {
+        // Best-effort cleanup — ignore delete errors so the original error is preserved.
+        try {
+          await CrewService.deleteChatImage(path);
+        } catch (_) {}
         rethrow;
       }
       await _onNewMessage();

@@ -2,9 +2,9 @@
 -- WabWay — Migration 039: create_trip_invite — retry on code collision
 -- =============================================================================
 -- trip_invites.code is UNIQUE. The previous implementation generated a single
--- 8-hex code and failed with unique_violation if it collided. With ~16M possible
--- codes the probability is tiny but non-zero for active trips. This version
--- retries up to 5 times before surfacing a clear error.
+-- 8-hex code and failed with unique_violation if it collided. With 16^8 (~4.3B)
+-- possible codes the probability is tiny but non-zero for active trips. This
+-- version retries up to 5 times before surfacing a clear error.
 
 create or replace function create_trip_invite(p_trip_id uuid)
 returns text

@@ -225,7 +225,7 @@ class _CodesSection extends StatelessWidget {
   final Set<String> copied;
   final Future<void> Function(InviteCode) onCopy;
   final Future<void> Function(InviteCode) onShareLink;
-  final Future<void> Function(InviteCode) onRevoke;
+  final Future<void> Function(InviteCode)? onRevoke;
 
   @override
   Widget build(BuildContext context) {
@@ -245,7 +245,7 @@ class _CodesSection extends StatelessWidget {
                   copied: copied.contains(c.id),
                   onCopy: () => onCopy(c),
                   onShareLink: () => onShareLink(c),
-                  onRevoke: () => onRevoke(c),
+                  onRevoke: onRevoke != null ? () => onRevoke!(c) : null,
                 ),
               )),
           const SizedBox(height: kSpace3),

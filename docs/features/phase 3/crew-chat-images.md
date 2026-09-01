@@ -8,8 +8,8 @@ Trip members can share photos directly in the crew chat — from the device came
 
 1. Tap the **image icon** in the chat input bar (native platforms only; hidden on web).
 2. A bottom sheet appears with two options: **Camera** or **Photo library**.
-3. The selected photo is resized to a maximum of 1280×1280 px at 80% JPEG quality before upload.
-4. The file is uploaded to the `trip-chat` Supabase Storage bucket under `{tripId}/{timestamp}.{ext}`.
+3. The selected photo is resized to a maximum of 1280×1280 px at quality 80 (preserving the original file format) before upload.
+4. The file is uploaded to the `trip-chat` Supabase Storage bucket under `{tripId}/{userId}_{timestamp}.{ext}`.
 5. A `trip_messages` row is inserted with `message_type = 'image'` and the public URL in `image_url`.
 6. The image appears as a **220×220 thumbnail** bubble in the chat stream for all crew members via the existing realtime subscription.
 

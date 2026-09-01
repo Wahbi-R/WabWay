@@ -1,4 +1,4 @@
-import 'package:image_picker/image_picker.dart';
+import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/crew_data.dart';
 import 'client.dart';
@@ -99,9 +99,8 @@ abstract final class CrewService {
     });
   }
 
-  static Future<({String path, String url})> uploadChatImage(String tripId, String userId, XFile file) async {
-    final bytes = await file.readAsBytes();
-    final ext = file.name.contains('.') ? file.name.split('.').last.toLowerCase() : 'jpg';
+  static Future<({String path, String url})> uploadChatImage(
+      String tripId, String userId, Uint8List bytes, String ext) async {
     final mime = switch (ext) {
       'jpg' || 'jpeg' => 'image/jpeg',
       'png'           => 'image/png',

@@ -451,7 +451,9 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
     if (file == null || !mounted) return;
     setState(() => _sendingImage = true);
     try {
-      final (:path, :url) = await CrewService.uploadChatImage(_tripId!, _userId!, file);
+      final bytes = await file.readAsBytes();
+      final ext = file.name.contains('.') ? file.name.split('.').last.toLowerCase() : 'jpg';
+      final (:path, :url) = await CrewService.uploadChatImage(_tripId!, _userId!, bytes, ext);
       try {
         await CrewService.sendImageMessage(
           tripId: _tripId!,
@@ -851,7 +853,7 @@ class _MessageBubble extends StatelessWidget {
                   ),
                 GestureDetector(
                   onLongPress: () => _showEmojiPicker(context),
-                  child: message.type == MessageType.image && message.imageUrl != null
+                  child: message.type == MessageType.image
                       ? Semantics(
                           label: 'Photo message',
                           image: true,
@@ -863,7 +865,7 @@ class _MessageBubble extends StatelessWidget {
                             bottomRight: Radius.circular(isMe ? 4 : 16),
                           ),
                           child: CachedNetworkImage(
-                            imageUrl: message.imageUrl!,
+                            imageUrl: message.imageUrl ?? '',
                             cacheManager: WabwayImageCache.instance,
                             width: 220,
                             height: 220,

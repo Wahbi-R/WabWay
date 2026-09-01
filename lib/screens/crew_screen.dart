@@ -451,7 +451,7 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
     if (file == null || !mounted) return;
     setState(() => _sendingImage = true);
     try {
-      final (:path, :url) = await CrewService.uploadChatImage(_tripId!, file);
+      final (:path, :url) = await CrewService.uploadChatImage(_tripId!, _userId!, file);
       try {
         await CrewService.sendImageMessage(
           tripId: _tripId!,
@@ -852,7 +852,10 @@ class _MessageBubble extends StatelessWidget {
                 GestureDetector(
                   onLongPress: () => _showEmojiPicker(context),
                   child: message.type == MessageType.image && message.imageUrl != null
-                      ? ClipRRect(
+                      ? Semantics(
+                          label: 'Photo message',
+                          image: true,
+                          child: ClipRRect(
                           borderRadius: BorderRadius.only(
                             topLeft: const Radius.circular(16),
                             topRight: const Radius.circular(16),
@@ -884,6 +887,7 @@ class _MessageBubble extends StatelessWidget {
                                   color: kColorInkSoft),
                             ),
                           ),
+                        ),
                         )
                       : Container(
                           padding: const EdgeInsets.symmetric(

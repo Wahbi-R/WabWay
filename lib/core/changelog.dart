@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 283,
+    label: 'Send photos in crew chat',
+    changes: [
+      'Tap the new image button in crew chat to share a photo from your camera or photo library',
+      'Images appear as 220×220 thumbnails in the chat alongside text and location messages',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 282,
     label: 'Anyone can invite trip members',
     changes: [

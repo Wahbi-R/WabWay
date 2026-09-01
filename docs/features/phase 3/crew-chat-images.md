@@ -16,7 +16,7 @@ Trip members can share photos directly in the crew chat — from the device came
 ## Storage
 
 - **Bucket**: `trip-chat` (public)
-- **Path format**: `{tripId}/{timestamp}.{ext}`
+- **Path format**: `{tripId}/{userId}_{timestamp}.{ext}` (timestamp in microseconds)
 - **RLS**: only authenticated trip members may upload; only the uploader may delete
 - **MIME type**: mapped from file extension (`jpg`/`jpeg` → `image/jpeg`, `png`, `gif`, `webp`, `heic`)
 

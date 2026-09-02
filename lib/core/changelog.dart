@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 314,
+    label: 'Fix: Settle Up no longer shows previous trip data',
+    changes: [
+      'Switching trips now immediately clears the Settle Up panel — previous trip settlements no longer bleed through while the new trip loads',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 313,
     label: 'Fix: connection chip remove button no longer navigates',
     changes: [

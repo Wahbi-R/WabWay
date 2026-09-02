@@ -90,6 +90,7 @@ abstract final class ConnectionService {
   static Future<(Map<String, String>, Map<String, String>)>
       fetchSpotAndStayMapsForItems(List<String> itemIds) async {
     if (itemIds.isEmpty) return ({}, {});
+    final idSet = itemIds.toSet();
     final rows = await supabase
         .from('trip_connections')
         .select('entity_a_id, entity_a_type, entity_b_id, entity_b_type')
@@ -101,10 +102,10 @@ abstract final class ConnectionService {
       final bType = r['entity_b_type'] as String;
       final aId   = r['entity_a_id'] as String;
       final bId   = r['entity_b_id'] as String;
-      if (aType == 'plan_item' && itemIds.contains(aId)) {
+      if (aType == 'plan_item' && idSet.contains(aId)) {
         if (bType == 'spot') spotMap[aId] = bId;
         if (bType == 'stay') stayMap[aId] = bId;
-      } else if (bType == 'plan_item' && itemIds.contains(bId)) {
+      } else if (bType == 'plan_item' && idSet.contains(bId)) {
         if (aType == 'spot') spotMap[bId] = aId;
         if (aType == 'stay') stayMap[bId] = aId;
       }

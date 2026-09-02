@@ -2,6 +2,7 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **314. Fix Copilot review: O(n) itemIds lookup in connection query, money stale settlements on trip switch** — fetchSpotAndStayMapsForItems now converts itemIds to a Set before the row loop for O(1) lookups; money_screen non-silent load now clears _persistedSettlements when the trip changes so stale Settle Up data never bleeds into the new trip (2026-09-02, build 314).
 - [x] **313. Fix Copilot review: TripDoc type error and connection chip tap target** — TripDoc corrected to TripDocument fixing a compile error in connections_section; connection chip now only makes the icon+label area tappable for navigation so the X (remove) button no longer also triggers navigation (2026-09-02, build 313).
 - [x] **312. Fix Copilot review: failure-tolerant name resolution in ConnectionsSection** — all entity loads in _resolveNames now use catchError so a failed spot/travel/doc/link fetch degrades gracefully (chips render without a name) instead of rejecting the Future.wait and leaving the section stuck (2026-09-02, build 312).
 - [x] **311. Fix Copilot review: shopping realtime guard on empty trip id, scoped connection query** — shopping realtime now only re-subscribes when the new trip id is non-empty; fetchSpotMapForItems and fetchStayMapForItems replaced with a single fetchSpotAndStayMapsForItems that filters by item IDs in SQL instead of fetching all rows (2026-09-02, build 311).

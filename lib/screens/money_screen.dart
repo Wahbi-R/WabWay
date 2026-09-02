@@ -345,7 +345,11 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
     final tripId = _activeTripId;
     if (tripId == null) return;
     final gen = ++_loadGen;
-    if (!silent) setState(() { _loading = true; _error = false; _offline = false; _receipts = []; _withdrawals = []; });
+    if (!silent) setState(() {
+      _loading = true; _error = false; _offline = false;
+      _receipts = []; _withdrawals = [];
+      if (_lastTripId != tripId) _persistedSettlements = [];
+    });
 
     if (!silent) {
       final cachedReceipts    = await MoneyService.loadReceiptsFromCache(tripId);

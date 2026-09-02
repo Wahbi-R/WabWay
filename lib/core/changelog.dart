@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 293,
+    label: 'Fix: global search & map survive accommodation errors',
+    changes: [
+      'Global search and the map no longer fail entirely when accommodation data can\'t be fetched — spots, docs, and all other results still load normally',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 292,
     label: 'Fix: safer offline cache reads for plan & travel',
     changes: [

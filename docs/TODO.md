@@ -2,6 +2,7 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **293. Fix Copilot review: isolate AccommodationService.loadAll in global_search and map Future.wait, update PR title to 284-293** — global_search_screen and map_screen called loadAll inside Future.wait without catchError so an accommodation failure would drop all other search/map results; both now use .catchError((_) => []) to isolate the failure (2026-09-02, build 293).
 - [x] **292. Fix Copilot review: safe enum deserialization in plan/travel cache reads, fix misleading SWR test comment** — ItineraryItemType and TravelItemType now use firstWhere+orElse instead of byName so corrupted or unrecognised cached strings fall back to .other instead of throwing; swr_test.dart group comment rewritten to describe what test 1 actually does (clears cache → network load → assert cache populated) (2026-09-02, build 292).
 - [x] **291. Fix Copilot review: catch (e) → catch (_) in accommodation_service** — unused catch variable lint (2026-09-02, build 291).
 - [x] **290. Fix Copilot review: guard AccommodationService.loadAll call sites in connections_section, update PR title** — connections_section.dart had two unguarded AccommodationService.loadAll calls (one in Future.wait, one in a switch case) that could throw and crash the connections UI since Build 289 made loadAll rethrow on empty cache; both now use catchError; PR title updated to reflect builds 284-291 (2026-09-02, build 290).

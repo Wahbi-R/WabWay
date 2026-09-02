@@ -117,7 +117,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     try {
       final results = await Future.wait([
         SpotService.loadSpots(tripId),
-        AccommodationService.loadAll(tripId),
+        AccommodationService.loadAll(tripId).catchError((_) => <Accommodation>[]),
       ]);
       if (!mounted) return;
       setState(() {

@@ -348,7 +348,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
     if (!silent) setState(() {
       _loading = true; _error = false; _offline = false;
       _receipts = []; _withdrawals = [];
-      if (_lastTripId != tripId) _persistedSettlements = [];
+      if (_lastTripId != tripId) { _persistedSettlements = []; _pendingSyncCount = 0; }
     });
 
     if (!silent) {

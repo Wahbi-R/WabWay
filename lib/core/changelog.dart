@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 317,
+    label: 'Fix: money pending-sync badge clears on trip switch',
+    changes: [
+      'The pending-sync badge in the Money screen no longer briefly shows the previous trip\'s count when switching trips',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 316,
     label: 'Fix: travel screen compile errors',
     changes: [

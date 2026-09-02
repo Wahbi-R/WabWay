@@ -233,7 +233,10 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
       final stays = await staysFuture;
       if (!mounted || gen != _loadGen) return;
       setState(() {
-        _days..clear()..addAll(days)..sort((a, b) => a.date.compareTo(b.date));
+        _days..clear()..addAll(days)..sort((a, b) {
+          final cmp = a.date.compareTo(b.date);
+          return cmp != 0 ? cmp : a.dayNumber.compareTo(b.dayNumber);
+        });
         _spots..clear()..addAll(spots);
         _docs..clear()..addAll(docs);
         _stayItems..clear()..addAll(stays);
@@ -632,7 +635,13 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
         notes:     draft.notes,
       );
       if (!mounted) return;
-      setState(() { _days.add(day); _days.sort((a, b) => a.date.compareTo(b.date)); });
+      setState(() {
+        _days.add(day);
+        _days.sort((a, b) {
+          final cmp = a.date.compareTo(b.date);
+          return cmp != 0 ? cmp : a.dayNumber.compareTo(b.dayNumber);
+        });
+      });
     } catch (e) {
       if (!mounted) return;
       messenger.showSnackBar(SnackBar(
@@ -690,7 +699,10 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
       if (!mounted) return;
       setState(() {
         _days.addAll(newDays);
-        _days.sort((a, b) => a.date.compareTo(b.date));
+        _days.sort((a, b) {
+          final cmp = a.date.compareTo(b.date);
+          return cmp != 0 ? cmp : a.dayNumber.compareTo(b.dayNumber);
+        });
         _loading = false;
       });
       unawaited(PlanService.writeDaysToCache(_activeTripId, _days));

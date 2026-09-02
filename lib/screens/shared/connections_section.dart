@@ -552,8 +552,7 @@ class _StayDetailSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     String? dateRange;
     if (stay.checkIn != null && stay.checkOut != null) {
-      final fmt = (DateTime d) => '${d.day}/${d.month}/${d.year}';
-      dateRange = '${fmt(stay.checkIn!)} – ${fmt(stay.checkOut!)}';
+      dateRange = '${fmtDate(stay.checkIn!)} – ${fmtDate(stay.checkOut!)}';
     }
     return DraggableScrollableSheet(
       initialChildSize: 0.5,

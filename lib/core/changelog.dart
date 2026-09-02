@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 308,
+    label: 'Fix: stable day ordering when dates overlap',
+    changes: [
+      'Days sharing the same date now always display in a consistent, stable order',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 307,
     label: 'Fix: connection chips and stay-swap picker',
     changes: [

@@ -10,6 +10,7 @@ enum ItineraryItemType {
   activity,
   freeTime,
   transport,
+  stay,
   other;
 
   String get label => switch (this) {
@@ -19,6 +20,7 @@ enum ItineraryItemType {
         ItineraryItemType.activity => 'Activity',
         ItineraryItemType.freeTime => 'Free Time',
         ItineraryItemType.transport => 'Transport',
+        ItineraryItemType.stay => 'Stay',
         ItineraryItemType.other => 'Other',
       };
 
@@ -29,6 +31,7 @@ enum ItineraryItemType {
         ItineraryItemType.activity => Icons.camera_alt_rounded,
         ItineraryItemType.freeTime => Icons.self_improvement_rounded,
         ItineraryItemType.transport => Icons.train_rounded,
+        ItineraryItemType.stay => Icons.hotel_rounded,
         ItineraryItemType.other => Icons.circle_outlined,
       };
 
@@ -39,6 +42,7 @@ enum ItineraryItemType {
         ItineraryItemType.activity => const Color(0xFF7D9A75),
         ItineraryItemType.freeTime => const Color(0xFF8A7F75),
         ItineraryItemType.transport => const Color(0xFFC98A2E),
+        ItineraryItemType.stay => const Color(0xFF6A80B5),
         ItineraryItemType.other => const Color(0xFF6F665D),
       };
 
@@ -49,6 +53,7 @@ enum ItineraryItemType {
         ItineraryItemType.activity => const Color(0xFFEEF4EC),
         ItineraryItemType.freeTime => const Color(0xFFEEEAE3),
         ItineraryItemType.transport => const Color(0xFFF6EDDF),
+        ItineraryItemType.stay => const Color(0xFFEAEEF6),
         ItineraryItemType.other => const Color(0xFFEEEAE3),
       };
 }
@@ -69,6 +74,7 @@ class ItineraryItem {
     this.confirmationUrl,
     this.notes,
     this.linkedSpotId,
+    this.linkedStayId,
     this.linkedDocIds = const [],
     this.sortOrder = 0,
     this.isDone = false,
@@ -90,6 +96,7 @@ class ItineraryItem {
   final String? confirmationUrl;
   final String? notes;
   final String? linkedSpotId;
+  final String? linkedStayId;
   final List<String> linkedDocIds;
   final int sortOrder;
   final bool isDone;
@@ -97,9 +104,9 @@ class ItineraryItem {
   final String? currency;
 
   bool get hasTime => time != null;
-  bool get hasLinks => linkedSpotId != null || linkedDocIds.isNotEmpty;
+  bool get hasLinks => linkedSpotId != null || linkedStayId != null || linkedDocIds.isNotEmpty;
 
-  ItineraryItem copyWith({bool? isDone, double? plannedCost, String? currency, String? linkedSpotId}) =>
+  ItineraryItem copyWith({bool? isDone, double? plannedCost, String? currency, String? linkedSpotId, String? linkedStayId}) =>
       ItineraryItem(
         id:              id,
         dayId:           dayId,
@@ -113,6 +120,7 @@ class ItineraryItem {
         confirmationUrl: confirmationUrl,
         notes:           notes,
         linkedSpotId:    linkedSpotId ?? this.linkedSpotId,
+        linkedStayId:    linkedStayId ?? this.linkedStayId,
         linkedDocIds:    linkedDocIds,
         sortOrder:       sortOrder,
         isDone:          isDone ?? this.isDone,

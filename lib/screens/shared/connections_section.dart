@@ -136,6 +136,29 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
     }));
   }
 
+  bool _canNavigate(EntityType type) =>
+      type == EntityType.stay || type == EntityType.spot;
+
+  Future<void> _navigate(BuildContext context, ResolvedConnection r) async {
+    final tripId = widget.tripId;
+    if (r.peerType == EntityType.stay) {
+      final stays = await AccommodationService.loadAll(tripId).catchError((_) => <Accommodation>[]);
+      final stay = stays.where((s) => s.id == r.peerId).firstOrNull;
+      if (!mounted || stay == null) return;
+      _showStayDetailSheet(context, stay);
+    }
+  }
+
+  void _showStayDetailSheet(BuildContext context, Accommodation stay) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _StayDetailSheet(stay: stay),
+    );
+  }
+
   Future<void> _remove(TripConnection c) async {
     setState(() => _connections.remove(c));
     await ConnectionService.remove(c.id);
@@ -234,6 +257,9 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
                 .map((r) => _ConnectionChip(
                       resolved: r,
                       onRemove: () => _remove(r.connection),
+                      onTap: _canNavigate(r.peerType)
+                          ? () => _navigate(context, r)
+                          : null,
                     ))
                 .toList(),
           ),
@@ -246,31 +272,34 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
 
 class _ConnectionChip extends StatelessWidget {
   const _ConnectionChip(
-      {required this.resolved, required this.onRemove});
+      {required this.resolved, required this.onRemove, this.onTap});
   final ResolvedConnection resolved;
   final VoidCallback        onRemove;
+  final VoidCallback?       onTap;
 
   @override
   Widget build(BuildContext context) {
     final type = resolved.peerType;
-    return Container(
-      padding:
-          const EdgeInsets.only(left: 8, top: 5, bottom: 5, right: 4),
+    final chip = Container(
+      padding: const EdgeInsets.only(left: 8, top: 5, bottom: 5, right: 4),
       decoration: BoxDecoration(
         color: kColorSurfaceSunken,
         borderRadius: kRadiusPill,
-        border: Border.all(color: kColorBorder),
+        border: Border.all(color: onTap != null ? kColorPrimary.withValues(alpha: 0.35) : kColorBorder),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(type.icon, size: 12, color: kColorInkSoft),
+          Icon(type.icon, size: 12, color: onTap != null ? kColorPrimary : kColorInkSoft),
           const SizedBox(width: 4),
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 160),
             child: Text(
               resolved.peerName,
-              style: kStyleCaption.copyWith(fontWeight: FontWeight.w500),
+              style: kStyleCaption.copyWith(
+                fontWeight: FontWeight.w500,
+                color: onTap != null ? kColorPrimary : null,
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -278,12 +307,13 @@ class _ConnectionChip extends StatelessWidget {
           const SizedBox(width: 4),
           GestureDetector(
             onTap: onRemove,
-            child: Icon(Icons.close_rounded,
-                size: 14, color: kColorInkSoft),
+            child: Icon(Icons.close_rounded, size: 14, color: kColorInkSoft),
           ),
         ],
       ),
     );
+    if (onTap == null) return chip;
+    return GestureDetector(onTap: onTap, child: chip);
   }
 }
 
@@ -511,4 +541,75 @@ class _ConnectionPickerSheetState
       ),
     );
   }
+}
+
+// ─── Stay detail sheet ────────────────────────────────────────────────────────
+
+class _StayDetailSheet extends StatelessWidget {
+  const _StayDetailSheet({required this.stay});
+  final Accommodation stay;
+
+  @override
+  Widget build(BuildContext context) {
+    String? dateRange;
+    if (stay.checkIn != null && stay.checkOut != null) {
+      final fmt = (DateTime d) => '${d.day}/${d.month}/${d.year}';
+      dateRange = '${fmt(stay.checkIn!)} – ${fmt(stay.checkOut!)}';
+    }
+    return DraggableScrollableSheet(
+      initialChildSize: 0.5,
+      minChildSize: 0.35,
+      maxChildSize: 0.85,
+      builder: (_, ctrl) => DecoratedBox(
+        decoration: const BoxDecoration(
+          color: kColorPaper,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: ListView(
+          controller: ctrl,
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+          children: [
+            Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: kColorBorder, borderRadius: BorderRadius.circular(2)))),
+            const SizedBox(height: 16),
+            Row(children: [
+              Container(
+                width: 40, height: 40,
+                decoration: BoxDecoration(color: ItineraryItemType.stay.softColor, borderRadius: kRadiusMd),
+                child: Icon(stay.source?.icon ?? Icons.hotel_rounded, size: 20, color: ItineraryItemType.stay.color),
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(stay.name, style: kStyleTitle, maxLines: 2, overflow: TextOverflow.ellipsis),
+                  if (stay.source != null)
+                    Text(stay.source!.label, style: kStyleCaption.copyWith(color: kColorInkSoft)),
+                ],
+              )),
+            ]),
+            const SizedBox(height: 16),
+            const Divider(height: 1),
+            const SizedBox(height: 16),
+            if (stay.city.isNotEmpty) _row(Icons.location_city_rounded, stay.city),
+            if (stay.address != null) _row(Icons.place_rounded, stay.address!),
+            if (dateRange != null) _row(Icons.calendar_today_rounded, dateRange),
+            _row(Icons.info_outline_rounded, stay.status.label),
+            if (stay.notes != null && stay.notes!.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(stay.notes!, style: kStyleBody.copyWith(color: kColorInkSoft)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _row(IconData icon, String text) => Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Row(children: [
+      Icon(icon, size: 16, color: kColorInkSoft),
+      const SizedBox(width: 8),
+      Expanded(child: Text(text, style: kStyleBody)),
+    ]),
+  );
 }

@@ -14,6 +14,7 @@ abstract final class PlanService {
         'activity'  => ItineraryItemType.activity,
         'free_time' => ItineraryItemType.freeTime,
         'transport' => ItineraryItemType.transport,
+        'stay'      => ItineraryItemType.stay,
         _           => ItineraryItemType.other,
       };
 
@@ -24,6 +25,7 @@ abstract final class PlanService {
         ItineraryItemType.activity  => 'activity',
         ItineraryItemType.freeTime  => 'free_time',
         ItineraryItemType.transport => 'transport',
+        ItineraryItemType.stay      => 'stay',
         ItineraryItemType.other     => 'other',
       };
 
@@ -147,9 +149,7 @@ abstract final class PlanService {
   static ItineraryItem _itemFromJson(Map<String, dynamic> j) => ItineraryItem(
     id: j['id'] as String, dayId: j['day_id'] as String,
     title: j['title'] as String,
-    type: ItineraryItemType.values.firstWhere(
-            (e) => e.name == (j['type'] as String? ?? ''),
-            orElse: () => ItineraryItemType.other),
+    type: _typeFrom(j['type'] as String? ?? ''),
     time: j['time'] as String?, city: j['city'] as String?,
     country: j['country'] as String?, location: j['location'] as String?,
     mapsUrl: j['maps_url'] as String?, confirmationUrl: j['confirmation_url'] as String?,
@@ -290,6 +290,9 @@ abstract final class PlanService {
   static Future<void> deleteDay(String dayId) async {
     await supabase.from('itinerary_days').delete().eq('id', dayId);
   }
+
+  static Future<void> writeDaysToCache(String tripId, List<TripDay> days) =>
+      OfflineCache.write(OfflineCache.planKey(tripId), days.map(_dayToJson).toList());
 
   static Future<void> updateDay(
     String dayId, {

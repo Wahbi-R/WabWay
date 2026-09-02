@@ -11,6 +11,18 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 302,
+    label: 'Plan: Stay items, fix delete cache, fill from stay',
+    changes: [
+      'Deleting a day now immediately updates the offline cache — deleted days no longer reappear when you pull to refresh',
+      'New "Stay" item type in the itinerary — add your booked accommodations directly to the plan',
+      '"Add itinerary item" now shows a "Fill from spot or stay" picker with a Spots / Stays tab, so you can fill from an accommodation in one tap',
+      'Linking a stay to a plan item creates a proper connection — tap the linked stay chip in item details to see its info',
+      'Spot address no longer shows as the item subtitle — the name is already the title, so the address was redundant',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 301,
     label: 'Fix: spots screen fully clears on trip switch',
     changes: [

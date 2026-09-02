@@ -11,10 +11,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/providers/trip_provider.dart';
 import '../core/trip/trip_state.dart';
 import '../core/supabase/client.dart';
+import '../core/supabase/accommodation_service.dart';
 import '../core/supabase/connection_service.dart';
 import '../core/supabase/plan_service.dart';
 import '../core/supabase/spot_service.dart';
 import '../core/supabase/doc_service.dart';
+import '../data/accommodation_data.dart';
 import '../data/connection_data.dart';
 import '../data/money_data.dart' show fmtAmount;
 import '../data/plan_data.dart';
@@ -40,6 +42,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
   final List<TripDay> _days = [];
   final List<Spot> _spots = [];
   final List<TripDocument> _docs = [];
+  final List<Accommodation> _stayItems = [];
 
   bool _loading = false;
   bool _offline = false;
@@ -196,21 +199,24 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
   Future<void> _loadAll({bool silent = false}) async {
     if (_activeTripId.isEmpty) return;
     final gen = ++_loadGen;
-    if (!silent) setState(() { _loading = true; _error = null; _offline = false; _days.clear(); _spots.clear(); _docs.clear(); });
+    if (!silent) setState(() { _loading = true; _error = null; _offline = false; _days.clear(); _spots.clear(); _docs.clear(); _stayItems.clear(); });
 
     if (!silent) {
       final cachedDaysFuture  = PlanService.loadFromCache(_activeTripId);
       final cachedSpotsFuture = SpotService.loadSpotsFromCache(_activeTripId);
       final cachedDocsFuture  = DocService.loadDocumentsFromCache(_activeTripId);
+      final cachedStaysFuture = AccommodationService.loadFromCache(_activeTripId);
       final cachedDays  = await cachedDaysFuture;
       final cachedSpots = await cachedSpotsFuture;
       final cachedDocs  = await cachedDocsFuture;
+      final cachedStays = await cachedStaysFuture;
       if (!mounted || gen != _loadGen) return;
       if (cachedDays != null) {
         setState(() {
           _days..clear()..addAll(cachedDays)..sort((a, b) => a.date.compareTo(b.date));
           _spots..clear()..addAll(cachedSpots ?? []);
           _docs..clear()..addAll(cachedDocs ?? []);
+          _stayItems..clear()..addAll(cachedStays ?? []);
           _loading = false;
         });
       }
@@ -220,14 +226,17 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
       final daysFuture  = PlanService.loadAll(_activeTripId);
       final spotsFuture = SpotService.loadSpots(_activeTripId);
       final docsFuture  = DocService.loadDocuments(_activeTripId);
+      final staysFuture = AccommodationService.loadAll(_activeTripId).catchError((_) => <Accommodation>[]);
       final days  = await daysFuture;
       final spots = await spotsFuture;
       final docs  = await docsFuture;
+      final stays = await staysFuture;
       if (!mounted || gen != _loadGen) return;
       setState(() {
         _days..clear()..addAll(days)..sort((a, b) => a.date.compareTo(b.date));
         _spots..clear()..addAll(spots);
         _docs..clear()..addAll(docs);
+        _stayItems..clear()..addAll(stays);
         if (!silent) _loading = false;
         _offline = false;
       });
@@ -357,6 +366,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
       defaultCurrency: ref.read(activeTripProvider)?.homeCurrency ?? '',
       spots: _spots,
       docs: _docs,
+      stays: _stayItems,
     );
     if (draft == null || !mounted) return;
 
@@ -389,7 +399,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
         sortOrder:       day.items.length,
       );
       if (!mounted) return;
-      // Write spot connection to trip_connections if one was picked.
+      // Write spot or stay connection to trip_connections if one was picked.
       if (draft.linkedSpotId != null) {
         await ConnectionService.add(
           tripId: _activeTripId,
@@ -399,10 +409,19 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
           typeB:  EntityType.spot,
           idB:    draft.linkedSpotId!,
         );
+      } else if (draft.linkedStayId != null) {
+        await ConnectionService.add(
+          tripId: _activeTripId,
+          userId: _userId,
+          typeA:  EntityType.planItem,
+          idA:    item.id,
+          typeB:  EntityType.stay,
+          idB:    draft.linkedStayId!,
+        );
       }
       if (!mounted) return;
       setState(() {
-        day.items.add(item.copyWith(linkedSpotId: draft.linkedSpotId));
+        day.items.add(item.copyWith(linkedSpotId: draft.linkedSpotId, linkedStayId: draft.linkedStayId));
         _selectedItemId = item.id;
       });
     } catch (e) {
@@ -444,7 +463,6 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
         createdBy:    _userId,
         time:         timeStr,
         city:         spot.city.isNotEmpty ? spot.city : spot.area,
-        location:     (spot.address?.isNotEmpty == true) ? spot.address : spot.name,
         mapsUrl:      spot.mapsUrl,
         sortOrder:    day.items.length,
       );
@@ -542,6 +560,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
     );
     if (confirmed != true || !mounted) return;
     setState(() => _days.removeWhere((d) => d.id == day.id));
+    PlanService.writeDaysToCache(_activeTripId, _days);
     PlanService.deleteDay(day.id).catchError((_) => _loadAll(silent: true));
   }
 

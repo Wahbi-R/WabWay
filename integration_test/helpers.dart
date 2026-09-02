@@ -1,6 +1,8 @@
 // Shared utilities for WabWay integration tests.
 // ignore_for_file: avoid_print
 import 'dart:async';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -27,12 +29,19 @@ Widget testApp() => const ProviderScope(
 
 // ── Supabase ─────────────────────────────────────────────────────────────────
 
-Future<void> initSupabase() async {
+/// Full app initialization matching main.dart: Firebase + Supabase.
+/// Safe to call multiple times — both are idempotent.
+Future<void> initApp() async {
   assert(kSupabaseUrl.isNotEmpty && kSupabaseKey.isNotEmpty,
       'SUPABASE_URL / SUPABASE_ANON_KEY missing — run with --dart-define-from-file=.env');
-  // initialize is idempotent; safe to call in every setUpAll
+  if (!kIsWeb) {
+    try { await Firebase.initializeApp(); } catch (_) { /* already initialized */ }
+  }
   await Supabase.initialize(url: kSupabaseUrl, publishableKey: kSupabaseKey);
 }
+
+/// Alias kept for back-compat with older test files.
+Future<void> initSupabase() => initApp();
 
 SupabaseClient get sb => Supabase.instance.client;
 
@@ -64,7 +73,7 @@ Future<void> tapTab(WidgetTester t, String label, {Duration settle = const Durat
     print('[test] tab "$label" not found — skipping');
     return;
   }
-  await t.tap(f.first);
+  await t.tap(f.first, warnIfMissed: false);
   await t.pumpAndSettle(settle);
 }
 

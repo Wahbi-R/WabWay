@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 285,
+    label: 'SWR test suite green',
+    changes: [
+      'All offline-caching behaviours verified by automated integration tests: cache-first, trip-switch invalidation, rapid-tab gen-counter, and warm-cache spinner timing',
+      'Fixed visual glitches on the Home screen caused by missing Material wrappers around list tiles',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 284,
     label: 'Instant offline browsing',
     changes: [

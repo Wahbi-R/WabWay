@@ -152,6 +152,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
     if (!silent) {
       final cachedSpots = await SpotService.loadSpotsFromCache(tripId);
       final cachedDocs  = await DocService.loadDocumentsFromCache(tripId);
+      final cachedStays = await AccommodationService.loadFromCache(tripId);
       if (!mounted || gen != _loadGen) return;
       if (cachedSpots != null) {
         final myId = supabase.auth.currentUser?.id;
@@ -169,7 +170,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
         setState(() {
           _spots   = cachedSpots;
           _docs    = cachedDocs ?? [];
-          _stays   = [];
+          _stays   = cachedStays ?? [];
           _myVotes = cachedVotes;
           _loading = false;
         });

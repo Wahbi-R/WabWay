@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 315,
+    label: 'Fix: Stays filter chip appears instantly from cache',
+    changes: [
+      'The Stays filter chip in the Spots screen now appears immediately when loading from cache, including while offline',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 314,
     label: 'Fix: Settle Up no longer shows previous trip data',
     changes: [

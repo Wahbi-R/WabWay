@@ -147,7 +147,9 @@ abstract final class PlanService {
   static ItineraryItem _itemFromJson(Map<String, dynamic> j) => ItineraryItem(
     id: j['id'] as String, dayId: j['day_id'] as String,
     title: j['title'] as String,
-    type: ItineraryItemType.values.byName(j['type'] as String? ?? 'other'),
+    type: ItineraryItemType.values.firstWhere(
+            (e) => e.name == (j['type'] as String? ?? ''),
+            orElse: () => ItineraryItemType.other),
     time: j['time'] as String?, city: j['city'] as String?,
     country: j['country'] as String?, location: j['location'] as String?,
     mapsUrl: j['maps_url'] as String?, confirmationUrl: j['confirmation_url'] as String?,

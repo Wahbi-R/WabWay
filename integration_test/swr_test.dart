@@ -34,11 +34,12 @@ void main() {
 
   tearDownAll(signOut);
 
-  // ── 1. Cache-first ──────────────────────────────────────────────────────────
+  // ── 1. Cache population ─────────────────────────────────────────────────────
   //
-  // Seed a known JSON blob directly into SharedPreferences for the active trip,
-  // then pump the app and verify the seeded text appears before pumpAndSettle
-  // finishes (i.e. while the network request is still in flight).
+  // Clears the OfflineCache for the active trip, pumps the app so it performs a
+  // live network load, then asserts that OfflineCache is populated with the
+  // result — verifying the write-through path that makes later cache-first
+  // reads possible.
 
   group('1. Cache-first rendering', () {
     testWidgets('Spots: cache is populated after a network load', (t) async {

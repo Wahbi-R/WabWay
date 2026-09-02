@@ -106,7 +106,9 @@ abstract final class TravelService {
   static TravelItem _fromJson(Map<String, dynamic> j) => TravelItem(
     id:                    j['id'] as String,
     title:                 j['title'] as String,
-    type:                  TravelItemType.values.byName(j['type'] as String? ?? 'other'),
+    type:                  TravelItemType.values.firstWhere(
+                               (e) => e.name == (j['type'] as String? ?? ''),
+                               orElse: () => TravelItemType.other),
     status:                TravelBookingStatus.fromDb(j['status'] as String?),
     date:                  j['date'] != null ? DateTime.parse(j['date'] as String) : null,
     endDate:               j['end_date'] != null ? DateTime.parse(j['end_date'] as String) : null,

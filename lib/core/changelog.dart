@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 292,
+    label: 'Fix: safer offline cache reads for plan & travel',
+    changes: [
+      'Plan and Travel items with an unrecognised type in the offline cache now fall back to "other" instead of crashing — corrupted or renamed cache entries are handled gracefully',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 291,
     label: 'Fix: lint cleanup in accommodation service',
     changes: [

@@ -587,7 +587,15 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
 
   Future<void> _addDay(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
-    final draft = await _showAddDayDialog(context);
+    // Default to day after the latest existing day, or the trip start date, or today.
+    DateTime defaultDate;
+    if (_days.isNotEmpty) {
+      final latest = _days.map((d) => d.date).reduce((a, b) => a.isAfter(b) ? a : b);
+      defaultDate = latest.add(const Duration(days: 1));
+    } else {
+      defaultDate = TripState.maybeOf(context)?.trip.startDate ?? DateTime.now();
+    }
+    final draft = await _showAddDayDialog(context, defaultDate: defaultDate);
     if (draft == null || !mounted) return;
     if (_activeTripId.isEmpty || _userId.isEmpty) return;
 
@@ -2329,15 +2337,17 @@ class _CalendarItemTile extends StatelessWidget {
 
 // ─── Add day dialog ───────────────────────────────────────────────────────────
 
-Future<TripDay?> _showAddDayDialog(BuildContext context) {
+Future<TripDay?> _showAddDayDialog(BuildContext context, {required DateTime defaultDate}) {
   return showDialog<TripDay>(
     context: context,
-    builder: (ctx) => const _AddDayDialog(),
+    builder: (ctx) => _AddDayDialog(defaultDate: defaultDate),
   );
 }
 
 class _AddDayDialog extends StatefulWidget {
-  const _AddDayDialog();
+  const _AddDayDialog({required this.defaultDate});
+
+  final DateTime defaultDate;
 
   @override
   State<_AddDayDialog> createState() => _AddDayDialogState();
@@ -2347,7 +2357,7 @@ class _AddDayDialogState extends State<_AddDayDialog> {
   final _formKey = GlobalKey<FormState>();
   final _cityCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
-  DateTime _date = DateTime.now();
+  late DateTime _date = widget.defaultDate;
 
   @override
   void dispose() {

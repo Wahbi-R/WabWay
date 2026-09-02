@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 299,
+    label: 'Plan: Add Day defaults to the next sequential date',
+    changes: [
+      'The date picker now opens on the day after your latest itinerary day — if you have Nov 6 it suggests Nov 7 automatically',
+      'For a new trip with no days yet, the picker opens on your trip\'s start date instead of today',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 298,
     label: 'Fix: switching trips never shows the previous trip\'s data',
     changes: [

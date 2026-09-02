@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 294,
+    label: 'Fix: packing list loads correctly on first launch',
+    changes: [
+      'The packing list no longer issues a spurious empty-trip network request before your trip data has loaded',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 293,
     label: 'Fix: global search & map survive accommodation errors',
     changes: [

@@ -2,6 +2,7 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **294. Fix Copilot review: packing_screen _load() early-return when tripId empty** — without the guard, _load could run with _tripId == '' and issue cache reads/network requests keyed to an empty suffix (2026-09-02, build 294).
 - [x] **293. Fix Copilot review: isolate AccommodationService.loadAll in global_search and map Future.wait, update PR title to 284-293** — global_search_screen and map_screen called loadAll inside Future.wait without catchError so an accommodation failure would drop all other search/map results; both now use .catchError((_) => []) to isolate the failure (2026-09-02, build 293).
 - [x] **292. Fix Copilot review: safe enum deserialization in plan/travel cache reads, fix misleading SWR test comment** — ItineraryItemType and TravelItemType now use firstWhere+orElse instead of byName so corrupted or unrecognised cached strings fall back to .other instead of throwing; swr_test.dart group comment rewritten to describe what test 1 actually does (clears cache → network load → assert cache populated) (2026-09-02, build 292).
 - [x] **291. Fix Copilot review: catch (e) → catch (_) in accommodation_service** — unused catch variable lint (2026-09-02, build 291).

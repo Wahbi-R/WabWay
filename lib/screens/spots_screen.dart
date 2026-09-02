@@ -152,8 +152,10 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
       if (!mounted || gen != _loadGen) return;
       if (cachedSpots != null) {
         setState(() {
-          _spots = cachedSpots;
-          _docs  = cachedDocs ?? _docs;
+          _spots   = cachedSpots;
+          _docs    = cachedDocs ?? [];
+          _stays   = [];
+          _myVotes = {};
           _loading = false;
         });
       }

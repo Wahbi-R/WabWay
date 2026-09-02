@@ -262,6 +262,7 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
       if (next != _tripId) {
         _tripId = next;
         _load();
+        _subscribeRealtime();
       }
     });
     return Scaffold(

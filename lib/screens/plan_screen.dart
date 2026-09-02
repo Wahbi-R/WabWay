@@ -205,8 +205,8 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
       if (cachedDays != null) {
         setState(() {
           _days..clear()..addAll(cachedDays);
-          if (cachedSpots != null) _spots..clear()..addAll(cachedSpots);
-          if (cachedDocs  != null) _docs..clear()..addAll(cachedDocs);
+          _spots..clear()..addAll(cachedSpots ?? []);
+          _docs..clear()..addAll(cachedDocs ?? []);
           _loading = false;
         });
       }

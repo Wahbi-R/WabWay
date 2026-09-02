@@ -84,7 +84,7 @@ abstract final class TravelService {
     final items = itemsData
         .map((r) => _fromRow(r, itemDocIds[r['id'] as String] ?? []))
         .toList();
-    OfflineCache.write(OfflineCache.travelKey(tripId), items.map(_toJson).toList());
+    await OfflineCache.write(OfflineCache.travelKey(tripId), items.map(_toJson).toList());
     return items;
   }
 

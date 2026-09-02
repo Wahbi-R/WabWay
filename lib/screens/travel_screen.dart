@@ -150,8 +150,8 @@ class _TravelScreenState extends ConsumerState<TravelScreen> {
       if (cachedItems != null) {
         setState(() {
           _items..clear()..addAll(cachedItems);
-          if (cachedDocs != null) _docs..clear()..addAll(cachedDocs);
-          if (cachedDays != null) _days..clear()..addAll(cachedDays);
+          _docs..clear()..addAll(cachedDocs ?? []);
+          _days..clear()..addAll(cachedDays ?? []);
           _loading = false;
         });
       }

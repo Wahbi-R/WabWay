@@ -35,7 +35,11 @@ Future<void> initApp() async {
   assert(kSupabaseUrl.isNotEmpty && kSupabaseKey.isNotEmpty,
       'SUPABASE_URL / SUPABASE_ANON_KEY missing — run with --dart-define-from-file=.env');
   if (!kIsWeb) {
-    try { await Firebase.initializeApp(); } catch (_) { /* already initialized */ }
+    try {
+      await Firebase.initializeApp();
+    } on FirebaseException catch (e) {
+      if (e.code != 'duplicate-app') rethrow;
+    }
   }
   await Supabase.initialize(url: kSupabaseUrl, publishableKey: kSupabaseKey);
 }

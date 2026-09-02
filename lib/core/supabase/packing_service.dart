@@ -29,7 +29,7 @@ abstract final class PackingService {
         .eq('trip_id', tripId)
         .order('sort_order')
         .order('created_at');
-    OfflineCache.write(OfflineCache.packingKey(tripId), rows);
+    await OfflineCache.write(OfflineCache.packingKey(tripId), rows);
     return rows.map(_fromRow).toList();
   }
 

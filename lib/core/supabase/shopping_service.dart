@@ -39,7 +39,7 @@ abstract final class ShoppingService {
         .order('checked',    ascending: true)
         .order('sort_order', ascending: true)
         .order('created_at', ascending: true);
-    OfflineCache.write(OfflineCache.shoppingKey(tripId), data);
+    await OfflineCache.write(OfflineCache.shoppingKey(tripId), data);
     return data.map((r) => _fromRow(r)).toList();
   }
 

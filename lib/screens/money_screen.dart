@@ -353,8 +353,9 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
       if (!mounted || gen != _loadGen) return;
       if (cachedReceipts != null) {
         setState(() {
-          _receipts    = cachedReceipts;
-          _withdrawals = cachedWithdrawals ?? [];
+          _receipts             = cachedReceipts;
+          _withdrawals          = cachedWithdrawals ?? [];
+          _persistedSettlements = [];
           _loading = false;
           _pendingSyncCount = pending;
         });

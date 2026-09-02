@@ -100,7 +100,7 @@ abstract final class AccommodationService {
         .select('*')
         .eq('trip_id', tripId)
         .order('created_at', ascending: false);
-    OfflineCache.write(OfflineCache.accommodationsKey(tripId), data);
+    await OfflineCache.write(OfflineCache.accommodationsKey(tripId), data);
     return data.map((r) => _fromRow(r)).toList();
   }
 

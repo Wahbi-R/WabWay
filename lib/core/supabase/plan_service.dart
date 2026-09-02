@@ -124,7 +124,7 @@ abstract final class PlanService {
     final days = daysData
         .map<TripDay>((r) => _dayFromRow(r, dayItems[r['id'] as String] ?? []))
         .toList();
-    OfflineCache.write(OfflineCache.planKey(tripId), days.map(_dayToJson).toList());
+    await OfflineCache.write(OfflineCache.planKey(tripId), days.map(_dayToJson).toList());
     return days;
   }
 

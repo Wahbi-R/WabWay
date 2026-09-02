@@ -9,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/providers/trip_provider.dart';
+import '../core/trip/trip_state.dart';
 import '../core/supabase/client.dart';
 import '../core/supabase/connection_service.dart';
 import '../core/supabase/plan_service.dart';
@@ -195,7 +196,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
   Future<void> _loadAll({bool silent = false}) async {
     if (_activeTripId.isEmpty) return;
     final gen = ++_loadGen;
-    if (!silent) setState(() { _loading = true; _error = null; _offline = false; _days = []; _spots = []; _docs = []; });
+    if (!silent) setState(() { _loading = true; _error = null; _offline = false; _days.clear(); _spots.clear(); _docs.clear(); });
 
     if (!silent) {
       final cachedDaysFuture  = PlanService.loadFromCache(_activeTripId);
@@ -207,7 +208,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
       if (!mounted || gen != _loadGen) return;
       if (cachedDays != null) {
         setState(() {
-          _days..clear()..addAll(cachedDays);
+          _days..clear()..addAll(cachedDays)..sort((a, b) => a.date.compareTo(b.date));
           _spots..clear()..addAll(cachedSpots ?? []);
           _docs..clear()..addAll(cachedDocs ?? []);
           _loading = false;
@@ -224,7 +225,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
       final docs  = await docsFuture;
       if (!mounted || gen != _loadGen) return;
       setState(() {
-        _days..clear()..addAll(days);
+        _days..clear()..addAll(days)..sort((a, b) => a.date.compareTo(b.date));
         _spots..clear()..addAll(spots);
         _docs..clear()..addAll(docs);
         if (!silent) _loading = false;
@@ -602,14 +603,14 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
     try {
       final day = await PlanService.createDay(
         tripId:    _activeTripId,
-        dayNumber: _days.length + 1,
+        dayNumber: _days.isEmpty ? 1 : _days.map((d) => d.dayNumber).reduce((a, b) => a > b ? a : b) + 1,
         date:      draft.date,
         city:      draft.city,
         createdBy: _userId,
         notes:     draft.notes,
       );
       if (!mounted) return;
-      setState(() => _days.add(day));
+      setState(() { _days.add(day); _days.sort((a, b) => a.date.compareTo(b.date)); });
     } catch (e) {
       if (!mounted) return;
       messenger.showSnackBar(SnackBar(
@@ -617,6 +618,64 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
           'Failed to add day: $e',
           style: kStyleBody.copyWith(color: Colors.white),
         ),
+        backgroundColor: kColorDanger,
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
+  }
+
+  Future<void> _addAllTripDays(BuildContext context) async {
+    final trip = TripState.maybeOf(context)?.trip;
+    if (trip == null || trip.startDate == null || trip.endDate == null) return;
+    final messenger = ScaffoldMessenger.of(context);
+
+    // Collect dates already covered by existing days (date-only comparison).
+    final existingDates = _days
+        .map((d) => DateTime(d.date.year, d.date.month, d.date.day))
+        .toSet();
+
+    // Enumerate every date in the trip range that is not yet covered.
+    final missingDates = <DateTime>[];
+    var current = DateTime(trip.startDate!.year, trip.startDate!.month, trip.startDate!.day);
+    final tripEnd  = DateTime(trip.endDate!.year,  trip.endDate!.month,  trip.endDate!.day);
+    while (!current.isAfter(tripEnd)) {
+      if (!existingDates.contains(current)) missingDates.add(current);
+      current = current.add(const Duration(days: 1));
+    }
+
+    if (missingDates.isEmpty) {
+      messenger.showSnackBar(const SnackBar(content: Text('All trip days are already added.')));
+      return;
+    }
+    if (_activeTripId.isEmpty || _userId.isEmpty) return;
+
+    setState(() => _loading = true);
+    int nextDayNumber = _days.isEmpty ? 0 : _days.map((d) => d.dayNumber).reduce((a, b) => a > b ? a : b);
+    final newDays = <TripDay>[];
+    try {
+      for (final date in missingDates) {
+        nextDayNumber++;
+        final day = await PlanService.createDay(
+          tripId:    _activeTripId,
+          dayNumber: nextDayNumber,
+          date:      date,
+          city:      '',
+          createdBy: _userId,
+          notes:     null,
+        );
+        newDays.add(day);
+      }
+      if (!mounted) return;
+      setState(() {
+        _days.addAll(newDays);
+        _days.sort((a, b) => a.date.compareTo(b.date));
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      messenger.showSnackBar(SnackBar(
+        content: Text('Failed to add days: $e', style: kStyleBody.copyWith(color: Colors.white)),
         backgroundColor: kColorDanger,
         behavior: SnackBarBehavior.floating,
       ));
@@ -770,6 +829,8 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
           _DesktopPlanBar(
             dayCount: _days.length,
             onAddDay: () => _addDay(context),
+            onAddAllDays: () => _addAllTripDays(context),
+            showAddAllDays: () { final t = TripState.maybeOf(context)?.trip; return t?.startDate != null && t?.endDate != null; }(),
             onExport: _days.isNotEmpty ? _exportPlan : null,
             onExportCalendar: (_days.isNotEmpty && !kIsWeb) ? _exportToCalendar : null,
             hideCompleted: _hideCompleted,
@@ -1001,6 +1062,13 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
                 ),
             ],
           ],
+          if (() { final t = TripState.maybeOf(context)?.trip; return t?.startDate != null && t?.endDate != null; }())
+            TextButton.icon(
+              onPressed: () => _addAllTripDays(context),
+              icon: const Icon(Icons.date_range_rounded, size: 18),
+              label: Text('All days', style: kStyleCaptionMedium),
+              style: TextButton.styleFrom(foregroundColor: kColorInkSoft),
+            ),
           TextButton.icon(
             onPressed: () => _addDay(context),
             icon: const Icon(Icons.add_rounded, size: 18),
@@ -1876,6 +1944,8 @@ class _DesktopPlanBar extends StatelessWidget {
   const _DesktopPlanBar({
     required this.dayCount,
     required this.onAddDay,
+    required this.onAddAllDays,
+    this.showAddAllDays = false,
     this.onExport,
     this.onExportCalendar,
     this.hideCompleted = false,
@@ -1884,6 +1954,8 @@ class _DesktopPlanBar extends StatelessWidget {
 
   final int dayCount;
   final VoidCallback onAddDay;
+  final VoidCallback onAddAllDays;
+  final bool showAddAllDays;
   final VoidCallback? onExport;
   final VoidCallback? onExportCalendar;
   final bool hideCompleted;
@@ -1951,6 +2023,16 @@ class _DesktopPlanBar extends StatelessWidget {
                   ? WabwayButtonVariant.primary
                   : WabwayButtonVariant.ghost,
               onPressed: onToggleHideCompleted,
+            ),
+            const SizedBox(width: kSpace2),
+          ],
+          if (showAddAllDays) ...[
+            WabwayButton(
+              label: 'Add all days',
+              icon: Icons.date_range_rounded,
+              size: WabwayButtonSize.sm,
+              variant: WabwayButtonVariant.ghost,
+              onPressed: onAddAllDays,
             ),
             const SizedBox(width: kSpace2),
           ],

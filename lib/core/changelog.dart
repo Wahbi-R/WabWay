@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 300,
+    label: 'Plan: days sorted oldest-first, bulk "Add all days" button',
+    changes: [
+      'Day 1 is always at the top — days are now sorted by date regardless of the order you added them',
+      'New "Add all days" button fills every date in your trip\'s date range at once, skipping days you\'ve already added',
+      'Adding a day after deleting one no longer creates duplicate day numbers',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 299,
     label: 'Plan: Add Day defaults to the next sequential date',
     changes: [

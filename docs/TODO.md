@@ -2,6 +2,7 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **300. Plan: sort days chronologically, fix day numbering, add "Add all days" button** — days list now always sorted by date (oldest at top) and day numbers use max+1 instead of length+1 to avoid duplicates after deletions; new "Add all days" button fills in all missing trip dates between start and end date, skipping dates already covered (2026-09-02, build 300).
 - [x] **299. Plan: Add Day defaults to day after latest existing day, or trip start date** — the date picker now opens on the day after the most recent itinerary day; if there are no days yet it defaults to the trip's start date; previously always defaulted to today (2026-09-02, build 299).
 - [x] **298. Fix Copilot review: clear trip-scoped lists on non-silent load start across all SWR screens** — 8 screens (packing, shopping, accommodations, docs, money, plan, spots, travel) now clear their item/doc lists when starting a non-silent load; prevents stale previous-trip data appearing under an offline/error banner after a failed trip-switch load (2026-09-02, build 298).
 - [x] **297. Fix Copilot review: guard shopping realtime subscription in initState, raise changelog display limit** — _subscribeRealtime() in shopping_screen initState now only fires when _tripId is non-empty, preventing a subscription to trip_id=='' on startup; changelog sheet limit raised from 10 to 20 so all builds in this PR are visible (2026-09-02, build 297).

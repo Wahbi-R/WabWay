@@ -43,6 +43,7 @@ class _TravelScreenState extends ConsumerState<TravelScreen> {
 
   RealtimeChannel? _channel;
   Timer? _debounce;
+  int _loadGen = 0;
 
   TravelItemType? _filter;
   TravelBookingStatus? _statusFilter;
@@ -138,7 +139,27 @@ class _TravelScreenState extends ConsumerState<TravelScreen> {
   // silent=true silently refreshes in the background after a realtime event.
   Future<void> _loadAll({bool silent = false}) async {
     if (_activeTripId.isEmpty) return;
-    if (!silent) setState(() { _loading = true; _error = null; });
+    final gen = ++_loadGen;
+    if (!silent) setState(() { _loading = true; _error = null; _offline = false; _items.clear(); _docs.clear(); _days.clear(); });
+
+    if (!silent) {
+      final cachedItemsFuture = TravelService.loadFromCache(_activeTripId);
+      final cachedDocsFuture  = DocService.loadDocumentsFromCache(_activeTripId);
+      final cachedDaysFuture  = PlanService.loadFromCache(_activeTripId);
+      final cachedItems = await cachedItemsFuture;
+      final cachedDocs  = await cachedDocsFuture;
+      final cachedDays  = await cachedDaysFuture;
+      if (!mounted || gen != _loadGen) return;
+      if (cachedItems != null) {
+        setState(() {
+          _items..clear()..addAll(cachedItems);
+          _docs..clear()..addAll(cachedDocs ?? []);
+          _days..clear()..addAll(cachedDays ?? []);
+          _loading = false;
+        });
+      }
+    }
+
     try {
       final itemsFuture = TravelService.loadItems(_activeTripId);
       final docsFuture  = DocService.loadDocuments(_activeTripId);
@@ -146,7 +167,7 @@ class _TravelScreenState extends ConsumerState<TravelScreen> {
       final items = await itemsFuture;
       final docs  = await docsFuture;
       final days  = await daysFuture;
-      if (!mounted) return;
+      if (!mounted || gen != _loadGen) return;
       setState(() {
         _items..clear()..addAll(items);
         _docs..clear()..addAll(docs);
@@ -155,11 +176,12 @@ class _TravelScreenState extends ConsumerState<TravelScreen> {
         _offline = false;
       });
     } catch (e) {
-      if (!mounted) return;
-      if (silent) {
-        setState(() => _offline = true);
-      } else {
+      if (!mounted || gen != _loadGen) return;
+      if (silent) { setState(() => _offline = true); return; }
+      if (_items.isEmpty) {
         setState(() { _loading = false; _error = e.toString(); });
+      } else {
+        setState(() { _loading = false; _offline = true; });
       }
     }
   }

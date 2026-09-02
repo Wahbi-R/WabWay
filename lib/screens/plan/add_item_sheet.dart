@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../../data/plan_data.dart';
 import '../../data/docs_data.dart';
 import '../../data/spot_data.dart';
+import '../../data/accommodation_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
@@ -26,6 +27,7 @@ Future<ItineraryItem?> showAddItemSheet(
   required String defaultCurrency,
   List<Spot> spots = const [],
   List<TripDocument> docs = const [],
+  List<Accommodation> stays = const [],
   ItineraryItem? initialItem,
 }) {
   final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
@@ -45,6 +47,7 @@ Future<ItineraryItem?> showAddItemSheet(
             dayId: dayId,
             spots: spots,
             docs: docs,
+            stays: stays,
             initialItem: initialItem,
             defaultCurrency: defaultCurrency,
             onSubmit: (item) => Navigator.pop(ctx, item),
@@ -63,6 +66,7 @@ Future<ItineraryItem?> showAddItemSheet(
       dayId: dayId,
       spots: spots,
       docs: docs,
+      stays: stays,
       initialItem: initialItem,
       defaultCurrency: defaultCurrency,
       onSubmit: (item) => Navigator.pop(ctx, item),
@@ -75,6 +79,7 @@ class _AddItemSheet extends StatelessWidget {
     required this.dayId,
     required this.spots,
     required this.docs,
+    required this.stays,
     required this.onSubmit,
     required this.defaultCurrency,
     this.initialItem,
@@ -82,6 +87,7 @@ class _AddItemSheet extends StatelessWidget {
   final String dayId;
   final List<Spot> spots;
   final List<TripDocument> docs;
+  final List<Accommodation> stays;
   final ValueChanged<ItineraryItem> onSubmit;
   final String defaultCurrency;
   final ItineraryItem? initialItem;
@@ -101,6 +107,7 @@ class _AddItemSheet extends StatelessWidget {
           dayId: dayId,
           spots: spots,
           docs: docs,
+          stays: stays,
           initialItem: initialItem,
           defaultCurrency: defaultCurrency,
           scrollController: ctrl,
@@ -119,6 +126,7 @@ class _AddItemContent extends StatefulWidget {
     required this.dayId,
     required this.spots,
     required this.docs,
+    required this.stays,
     required this.onSubmit,
     required this.defaultCurrency,
     this.scrollController,
@@ -129,6 +137,7 @@ class _AddItemContent extends StatefulWidget {
   final String dayId;
   final List<Spot> spots;
   final List<TripDocument> docs;
+  final List<Accommodation> stays;
   final ValueChanged<ItineraryItem> onSubmit;
   final String defaultCurrency;
   final ScrollController? scrollController;
@@ -153,6 +162,7 @@ class _AddItemContentState extends State<_AddItemContent> {
   ItineraryItemType _type = ItineraryItemType.activity;
   TimeOfDay? _time;
   String? _linkedSpotId;
+  String? _linkedStayId;
   final Set<String> _linkedDocIds = {};
   bool _showAdvanced = false;
   late String _currency;
@@ -209,20 +219,36 @@ class _AddItemContentState extends State<_AddItemContent> {
 
   void _applySpot(Spot spot) {
     setState(() {
-      _titleCtrl.text   = spot.name;
-      _cityCtrl.text    = spot.city.isNotEmpty ? spot.city : spot.area;
-      _locationCtrl.text = spot.address?.isNotEmpty == true ? spot.address! : '';
+      _titleCtrl.text    = spot.name;
+      _cityCtrl.text     = spot.city.isNotEmpty ? spot.city : spot.area;
+      _locationCtrl.text = '';
       if (spot.mapsUrl != null) {
-        _mapsCtrl.text  = spot.mapsUrl!;
-        _showAdvanced   = true;
+        _mapsCtrl.text = spot.mapsUrl!;
+        _showAdvanced  = true;
       }
-      _linkedSpotId     = spot.id;
-      _type             = _typeFromCategory(spot.category);
+      _linkedSpotId  = spot.id;
+      _linkedStayId  = null;
+      _type          = _typeFromCategory(spot.category);
     });
   }
 
   void _clearSpot() {
     setState(() => _linkedSpotId = null);
+  }
+
+  void _applyStay(Accommodation stay) {
+    setState(() {
+      _titleCtrl.text    = stay.name;
+      _cityCtrl.text     = stay.city;
+      _locationCtrl.text = stay.address ?? '';
+      _linkedStayId      = stay.id;
+      _linkedSpotId      = null;
+      _type              = ItineraryItemType.stay;
+    });
+  }
+
+  void _clearStay() {
+    setState(() => _linkedStayId = null);
   }
 
   void _submit() {
@@ -243,6 +269,7 @@ class _AddItemContentState extends State<_AddItemContent> {
       confirmationUrl: _confirmCtrl.text.trim().isEmpty ? null : _confirmCtrl.text.trim(),
       notes:           _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
       linkedSpotId:    _linkedSpotId,
+      linkedStayId:    _linkedStayId,
       linkedDocIds:    _linkedDocIds.toList(),
       plannedCost:     double.tryParse(_costCtrl.text.trim()),
       currency:        _costCtrl.text.trim().isNotEmpty ? _currency : null,
@@ -297,13 +324,17 @@ class _AddItemContentState extends State<_AddItemContent> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
 
-                  // ── Spot quick-pick ───────────────────────────────────────
-                  if (widget.spots.isNotEmpty) ...[
-                    _SpotPicker(
+                  // ── Fill from spot or stay ────────────────────────────────
+                  if (widget.spots.isNotEmpty || widget.stays.isNotEmpty) ...[
+                    _FillFromPicker(
                       spots: widget.spots,
+                      stays: widget.stays,
                       linkedSpotId: _linkedSpotId,
-                      onSelected: _applySpot,
-                      onClear: _clearSpot,
+                      linkedStayId: _linkedStayId,
+                      onSpotSelected: _applySpot,
+                      onStaySelected: _applyStay,
+                      onSpotClear: _clearSpot,
+                      onStayClear: _clearStay,
                     ),
                     const SizedBox(height: kSpace4),
                   ],
@@ -556,26 +587,37 @@ class _CostField extends StatelessWidget {
   }
 }
 
-// ─── Spot quick-pick ──────────────────────────────────────────────────────────
+// ─── Combined fill-from picker (spots + stays) ────────────────────────────────
 
-class _SpotPicker extends StatefulWidget {
-  const _SpotPicker({
+enum _FillSource { spot, stay }
+
+class _FillFromPicker extends StatefulWidget {
+  const _FillFromPicker({
     required this.spots,
+    required this.stays,
     required this.linkedSpotId,
-    required this.onSelected,
-    required this.onClear,
+    required this.linkedStayId,
+    required this.onSpotSelected,
+    required this.onStaySelected,
+    required this.onSpotClear,
+    required this.onStayClear,
   });
   final List<Spot> spots;
+  final List<Accommodation> stays;
   final String? linkedSpotId;
-  final ValueChanged<Spot> onSelected;
-  final VoidCallback onClear;
+  final String? linkedStayId;
+  final ValueChanged<Spot> onSpotSelected;
+  final ValueChanged<Accommodation> onStaySelected;
+  final VoidCallback onSpotClear;
+  final VoidCallback onStayClear;
 
   @override
-  State<_SpotPicker> createState() => _SpotPickerState();
+  State<_FillFromPicker> createState() => _FillFromPickerState();
 }
 
-class _SpotPickerState extends State<_SpotPicker> {
+class _FillFromPickerState extends State<_FillFromPicker> {
   bool _expanded = false;
+  _FillSource _source = _FillSource.spot;
   final _searchCtrl = TextEditingController();
   String _query = '';
 
@@ -585,78 +627,105 @@ class _SpotPickerState extends State<_SpotPicker> {
     super.dispose();
   }
 
-  Spot? get _linked =>
+  Spot? get _linkedSpot =>
       widget.linkedSpotId == null
           ? null
           : widget.spots.where((s) => s.id == widget.linkedSpotId).firstOrNull;
 
-  List<Spot> get _filtered {
+  Accommodation? get _linkedStay =>
+      widget.linkedStayId == null
+          ? null
+          : widget.stays.where((s) => s.id == widget.linkedStayId).firstOrNull;
+
+  List<Spot> get _filteredSpots {
     if (_query.isEmpty) return widget.spots;
     final q = _query.toLowerCase();
     return widget.spots
-        .where((s) =>
-            s.name.toLowerCase().contains(q) ||
-            s.city.toLowerCase().contains(q))
+        .where((s) => s.name.toLowerCase().contains(q) || s.city.toLowerCase().contains(q))
         .toList();
+  }
+
+  List<Accommodation> get _filteredStays {
+    if (_query.isEmpty) return widget.stays;
+    final q = _query.toLowerCase();
+    return widget.stays
+        .where((s) => s.name.toLowerCase().contains(q) || s.city.toLowerCase().contains(q))
+        .toList();
+  }
+
+  Widget _linkedBanner({
+    required IconData icon,
+    required String label,
+    required String name,
+    required VoidCallback onSwap,
+    required VoidCallback onClear,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: kSpace2),
+      decoration: BoxDecoration(
+        color: kColorPrimarySoft,
+        borderRadius: kRadiusMd,
+        border: Border.all(color: kColorPrimary.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: kColorPrimary),
+          const SizedBox(width: kSpace2),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: kStyleCaption.copyWith(color: kColorPrimary)),
+                Text(name, style: kStyleBodySemibold, maxLines: 1, overflow: TextOverflow.ellipsis),
+              ],
+            ),
+          ),
+          GestureDetector(
+            onTap: () { setState(() => _expanded = true); onSwap(); },
+            child: const Icon(Icons.swap_horiz_rounded, size: 16, color: kColorPrimary),
+          ),
+          const SizedBox(width: kSpace2),
+          GestureDetector(
+            onTap: onClear,
+            child: const Icon(Icons.close_rounded, size: 16, color: kColorPrimary),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final linked = _linked;
+    final linkedSpot = _linkedSpot;
+    final linkedStay = _linkedStay;
 
-    // Linked state — show the selected spot with a clear button
-    if (linked != null && !_expanded) {
-      return Container(
-        padding: const EdgeInsets.symmetric(
-            horizontal: kSpace3, vertical: kSpace2),
-        decoration: BoxDecoration(
-          color: kColorPrimarySoft,
-          borderRadius: kRadiusMd,
-          border: Border.all(color: kColorPrimary.withValues(alpha: 0.4)),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.place_rounded, size: 16, color: kColorPrimary),
-            const SizedBox(width: kSpace2),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Filled from spot',
-                      style: kStyleCaption.copyWith(color: kColorPrimary)),
-                  Text(linked.name,
-                      style: kStyleBodySemibold,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
-                ],
-              ),
-            ),
-            GestureDetector(
-              onTap: () {
-                setState(() => _expanded = true);
-                widget.onClear();
-              },
-              child: const Icon(Icons.swap_horiz_rounded,
-                  size: 16, color: kColorPrimary),
-            ),
-            const SizedBox(width: kSpace2),
-            GestureDetector(
-              onTap: widget.onClear,
-              child: const Icon(Icons.close_rounded,
-                  size: 16, color: kColorPrimary),
-            ),
-          ],
-        ),
+    if (linkedSpot != null && !_expanded) {
+      return _linkedBanner(
+        icon: Icons.place_rounded,
+        label: 'Filled from spot',
+        name: linkedSpot.name,
+        onSwap: () { setState(() => _source = _FillSource.spot); widget.onSpotClear(); },
+        onClear: widget.onSpotClear,
+      );
+    }
+    if (linkedStay != null && !_expanded) {
+      return _linkedBanner(
+        icon: Icons.hotel_rounded,
+        label: 'Filled from stay',
+        name: linkedStay.name,
+        onSwap: () { setState(() => _source = _FillSource.stay); widget.onStayClear(); },
+        onClear: widget.onStayClear,
       );
     }
 
-    // Collapsed state
     if (!_expanded) {
       return GestureDetector(
-        onTap: () => setState(() => _expanded = true),
+        onTap: () => setState(() {
+          _expanded = true;
+          _source = widget.spots.isNotEmpty ? _FillSource.spot : _FillSource.stay;
+        }),
         child: Container(
-          padding: const EdgeInsets.symmetric(
-              horizontal: kSpace3, vertical: kSpace3),
+          padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: kSpace3),
           decoration: BoxDecoration(
             color: kColorSurfaceSunken,
             borderRadius: kRadiusMd,
@@ -664,20 +733,18 @@ class _SpotPickerState extends State<_SpotPicker> {
           ),
           child: Row(
             children: [
-              const Icon(Icons.place_outlined, size: 16, color: kColorInkSoft),
+              const Icon(Icons.add_link_rounded, size: 16, color: kColorInkSoft),
               const SizedBox(width: kSpace2),
-              Text('Fill from a spot',
+              Text('Fill from spot or stay',
                   style: kStyleBody.copyWith(color: kColorInkSoft)),
               const Spacer(),
-              const Icon(Icons.expand_more_rounded,
-                  size: 16, color: kColorInkSoft),
+              const Icon(Icons.expand_more_rounded, size: 16, color: kColorInkSoft),
             ],
           ),
         ),
       );
     }
 
-    // Expanded search list
     return Container(
       decoration: BoxDecoration(
         color: kColorSurfaceSunken,
@@ -687,29 +754,37 @@ class _SpotPickerState extends State<_SpotPicker> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Tab row + search
           Padding(
             padding: const EdgeInsets.fromLTRB(kSpace3, kSpace2, kSpace2, kSpace2),
             child: Row(
               children: [
-                const Icon(Icons.search_rounded, size: 16, color: kColorInkSoft),
-                const SizedBox(width: kSpace2),
-                Expanded(
-                  child: TextField(
-                    controller: _searchCtrl,
-                    autofocus: true,
-                    onChanged: (v) => setState(() => _query = v),
-                    style: kStyleBody,
-                    decoration: InputDecoration(
-                      hintText: 'Search spots…',
-                      hintStyle: kStyleBody.copyWith(color: kColorInkSoft),
-                      isDense: true,
-                      border: InputBorder.none,
-                    ),
+                if (widget.spots.isNotEmpty) ...[
+                  GestureDetector(
+                    onTap: () => setState(() { _source = _FillSource.spot; _query = ''; _searchCtrl.clear(); }),
+                    child: Text('Spots',
+                        style: kStyleCaptionMedium.copyWith(
+                          color: _source == _FillSource.spot ? kColorPrimary : kColorInkSoft,
+                          decoration: _source == _FillSource.spot ? TextDecoration.underline : null,
+                        )),
                   ),
-                ),
+                  const SizedBox(width: kSpace3),
+                ],
+                if (widget.stays.isNotEmpty)
+                  GestureDetector(
+                    onTap: () => setState(() { _source = _FillSource.stay; _query = ''; _searchCtrl.clear(); }),
+                    child: Text('Stays',
+                        style: kStyleCaptionMedium.copyWith(
+                          color: _source == _FillSource.stay ? kColorPrimary : kColorInkSoft,
+                          decoration: _source == _FillSource.stay ? TextDecoration.underline : null,
+                        )),
+                  ),
+                const Spacer(),
                 IconButton(
                   icon: const Icon(Icons.close_rounded, size: 16),
                   color: kColorInkSoft,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
                   onPressed: () => setState(() {
                     _expanded = false;
                     _searchCtrl.clear();
@@ -719,50 +794,100 @@ class _SpotPickerState extends State<_SpotPicker> {
               ],
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(kSpace3, 0, kSpace3, kSpace2),
+            child: TextField(
+              controller: _searchCtrl,
+              autofocus: true,
+              onChanged: (v) => setState(() => _query = v),
+              style: kStyleBody,
+              decoration: InputDecoration(
+                hintText: _source == _FillSource.spot ? 'Search spots…' : 'Search stays…',
+                hintStyle: kStyleBody.copyWith(color: kColorInkSoft),
+                isDense: true,
+                prefixIcon: const Icon(Icons.search_rounded, size: 16, color: kColorInkSoft),
+                border: OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorBorder)),
+                focusedBorder: OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorPrimary, width: 1.5)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: kSpace2, vertical: 8),
+              ),
+            ),
+          ),
           const Divider(height: 1),
           ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 220),
-            child: _filtered.isEmpty
-                ? Padding(
-                    padding: const EdgeInsets.all(kSpace4),
-                    child: Text('No spots match',
-                        style: kStyleCaption.copyWith(color: kColorInkSoft)),
-                  )
-                : ListView.separated(
-                    shrinkWrap: true,
-                    itemCount: _filtered.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (_, i) {
-                      final s = _filtered[i];
-                      return ListTile(
-                        dense: true,
-                        leading: Container(
-                          width: 30,
-                          height: 30,
-                          decoration: BoxDecoration(
-                            color: _typeFromCategory(s.category).softColor,
-                            borderRadius: kRadiusSm,
-                          ),
-                          child: Icon(s.category.icon,
-                              size: 14, color: _typeFromCategory(s.category).color),
-                        ),
-                        title: Text(s.name, style: kStyleBodyMedium),
-                        subtitle: Text(s.city,
-                            style: kStyleCaption.copyWith(color: kColorInkSoft)),
-                        onTap: () {
-                          setState(() {
-                            _expanded = false;
-                            _searchCtrl.clear();
-                            _query = '';
-                          });
-                          widget.onSelected(s);
-                        },
-                      );
-                    },
-                  ),
+            constraints: const BoxConstraints(maxHeight: 200),
+            child: _source == _FillSource.spot
+                ? _buildSpotList()
+                : _buildStayList(),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSpotList() {
+    final filtered = _filteredSpots;
+    if (filtered.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(kSpace4),
+        child: Text('No spots match', style: kStyleCaption.copyWith(color: kColorInkSoft)),
+      );
+    }
+    return ListView.separated(
+      shrinkWrap: true,
+      itemCount: filtered.length,
+      separatorBuilder: (_, __) => const Divider(height: 1),
+      itemBuilder: (_, i) {
+        final s = filtered[i];
+        return ListTile(
+          dense: true,
+          leading: Container(
+            width: 30, height: 30,
+            decoration: BoxDecoration(color: _typeFromCategory(s.category).softColor, borderRadius: kRadiusSm),
+            child: Icon(s.category.icon, size: 14, color: _typeFromCategory(s.category).color),
+          ),
+          title: Text(s.name, style: kStyleBodyMedium),
+          subtitle: Text(s.city, style: kStyleCaption.copyWith(color: kColorInkSoft)),
+          onTap: () {
+            setState(() { _expanded = false; _searchCtrl.clear(); _query = ''; });
+            widget.onSpotSelected(s);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildStayList() {
+    final filtered = _filteredStays;
+    if (filtered.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(kSpace4),
+        child: Text('No stays match', style: kStyleCaption.copyWith(color: kColorInkSoft)),
+      );
+    }
+    return ListView.separated(
+      shrinkWrap: true,
+      itemCount: filtered.length,
+      separatorBuilder: (_, __) => const Divider(height: 1),
+      itemBuilder: (_, i) {
+        final s = filtered[i];
+        return ListTile(
+          dense: true,
+          leading: Container(
+            width: 30, height: 30,
+            decoration: BoxDecoration(color: ItineraryItemType.stay.softColor, borderRadius: kRadiusSm),
+            child: Icon(s.source?.icon ?? Icons.hotel_rounded, size: 14, color: ItineraryItemType.stay.color),
+          ),
+          title: Text(s.name, style: kStyleBodyMedium),
+          subtitle: Text(
+            [s.city, if (s.status == AccommodationStatus.booked) 'Booked'].join(' · '),
+            style: kStyleCaption.copyWith(color: kColorInkSoft),
+          ),
+          onTap: () {
+            setState(() { _expanded = false; _searchCtrl.clear(); _query = ''; });
+            widget.onStaySelected(s);
+          },
+        );
+      },
     );
   }
 }

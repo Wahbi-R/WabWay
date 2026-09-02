@@ -5,12 +5,14 @@ import '../../core/places/listing_parser.dart';
 import '../../core/supabase/accommodation_service.dart';
 import '../../core/supabase/spot_service.dart';
 import '../../data/accommodation_data.dart';
+import '../../data/connection_data.dart' show EntityType;
 import '../../data/spot_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 import 'accommodations_screen.dart';
+import '../shared/connections_section.dart';
 
 class AddAccommodationSheet extends StatefulWidget {
   const AddAccommodationSheet({
@@ -515,6 +517,17 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
                 Text(detectedSrc.label,
                     style: kStyleCaption.copyWith(color: kColorInkSoft)),
               ],
+            ),
+          ],
+
+          if (isEditing) ...[
+            const SizedBox(height: kSpace5),
+            const Divider(height: 1),
+            const SizedBox(height: kSpace5),
+            ConnectionsSection(
+              entityType: EntityType.stay,
+              entityId: widget.editing!.id,
+              tripId: widget.tripId,
             ),
           ],
 

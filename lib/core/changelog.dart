@@ -6,9 +6,317 @@ import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
 
 // ─── Changelog entries ────────────────────────────────────────────────────────
-// Add newest entry at the top. Max ~10 shown in the sheet.
+// Add newest entry at the top. Max ~20 shown in the sheet.
 
 const _kChangelog = <_Release>[
+  _Release(
+    version: '1.1.0',
+    build: 319,
+    label: 'Fix: stay details open instantly from cache',
+    changes: [
+      'Tapping a linked stay in the Connections panel now opens instantly using cached data instead of waiting for a network fetch',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 318,
+    label: 'Fix: plan item spot-swap opens correct tab',
+    changes: [
+      'Swapping a spot-linked plan item now reopens the picker on the Spots tab, not whichever tab was last used',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 317,
+    label: 'Fix: money pending-sync badge clears on trip switch',
+    changes: [
+      'The pending-sync badge in the Money screen no longer briefly shows the previous trip\'s count when switching trips',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 316,
+    label: 'Fix: travel screen compile errors',
+    changes: [
+      'Fixed a crash introduced in the last update where the Travel screen could not start a fresh load after switching trips',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 315,
+    label: 'Fix: Stays filter chip appears instantly from cache',
+    changes: [
+      'The Stays filter chip in the Spots screen now appears immediately when loading from cache, including while offline',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 314,
+    label: 'Fix: Settle Up no longer shows previous trip data',
+    changes: [
+      'Switching trips now immediately clears the Settle Up panel — previous trip settlements no longer bleed through while the new trip loads',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 313,
+    label: 'Fix: connection chip remove button no longer navigates',
+    changes: [
+      'Tapping the X to remove a connection now only removes it — it no longer also triggers opening the connected item',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 312,
+    label: 'Fix: connection chips load reliably offline',
+    changes: [
+      'Connection chips (spots, docs, stays, travel items) now load gracefully when offline — a failed fetch no longer blocks the entire connections panel',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 311,
+    label: 'Fix: shopping realtime, faster plan connection load',
+    changes: [
+      'Shopping list no longer briefly subscribes to an empty trip on startup',
+      'Loading the itinerary is faster — stay and spot connections are now fetched in a single scoped query',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 310,
+    label: 'Fix: stay-linked plan items restored from cache',
+    changes: [
+      'Plan items linked to a stay now correctly show the stay link after reloading — the connection was stored but never re-read from the server',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 309,
+    label: 'Fix: day numbering stable after edits',
+    changes: [
+      'Day numbers stay correct after editing or reloading — no more "Day 0" appearing after a change',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 308,
+    label: 'Fix: stable day ordering when dates overlap',
+    changes: [
+      'Days sharing the same date now always display in a consistent, stable order',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 307,
+    label: 'Fix: connection chips and stay-swap picker',
+    changes: [
+      'Spot connection chips no longer show a tap effect when tapping them does nothing',
+      'Swapping a stay-filled plan item now opens the picker on the Stay tab directly',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 306,
+    label: 'Fix: plan cache round-trip (type + stay link)',
+    changes: [
+      'Itinerary items loaded from offline cache now keep their correct type (e.g. Stay, Food, Free Time) instead of falling back to Other',
+      'Stays linked to a plan item are now preserved when loading from cache',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 305,
+    label: 'Fix: Add Day dialog date initialisation',
+    changes: [
+      'Fixed a crash that could occur when opening the Add Day dialog in the itinerary planner',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 304,
+    label: 'Spots: Stays filter, connections on stays',
+    changes: [
+      'Filter the Spots list to show only your accommodations using the new "Stays" chip',
+      'Tapping a stay from the Spots screen now shows a proper sheet with check-in/out details',
+      'You can now link documents and spots to a stay from the stay sheet or the accommodation edit screen',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 303,
+    label: 'Plan: chronological day numbers, duplicate dates allowed',
+    changes: [
+      'Day numbers in the itinerary now always reflect date order — Day 1 is your earliest date, Day 2 is the next, and so on',
+      'You can now add two days on the same date (e.g. Tokyo in the morning and Kyoto in the evening on Aug 19)',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 302,
+    label: 'Plan: Stay items, fix delete cache, fill from stay',
+    changes: [
+      'Deleting a day now immediately updates the offline cache — deleted days no longer reappear when you pull to refresh',
+      'New "Stay" item type in the itinerary — add your booked accommodations directly to the plan',
+      '"Add itinerary item" now shows a "Fill from spot or stay" picker with a Spots / Stays tab, so you can fill from an accommodation in one tap',
+      'Linking a stay to a plan item creates a proper connection — tap the linked stay chip in item details to see its info',
+      'Spot address no longer shows as the item subtitle — the name is already the title, so the address was redundant',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 301,
+    label: 'Fix: spots screen fully clears on trip switch',
+    changes: [
+      'Switching trips on the Spots screen now immediately clears stay suggestions and your vote state — previously they could linger from the previous trip if the load failed',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 300,
+    label: 'Plan: days sorted oldest-first, bulk "Add all days" button',
+    changes: [
+      'Day 1 is always at the top — days are now sorted by date regardless of the order you added them',
+      'New "Add all days" button fills every date in your trip\'s date range at once, skipping days you\'ve already added',
+      'Adding a day after deleting one no longer creates duplicate day numbers',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 299,
+    label: 'Plan: Add Day defaults to the next sequential date',
+    changes: [
+      'The date picker now opens on the day after your latest itinerary day — if you have Nov 6 it suggests Nov 7 automatically',
+      'For a new trip with no days yet, the picker opens on your trip\'s start date instead of today',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 298,
+    label: 'Fix: switching trips never shows the previous trip\'s data',
+    changes: [
+      'All screens now clear their lists immediately when switching trips — if the network is unavailable you\'ll see the offline state rather than the wrong trip\'s content',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 297,
+    label: 'Fix: shopping realtime no longer connects before trip loads',
+    changes: [
+      'The shopping list no longer opens a realtime connection before your trip data is ready on startup',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 296,
+    label: 'Fix: shopping list stays responsive when switching trips',
+    changes: [
+      'Switching trips no longer risks freezing the shopping list spinner — a stale background timer is now cancelled before the new trip loads',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 295,
+    label: 'Fix: votes and settlements preserved in cached view',
+    changes: [
+      'Your vote on a spot is now shown correctly even before the network refreshes — the cached view no longer clears it',
+      'Settle Up balances are no longer lost if a network reload fails on the same trip',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 294,
+    label: 'Fix: packing list loads correctly on first launch',
+    changes: [
+      'The packing list no longer issues a spurious empty-trip network request before your trip data has loaded',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 293,
+    label: 'Fix: global search & map survive accommodation errors',
+    changes: [
+      'Global search and the map no longer fail entirely when accommodation data can\'t be fetched — spots, docs, and all other results still load normally',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 292,
+    label: 'Fix: safer offline cache reads for plan & travel',
+    changes: [
+      'Plan and Travel items with an unrecognised type in the offline cache now fall back to "other" instead of crashing — corrupted or renamed cache entries are handled gracefully',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 291,
+    label: 'Fix: lint cleanup in accommodation service',
+    changes: [
+      'Minor internal code quality fix — no user-facing changes',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 290,
+    label: 'Fix: connection panel stability on poor connections',
+    changes: [
+      'The connections panel (links between spots, stays, travel, etc.) no longer crashes when accommodation data can\'t be fetched — it shows whatever it has and skips the missing stays gracefully',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 289,
+    label: 'Offline reliability: faster cache & safer spot loading',
+    changes: [
+      'The Plan and Travel screens now load cached data faster — all three data sources fetch at the same time instead of one after another',
+      'The Spots screen now loads successfully even when there\'s a temporary problem fetching accommodations — spots and docs always appear',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 288,
+    label: 'Fix: notifications from web',
+    changes: [
+      'Messages and updates sent from the WabWay web app now correctly notify your phone — previously no push notifications were sent when acting from a browser',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 287,
+    label: 'Offline reliability: accommodation fallback',
+    changes: [
+      'Loading accommodations now falls back to cached data on a network error instead of crashing — no more blank screens when your connection drops mid-load',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 286,
+    label: 'Offline caching reliability fixes',
+    changes: [
+      'Switching trips no longer briefly shows spots, docs, or money settlements from your previous trip',
+      'Shopping list now stays in sync with real-time updates after switching trips',
+      'Offline cache is guaranteed to be saved before the screen updates, preventing missed cache reads on fast revisits',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 285,
+    label: 'SWR test suite green',
+    changes: [
+      'All offline-caching behaviours verified by automated integration tests: cache-first, trip-switch invalidation, rapid-tab gen-counter, and warm-cache spinner timing',
+      'Fixed visual glitches on the Home screen caused by missing Material wrappers around list tiles',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 284,
+    label: 'Instant offline browsing',
+    changes: [
+      'Spots, docs, money, plan, travel, accommodations, shopping, and packing all load instantly from cache while a fresh sync runs in the background',
+      'Switching trips or tabs no longer shows a spinner when data was previously loaded',
+      'Real-time updates from teammates no longer cause flicker — stale results are silently dropped',
+    ],
+  ),
   _Release(
     version: '1.1.0',
     build: 283,
@@ -2098,7 +2406,7 @@ Widget _changelogHeader(BuildContext context) {
 }
 
 Widget _changelogList(ScrollController? scroll) {
-  final releases = _kChangelog.take(10).toList();
+  final releases = _kChangelog.take(20).toList();
   return ListView.separated(
     controller: scroll,
     padding: const EdgeInsets.fromLTRB(kSpace5, kSpace4, kSpace5, kSpace6),

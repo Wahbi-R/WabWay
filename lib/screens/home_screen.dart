@@ -1122,28 +1122,31 @@ class _UpcomingCard extends StatelessWidget {
                 if (i > 0)
                   const Divider(
                       height: 1, indent: kSpace4 + 36 + kSpace3, endIndent: kSpace4),
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: kSpace4,
-                    vertical: kSpace2,
-                  ),
-                  leading: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: const BoxDecoration(
-                      color: kColorSurfaceSunken,
-                      shape: BoxShape.circle,
+                Material(
+                  color: Colors.transparent,
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: kSpace4,
+                      vertical: kSpace2,
                     ),
-                    child: Icon(items[i].icon, size: 18, color: kColorInkSoft),
+                    leading: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: const BoxDecoration(
+                        color: kColorSurfaceSunken,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(items[i].icon, size: 18, color: kColorInkSoft),
+                    ),
+                    title: Text(items[i].label, style: kStyleBodyMedium),
+                    subtitle: items[i].sub.isNotEmpty
+                        ? Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(items[i].sub, style: kStyleCaption),
+                          )
+                        : null,
+                    trailing: Text(fmtDate(items[i].date), style: kStyleOverline),
                   ),
-                  title: Text(items[i].label, style: kStyleBodyMedium),
-                  subtitle: items[i].sub.isNotEmpty
-                      ? Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Text(items[i].sub, style: kStyleCaption),
-                        )
-                      : null,
-                  trailing: Text(fmtDate(items[i].date), style: kStyleOverline),
                 ),
               ],
             ],
@@ -1244,43 +1247,46 @@ class _TodayAgendaCardState extends State<_TodayAgendaCard> {
                     children: [
                       if (i == 0)
                         const Divider(height: 1, color: kColorBorder),
-                      ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: kSpace4, vertical: kSpace1),
-                        onTap: () => _toggle(item),
-                        leading: Container(
-                          width: 28,
-                          height: 28,
-                          decoration: BoxDecoration(
-                            color: done
-                                ? kColorPrimary.withValues(alpha: 0.12)
-                                : item.type.color.withValues(alpha: 0.12),
-                            shape: BoxShape.circle,
+                      Material(
+                        color: Colors.transparent,
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: kSpace4, vertical: kSpace1),
+                          onTap: () => _toggle(item),
+                          leading: Container(
+                            width: 28,
+                            height: 28,
+                            decoration: BoxDecoration(
+                              color: done
+                                  ? kColorPrimary.withValues(alpha: 0.12)
+                                  : item.type.color.withValues(alpha: 0.12),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              done ? Icons.check_rounded : item.type.icon,
+                              size: 14,
+                              color: done ? kColorPrimary : item.type.color,
+                            ),
                           ),
-                          child: Icon(
-                            done ? Icons.check_rounded : item.type.icon,
-                            size: 14,
-                            color: done ? kColorPrimary : item.type.color,
+                          title: Text(
+                            item.title,
+                            style: kStyleBodyMedium.copyWith(
+                              decoration: done ? TextDecoration.lineThrough : null,
+                              color: done ? kColorInkSoft : kColorInk,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
+                          subtitle: item.time != null || item.city != null
+                              ? Padding(
+                                  padding: const EdgeInsets.only(top: 1),
+                                  child: Text(
+                                    [if (item.time != null) item.time!, if (item.city != null) item.city!].join('  ·  '),
+                                    style: kStyleCaption,
+                                  ),
+                                )
+                              : null,
                         ),
-                        title: Text(
-                          item.title,
-                          style: kStyleBodyMedium.copyWith(
-                            decoration: done ? TextDecoration.lineThrough : null,
-                            color: done ? kColorInkSoft : kColorInk,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        subtitle: item.time != null || item.city != null
-                            ? Padding(
-                                padding: const EdgeInsets.only(top: 1),
-                                child: Text(
-                                  [if (item.time != null) item.time!, if (item.city != null) item.city!].join('  ·  '),
-                                  style: kStyleCaption,
-                                ),
-                              )
-                            : null,
                       ),
                       if (!isLast)
                         const Divider(height: 1, indent: kSpace4 + 28 + kSpace3),
@@ -1295,38 +1301,41 @@ class _TodayAgendaCardState extends State<_TodayAgendaCard> {
                   child: Text('Bookings today',
                       style: kStyleCaption.copyWith(color: kColorInkSoft)),
                 ),
-                ...widget.travelItems.map((t) => ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                      horizontal: kSpace4, vertical: kSpace1),
-                  leading: Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      color: t.type.color.withValues(alpha: 0.12),
-                      shape: BoxShape.circle,
+                ...widget.travelItems.map((t) => Material(
+                  color: Colors.transparent,
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: kSpace4, vertical: kSpace1),
+                    leading: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: t.type.color.withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(t.type.icon, size: 14, color: t.type.color),
                     ),
-                    child: Icon(t.type.icon, size: 14, color: t.type.color),
+                    title: Text(t.title,
+                        style: kStyleBodyMedium,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
+                    subtitle: () {
+                      final parts = [
+                        if (t.time != null) t.time!,
+                        if (t.location != null) t.location!,
+                        if (t.destination != null && t.location != null) '→ ${t.destination!}',
+                        if (t.confirmationNumber != null) t.confirmationNumber!,
+                      ];
+                      if (parts.isEmpty) return null;
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 1),
+                        child: Text(parts.join('  ·  '),
+                            style: kStyleCaption,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis),
+                      );
+                    }(),
                   ),
-                  title: Text(t.title,
-                      style: kStyleBodyMedium,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
-                  subtitle: () {
-                    final parts = [
-                      if (t.time != null) t.time!,
-                      if (t.location != null) t.location!,
-                      if (t.destination != null && t.location != null) '→ ${t.destination!}',
-                      if (t.confirmationNumber != null) t.confirmationNumber!,
-                    ];
-                    if (parts.isEmpty) return null;
-                    return Padding(
-                      padding: const EdgeInsets.only(top: 1),
-                      child: Text(parts.join('  ·  '),
-                          style: kStyleCaption,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis),
-                    );
-                  }(),
                 )),
               ],
             ],
@@ -1491,42 +1500,45 @@ class _ActivityFeed extends StatelessWidget {
           return RepaintBoundary(
             child: Column(
               children: [
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: kSpace4,
-                    vertical: kSpace2,
-                  ),
-                  leading: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: ev.type.softColor,
-                      shape: BoxShape.circle,
+                Material(
+                  color: Colors.transparent,
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: kSpace4,
+                      vertical: kSpace2,
                     ),
-                    child: Icon(ev.type.icon, size: 18, color: ev.type.color),
-                  ),
-                  title: Text('$actorLabel ${ev.type.verb}', style: kStyleBodyMedium),
-                  subtitle: ev.entityTitle != null && ev.entityTitle!.isNotEmpty
-                      ? Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Text(ev.entityTitle!, style: kStyleCaption),
-                        )
-                      : null,
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(_relativeTime(ev.createdAt), style: kStyleOverline),
-                      if (onTap != null) ...[
-                        const SizedBox(width: kSpace1),
-                        const Icon(
-                          Icons.chevron_right_rounded,
-                          size: 16,
-                          color: kColorInkSoft,
-                        ),
+                    leading: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: ev.type.softColor,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(ev.type.icon, size: 18, color: ev.type.color),
+                    ),
+                    title: Text('$actorLabel ${ev.type.verb}', style: kStyleBodyMedium),
+                    subtitle: ev.entityTitle != null && ev.entityTitle!.isNotEmpty
+                        ? Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(ev.entityTitle!, style: kStyleCaption),
+                          )
+                        : null,
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(_relativeTime(ev.createdAt), style: kStyleOverline),
+                        if (onTap != null) ...[
+                          const SizedBox(width: kSpace1),
+                          const Icon(
+                            Icons.chevron_right_rounded,
+                            size: 16,
+                            color: kColorInkSoft,
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
+                    onTap: onTap != null ? () => onTap(context) : null,
                   ),
-                  onTap: onTap != null ? () => onTap(context) : null,
                 ),
                 if (!isLast) const Divider(height: 1, indent: kSpace4 + 36 + kSpace3),
               ],

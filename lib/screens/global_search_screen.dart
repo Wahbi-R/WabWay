@@ -131,7 +131,7 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
         MoneyService.loadReceipts(widget.tripId),
         MoneyService.loadWithdrawals(widget.tripId),
         PlanService.loadAll(widget.tripId),
-        AccommodationService.loadAll(widget.tripId),
+        AccommodationService.loadAll(widget.tripId).catchError((_) => <Accommodation>[]),
         PackingService.fetchAll(widget.tripId),
         LinksService.loadLinks(widget.tripId),
       ]);

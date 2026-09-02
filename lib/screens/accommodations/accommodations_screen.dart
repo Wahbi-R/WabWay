@@ -41,6 +41,7 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen> {
   String _search = '';
   RealtimeChannel? _channel;
   Timer? _debounce;
+  int _loadGen = 0;
 
   final _searchCtrl = TextEditingController();
 
@@ -88,15 +89,29 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen> {
   }
 
   Future<void> _load({bool silent = false}) async {
-    if (!silent) setState(() { _loading = true; _error = false; });
+    final tripId = _activeTripId;
+    if (tripId == null) return;
+    final gen = ++_loadGen;
+    if (!silent) setState(() { _loading = true; _error = false; _offline = false; _items = []; });
+
+    if (!silent) {
+      final cached = await AccommodationService.loadFromCache(tripId);
+      if (!mounted || gen != _loadGen) return;
+      if (cached != null) setState(() { _items = cached; _loading = false; });
+    }
+
     try {
-      final items  = await AccommodationService.loadAll(_activeTripId!);
-      if (!mounted) return;
+      final items = await AccommodationService.loadAll(tripId);
+      if (!mounted || gen != _loadGen) return;
       setState(() { _items = items; _loading = false; _offline = false; });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || gen != _loadGen) return;
       if (silent) { setState(() => _offline = true); return; }
-      setState(() { _loading = false; _error = true; });
+      if (_items.isEmpty) {
+        setState(() { _loading = false; _error = true; });
+      } else {
+        setState(() { _loading = false; _offline = true; });
+      }
     }
   }
 

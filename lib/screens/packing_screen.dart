@@ -26,6 +26,7 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
   bool _loading = true;
   RealtimeChannel? _channel;
   Timer? _debounce;
+  int _loadGen = 0;
 
   String _tripId = '';
   String _myId   = '';
@@ -59,13 +60,24 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
   }
 
   Future<void> _load({bool silent = false}) async {
-    if (!silent && mounted) setState(() => _loading = true);
-    final items = await PackingService.fetchAll(_tripId);
-    if (!mounted) return;
-    setState(() {
-      _items   = items;
-      _loading = false;
-    });
+    if (_tripId.isEmpty) return;
+    final gen = ++_loadGen;
+    if (!silent && mounted) setState(() { _loading = true; _items = []; });
+
+    if (!silent) {
+      final cached = await PackingService.loadFromCache(_tripId);
+      if (!mounted || gen != _loadGen) return;
+      if (cached != null) setState(() { _items = cached; _loading = false; });
+    }
+
+    try {
+      final items = await PackingService.fetchAll(_tripId);
+      if (!mounted || gen != _loadGen) return;
+      setState(() { _items = items; _loading = false; });
+    } catch (_) {
+      if (!mounted || gen != _loadGen) return;
+      if (!silent) setState(() => _loading = false);
+    }
   }
 
   void _subscribe() {

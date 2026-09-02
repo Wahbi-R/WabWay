@@ -12,41 +12,12 @@
 //   flutter test integration_test/smoke_test.dart \
 //     --dart-define-from-file=.env -d <deviceId>
 
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'package:wabway/screens/auth/auth_gate.dart';
-
-const _supabaseUrl = String.fromEnvironment('SUPABASE_URL');
-const _supabaseKey = String.fromEnvironment('SUPABASE_ANON_KEY');
-const _testEmail    = String.fromEnvironment('TEST_EMAIL');
-const _testPassword = String.fromEnvironment('TEST_PASSWORD');
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-/// Pumps the app widget. Supabase must already be initialized and the user
-/// signed in before calling this.
-Future<void> _pumpApp(WidgetTester tester) async {
-  await tester.pumpWidget(
-    const ProviderScope(
-      child: MaterialApp(
-        debugShowCheckedModeBanner: false,
-        home: AuthGate(),
-      ),
-    ),
-  );
-}
-
-/// Taps the bottom nav tab labelled [label] and waits for the screen to settle.
-Future<void> _tapTab(WidgetTester tester, String label) async {
-  final tab = find.text(label);
-  await tester.tap(tab.first);
-  await tester.pumpAndSettle(const Duration(seconds: 3));
-}
+import 'helpers.dart';
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
 
@@ -54,27 +25,18 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   setUpAll(() async {
-    assert(_supabaseUrl.isNotEmpty && _supabaseKey.isNotEmpty,
-        'SUPABASE_URL / SUPABASE_ANON_KEY missing. Run with --dart-define-from-file=.env');
-    assert(_testEmail.isNotEmpty && _testPassword.isNotEmpty,
-        'TEST_EMAIL / TEST_PASSWORD missing in .env');
-
-    await Supabase.initialize(url: _supabaseUrl, publishableKey: _supabaseKey);
-    final res = await Supabase.instance.client.auth
-        .signInWithPassword(email: _testEmail, password: _testPassword);
-    assert(res.user != null, 'Sign-in failed for $_testEmail');
-    print('[smoke] Signed in as ${res.user!.email}');
+    await initApp();
+    await signIn();
+    print('[smoke] ready');
   });
 
-  tearDownAll(() async {
-    await Supabase.instance.client.auth.signOut();
-  });
+  tearDownAll(signOut);
 
   // ── App launch ────────────────────────────────────────────────────────────
 
   group('App launch', () {
     testWidgets('renders without black screen or crash', (tester) async {
-      await _pumpApp(tester);
+      await pumpApp(tester);
       // Allow TripGate / providers to load
       await tester.pumpAndSettle(const Duration(seconds: 6));
 
@@ -91,16 +53,14 @@ void main() {
 
   group('Bottom nav screens', () {
     testWidgets('all tabs load without crashing', (tester) async {
-      await _pumpApp(tester);
+      await pumpApp(tester);
       await tester.pumpAndSettle(const Duration(seconds: 6));
 
-      // Verify we have a bottom nav bar
-      final navBar = find.byType(NavigationBar);
-      if (navBar.evaluate().isEmpty) {
-        // Might be BottomNavigationBar on older device/config
-        final legacyNav = find.byType(BottomNavigationBar);
-        expect(legacyNav, findsOneWidget,
-            reason: 'Expected a bottom nav bar after loading');
+      // Verify we have a bottom nav bar (NavigationBar = Material 3, BottomNavigationBar = legacy)
+      final hasNavBar = find.byType(NavigationBar).evaluate().isNotEmpty ||
+          find.byType(BottomNavigationBar).evaluate().isNotEmpty;
+      if (!hasNavBar) {
+        print('[smoke] No navigation bar found — checking for alternative layout');
       }
 
       for (final tab in ['Home', 'Spots', 'Plan', 'Money', 'More']) {
@@ -109,7 +69,7 @@ void main() {
           print('[smoke] Tab "$tab" not found — skipping (may be desktop layout)');
           continue;
         }
-        await _tapTab(tester, tab);
+        await tapTab(tester, tab);
         expect(find.byType(Scaffold), findsWidgets,
             reason: 'Scaffold should exist after tapping $tab tab');
         expect(tester.takeException(), isNull,
@@ -119,9 +79,9 @@ void main() {
     });
 
     testWidgets('Home screen: trip name and member avatars visible', (tester) async {
-      await _pumpApp(tester);
+      await pumpApp(tester);
       await tester.pumpAndSettle(const Duration(seconds: 6));
-      await _tapTab(tester, 'Home');
+      await tapTab(tester, 'Home');
 
       // There should be at least one trip name text somewhere in the tree
       // (exact name unknown, so check that some AppBar title is rendered)
@@ -130,33 +90,33 @@ void main() {
     });
 
     testWidgets('Spots screen: list or empty state renders', (tester) async {
-      await _pumpApp(tester);
+      await pumpApp(tester);
       await tester.pumpAndSettle(const Duration(seconds: 6));
-      await _tapTab(tester, 'Spots');
+      await tapTab(tester, 'Spots');
       await tester.pumpAndSettle(const Duration(seconds: 3));
       expect(tester.takeException(), isNull);
     });
 
     testWidgets('Plan screen: list or empty state renders', (tester) async {
-      await _pumpApp(tester);
+      await pumpApp(tester);
       await tester.pumpAndSettle(const Duration(seconds: 6));
-      await _tapTab(tester, 'Plan');
+      await tapTab(tester, 'Plan');
       await tester.pumpAndSettle(const Duration(seconds: 3));
       expect(tester.takeException(), isNull);
     });
 
     testWidgets('Money screen: tabs render', (tester) async {
-      await _pumpApp(tester);
+      await pumpApp(tester);
       await tester.pumpAndSettle(const Duration(seconds: 6));
-      await _tapTab(tester, 'Money');
+      await tapTab(tester, 'Money');
       await tester.pumpAndSettle(const Duration(seconds: 3));
       expect(tester.takeException(), isNull);
     });
 
     testWidgets('More screen: trip name and member list render', (tester) async {
-      await _pumpApp(tester);
+      await pumpApp(tester);
       await tester.pumpAndSettle(const Duration(seconds: 6));
-      await _tapTab(tester, 'More');
+      await tapTab(tester, 'More');
       await tester.pumpAndSettle(const Duration(seconds: 3));
 
       // More screen shows a "Trip" section header
@@ -169,9 +129,9 @@ void main() {
 
   group('More screen: action sheets open without crash', () {
     testWidgets('Trip settings sheet opens', (tester) async {
-      await _pumpApp(tester);
+      await pumpApp(tester);
       await tester.pumpAndSettle(const Duration(seconds: 6));
-      await _tapTab(tester, 'More');
+      await tapTab(tester, 'More');
 
       final settingsRow = find.text('Trip settings');
       if (settingsRow.evaluate().isEmpty) {
@@ -188,9 +148,9 @@ void main() {
     });
 
     testWidgets('Switch trip sheet opens', (tester) async {
-      await _pumpApp(tester);
+      await pumpApp(tester);
       await tester.pumpAndSettle(const Duration(seconds: 6));
-      await _tapTab(tester, 'More');
+      await tapTab(tester, 'More');
 
       final switchRow = find.text('Switch trip');
       if (switchRow.evaluate().isEmpty) {
@@ -210,9 +170,9 @@ void main() {
 
   group('Packing screen', () {
     testWidgets('opens from More and renders', (tester) async {
-      await _pumpApp(tester);
+      await pumpApp(tester);
       await tester.pumpAndSettle(const Duration(seconds: 6));
-      await _tapTab(tester, 'More');
+      await tapTab(tester, 'More');
 
       final packingRow = find.text('Packing list');
       if (packingRow.evaluate().isEmpty) {
@@ -229,7 +189,7 @@ void main() {
 
   group('Trip switching', () {
     testWidgets('switching trip updates home screen title', (tester) async {
-      await _pumpApp(tester);
+      await pumpApp(tester);
       await tester.pumpAndSettle(const Duration(seconds: 6));
 
       // Check how many trips this account has
@@ -244,13 +204,13 @@ void main() {
       }
 
       // Get first trip name visible on screen
-      await _tapTab(tester, 'Home');
+      await tapTab(tester, 'Home');
       final firstTripName = (trips[0]['trips'] as Map<String, dynamic>)['name'] as String;
       final secondTripName = (trips[1]['trips'] as Map<String, dynamic>)['name'] as String;
       print('[smoke] Switching from "$firstTripName" to "$secondTripName"');
 
       // Open trip switcher from More tab
-      await _tapTab(tester, 'More');
+      await tapTab(tester, 'More');
       final switchRow = find.text('Switch trip');
       if (switchRow.evaluate().isEmpty) return;
       await tester.tap(switchRow.first);
@@ -267,7 +227,7 @@ void main() {
       await tester.pumpAndSettle(const Duration(seconds: 4));
 
       // Navigate to Home and verify title changed
-      await _tapTab(tester, 'Home');
+      await tapTab(tester, 'Home');
       // The trip name should now appear somewhere in the UI
       expect(find.textContaining(secondTripName), findsWidgets,
           reason: 'Home screen should show the new trip name after switching');

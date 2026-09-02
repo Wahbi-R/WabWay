@@ -19,6 +19,7 @@
 // --   created_at timestamptz not null default now()
 // -- );
 
+import '../../core/offline_cache.dart';
 import '../../data/accommodation_data.dart';
 import 'client.dart';
 
@@ -100,13 +101,25 @@ abstract final class AccommodationService {
           .select('*')
           .eq('trip_id', tripId)
           .order('created_at', ascending: false);
+      await OfflineCache.write(OfflineCache.accommodationsKey(tripId), data);
       return data.map((r) => _fromRow(r)).toList();
     } catch (_) {
-      return kMockAccommodations
-          .where((a) => a.tripId == tripId || tripId.isEmpty)
-          .toList();
+      // Fall back to cache so callers get data when offline.
+      // Re-throw only when cache is also empty so the screen can show its
+      // error/offline UI rather than a misleading empty state.
+      final cached = await loadFromCache(tripId);
+      if (cached != null) return cached;
+      rethrow;
     }
   }
+
+  static Future<List<Accommodation>?> loadFromCache(String tripId) =>
+      OfflineCache.read(
+        OfflineCache.accommodationsKey(tripId),
+        (json) => (json as List)
+            .map((r) => _fromRow(Map<String, dynamic>.from(r as Map)))
+            .toList(),
+      );
 
   static Future<Accommodation> create({
     required String tripId,

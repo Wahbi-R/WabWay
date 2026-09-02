@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -52,6 +53,8 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
   List<ShoppingItem> _items   = [];
   bool               _loading = true;
   RealtimeChannel?   _channel;
+  Timer?             _debounce;
+  int                _loadGen = 0;
 
   String? get _userId => supabase.auth.currentUser?.id;
 
@@ -65,19 +68,29 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
       if (!mounted) return;
       _tripId = ref.read(activeTripIdProvider);
       _load();
+      if (_tripId.isNotEmpty) _subscribeRealtime();
     });
   }
 
   Future<void> _load({bool silent = false}) async {
     if (_tripId.isEmpty || !mounted) return;
-    if (!silent) setState(() => _loading = true);
+    final gen = ++_loadGen;
+    if (!silent) setState(() { _loading = true; _items = []; });
+
+    if (!silent) {
+      final cached = await ShoppingService.loadFromCache(_tripId);
+      if (!mounted || gen != _loadGen) return;
+      if (cached != null) setState(() { _items = cached; _loading = false; });
+    }
+
     try {
       final items = await ShoppingService.loadAll(_tripId);
-      if (!mounted) return;
+      if (!mounted || gen != _loadGen) return;
       setState(() { _items = items; _loading = false; });
-      _subscribeRealtime();
     } catch (_) {
-      if (mounted) setState(() => _loading = false);
+      if (!mounted || gen != _loadGen) return;
+      if (silent) return;
+      setState(() => _loading = false);
     }
   }
 
@@ -94,13 +107,20 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
             column: 'trip_id',
             value: _tripId,
           ),
-          callback: (_) => _load(silent: true),
+          callback: (_) {
+            _debounce?.cancel();
+            _debounce = Timer(
+              const Duration(milliseconds: 400),
+              () { if (mounted) _load(silent: true); },
+            );
+          },
         )
         .subscribe();
   }
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _channel?.unsubscribe();
     super.dispose();
   }
@@ -240,8 +260,10 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
   Widget build(BuildContext context) {
     ref.listen<String>(activeTripIdProvider, (prev, next) {
       if (next != _tripId) {
+        _debounce?.cancel();
         _tripId = next;
         _load();
+        if (next.isNotEmpty) _subscribeRealtime();
       }
     });
     return Scaffold(

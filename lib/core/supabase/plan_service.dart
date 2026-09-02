@@ -1,3 +1,4 @@
+import '../../core/offline_cache.dart';
 import '../../data/date_utils.dart';
 import '../../data/plan_data.dart';
 import 'client.dart';
@@ -13,6 +14,7 @@ abstract final class PlanService {
         'activity'  => ItineraryItemType.activity,
         'free_time' => ItineraryItemType.freeTime,
         'transport' => ItineraryItemType.transport,
+        'stay'      => ItineraryItemType.stay,
         _           => ItineraryItemType.other,
       };
 
@@ -23,6 +25,7 @@ abstract final class PlanService {
         ItineraryItemType.activity  => 'activity',
         ItineraryItemType.freeTime  => 'free_time',
         ItineraryItemType.transport => 'transport',
+        ItineraryItemType.stay      => 'stay',
         ItineraryItemType.other     => 'other',
       };
 
@@ -32,6 +35,7 @@ abstract final class PlanService {
     Map<String, dynamic> row,
     List<String> docIds, {
     String? spotId,
+    String? stayId,
   }) {
     // Postgres returns time as "HH:MM:SS"; the model uses "HH:MM".
     final rawTime = row['time'] as String?;
@@ -49,6 +53,7 @@ abstract final class PlanService {
       confirmationUrl: row['confirmation_url'] as String?,
       notes:           row['notes'] as String?,
       linkedSpotId:    spotId,
+      linkedStayId:    stayId,
       linkedDocIds:    docIds,
       sortOrder:       (row['sort_order'] as num?)?.toInt() ?? 0,
       isDone:          (row['is_done'] as bool?) ?? false,
@@ -101,16 +106,17 @@ abstract final class PlanService {
       }
     }
 
-    // Load spot connections from trip_connections for all items.
-    final spotMap = itemIds.isNotEmpty
-        ? await ConnectionService.fetchSpotMapForItems(itemIds)
-        : <String, String>{};
+    // Load spot and stay connections from trip_connections for all items.
+    final (spotMap, stayMap) = itemIds.isNotEmpty
+        ? await ConnectionService.fetchSpotAndStayMapsForItems(itemIds)
+        : (<String, String>{}, <String, String>{});
 
     final allItems = itemsData
         .map((r) => _itemFromRow(
               r,
               itemDocIds[r['id'] as String] ?? [],
               spotId: spotMap[r['id'] as String],
+              stayId: stayMap[r['id'] as String],
             ))
         .toList();
 
@@ -120,10 +126,65 @@ abstract final class PlanService {
       (dayItems[item.dayId] ??= []).add(item);
     }
 
-    return daysData
+    final days = daysData
         .map<TripDay>((r) => _dayFromRow(r, dayItems[r['id'] as String] ?? []))
         .toList();
+    await OfflineCache.write(OfflineCache.planKey(tripId), days.map(_dayToJson).toList());
+    return days;
   }
+
+  static Map<String, dynamic> _itemToJson(ItineraryItem i) => {
+    'id': i.id, 'day_id': i.dayId, 'title': i.title,
+    'type': _typeToDb(i.type), 'time': i.time, 'city': i.city,
+    'country': i.country, 'location': i.location, 'maps_url': i.mapsUrl,
+    'confirmation_url': i.confirmationUrl, 'notes': i.notes,
+    'linked_spot_id': i.linkedSpotId, 'linked_stay_id': i.linkedStayId,
+    'linked_doc_ids': i.linkedDocIds,
+    'sort_order': i.sortOrder, 'is_done': i.isDone,
+    'planned_cost': i.plannedCost, 'currency': i.currency,
+  };
+
+  static Map<String, dynamic> _dayToJson(TripDay d) => {
+    'id': d.id, 'day_number': d.dayNumber,
+    'date': d.date.toIso8601String(), 'city': d.city,
+    'notes': d.notes, 'items': d.items.map(_itemToJson).toList(),
+  };
+
+  static ItineraryItem _itemFromJson(Map<String, dynamic> j) => ItineraryItem(
+    id: j['id'] as String, dayId: j['day_id'] as String,
+    title: j['title'] as String,
+    type: _typeFrom(j['type'] as String? ?? ''),
+    time: j['time'] as String?, city: j['city'] as String?,
+    country: j['country'] as String?, location: j['location'] as String?,
+    mapsUrl: j['maps_url'] as String?, confirmationUrl: j['confirmation_url'] as String?,
+    notes: j['notes'] as String?,
+    linkedSpotId: j['linked_spot_id'] as String?,
+    linkedStayId: j['linked_stay_id'] as String?,
+    linkedDocIds: (j['linked_doc_ids'] as List?)?.cast<String>() ?? [],
+    sortOrder: (j['sort_order'] as num?)?.toInt() ?? 0,
+    isDone: (j['is_done'] as bool?) ?? false,
+    plannedCost: (j['planned_cost'] as num?)?.toDouble(),
+    currency: j['currency'] as String?,
+  );
+
+  static TripDay _dayFromJson(Map<String, dynamic> j) => TripDay(
+    id: j['id'] as String,
+    dayNumber: (j['day_number'] as num).toInt(),
+    date: DateTime.parse(j['date'] as String),
+    city: j['city'] as String? ?? '',
+    notes: j['notes'] as String?,
+    items: (j['items'] as List?)
+        ?.map((i) => _itemFromJson(Map<String, dynamic>.from(i as Map)))
+        .toList() ?? [],
+  );
+
+  static Future<List<TripDay>?> loadFromCache(String tripId) =>
+      OfflineCache.read(
+        OfflineCache.planKey(tripId),
+        (json) => (json as List)
+            .map((d) => _dayFromJson(Map<String, dynamic>.from(d as Map)))
+            .toList(),
+      );
 
   // ── Mutations ─────────────────────────────────────────────────────────────────
 
@@ -234,6 +295,9 @@ abstract final class PlanService {
   static Future<void> deleteDay(String dayId) async {
     await supabase.from('itinerary_days').delete().eq('id', dayId);
   }
+
+  static Future<void> writeDaysToCache(String tripId, List<TripDay> days) =>
+      OfflineCache.write(OfflineCache.planKey(tripId), days.map(_dayToJson).toList());
 
   static Future<void> updateDay(
     String dayId, {

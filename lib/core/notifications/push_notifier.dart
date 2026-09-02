@@ -16,8 +16,10 @@ Future<void> pushNotify({
   String? prefKey, // one of kPrefNotif* constants — null means always send
   bool highPriority = false,
 }) async {
-  if (kIsWeb) return;
-  if (prefKey != null) {
+  // On native, respect the per-category pref. On web, SharedPreferences is
+  // unavailable but we still need to fire the Edge Function so other members
+  // on native receive their notifications.
+  if (!kIsWeb && prefKey != null) {
     final prefs = await SharedPreferences.getInstance();
     if (!(prefs.getBool(prefKey) ?? true)) return;
   }

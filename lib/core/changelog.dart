@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 303,
+    label: 'Plan: chronological day numbers, duplicate dates allowed',
+    changes: [
+      'Day numbers in the itinerary now always reflect date order — Day 1 is your earliest date, Day 2 is the next, and so on',
+      'You can now add two days on the same date (e.g. Tokyo in the morning and Kyoto in the evening on Aug 19)',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 302,
     label: 'Plan: Stay items, fix delete cache, fill from stay',
     changes: [

@@ -496,8 +496,10 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
     _                      => ItineraryItemType.spot,
   };
 
+  int _dayDisplayNumber(TripDay day) => _days.indexOf(day) + 1;
+
   void _onEditDay(TripDay day) {
-    _showEditDaySheet(context, day: day, onSaved: (city, date, notes, clearNotes) {
+    _showEditDaySheet(context, day: day, displayNumber: _dayDisplayNumber(day), onSaved: (city, date, notes, clearNotes) {
       setState(() {
         final idx = _days.indexWhere((d) => d.id == day.id);
         if (idx != -1) {
@@ -518,8 +520,9 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
   }
 
   Future<void> _copyDay(TripDay day) async {
+    final n = _dayDisplayNumber(day);
     final buf = StringBuffer();
-    buf.writeln('Day ${day.dayNumber} – ${day.city}');
+    buf.writeln('Day $n – ${day.city}');
     final sorted = day.sortedItems;
     for (final item in sorted) {
       final prefix = item.hasTime ? '${item.time} ' : '';
@@ -529,7 +532,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Day ${day.dayNumber} copied to clipboard'),
+          content: Text('Day $n copied to clipboard'),
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 2),
         ),
@@ -543,7 +546,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Delete day?'),
         content: Text(
-          'Day ${day.dayNumber} (${day.city}) and all its itinerary items will be permanently deleted.',
+          'Day ${_dayDisplayNumber(day)} (${day.city}) and all its itinerary items will be permanently deleted.',
         ),
         actions: [
           TextButton(
@@ -707,8 +710,9 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
     final tripName = ref.read(activeTripProvider)?.name ?? 'Trip';
     buf.writeln('$tripName — Itinerary');
     buf.writeln('=' * 40);
-    for (final day in _days) {
-      buf.writeln('\nDay ${day.dayNumber} · ${day.city} · ${fmtDate(day.date)}');
+    for (var di = 0; di < _days.length; di++) {
+      final day = _days[di];
+      buf.writeln('\nDay ${di + 1} · ${day.city} · ${fmtDate(day.date)}');
       if (day.notes != null && day.notes!.isNotEmpty) {
         buf.writeln('  Note: ${day.notes}');
       }
@@ -916,6 +920,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
                                                         bottom: di < _days.length - 1 ? kSpace3 : 0),
                                                     child: TripDayCard(
                                                       day: _days[di],
+                                                      displayNumber: di + 1,
                                                       selectedItemId: _selectedItemId,
                                                       onItemTap: _selectItem,
                                                       onAddItem: () =>
@@ -978,6 +983,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
           child: _DayDetailPanel(
             key: ValueKey(selectedDay.id),
             day: selectedDay,
+            displayNumber: _dayDisplayNumber(selectedDay),
             onAddItem: () => _addItem(context, selectedDay.id),
           ),
         );
@@ -1171,6 +1177,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
                                           bottom: di < _days.length - 1 ? kSpace3 : 0),
                                       child: TripDayCard(
                                         day: _days[di],
+                                        displayNumber: di + 1,
                                         onItemTap: (id) {
                                           final item = itemById(_days, id);
                                           final day  = dayForItem(_days, id);
@@ -1349,7 +1356,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
           Row(
             children: [
               Text(
-                'Day ${day.dayNumber} · ${day.city}',
+                'Day ${_dayDisplayNumber(day)} · ${day.city}',
                 style: kStyleBodyBold,
               ),
               const SizedBox(width: kSpace2),
@@ -1466,6 +1473,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
         return _PlanSearchResultTile(
           item: r.item,
           day:  r.day,
+          displayNumber: _dayDisplayNumber(r.day),
           onTap: () => _selectItem(r.item.id),
         );
       },
@@ -1495,6 +1503,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
         return _PlanSearchResultTile(
           item: r.item,
           day:  r.day,
+          displayNumber: _dayDisplayNumber(r.day),
           onTap: () => Navigator.push(
             ctx,
             MaterialPageRoute(
@@ -1608,10 +1617,12 @@ class _PlanSearchResultTile extends StatelessWidget {
   const _PlanSearchResultTile({
     required this.item,
     required this.day,
+    required this.displayNumber,
     required this.onTap,
   });
   final ItineraryItem item;
   final TripDay day;
+  final int displayNumber;
   final VoidCallback onTap;
 
   @override
@@ -1639,7 +1650,7 @@ class _PlanSearchResultTile extends StatelessWidget {
                 Text(item.title, style: kStyleBodyMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 2),
                 Text(
-                  'Day ${day.dayNumber} · ${day.city}',
+                  'Day $displayNumber · ${day.city}',
                   style: kStyleCaption.copyWith(color: kColorInkSoft),
                 ),
               ],
@@ -1658,10 +1669,12 @@ class _DayDetailPanel extends StatelessWidget {
   const _DayDetailPanel({
     super.key,
     required this.day,
+    this.displayNumber,
     required this.onAddItem,
   });
 
   final TripDay day;
+  final int? displayNumber;
   final VoidCallback onAddItem;
 
   @override
@@ -1692,7 +1705,7 @@ class _DayDetailPanel extends StatelessWidget {
                     ),
                     child: Center(
                       child: Text(
-                        '${day.dayNumber}',
+                        '${displayNumber ?? day.dayNumber}',
                         style: kStyleBodySemibold.copyWith(
                           color: kColorTextOnPrimary,
                           fontSize: 18,
@@ -1704,7 +1717,7 @@ class _DayDetailPanel extends StatelessWidget {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Day ${day.dayNumber}',
+                      Text('Day ${displayNumber ?? day.dayNumber}',
                           style: kStyleTitle.copyWith(fontSize: 20)),
                       Text(
                         fmtDate(day.date),
@@ -1818,19 +1831,21 @@ typedef _EditDaySaved = void Function(
 void _showEditDaySheet(
   BuildContext context, {
   required TripDay day,
+  int? displayNumber,
   required _EditDaySaved onSaved,
 }) {
   showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => _EditDaySheet(day: day, onSaved: onSaved),
+    builder: (_) => _EditDaySheet(day: day, displayNumber: displayNumber, onSaved: onSaved),
   );
 }
 
 class _EditDaySheet extends StatefulWidget {
-  const _EditDaySheet({required this.day, required this.onSaved});
+  const _EditDaySheet({required this.day, this.displayNumber, required this.onSaved});
   final TripDay day;
+  final int? displayNumber;
   final _EditDaySaved onSaved;
 
   @override
@@ -1901,7 +1916,7 @@ class _EditDaySheetState extends State<_EditDaySheet> {
           children: [
             const WabwayDragHandle(),
             const SizedBox(height: kSpace3),
-            Text('Edit Day ${widget.day.dayNumber}', style: kStyleTitle),
+            Text('Edit Day ${widget.displayNumber ?? widget.day.dayNumber}', style: kStyleTitle),
             const SizedBox(height: kSpace5),
 
             Text('Date', style: kStyleCaptionMedium.copyWith(color: kColorInk)),

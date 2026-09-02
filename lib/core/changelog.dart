@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 309,
+    label: 'Fix: day numbering stable after edits',
+    changes: [
+      'Day numbers stay correct after editing or reloading — no more "Day 0" appearing after a change',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 308,
     label: 'Fix: stable day ordering when dates overlap',
     changes: [

@@ -213,7 +213,10 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
       if (!mounted || gen != _loadGen) return;
       if (cachedDays != null) {
         setState(() {
-          _days..clear()..addAll(cachedDays)..sort((a, b) => a.date.compareTo(b.date));
+          _days..clear()..addAll(cachedDays)..sort((a, b) {
+            final cmp = a.date.compareTo(b.date);
+            return cmp != 0 ? cmp : a.dayNumber.compareTo(b.dayNumber);
+          });
           _spots..clear()..addAll(cachedSpots ?? []);
           _docs..clear()..addAll(cachedDocs ?? []);
           _stayItems..clear()..addAll(cachedStays ?? []);
@@ -499,7 +502,10 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
     _                      => ItineraryItemType.spot,
   };
 
-  int _dayDisplayNumber(TripDay day) => _days.indexOf(day) + 1;
+  int _dayDisplayNumber(TripDay day) {
+    final idx = _days.indexWhere((d) => d.id == day.id);
+    return idx >= 0 ? idx + 1 : day.dayNumber;
+  }
 
   void _onEditDay(TripDay day) {
     _showEditDaySheet(context, day: day, displayNumber: _dayDisplayNumber(day), onSaved: (city, date, notes, clearNotes) {

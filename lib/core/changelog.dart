@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 287,
+    label: 'Offline reliability: accommodation fallback',
+    changes: [
+      'Loading accommodations now falls back to cached data on a network error instead of crashing — no more blank screens when your connection drops mid-load',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 286,
     label: 'Offline caching reliability fixes',
     changes: [

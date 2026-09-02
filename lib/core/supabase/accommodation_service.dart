@@ -95,13 +95,17 @@ abstract final class AccommodationService {
   // ─── Queries ────────────────────────────────────────────────────────────────
 
   static Future<List<Accommodation>> loadAll(String tripId) async {
-    final data = await supabase
-        .from('accommodations')
-        .select('*')
-        .eq('trip_id', tripId)
-        .order('created_at', ascending: false);
-    await OfflineCache.write(OfflineCache.accommodationsKey(tripId), data);
-    return data.map((r) => _fromRow(r)).toList();
+    try {
+      final data = await supabase
+          .from('accommodations')
+          .select('*')
+          .eq('trip_id', tripId)
+          .order('created_at', ascending: false);
+      await OfflineCache.write(OfflineCache.accommodationsKey(tripId), data);
+      return data.map((r) => _fromRow(r)).toList();
+    } catch (_) {
+      return await loadFromCache(tripId) ?? [];
+    }
   }
 
   static Future<List<Accommodation>?> loadFromCache(String tripId) =>

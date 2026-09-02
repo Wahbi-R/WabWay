@@ -75,7 +75,7 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
   Future<void> _load({bool silent = false}) async {
     if (_tripId.isEmpty || !mounted) return;
     final gen = ++_loadGen;
-    if (!silent) setState(() => _loading = true);
+    if (!silent) setState(() { _loading = true; _items = []; });
 
     if (!silent) {
       final cached = await ShoppingService.loadFromCache(_tripId);

@@ -94,7 +94,7 @@ class _DocsScreenState extends ConsumerState<DocsScreen> {
     final tripId = _activeTripId;
     if (tripId == null) return;
     final gen = ++_loadGen;
-    if (!silent) setState(() { _loading = true; _error = false; _offline = false; });
+    if (!silent) setState(() { _loading = true; _error = false; _offline = false; _docs = []; });
 
     if (!silent) {
       final cached = await DocService.loadDocumentsFromCache(tripId);

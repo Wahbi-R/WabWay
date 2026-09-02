@@ -62,7 +62,7 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
   Future<void> _load({bool silent = false}) async {
     if (_tripId.isEmpty) return;
     final gen = ++_loadGen;
-    if (!silent && mounted) setState(() => _loading = true);
+    if (!silent && mounted) setState(() { _loading = true; _items = []; });
 
     if (!silent) {
       final cached = await PackingService.loadFromCache(_tripId);

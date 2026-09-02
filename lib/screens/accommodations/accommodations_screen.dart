@@ -92,7 +92,7 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen> {
     final tripId = _activeTripId;
     if (tripId == null) return;
     final gen = ++_loadGen;
-    if (!silent) setState(() { _loading = true; _error = false; _offline = false; });
+    if (!silent) setState(() { _loading = true; _error = false; _offline = false; _items = []; });
 
     if (!silent) {
       final cached = await AccommodationService.loadFromCache(tripId);

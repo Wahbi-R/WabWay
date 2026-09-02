@@ -140,7 +140,7 @@ class _TravelScreenState extends ConsumerState<TravelScreen> {
   Future<void> _loadAll({bool silent = false}) async {
     if (_activeTripId.isEmpty) return;
     final gen = ++_loadGen;
-    if (!silent) setState(() { _loading = true; _error = null; _offline = false; });
+    if (!silent) setState(() { _loading = true; _error = null; _offline = false; _items = []; _docs = []; _days = []; });
 
     if (!silent) {
       final cachedItemsFuture = TravelService.loadFromCache(_activeTripId);

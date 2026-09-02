@@ -144,7 +144,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
     final tripId = _activeTripId;
     if (tripId == null) return;
     final gen = ++_loadGen;
-    if (!silent) setState(() { _loading = true; _error = false; _offline = false; });
+    if (!silent) setState(() { _loading = true; _error = false; _offline = false; _spots = []; _docs = []; });
 
     if (!silent) {
       final cachedSpots = await SpotService.loadSpotsFromCache(tripId);

@@ -2,6 +2,7 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **298. Fix Copilot review: clear trip-scoped lists on non-silent load start across all SWR screens** — 8 screens (packing, shopping, accommodations, docs, money, plan, spots, travel) now clear their item/doc lists when starting a non-silent load; prevents stale previous-trip data appearing under an offline/error banner after a failed trip-switch load (2026-09-02, build 298).
 - [x] **297. Fix Copilot review: guard shopping realtime subscription in initState, raise changelog display limit** — _subscribeRealtime() in shopping_screen initState now only fires when _tripId is non-empty, preventing a subscription to trip_id=='' on startup; changelog sheet limit raised from 10 to 20 so all builds in this PR are visible (2026-09-02, build 297).
 - [x] **296. Fix Copilot review: cancel shopping debounce timer on trip switch** — a pending realtime debounce from the previous trip could fire after a trip switch, increment _loadGen, and race the non-silent load leaving _loading stuck; _debounce is now cancelled before _load() is called on trip change (2026-09-02, build 296).
 - [x] **295. Fix Copilot review: preserve vote state and settlements in SWR cache-first path** — spots_screen now derives _myVotes from cached spot vote data instead of clearing it on a cache hit, so offline/cached UI shows correct vote state; money_screen now only clears _persistedSettlements when the trip changes, preserving same-trip settlement history if the network load fails (2026-09-02, build 295).

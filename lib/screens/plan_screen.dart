@@ -195,7 +195,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
   Future<void> _loadAll({bool silent = false}) async {
     if (_activeTripId.isEmpty) return;
     final gen = ++_loadGen;
-    if (!silent) setState(() { _loading = true; _error = null; _offline = false; });
+    if (!silent) setState(() { _loading = true; _error = null; _offline = false; _days = []; _spots = []; _docs = []; });
 
     if (!silent) {
       final cachedDaysFuture  = PlanService.loadFromCache(_activeTripId);

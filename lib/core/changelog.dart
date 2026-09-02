@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 298,
+    label: 'Fix: switching trips never shows the previous trip\'s data',
+    changes: [
+      'All screens now clear their lists immediately when switching trips — if the network is unavailable you\'ll see the offline state rather than the wrong trip\'s content',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 297,
     label: 'Fix: shopping realtime no longer connects before trip loads',
     changes: [

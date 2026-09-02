@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 301,
+    label: 'Fix: spots screen fully clears on trip switch',
+    changes: [
+      'Switching trips on the Spots screen now immediately clears stay suggestions and your vote state — previously they could linger from the previous trip if the load failed',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 300,
     label: 'Plan: days sorted oldest-first, bulk "Add all days" button',
     changes: [

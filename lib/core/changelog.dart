@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 307,
+    label: 'Fix: connection chips and stay-swap picker',
+    changes: [
+      'Spot connection chips no longer show a tap effect when tapping them does nothing',
+      'Swapping a stay-filled plan item now opens the picker on the Stay tab directly',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 306,
     label: 'Fix: plan cache round-trip (type + stay link)',
     changes: [

@@ -136,8 +136,7 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
     }));
   }
 
-  bool _canNavigate(EntityType type) =>
-      type == EntityType.stay || type == EntityType.spot;
+  bool _canNavigate(EntityType type) => type == EntityType.stay;
 
   Future<void> _navigate(BuildContext context, ResolvedConnection r) async {
     final tripId = widget.tripId;

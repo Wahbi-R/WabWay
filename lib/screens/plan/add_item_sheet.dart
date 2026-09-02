@@ -713,7 +713,7 @@ class _FillFromPickerState extends State<_FillFromPicker> {
         icon: Icons.hotel_rounded,
         label: 'Filled from stay',
         name: linkedStay.name,
-        onSwap: widget.onStayClear,
+        onSwap: () { setState(() => _source = _FillSource.stay); widget.onStayClear(); },
         onClear: widget.onStayClear,
       );
     }

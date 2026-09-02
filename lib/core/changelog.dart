@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 318,
+    label: 'Fix: plan item spot-swap opens correct tab',
+    changes: [
+      'Swapping a spot-linked plan item now reopens the picker on the Spots tab, not whichever tab was last used',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 317,
     label: 'Fix: money pending-sync badge clears on trip switch',
     changes: [

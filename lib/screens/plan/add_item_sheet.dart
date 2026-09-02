@@ -704,7 +704,7 @@ class _FillFromPickerState extends State<_FillFromPicker> {
         icon: Icons.place_rounded,
         label: 'Filled from spot',
         name: linkedSpot.name,
-        onSwap: widget.onSpotClear,
+        onSwap: () { setState(() => _source = _FillSource.spot); widget.onSpotClear(); },
         onClear: widget.onSpotClear,
       );
     }

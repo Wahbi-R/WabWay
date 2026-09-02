@@ -106,36 +106,42 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
           for (final s in spots) {
             if (ids.contains(s.id)) _nameCache[s.id] = s.name;
           }
+          break;
         case EntityType.travel:
           final items = await TravelService.loadItems(tripId)
               .catchError((_) => <TravelItem>[]);
           for (final i in items) {
             if (ids.contains(i.id)) _nameCache[i.id] = i.title;
           }
+          break;
         case EntityType.stay:
           final stays = await AccommodationService.loadAll(tripId)
               .catchError((_) => <Accommodation>[]);
           for (final s in stays) {
             if (ids.contains(s.id)) _nameCache[s.id] = s.name;
           }
+          break;
         case EntityType.doc:
           final docs = await DocService.loadDocuments(tripId)
               .catchError((_) => <TripDocument>[]);
           for (final d in docs) {
             if (ids.contains(d.id)) _nameCache[d.id] = d.title;
           }
+          break;
         case EntityType.link:
           final links = await LinksService.loadLinks(tripId)
               .catchError((_) => <TripLink>[]);
           for (final l in links) {
             if (ids.contains(l.id)) _nameCache[l.id] = l.title;
           }
+          break;
         case EntityType.planItem:
           for (final day in widget.days) {
             for (final item in day.items) {
               if (ids.contains(item.id)) _nameCache[item.id] = item.title;
             }
           }
+          break;
       }
     }));
   }

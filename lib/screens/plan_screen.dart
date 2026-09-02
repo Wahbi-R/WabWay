@@ -2473,7 +2473,13 @@ class _AddDayDialogState extends State<_AddDayDialog> {
   final _formKey = GlobalKey<FormState>();
   final _cityCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
-  late DateTime _date = widget.defaultDate;
+  late DateTime _date;
+
+  @override
+  void initState() {
+    super.initState();
+    _date = widget.defaultDate;
+  }
 
   @override
   void dispose() {

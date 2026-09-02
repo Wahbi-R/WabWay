@@ -151,8 +151,10 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
   Future<void> _navigate(BuildContext context, ResolvedConnection r) async {
     final tripId = widget.tripId;
     if (r.peerType == EntityType.stay) {
-      final stays = await AccommodationService.loadAll(tripId).catchError((_) => <Accommodation>[]);
-      final stay = stays.where((s) => s.id == r.peerId).firstOrNull;
+      // Try cache first for instant navigation; fall back to network.
+      final cached = await AccommodationService.loadFromCache(tripId);
+      final stay = cached?.where((s) => s.id == r.peerId).firstOrNull
+          ?? (await AccommodationService.loadAll(tripId).catchError((_) => <Accommodation>[])).where((s) => s.id == r.peerId).firstOrNull;
       if (!mounted || stay == null) return;
       _showStayDetailSheet(context, stay);
     }

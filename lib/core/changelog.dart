@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 319,
+    label: 'Fix: stay details open instantly from cache',
+    changes: [
+      'Tapping a linked stay in the Connections panel now opens instantly using cached data instead of waiting for a network fetch',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 318,
     label: 'Fix: plan item spot-swap opens correct tab',
     changes: [

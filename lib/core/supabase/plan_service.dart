@@ -35,6 +35,7 @@ abstract final class PlanService {
     Map<String, dynamic> row,
     List<String> docIds, {
     String? spotId,
+    String? stayId,
   }) {
     // Postgres returns time as "HH:MM:SS"; the model uses "HH:MM".
     final rawTime = row['time'] as String?;
@@ -52,6 +53,7 @@ abstract final class PlanService {
       confirmationUrl: row['confirmation_url'] as String?,
       notes:           row['notes'] as String?,
       linkedSpotId:    spotId,
+      linkedStayId:    stayId,
       linkedDocIds:    docIds,
       sortOrder:       (row['sort_order'] as num?)?.toInt() ?? 0,
       isDone:          (row['is_done'] as bool?) ?? false,
@@ -104,16 +106,23 @@ abstract final class PlanService {
       }
     }
 
-    // Load spot connections from trip_connections for all items.
-    final spotMap = itemIds.isNotEmpty
-        ? await ConnectionService.fetchSpotMapForItems(itemIds)
-        : <String, String>{};
+    // Load spot and stay connections from trip_connections for all items.
+    final spotMapFuture = itemIds.isNotEmpty
+        ? ConnectionService.fetchSpotMapForItems(itemIds)
+        : Future.value(<String, String>{});
+    final stayMapFuture = itemIds.isNotEmpty
+        ? ConnectionService.fetchStayMapForItems(itemIds)
+        : Future.value(<String, String>{});
+    final results = await Future.wait([spotMapFuture, stayMapFuture]);
+    final spotMap = results[0];
+    final stayMap = results[1];
 
     final allItems = itemsData
         .map((r) => _itemFromRow(
               r,
               itemDocIds[r['id'] as String] ?? [],
               spotId: spotMap[r['id'] as String],
+              stayId: stayMap[r['id'] as String],
             ))
         .toList();
 

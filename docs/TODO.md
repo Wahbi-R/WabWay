@@ -2,6 +2,7 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **310. Fix Copilot review: hydrate linkedStayId from DB in PlanService.loadAll** — stay connections for plan items were written to cache JSON but never loaded from the database; added fetchStayMapForItems to ConnectionService (mirrors fetchSpotMapForItems) and populated linkedStayId in _itemFromRow; both spot and stay maps are now fetched in parallel (2026-09-02, build 310).
 - [x] **309. Fix Copilot review: cached day sort tie-breaker, id-based display number lookup** — cached path now sorts days with the same dayNumber tie-breaker as the network path; _dayDisplayNumber now uses indexWhere by id instead of indexOf (identity-based) so display numbers are correct after edits or cache round-trips (2026-09-02, build 309).
 - [x] **308. Fix Copilot review: deterministic day sort with tie-breaker, fmtDate in stay detail sheet** — all three day-sort calls now use dayNumber as a tie-breaker so same-date days display in stable order; stay detail sheet in connections panel now uses fmtDate for consistent date formatting (2026-09-02, build 308).
 - [x] **307. Fix Copilot review: spot chips non-navigable in connections, stay-swap picker source** — spot connection chips no longer show tap styling when navigation isn't supported (only stays are navigable); swapping from a "Filled from stay" banner now opens the picker on the Stay tab instead of defaulting to Spot (2026-09-02, build 307).

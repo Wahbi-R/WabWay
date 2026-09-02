@@ -109,6 +109,30 @@ abstract final class ConnectionService {
     return map;
   }
 
+  /// Batch-load stay connections for a list of plan item ids.
+  /// Returns a map of itemId → stayId.
+  static Future<Map<String, String>> fetchStayMapForItems(
+      List<String> itemIds) async {
+    if (itemIds.isEmpty) return {};
+    final rows = await supabase
+        .from('trip_connections')
+        .select('entity_a_id, entity_a_type, entity_b_id, entity_b_type')
+        .or('entity_a_type.eq.plan_item,entity_b_type.eq.plan_item');
+    final map = <String, String>{};
+    for (final r in rows) {
+      final aType = r['entity_a_type'] as String;
+      final bType = r['entity_b_type'] as String;
+      final aId   = r['entity_a_id'] as String;
+      final bId   = r['entity_b_id'] as String;
+      if (aType == 'plan_item' && bType == 'stay' && itemIds.contains(aId)) {
+        map[aId] = bId;
+      } else if (bType == 'plan_item' && aType == 'stay' && itemIds.contains(bId)) {
+        map[bId] = aId;
+      }
+    }
+    return map;
+  }
+
   static RealtimeChannel subscribe(
     String tripId,
     void Function() onChanged,

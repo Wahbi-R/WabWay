@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 310,
+    label: 'Fix: stay-linked plan items restored from cache',
+    changes: [
+      'Plan items linked to a stay now correctly show the stay link after reloading — the connection was stored but never re-read from the server',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 309,
     label: 'Fix: day numbering stable after edits',
     changes: [

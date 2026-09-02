@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 312,
+    label: 'Fix: connection chips load reliably offline',
+    changes: [
+      'Connection chips (spots, docs, stays, travel items) now load gracefully when offline — a failed fetch no longer blocks the entire connections panel',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 311,
     label: 'Fix: shopping realtime, faster plan connection load',
     changes: [

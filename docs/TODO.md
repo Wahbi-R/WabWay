@@ -2,6 +2,7 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **312. Fix Copilot review: failure-tolerant name resolution in ConnectionsSection** — all entity loads in _resolveNames now use catchError so a failed spot/travel/doc/link fetch degrades gracefully (chips render without a name) instead of rejecting the Future.wait and leaving the section stuck (2026-09-02, build 312).
 - [x] **311. Fix Copilot review: shopping realtime guard on empty trip id, scoped connection query** — shopping realtime now only re-subscribes when the new trip id is non-empty; fetchSpotMapForItems and fetchStayMapForItems replaced with a single fetchSpotAndStayMapsForItems that filters by item IDs in SQL instead of fetching all rows (2026-09-02, build 311).
 - [x] **310. Fix Copilot review: hydrate linkedStayId from DB in PlanService.loadAll** — stay connections for plan items were written to cache JSON but never loaded from the database; added fetchStayMapForItems to ConnectionService (mirrors fetchSpotMapForItems) and populated linkedStayId in _itemFromRow; both spot and stay maps are now fetched in parallel (2026-09-02, build 310).
 - [x] **309. Fix Copilot review: cached day sort tie-breaker, id-based display number lookup** — cached path now sorts days with the same dayNumber tie-breaker as the network path; _dayDisplayNumber now uses indexWhere by id instead of indexOf (identity-based) so display numbers are correct after edits or cache round-trips (2026-09-02, build 309).

@@ -68,7 +68,7 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
       if (!mounted) return;
       _tripId = ref.read(activeTripIdProvider);
       _load();
-      _subscribeRealtime();
+      if (_tripId.isNotEmpty) _subscribeRealtime();
     });
   }
 

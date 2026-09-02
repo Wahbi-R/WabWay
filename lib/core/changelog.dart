@@ -6,9 +6,17 @@ import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
 
 // ─── Changelog entries ────────────────────────────────────────────────────────
-// Add newest entry at the top. Max ~10 shown in the sheet.
+// Add newest entry at the top. Max ~20 shown in the sheet.
 
 const _kChangelog = <_Release>[
+  _Release(
+    version: '1.1.0',
+    build: 297,
+    label: 'Fix: shopping realtime no longer connects before trip loads',
+    changes: [
+      'The shopping list no longer opens a realtime connection before your trip data is ready on startup',
+    ],
+  ),
   _Release(
     version: '1.1.0',
     build: 296,
@@ -2209,7 +2217,7 @@ Widget _changelogHeader(BuildContext context) {
 }
 
 Widget _changelogList(ScrollController? scroll) {
-  final releases = _kChangelog.take(10).toList();
+  final releases = _kChangelog.take(20).toList();
   return ListView.separated(
     controller: scroll,
     padding: const EdgeInsets.fromLTRB(kSpace5, kSpace4, kSpace5, kSpace6),

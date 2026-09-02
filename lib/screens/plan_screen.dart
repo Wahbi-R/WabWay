@@ -48,6 +48,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
 
   RealtimeChannel? _channel;
   Timer? _debounce;
+  int _loadGen = 0;
 
   String? _selectedItemId;
   String? _selectedDayId;
@@ -193,7 +194,24 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
   // real-time CDC events — the loading spinner stays hidden to avoid a flash.
   Future<void> _loadAll({bool silent = false}) async {
     if (_activeTripId.isEmpty) return;
-    if (!silent) setState(() { _loading = true; _error = null; });
+    final gen = ++_loadGen;
+    if (!silent) setState(() { _loading = true; _error = null; _offline = false; });
+
+    if (!silent) {
+      final cachedDays  = await PlanService.loadFromCache(_activeTripId);
+      final cachedSpots = await SpotService.loadSpotsFromCache(_activeTripId);
+      final cachedDocs  = await DocService.loadDocumentsFromCache(_activeTripId);
+      if (!mounted || gen != _loadGen) return;
+      if (cachedDays != null) {
+        setState(() {
+          _days..clear()..addAll(cachedDays);
+          if (cachedSpots != null) _spots..clear()..addAll(cachedSpots);
+          if (cachedDocs  != null) _docs..clear()..addAll(cachedDocs);
+          _loading = false;
+        });
+      }
+    }
+
     try {
       final daysFuture  = PlanService.loadAll(_activeTripId);
       final spotsFuture = SpotService.loadSpots(_activeTripId);
@@ -201,24 +219,22 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
       final days  = await daysFuture;
       final spots = await spotsFuture;
       final docs  = await docsFuture;
-      if (!mounted) return;
+      if (!mounted || gen != _loadGen) return;
       setState(() {
-        _days
-          ..clear()
-          ..addAll(days);
-        _spots
-          ..clear()
-          ..addAll(spots);
-        _docs
-          ..clear()
-          ..addAll(docs);
+        _days..clear()..addAll(days);
+        _spots..clear()..addAll(spots);
+        _docs..clear()..addAll(docs);
         if (!silent) _loading = false;
         _offline = false;
       });
     } catch (e) {
-      if (!mounted) return;
-      if (!silent) { setState(() { _loading = false; _error = e.toString(); }); }
-      else { setState(() => _offline = true); }
+      if (!mounted || gen != _loadGen) return;
+      if (silent) { setState(() => _offline = true); return; }
+      if (_days.isEmpty) {
+        setState(() { _loading = false; _error = e.toString(); });
+      } else {
+        setState(() { _loading = false; _offline = true; });
+      }
     }
   }
 

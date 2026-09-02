@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/offline_cache.dart';
 import '../../data/packing_data.dart';
 import 'client.dart';
 
@@ -28,8 +29,17 @@ abstract final class PackingService {
         .eq('trip_id', tripId)
         .order('sort_order')
         .order('created_at');
+    OfflineCache.write(OfflineCache.packingKey(tripId), rows);
     return rows.map(_fromRow).toList();
   }
+
+  static Future<List<PackingItem>?> loadFromCache(String tripId) =>
+      OfflineCache.read(
+        OfflineCache.packingKey(tripId),
+        (json) => (json as List)
+            .map((r) => _fromRow(Map<String, dynamic>.from(r as Map)))
+            .toList(),
+      );
 
   static Future<PackingItem> addItem(
       String tripId, String title, String userId) async {

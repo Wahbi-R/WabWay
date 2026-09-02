@@ -42,6 +42,7 @@ class _DocsScreenState extends ConsumerState<DocsScreen> {
   String? _activeTripId;
   RealtimeChannel? _realtimeChannel;
   Timer? _debounce;
+  int _loadGen = 0;
 
   // Uploader name resolver (built from TripState in didChangeDependencies)
   String Function(String) _memberName = (id) => id;
@@ -90,25 +91,28 @@ class _DocsScreenState extends ConsumerState<DocsScreen> {
   // ── Data loading ─────────────────────────────────────────────────────────────
 
   Future<void> _loadDocs({bool silent = false}) async {
-    if (!silent) setState(() { _loading = true; _error = false; });
+    final tripId = _activeTripId;
+    if (tripId == null) return;
+    final gen = ++_loadGen;
+    if (!silent) setState(() { _loading = true; _error = false; _offline = false; });
+
+    if (!silent) {
+      final cached = await DocService.loadDocumentsFromCache(tripId);
+      if (!mounted || gen != _loadGen) return;
+      if (cached != null) setState(() { _docs = cached; _loading = false; });
+    }
+
     try {
-      final tripId = _activeTripId!;
       final docs = await DocService.loadDocuments(tripId);
-      if (!mounted) return;
+      if (!mounted || gen != _loadGen) return;
       setState(() { _docs = docs; _loading = false; _offline = false; });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || gen != _loadGen) return;
       if (silent) { setState(() => _offline = true); return; }
-      // Try cached data on cold-start failure
-      final tripId = _activeTripId ?? '';
-      final cached = tripId.isNotEmpty
-          ? await DocService.loadDocumentsFromCache(tripId)
-          : null;
-      if (!mounted) return;
-      if (cached != null) {
-        setState(() { _docs = cached; _loading = false; _offline = true; });
-      } else {
+      if (_docs.isEmpty) {
         setState(() { _loading = false; _error = true; });
+      } else {
+        setState(() { _loading = false; _offline = true; });
       }
     }
   }

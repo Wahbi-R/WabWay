@@ -1,3 +1,4 @@
+import '../../core/offline_cache.dart';
 import '../../data/shopping_data.dart';
 import 'client.dart';
 
@@ -38,8 +39,17 @@ abstract final class ShoppingService {
         .order('checked',    ascending: true)
         .order('sort_order', ascending: true)
         .order('created_at', ascending: true);
+    OfflineCache.write(OfflineCache.shoppingKey(tripId), data);
     return data.map((r) => _fromRow(r)).toList();
   }
+
+  static Future<List<ShoppingItem>?> loadFromCache(String tripId) =>
+      OfflineCache.read(
+        OfflineCache.shoppingKey(tripId),
+        (json) => (json as List)
+            .map((r) => _fromRow(Map<String, dynamic>.from(r as Map)))
+            .toList(),
+      );
 
   static Future<ShoppingItem> create({
     required String tripId,

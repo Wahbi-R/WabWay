@@ -53,6 +53,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
   String? _activeTripId;
   RealtimeChannel? _realtimeChannel;
   Timer? _debounce;
+  int _loadGen = 0;
   // Tracks spots for which we've already kicked off a thumbnail fetch this session.
   // Without this, every silent reload would re-request images that already failed.
 
@@ -140,18 +141,34 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
   }
 
   Future<void> _loadSpots({bool silent = false}) async {
-    if (!silent) setState(() { _loading = true; _error = false; });
+    final tripId = _activeTripId;
+    if (tripId == null) return;
+    final gen = ++_loadGen;
+    if (!silent) setState(() { _loading = true; _error = false; _offline = false; });
+
+    if (!silent) {
+      final cachedSpots = await SpotService.loadSpotsFromCache(tripId);
+      final cachedDocs  = await DocService.loadDocumentsFromCache(tripId);
+      if (!mounted || gen != _loadGen) return;
+      if (cachedSpots != null) {
+        setState(() {
+          _spots = cachedSpots;
+          _docs  = cachedDocs ?? _docs;
+          _loading = false;
+        });
+      }
+    }
+
     try {
-      final tripId = _activeTripId!;
       final results = await Future.wait([
         SpotService.loadSpots(tripId),
         DocService.loadDocuments(tripId),
         AccommodationService.loadAll(tripId),
       ]);
+      if (!mounted || gen != _loadGen) return;
       final spots = results[0] as List<Spot>;
       final docs  = results[1] as List<TripDocument>;
       final stays = results[2] as List<Accommodation>;
-      if (!mounted) return;
 
       final myId = supabase.auth.currentUser?.id;
       final myVotes = <String, VoteType>{};
@@ -175,26 +192,12 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
         _offline = false;
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || gen != _loadGen) return;
       if (silent) { setState(() => _offline = true); return; }
-      // Try to show cached data on cold-start failure
-      final tripId = _activeTripId ?? '';
-      final cachedSpots = tripId.isNotEmpty
-          ? await SpotService.loadSpotsFromCache(tripId)
-          : null;
-      final cachedDocs = tripId.isNotEmpty
-          ? await DocService.loadDocumentsFromCache(tripId)
-          : null;
-      if (!mounted) return;
-      if (cachedSpots != null) {
-        setState(() {
-          _spots = cachedSpots;
-          _docs = cachedDocs ?? _docs;
-          _loading = false;
-          _offline = true;
-        });
-      } else {
+      if (_spots.isEmpty) {
         setState(() { _loading = false; _error = true; });
+      } else {
+        setState(() { _loading = false; _offline = true; });
       }
     }
   }

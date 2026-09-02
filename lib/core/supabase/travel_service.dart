@@ -1,3 +1,4 @@
+import '../../core/offline_cache.dart';
 import '../../data/date_utils.dart';
 import '../../data/travel_data.dart';
 import 'client.dart';
@@ -80,10 +81,60 @@ abstract final class TravelService {
       }
     }
 
-    return itemsData
+    final items = itemsData
         .map((r) => _fromRow(r, itemDocIds[r['id'] as String] ?? []))
         .toList();
+    OfflineCache.write(OfflineCache.travelKey(tripId), items.map(_toJson).toList());
+    return items;
   }
+
+  static Map<String, dynamic> _toJson(TravelItem i) => {
+    'id': i.id, 'title': i.title, 'type': i.type.name,
+    'status': i.status.toDb,
+    'date': i.date?.toIso8601String(), 'end_date': i.endDate?.toIso8601String(),
+    'time': i.time, 'end_time': i.endTime,
+    'location': i.location, 'destination': i.destination,
+    'confirmation_number': i.confirmationNumber, 'url': i.url,
+    'address': i.address, 'notes': i.notes,
+    'departure_terminal': i.departureTerminal, 'arrival_terminal': i.arrivalTerminal,
+    'gate': i.gate, 'seat': i.seat, 'boarding_time': i.boardingTime,
+    'linked_doc_ids': i.linkedDocIds,
+    'linked_itinerary_item_id': i.linkedItineraryItemId,
+    'linked_day_id': i.linkedDayId,
+  };
+
+  static TravelItem _fromJson(Map<String, dynamic> j) => TravelItem(
+    id:                    j['id'] as String,
+    title:                 j['title'] as String,
+    type:                  TravelItemType.values.byName(j['type'] as String? ?? 'other'),
+    status:                TravelBookingStatus.fromDb(j['status'] as String?),
+    date:                  j['date'] != null ? DateTime.parse(j['date'] as String) : null,
+    endDate:               j['end_date'] != null ? DateTime.parse(j['end_date'] as String) : null,
+    time:                  j['time'] as String?,
+    endTime:               j['end_time'] as String?,
+    location:              j['location'] as String?,
+    destination:           j['destination'] as String?,
+    confirmationNumber:    j['confirmation_number'] as String?,
+    url:                   j['url'] as String?,
+    address:               j['address'] as String?,
+    notes:                 j['notes'] as String?,
+    departureTerminal:     j['departure_terminal'] as String?,
+    arrivalTerminal:       j['arrival_terminal'] as String?,
+    gate:                  j['gate'] as String?,
+    seat:                  j['seat'] as String?,
+    boardingTime:          j['boarding_time'] as String?,
+    linkedDocIds:          (j['linked_doc_ids'] as List?)?.cast<String>() ?? [],
+    linkedItineraryItemId: j['linked_itinerary_item_id'] as String?,
+    linkedDayId:           j['linked_day_id'] as String?,
+  );
+
+  static Future<List<TravelItem>?> loadFromCache(String tripId) =>
+      OfflineCache.read(
+        OfflineCache.travelKey(tripId),
+        (json) => (json as List)
+            .map((r) => _fromJson(Map<String, dynamic>.from(r as Map)))
+            .toList(),
+      );
 
   // ── Mutations ─────────────────────────────────────────────────────────────────
 

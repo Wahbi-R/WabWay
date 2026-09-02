@@ -1,3 +1,4 @@
+import '../../core/offline_cache.dart';
 import '../../data/date_utils.dart';
 import '../../data/plan_data.dart';
 import 'client.dart';
@@ -120,10 +121,63 @@ abstract final class PlanService {
       (dayItems[item.dayId] ??= []).add(item);
     }
 
-    return daysData
+    final days = daysData
         .map<TripDay>((r) => _dayFromRow(r, dayItems[r['id'] as String] ?? []))
         .toList();
+    OfflineCache.write(OfflineCache.planKey(tripId), days.map(_dayToJson).toList());
+    return days;
   }
+
+  static Map<String, dynamic> _itemToJson(ItineraryItem i) => {
+    'id': i.id, 'day_id': i.dayId, 'title': i.title,
+    'type': i.type.name, 'time': i.time, 'city': i.city,
+    'country': i.country, 'location': i.location, 'maps_url': i.mapsUrl,
+    'confirmation_url': i.confirmationUrl, 'notes': i.notes,
+    'linked_spot_id': i.linkedSpotId, 'linked_doc_ids': i.linkedDocIds,
+    'sort_order': i.sortOrder, 'is_done': i.isDone,
+    'planned_cost': i.plannedCost, 'currency': i.currency,
+  };
+
+  static Map<String, dynamic> _dayToJson(TripDay d) => {
+    'id': d.id, 'day_number': d.dayNumber,
+    'date': d.date.toIso8601String(), 'city': d.city,
+    'notes': d.notes, 'items': d.items.map(_itemToJson).toList(),
+  };
+
+  static ItineraryItem _itemFromJson(Map<String, dynamic> j) => ItineraryItem(
+    id: j['id'] as String, dayId: j['day_id'] as String,
+    title: j['title'] as String,
+    type: ItineraryItemType.values.byName(j['type'] as String? ?? 'other'),
+    time: j['time'] as String?, city: j['city'] as String?,
+    country: j['country'] as String?, location: j['location'] as String?,
+    mapsUrl: j['maps_url'] as String?, confirmationUrl: j['confirmation_url'] as String?,
+    notes: j['notes'] as String?,
+    linkedSpotId: j['linked_spot_id'] as String?,
+    linkedDocIds: (j['linked_doc_ids'] as List?)?.cast<String>() ?? [],
+    sortOrder: (j['sort_order'] as num?)?.toInt() ?? 0,
+    isDone: (j['is_done'] as bool?) ?? false,
+    plannedCost: (j['planned_cost'] as num?)?.toDouble(),
+    currency: j['currency'] as String?,
+  );
+
+  static TripDay _dayFromJson(Map<String, dynamic> j) => TripDay(
+    id: j['id'] as String,
+    dayNumber: (j['day_number'] as num).toInt(),
+    date: DateTime.parse(j['date'] as String),
+    city: j['city'] as String? ?? '',
+    notes: j['notes'] as String?,
+    items: (j['items'] as List?)
+        ?.map((i) => _itemFromJson(Map<String, dynamic>.from(i as Map)))
+        .toList() ?? [],
+  );
+
+  static Future<List<TripDay>?> loadFromCache(String tripId) =>
+      OfflineCache.read(
+        OfflineCache.planKey(tripId),
+        (json) => (json as List)
+            .map((d) => _dayFromJson(Map<String, dynamic>.from(d as Map)))
+            .toList(),
+      );
 
   // ── Mutations ─────────────────────────────────────────────────────────────────
 

@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 284,
+    label: 'Instant offline browsing',
+    changes: [
+      'Spots, docs, money, plan, travel, accommodations, shopping, and packing all load instantly from cache while a fresh sync runs in the background',
+      'Switching trips or tabs no longer shows a spinner when data was previously loaded',
+      'Real-time updates from teammates no longer cause flicker — stale results are silently dropped',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 283,
     label: 'Send photos in crew chat',
     changes: [

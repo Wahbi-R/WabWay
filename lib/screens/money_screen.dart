@@ -86,6 +86,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
   String? _activeTripId;
   RealtimeChannel? _realtimeChannel;
   Timer? _debounce;
+  int _loadGen = 0;
 
   // Captured in didChangeDependencies and passed to add sheets.
   List<TripMember> _members = [];
@@ -342,43 +343,48 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
   Future<void> _loadAll({bool silent = false}) async {
     final tripId = _activeTripId;
     if (tripId == null) return;
-    if (!silent) setState(() { _loading = true; _error = false; });
+    final gen = ++_loadGen;
+    if (!silent) setState(() { _loading = true; _error = false; _offline = false; });
+
+    if (!silent) {
+      final cachedReceipts    = await MoneyService.loadReceiptsFromCache(tripId);
+      final cachedWithdrawals = await MoneyService.loadWithdrawalsFromCache(tripId);
+      final pending           = await SyncQueue.pendingCountFor(tripId);
+      if (!mounted || gen != _loadGen) return;
+      if (cachedReceipts != null) {
+        setState(() {
+          _receipts    = cachedReceipts;
+          _withdrawals = cachedWithdrawals ?? [];
+          _loading = false;
+          _pendingSyncCount = pending;
+        });
+      }
+    }
+
     try {
       final futures = await Future.wait([
         MoneyService.loadReceipts(tripId),
         MoneyService.loadWithdrawals(tripId),
         SettlementService.loadSettlements(tripId),
       ]);
-      if (!mounted) return;
+      if (!mounted || gen != _loadGen) return;
       final pending = await SyncQueue.pendingCountFor(tripId);
-      if (!mounted) return;
+      if (!mounted || gen != _loadGen) return;
       setState(() {
-        _receipts              = List<Receipt>.from(futures[0] as List);
-        _withdrawals           = List<CashWithdrawal>.from(futures[1] as List);
-        _persistedSettlements  = List<Settlement>.from(futures[2] as List);
+        _receipts             = List<Receipt>.from(futures[0] as List);
+        _withdrawals          = List<CashWithdrawal>.from(futures[1] as List);
+        _persistedSettlements = List<Settlement>.from(futures[2] as List);
         _loading = false;
         _offline = false;
         _pendingSyncCount = pending;
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || gen != _loadGen) return;
       if (silent) { setState(() => _offline = true); return; }
-      // Try cached data on cold-start failure.
-      final cachedReceipts     = await MoneyService.loadReceiptsFromCache(tripId);
-      final cachedWithdrawals  = await MoneyService.loadWithdrawalsFromCache(tripId);
-      final pending            = await SyncQueue.pendingCountFor(tripId);
-      if (!mounted) return;
-      if (cachedReceipts != null) {
-        setState(() {
-          _receipts             = cachedReceipts;
-          _withdrawals          = cachedWithdrawals ?? [];
-          _persistedSettlements = [];
-          _loading = false;
-          _offline = true;
-          _pendingSyncCount = pending;
-        });
-      } else {
+      if (_receipts.isEmpty) {
         setState(() { _loading = false; _error = true; });
+      } else {
+        setState(() { _loading = false; _offline = true; });
       }
     }
   }

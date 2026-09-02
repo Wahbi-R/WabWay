@@ -2,6 +2,7 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **284. Offline-first SWR caching across all feature screens** — spots, docs, money, plan, travel, accommodations, shopping, and packing now use stale-while-revalidate: cached data is shown instantly on first load while a fresh network fetch runs in the background; a generation counter prevents flicker when cache, network, and realtime events all update the same list simultaneously (2026-09-01, build 284).
 - [x] **283. Crew chat image upload** — crew chat now has an image button (image icon) in the input bar (native only, hidden on web); tapping it shows a Camera/Gallery picker; selected photos are uploaded to Supabase Storage (`trip-chat` bucket) and sent as image messages; images render as 220×220 thumbnails in the chat alongside text and location messages (2026-08-31, build 283).
 - [x] **282. Any trip member can create invite links** — removed owner-only gate from the More screen invite section; updated Supabase RLS policies and `create_trip_invite` RPC so any trip member (not just owner) can view and create invite codes (2026-08-31, build 282).
 - [x] **281. Fix spot city/area missing on import** — Video AI (`/transcribe`), Maps import, and Nominatim geocode paths now populate area (neighbourhood/suburb) alongside city; `NominatimPlace`, `MapsPlace`, and `MapsPlaceInfo` all carry an `area` field; server `/transcribe` adds area as 8th pipe segment, `/maps/enrich` adds area to response (2026-08-31, build 281).

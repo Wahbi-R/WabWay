@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 286,
+    label: 'Offline caching reliability fixes',
+    changes: [
+      'Switching trips no longer briefly shows spots, docs, or money settlements from your previous trip',
+      'Shopping list now stays in sync with real-time updates after switching trips',
+      'Offline cache is guaranteed to be saved before the screen updates, preventing missed cache reads on fast revisits',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 285,
     label: 'SWR test suite green',
     changes: [

@@ -2,6 +2,7 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **296. Fix Copilot review: cancel shopping debounce timer on trip switch** — a pending realtime debounce from the previous trip could fire after a trip switch, increment _loadGen, and race the non-silent load leaving _loading stuck; _debounce is now cancelled before _load() is called on trip change (2026-09-02, build 296).
 - [x] **295. Fix Copilot review: preserve vote state and settlements in SWR cache-first path** — spots_screen now derives _myVotes from cached spot vote data instead of clearing it on a cache hit, so offline/cached UI shows correct vote state; money_screen now only clears _persistedSettlements when the trip changes, preserving same-trip settlement history if the network load fails (2026-09-02, build 295).
 - [x] **294. Fix Copilot review: packing_screen _load() early-return when tripId empty** — without the guard, _load could run with _tripId == '' and issue cache reads/network requests keyed to an empty suffix (2026-09-02, build 294).
 - [x] **293. Fix Copilot review: isolate AccommodationService.loadAll in global_search and map Future.wait, update PR title to 284-293** — global_search_screen and map_screen called loadAll inside Future.wait without catchError so an accommodation failure would drop all other search/map results; both now use .catchError((_) => []) to isolate the failure (2026-09-02, build 293).

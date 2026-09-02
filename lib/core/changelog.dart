@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 296,
+    label: 'Fix: shopping list stays responsive when switching trips',
+    changes: [
+      'Switching trips no longer risks freezing the shopping list spinner — a stale background timer is now cancelled before the new trip loads',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 295,
     label: 'Fix: votes and settlements preserved in cached view',
     changes: [

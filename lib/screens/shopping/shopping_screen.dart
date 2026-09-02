@@ -260,6 +260,7 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
   Widget build(BuildContext context) {
     ref.listen<String>(activeTripIdProvider, (prev, next) {
       if (next != _tripId) {
+        _debounce?.cancel();
         _tripId = next;
         _load();
         _subscribeRealtime();

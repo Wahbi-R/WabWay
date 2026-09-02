@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 306,
+    label: 'Fix: plan cache round-trip (type + stay link)',
+    changes: [
+      'Itinerary items loaded from offline cache now keep their correct type (e.g. Stay, Food, Free Time) instead of falling back to Other',
+      'Stays linked to a plan item are now preserved when loading from cache',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 305,
     label: 'Fix: Add Day dialog date initialisation',
     changes: [

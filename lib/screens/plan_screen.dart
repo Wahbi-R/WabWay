@@ -693,6 +693,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
         _days.sort((a, b) => a.date.compareTo(b.date));
         _loading = false;
       });
+      unawaited(PlanService.writeDaysToCache(_activeTripId, _days));
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);

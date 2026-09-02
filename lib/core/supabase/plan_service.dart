@@ -132,10 +132,11 @@ abstract final class PlanService {
 
   static Map<String, dynamic> _itemToJson(ItineraryItem i) => {
     'id': i.id, 'day_id': i.dayId, 'title': i.title,
-    'type': i.type.name, 'time': i.time, 'city': i.city,
+    'type': _typeToDb(i.type), 'time': i.time, 'city': i.city,
     'country': i.country, 'location': i.location, 'maps_url': i.mapsUrl,
     'confirmation_url': i.confirmationUrl, 'notes': i.notes,
-    'linked_spot_id': i.linkedSpotId, 'linked_doc_ids': i.linkedDocIds,
+    'linked_spot_id': i.linkedSpotId, 'linked_stay_id': i.linkedStayId,
+    'linked_doc_ids': i.linkedDocIds,
     'sort_order': i.sortOrder, 'is_done': i.isDone,
     'planned_cost': i.plannedCost, 'currency': i.currency,
   };
@@ -155,6 +156,7 @@ abstract final class PlanService {
     mapsUrl: j['maps_url'] as String?, confirmationUrl: j['confirmation_url'] as String?,
     notes: j['notes'] as String?,
     linkedSpotId: j['linked_spot_id'] as String?,
+    linkedStayId: j['linked_stay_id'] as String?,
     linkedDocIds: (j['linked_doc_ids'] as List?)?.cast<String>() ?? [],
     sortOrder: (j['sort_order'] as num?)?.toInt() ?? 0,
     isDone: (j['is_done'] as bool?) ?? false,

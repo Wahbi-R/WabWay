@@ -10,6 +10,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/providers/profile_provider.dart';
 import '../core/providers/trip_provider.dart';
 import '../core/supabase/accommodation_service.dart';
+import '../data/connection_data.dart' show EntityType;
+import 'shared/connections_section.dart';
 import '../core/supabase/client.dart';
 import '../core/supabase/doc_service.dart';
 import '../core/supabase/spot_service.dart';
@@ -59,6 +61,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
 
   String? _selectedId;
   SpotCategory? _filterCategory;
+  bool _filterStays = false;
   Set<SpotStatus> _filterStatuses = {};
   String? _filterCity;
   String _searchQuery = '';
@@ -525,7 +528,11 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
       context: context,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _StayMiniSheet(stay: stay, linkedSpot: linkedSpot),
+      builder: (_) => _StayMiniSheet(
+        stay: stay,
+        linkedSpot: linkedSpot,
+        tripId: _activeTripId ?? '',
+      ),
     );
   }
 
@@ -670,13 +677,14 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
 
     Widget body = isDesktop
         ? _DesktopLayout(
-            spots: _filtered,
+            spots: _filterStays ? const [] : _filtered,
             allSpots: _spots,
             stays: _stays,
             docs: _docs,
             selected: _selected,
             myVotes: _myVotes,
             filterCategory: _filterCategory,
+            filterStays: _filterStays,
             filterStatuses: _filterStatuses,
             searchQuery: _searchQuery,
             searchCtrl: _searchCtrl,
@@ -686,7 +694,8 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
             selectionMode: _selectionMode,
             selectedIds: _selectedIds,
             onSelectSpot: (s) => setState(() => _selectedId = s?.id),
-            onFilterCategory: (c) => setState(() => _filterCategory = c),
+            onFilterCategory: (c) => setState(() { _filterCategory = c; _filterStays = false; }),
+            onFilterStays: () => setState(() { _filterStays = !_filterStays; _filterCategory = null; }),
             onToggleStatus: (s) => setState(() {
               if (_filterStatuses.contains(s)) {
                 _filterStatuses = {..._filterStatuses}..remove(s);
@@ -715,11 +724,12 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
             onDeleteSelected: _deleteSelected,
           )
         : _MobileLayout(
-            spots: _filtered,
+            spots: _filterStays ? const [] : _filtered,
             allSpots: _spots,
             stays: _stays,
             myVotes: _myVotes,
             filterCategory: _filterCategory,
+            filterStays: _filterStays,
             filterStatuses: _filterStatuses,
             advancedFilterCount: _advancedFilterCount,
             searchQuery: _searchQuery,
@@ -734,7 +744,8 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
             onToggleSelection: _toggleSelection,
             onExitSelectionMode: _exitSelectionMode,
             onDeleteSelected: _deleteSelected,
-            onFilterCategory: (c) => setState(() => _filterCategory = c),
+            onFilterCategory: (c) => setState(() { _filterCategory = c; _filterStays = false; }),
+            onFilterStays: () => setState(() { _filterStays = !_filterStays; _filterCategory = null; }),
             onToggleStatus: (s) => setState(() {
               if (_filterStatuses.contains(s)) {
                 _filterStatuses = {..._filterStatuses}..remove(s);
@@ -797,6 +808,7 @@ class _MobileLayout extends StatelessWidget {
     required this.stays,
     required this.myVotes,
     required this.filterCategory,
+    required this.filterStays,
     required this.filterStatuses,
     required this.advancedFilterCount,
     required this.searchQuery,
@@ -812,6 +824,7 @@ class _MobileLayout extends StatelessWidget {
     required this.onExitSelectionMode,
     required this.onDeleteSelected,
     required this.onFilterCategory,
+    required this.onFilterStays,
     required this.onToggleStatus,
     required this.onSearch,
     required this.onToggleSearch,
@@ -826,6 +839,7 @@ class _MobileLayout extends StatelessWidget {
   final List<Accommodation> stays;
   final Map<String, VoteType> myVotes;
   final SpotCategory? filterCategory;
+  final bool filterStays;
   final Set<SpotStatus> filterStatuses;
   final int advancedFilterCount;
   final String searchQuery;
@@ -841,6 +855,7 @@ class _MobileLayout extends StatelessWidget {
   final VoidCallback onExitSelectionMode;
   final Future<void> Function() onDeleteSelected;
   final ValueChanged<SpotCategory?> onFilterCategory;
+  final VoidCallback onFilterStays;
   final ValueChanged<SpotStatus> onToggleStatus;
   final ValueChanged<String> onSearch;
   final VoidCallback onToggleSearch;
@@ -952,7 +967,10 @@ class _MobileLayout extends StatelessWidget {
           SliverToBoxAdapter(
             child: _CategoryFilterStrip(
               selected: filterCategory,
+              staysSelected: filterStays,
+              stayCount: stays.length,
               onChanged: onFilterCategory,
+              onStaysSelected: onFilterStays,
               spots: allSpots,
             ),
           ),
@@ -1062,6 +1080,7 @@ class _DesktopLayout extends StatelessWidget {
     required this.selected,
     required this.myVotes,
     required this.filterCategory,
+    required this.filterStays,
     required this.filterStatuses,
     required this.searchQuery,
     required this.searchCtrl,
@@ -1072,6 +1091,7 @@ class _DesktopLayout extends StatelessWidget {
     required this.selectedIds,
     required this.onSelectSpot,
     required this.onFilterCategory,
+    required this.onFilterStays,
     required this.onToggleStatus,
     required this.onSearch,
     required this.onToggleSearch,
@@ -1095,6 +1115,7 @@ class _DesktopLayout extends StatelessWidget {
   final Spot? selected;
   final Map<String, VoteType> myVotes;
   final SpotCategory? filterCategory;
+  final bool filterStays;
   final Set<SpotStatus> filterStatuses;
   final String searchQuery;
   final TextEditingController searchCtrl;
@@ -1105,6 +1126,7 @@ class _DesktopLayout extends StatelessWidget {
   final Set<String> selectedIds;
   final ValueChanged<Spot?> onSelectSpot;
   final ValueChanged<SpotCategory?> onFilterCategory;
+  final VoidCallback onFilterStays;
   final ValueChanged<SpotStatus> onToggleStatus;
   final ValueChanged<String> onSearch;
   final VoidCallback onToggleSearch;
@@ -1152,7 +1174,10 @@ class _DesktopLayout extends StatelessWidget {
                     children: [
                       _CategoryFilterStrip(
                         selected: filterCategory,
+                        staysSelected: filterStays,
+                        stayCount: stays.length,
                         onChanged: onFilterCategory,
+                        onStaysSelected: onFilterStays,
                         spots: allSpots,
                       ),
                       _StatusFilterStrip(
@@ -1407,12 +1432,18 @@ class _CategoryFilterStrip extends StatefulWidget {
     required this.selected,
     required this.onChanged,
     required this.spots,
+    this.staysSelected = false,
+    this.stayCount = 0,
+    this.onStaysSelected,
   });
 
   final SpotCategory? selected;
   final ValueChanged<SpotCategory?> onChanged;
   // Full (unfiltered) spot list — used to show counts per category.
   final List<Spot> spots;
+  final bool staysSelected;
+  final int stayCount;
+  final VoidCallback? onStaysSelected;
 
   @override
   State<_CategoryFilterStrip> createState() => _CategoryFilterStripState();
@@ -1486,6 +1517,15 @@ class _CategoryFilterStripState extends State<_CategoryFilterStrip> {
                     ),
                   );
                 }),
+                if (widget.stayCount > 0 && widget.onStaysSelected != null)
+                  Padding(
+                    padding: const EdgeInsets.only(left: kSpace2),
+                    child: WabwayTag(
+                      label: 'Stays (${widget.stayCount})',
+                      selected: widget.staysSelected,
+                      onTap: widget.onStaysSelected!,
+                    ),
+                  ),
               ],
             ),
           ),
@@ -1941,9 +1981,10 @@ class _StayRow extends StatelessWidget {
 // ── Stay mini sheet ───────────────────────────────────────────────────────────
 
 class _StayMiniSheet extends StatelessWidget {
-  const _StayMiniSheet({required this.stay, this.linkedSpot});
+  const _StayMiniSheet({required this.stay, required this.tripId, this.linkedSpot});
 
   final Accommodation stay;
+  final String tripId;
   final Spot? linkedSpot;
 
   String _fmt(DateTime dt) =>
@@ -1952,13 +1993,20 @@ class _StayMiniSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final nights = stay.nights;
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(kSpace5, kSpace4, kSpace5, kSpace5),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: kColorPaper,
+        borderRadius: kRadiusSheet,
+      ),
+      child: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(kSpace5, kSpace4, kSpace5, kSpace5),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const WabwayDragHandle(),
+              const SizedBox(height: kSpace3),
             Row(
               children: [
                 Expanded(
@@ -2051,7 +2099,17 @@ class _StayMiniSheet extends StatelessWidget {
               ),
             ],
             const SizedBox(height: kSpace4),
+            if (tripId.isNotEmpty) ...[
+              const Divider(height: 1),
+              const SizedBox(height: kSpace4),
+              ConnectionsSection(
+                entityType: EntityType.stay,
+                entityId: stay.id,
+                tripId: tripId,
+              ),
+            ],
           ],
+          ),
         ),
       ),
     );

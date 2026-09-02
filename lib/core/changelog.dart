@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 304,
+    label: 'Spots: Stays filter, connections on stays',
+    changes: [
+      'Filter the Spots list to show only your accommodations using the new "Stays" chip',
+      'Tapping a stay from the Spots screen now shows a proper sheet with check-in/out details',
+      'You can now link documents and spots to a stay from the stay sheet or the accommodation edit screen',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 303,
     label: 'Plan: chronological day numbers, duplicate dates allowed',
     changes: [

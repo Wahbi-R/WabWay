@@ -103,7 +103,7 @@ abstract final class AccommodationService {
           .order('created_at', ascending: false);
       await OfflineCache.write(OfflineCache.accommodationsKey(tripId), data);
       return data.map((r) => _fromRow(r)).toList();
-    } catch (e) {
+    } catch (_) {
       // Fall back to cache so callers get data when offline.
       // Re-throw only when cache is also empty so the screen can show its
       // error/offline UI rather than a misleading empty state.

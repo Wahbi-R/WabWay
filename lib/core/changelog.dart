@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 288,
+    label: 'Fix: notifications from web',
+    changes: [
+      'Messages and updates sent from the WabWay web app now correctly notify your phone — previously no push notifications were sent when acting from a browser',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 287,
     label: 'Offline reliability: accommodation fallback',
     changes: [

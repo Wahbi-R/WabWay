@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 316,
+    label: 'Fix: travel screen compile errors',
+    changes: [
+      'Fixed a crash introduced in the last update where the Travel screen could not start a fresh load after switching trips',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 315,
     label: 'Fix: Stays filter chip appears instantly from cache',
     changes: [

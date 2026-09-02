@@ -89,7 +89,7 @@ abstract final class ConnectionService {
   /// Returns ({itemId → spotId}, {itemId → stayId}) in a single query.
   static Future<(Map<String, String>, Map<String, String>)>
       fetchSpotAndStayMapsForItems(List<String> itemIds) async {
-    if (itemIds.isEmpty) return ({}, {});
+    if (itemIds.isEmpty) return (<String, String>{}, <String, String>{});
     final idSet = itemIds.toSet();
     final rows = await supabase
         .from('trip_connections')

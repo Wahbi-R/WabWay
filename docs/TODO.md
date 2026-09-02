@@ -2,6 +2,7 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **316. Fix Copilot review: travel screen compile errors — final list reassignment and typed empty map** — travel_screen non-silent load was assigning `= []` to final List fields (compile error); fixed with `.clear()`; connection_service empty-map early-return now returns typed `<String, String>{}` to match return type (2026-09-02, build 316).
 - [x] **315. Fix Copilot review: hydrate _stays from cache in spots screen cache-first path** — the cache-first render in spots_screen always set _stays = [] so the Stays filter chip never appeared instantly or offline; now loads AccommodationService.loadFromCache in the same cache phase as spots and docs (2026-09-02, build 315).
 - [x] **314. Fix Copilot review: O(n) itemIds lookup in connection query, money stale settlements on trip switch** — fetchSpotAndStayMapsForItems now converts itemIds to a Set before the row loop for O(1) lookups; money_screen non-silent load now clears _persistedSettlements when the trip changes so stale Settle Up data never bleeds into the new trip (2026-09-02, build 314).
 - [x] **313. Fix Copilot review: TripDoc type error and connection chip tap target** — TripDoc corrected to TripDocument fixing a compile error in connections_section; connection chip now only makes the icon+label area tappable for navigation so the X (remove) button no longer also triggers navigation (2026-09-02, build 313).

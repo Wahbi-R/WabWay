@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 311,
+    label: 'Fix: shopping realtime, faster plan connection load',
+    changes: [
+      'Shopping list no longer briefly subscribes to an empty trip on startup',
+      'Loading the itinerary is faster — stay and spot connections are now fetched in a single scoped query',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 310,
     label: 'Fix: stay-linked plan items restored from cache',
     changes: [

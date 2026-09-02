@@ -107,15 +107,9 @@ abstract final class PlanService {
     }
 
     // Load spot and stay connections from trip_connections for all items.
-    final spotMapFuture = itemIds.isNotEmpty
-        ? ConnectionService.fetchSpotMapForItems(itemIds)
-        : Future.value(<String, String>{});
-    final stayMapFuture = itemIds.isNotEmpty
-        ? ConnectionService.fetchStayMapForItems(itemIds)
-        : Future.value(<String, String>{});
-    final results = await Future.wait([spotMapFuture, stayMapFuture]);
-    final spotMap = results[0];
-    final stayMap = results[1];
+    final (spotMap, stayMap) = itemIds.isNotEmpty
+        ? await ConnectionService.fetchSpotAndStayMapsForItems(itemIds)
+        : (<String, String>{}, <String, String>{});
 
     final allItems = itemsData
         .map((r) => _itemFromRow(

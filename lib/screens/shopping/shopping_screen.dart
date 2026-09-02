@@ -263,7 +263,7 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
         _debounce?.cancel();
         _tripId = next;
         _load();
-        _subscribeRealtime();
+        if (next.isNotEmpty) _subscribeRealtime();
       }
     });
     return Scaffold(

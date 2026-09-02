@@ -120,7 +120,7 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
           }
         case EntityType.doc:
           final docs = await DocService.loadDocuments(tripId)
-              .catchError((_) => <TripDoc>[]);
+              .catchError((_) => <TripDocument>[]);
           for (final d in docs) {
             if (ids.contains(d.id)) _nameCache[d.id] = d.title;
           }
@@ -283,8 +283,32 @@ class _ConnectionChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final type = resolved.peerType;
-    final chip = Container(
-      padding: const EdgeInsets.only(left: 8, top: 5, bottom: 5, right: 4),
+    final labelArea = GestureDetector(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.only(left: 8, top: 5, bottom: 5, right: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(type.icon, size: 12, color: onTap != null ? kColorPrimary : kColorInkSoft),
+            const SizedBox(width: 4),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 160),
+              child: Text(
+                resolved.peerName,
+                style: kStyleCaption.copyWith(
+                  fontWeight: FontWeight.w500,
+                  color: onTap != null ? kColorPrimary : null,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    return Container(
       decoration: BoxDecoration(
         color: kColorSurfaceSunken,
         borderRadius: kRadiusPill,
@@ -293,30 +317,17 @@ class _ConnectionChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(type.icon, size: 12, color: onTap != null ? kColorPrimary : kColorInkSoft),
-          const SizedBox(width: 4),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 160),
-            child: Text(
-              resolved.peerName,
-              style: kStyleCaption.copyWith(
-                fontWeight: FontWeight.w500,
-                color: onTap != null ? kColorPrimary : null,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          const SizedBox(width: 4),
+          labelArea,
           GestureDetector(
             onTap: onRemove,
-            child: Icon(Icons.close_rounded, size: 14, color: kColorInkSoft),
+            child: const Padding(
+              padding: EdgeInsets.only(right: 6, top: 5, bottom: 5),
+              child: Icon(Icons.close_rounded, size: 14, color: kColorInkSoft),
+            ),
           ),
         ],
       ),
     );
-    if (onTap == null) return chip;
-    return GestureDetector(onTap: onTap, child: chip);
   }
 }
 

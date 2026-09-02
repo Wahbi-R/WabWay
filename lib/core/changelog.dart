@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 313,
+    label: 'Fix: connection chip remove button no longer navigates',
+    changes: [
+      'Tapping the X to remove a connection now only removes it — it no longer also triggers opening the connected item',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 312,
     label: 'Fix: connection chips load reliably offline',
     changes: [

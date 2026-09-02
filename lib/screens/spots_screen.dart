@@ -151,11 +151,23 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
       final cachedDocs  = await DocService.loadDocumentsFromCache(tripId);
       if (!mounted || gen != _loadGen) return;
       if (cachedSpots != null) {
+        final myId = supabase.auth.currentUser?.id;
+        final cachedVotes = <String, VoteType>{};
+        if (myId != null) {
+          for (final spot in cachedSpots) {
+            for (final type in VoteType.values) {
+              if (spot.votes.voters(type).contains(myId)) {
+                cachedVotes[spot.id] = type;
+                break;
+              }
+            }
+          }
+        }
         setState(() {
           _spots   = cachedSpots;
           _docs    = cachedDocs ?? [];
           _stays   = [];
-          _myVotes = {};
+          _myVotes = cachedVotes;
           _loading = false;
         });
       }

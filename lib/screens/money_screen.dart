@@ -84,6 +84,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
   String? _selectedWithdrawalId;
 
   String? _activeTripId;
+  String? _lastTripId;
   RealtimeChannel? _realtimeChannel;
   Timer? _debounce;
   int _loadGen = 0;
@@ -353,9 +354,10 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
       if (!mounted || gen != _loadGen) return;
       if (cachedReceipts != null) {
         setState(() {
-          _receipts             = cachedReceipts;
-          _withdrawals          = cachedWithdrawals ?? [];
-          _persistedSettlements = [];
+          _receipts    = cachedReceipts;
+          _withdrawals = cachedWithdrawals ?? [];
+          if (_lastTripId != tripId) _persistedSettlements = [];
+          _lastTripId  = tripId;
           _loading = false;
           _pendingSyncCount = pending;
         });
@@ -375,6 +377,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
         _receipts             = List<Receipt>.from(futures[0] as List);
         _withdrawals          = List<CashWithdrawal>.from(futures[1] as List);
         _persistedSettlements = List<Settlement>.from(futures[2] as List);
+        _lastTripId           = tripId;
         _loading = false;
         _offline = false;
         _pendingSyncCount = pending;

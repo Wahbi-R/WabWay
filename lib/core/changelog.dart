@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 295,
+    label: 'Fix: votes and settlements preserved in cached view',
+    changes: [
+      'Your vote on a spot is now shown correctly even before the network refreshes — the cached view no longer clears it',
+      'Settle Up balances are no longer lost if a network reload fails on the same trip',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 294,
     label: 'Fix: packing list loads correctly on first launch',
     changes: [

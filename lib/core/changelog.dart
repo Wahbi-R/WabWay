@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 290,
+    label: 'Fix: connection panel stability on poor connections',
+    changes: [
+      'The connections panel (links between spots, stays, travel, etc.) no longer crashes when accommodation data can\'t be fetched — it shows whatever it has and skips the missing stays gracefully',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 289,
     label: 'Offline reliability: faster cache & safer spot loading',
     changes: [

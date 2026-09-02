@@ -111,7 +111,8 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
             if (ids.contains(i.id)) _nameCache[i.id] = i.title;
           }
         case EntityType.stay:
-          final stays = await AccommodationService.loadAll(tripId);
+          final stays = await AccommodationService.loadAll(tripId)
+              .catchError((_) => <Accommodation>[]);
           for (final s in stays) {
             if (ids.contains(s.id)) _nameCache[s.id] = s.name;
           }
@@ -351,7 +352,7 @@ class _ConnectionPickerSheetState
     final results = await Future.wait([
       SpotService.loadSpots(tid),
       TravelService.loadItems(tid),
-      AccommodationService.loadAll(tid),
+      AccommodationService.loadAll(tid).catchError((_) => <Accommodation>[]),
       DocService.loadDocuments(tid),
       LinksService.loadLinks(tid),
     ]);

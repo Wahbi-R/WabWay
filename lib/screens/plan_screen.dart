@@ -198,9 +198,12 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
     if (!silent) setState(() { _loading = true; _error = null; _offline = false; });
 
     if (!silent) {
-      final cachedDays  = await PlanService.loadFromCache(_activeTripId);
-      final cachedSpots = await SpotService.loadSpotsFromCache(_activeTripId);
-      final cachedDocs  = await DocService.loadDocumentsFromCache(_activeTripId);
+      final cachedDaysFuture  = PlanService.loadFromCache(_activeTripId);
+      final cachedSpotsFuture = SpotService.loadSpotsFromCache(_activeTripId);
+      final cachedDocsFuture  = DocService.loadDocumentsFromCache(_activeTripId);
+      final cachedDays  = await cachedDaysFuture;
+      final cachedSpots = await cachedSpotsFuture;
+      final cachedDocs  = await cachedDocsFuture;
       if (!mounted || gen != _loadGen) return;
       if (cachedDays != null) {
         setState(() {

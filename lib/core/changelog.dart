@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 289,
+    label: 'Offline reliability: faster cache & safer spot loading',
+    changes: [
+      'The Plan and Travel screens now load cached data faster — all three data sources fetch at the same time instead of one after another',
+      'The Spots screen now loads successfully even when there\'s a temporary problem fetching accommodations — spots and docs always appear',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 288,
     label: 'Fix: notifications from web',
     changes: [

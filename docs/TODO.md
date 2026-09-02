@@ -2,6 +2,7 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **289. Fix Copilot review: concurrent cache reads, accommodation failure isolation** — plan/travel screens now fire all 3 cache reads concurrently (fire-all-await-in-order pattern); spots screen catches AccommodationService failure separately so a transient accommodation error no longer prevents spots from loading; accommodation loadAll re-throws when cache is also empty so callers can show proper error UI (2026-09-02, build 289).
 - [x] **288. Fix push notifications not firing from web** — `pushNotify` had an early `if (kIsWeb) return` that silently dropped all notifications sent from the browser; moved the guard to only skip the SharedPreferences check on web so the Edge Function still fires and native members get notified (2026-09-02, build 288).
 - [x] **287. Fix Copilot review: accommodation loadAll falls back to cache on network error, PR title updated to Build 284-286** — restores non-throwing contract for AccommodationService.loadAll; call sites in Future.wait no longer risk uncaught exceptions on transient failures (2026-09-02, build 287).
 - [x] **286. Fix Copilot review: await cache writes, clear stale state on trip switch, re-subscribe realtime in shopping, guard Firebase init error** — 5 service files now await OfflineCache.write; money/plan/spots/travel screens reset trip-scoped state on cache hit; shopping re-subscribes realtime on trip switch; helpers.dart only ignores `duplicate-app` Firebase error (2026-09-02, build 286).

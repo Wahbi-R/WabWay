@@ -162,15 +162,16 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
     }
 
     try {
-      final results = await Future.wait([
-        SpotService.loadSpots(tripId),
-        DocService.loadDocuments(tripId),
-        AccommodationService.loadAll(tripId),
-      ]);
+      final spotsFuture = SpotService.loadSpots(tripId);
+      final docsFuture  = DocService.loadDocuments(tripId);
+      // Accommodations fetched concurrently but caught separately so a transient
+      // failure doesn't prevent spots from loading.
+      final staysFuture = AccommodationService.loadAll(tripId)
+          .catchError((_) => <Accommodation>[]);
+      final spots = await spotsFuture;
+      final docs  = await docsFuture;
+      final stays = await staysFuture;
       if (!mounted || gen != _loadGen) return;
-      final spots = results[0] as List<Spot>;
-      final docs  = results[1] as List<TripDocument>;
-      final stays = results[2] as List<Accommodation>;
 
       final myId = supabase.auth.currentUser?.id;
       final myVotes = <String, VoteType>{};

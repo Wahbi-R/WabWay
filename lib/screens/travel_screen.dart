@@ -143,9 +143,12 @@ class _TravelScreenState extends ConsumerState<TravelScreen> {
     if (!silent) setState(() { _loading = true; _error = null; _offline = false; });
 
     if (!silent) {
-      final cachedItems = await TravelService.loadFromCache(_activeTripId);
-      final cachedDocs  = await DocService.loadDocumentsFromCache(_activeTripId);
-      final cachedDays  = await PlanService.loadFromCache(_activeTripId);
+      final cachedItemsFuture = TravelService.loadFromCache(_activeTripId);
+      final cachedDocsFuture  = DocService.loadDocumentsFromCache(_activeTripId);
+      final cachedDaysFuture  = PlanService.loadFromCache(_activeTripId);
+      final cachedItems = await cachedItemsFuture;
+      final cachedDocs  = await cachedDocsFuture;
+      final cachedDays  = await cachedDaysFuture;
       if (!mounted || gen != _loadGen) return;
       if (cachedItems != null) {
         setState(() {

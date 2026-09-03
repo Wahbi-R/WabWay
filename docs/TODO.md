@@ -2,6 +2,7 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **342. Fix code review: map stale-data and trip-switch race bugs** — map_screen now cancels the debounce timer on trip switch (preventing old-trip data loading into new trip view), adds a load-gen guard to prevent slower loads overwriting faster ones, and trip_provider.load() no longer reverts selectedIndex when switchTrip() completes during an in-flight member fetch (2026-09-03, build 342).
 - [x] **341. Fix code review: no error feedback on dialog-confirm link delete failure** — _deleteLink catch now shows a snackbar consistent with swipe-to-delete behaviour so users know why a deleted link reappeared (2026-09-03, build 341).
 
 - [x] **340. Fix code review: auto_links null name crash; sync_queue concurrent drain race** — auto_links_service now uses null-safe casts for name/title columns so a single row with a null name can no longer crash the entire load() and silently remove all auto-links from the screen; sync_queue drain() now sets a _draining flag in a try/finally so concurrent drain calls (connectivity-restored + retry timer) can no longer process the same queue simultaneously and create duplicate receipts (2026-09-03, build 340).

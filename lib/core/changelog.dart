@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 342,
+    label: 'Fix: map and trip-switch reliability improvements',
+    changes: [
+      'Switching trips no longer briefly shows the previous trip\'s spots on the map',
+      'The map no longer snaps back to an older spot list when a refresh and a realtime update overlap',
+      'Switching trips quickly no longer occasionally jumps you back to the previous trip',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 341,
     label: 'Fix: deleting a link now shows an error if it fails',
     changes: [

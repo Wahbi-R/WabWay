@@ -68,6 +68,11 @@ class TripNotifier extends StateNotifier<TripData> {
         OfflineCache.membersKey(trips[idx].id),
         members.map((m) => m.toMap()).toList(),
       );
+      // If switchTrip() completed while we were fetching members, don't revert it.
+      if (state.selectedIndex != idx) {
+        state = state.copyWith(trips: trips, loading: false, offline: false);
+        return;
+      }
       state = state.copyWith(
         trips:        trips,
         members:      members,

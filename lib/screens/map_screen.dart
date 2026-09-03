@@ -41,6 +41,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   String? _activeTripId;
   RealtimeChannel? _realtimeChannel;
   Timer? _debounce;
+  int _loadGen = 0;
 
   final _mapController = MapController();
   bool _needsFit = true;   // fit-to-bounds on first successful load only
@@ -113,13 +114,14 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   }
 
   Future<void> _load(String tripId, {bool silent = false}) async {
+    final gen = ++_loadGen;
     if (!silent) setState(() { _loading = true; _error = false; });
     try {
       final results = await Future.wait([
         SpotService.loadSpots(tripId),
         AccommodationService.loadAll(tripId).catchError((_) => <Accommodation>[]),
       ]);
-      if (!mounted) return;
+      if (!mounted || gen != _loadGen) return;
       setState(() {
         _spots = results[0] as List<Spot>;
         _accommodations = results[1] as List<Accommodation>;
@@ -128,7 +130,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       });
       _fitIfNeeded();
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || gen != _loadGen) return;
       if (!silent) setState(() { _loading = false; _error = true; });
     }
   }
@@ -359,6 +361,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     ref.listen<String>(activeTripIdProvider, (prev, next) {
       if (next != _activeTripId) {
         _activeTripId = next;
+        _debounce?.cancel();
         _load(next);
         _subscribeRealtime(next);
       }

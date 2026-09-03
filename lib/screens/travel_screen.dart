@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
+import '../core/async_screen_mixin.dart';
 import '../core/notifications/push_notifier.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/providers/trip_provider.dart';
@@ -31,19 +32,16 @@ class TravelScreen extends ConsumerStatefulWidget {
   ConsumerState<TravelScreen> createState() => _TravelScreenState();
 }
 
-class _TravelScreenState extends ConsumerState<TravelScreen> {
+class _TravelScreenState extends ConsumerState<TravelScreen> with AsyncScreenMixin {
   final List<TravelItem> _items = [];
   final List<TripDocument> _docs = [];
   final List<TripDay> _days = [];
 
-  bool _loading = true;
-  String? _error;
   String _activeTripId = '';
   String _userId = '';
 
   RealtimeChannel? _channel;
   Timer? _debounce;
-  int _loadGen = 0;
 
   TravelItemType? _filter;
   TravelBookingStatus? _statusFilter;
@@ -131,16 +129,14 @@ class _TravelScreenState extends ConsumerState<TravelScreen> {
     );
   }
 
-  bool _offline = false;
-
   // ─── Data loading ─────────────────────────────────────────────────────────────
 
   // silent=false shows a full loading spinner (first load / retry);
   // silent=true silently refreshes in the background after a realtime event.
   Future<void> _loadAll({bool silent = false}) async {
     if (_activeTripId.isEmpty) return;
-    final gen = ++_loadGen;
-    if (!silent) setState(() { _loading = true; _error = null; _offline = false; _items.clear(); _docs.clear(); _days.clear(); });
+    final gen = beginLoad(silent: silent);
+    if (!silent) setState(() { _items.clear(); _docs.clear(); _days.clear(); });
 
     if (!silent) {
       final cachedItemsFuture = TravelService.loadFromCache(_activeTripId);
@@ -149,13 +145,13 @@ class _TravelScreenState extends ConsumerState<TravelScreen> {
       final cachedItems = await cachedItemsFuture;
       final cachedDocs  = await cachedDocsFuture;
       final cachedDays  = await cachedDaysFuture;
-      if (!mounted || gen != _loadGen) return;
+      if (isStale(gen)) return;
       if (cachedItems != null) {
         setState(() {
           _items..clear()..addAll(cachedItems);
           _docs..clear()..addAll(cachedDocs ?? []);
           _days..clear()..addAll(cachedDays ?? []);
-          _loading = false;
+          loading = false;
         });
       }
     }
@@ -167,22 +163,16 @@ class _TravelScreenState extends ConsumerState<TravelScreen> {
       final items = await itemsFuture;
       final docs  = await docsFuture;
       final days  = await daysFuture;
-      if (!mounted || gen != _loadGen) return;
-      setState(() {
+      commitLoad(gen, () {
         _items..clear()..addAll(items);
         _docs..clear()..addAll(docs);
         _days..clear()..addAll(days);
-        _loading = false;
-        _offline = false;
-        _error   = null;
       });
     } catch (e) {
-      if (!mounted || gen != _loadGen) return;
-      if (silent) { setState(() { _offline = true; _loading = false; }); return; }
-      if (_items.isEmpty) {
-        setState(() { _loading = false; _error = e.toString(); _offline = false; });
+      if (silent || _items.isNotEmpty) {
+        failLoad(gen, silent: true);
       } else {
-        setState(() { _loading = false; _offline = true; });
+        failLoad(gen, message: e.toString());
       }
     }
   }
@@ -340,16 +330,16 @@ class _TravelScreenState extends ConsumerState<TravelScreen> {
         _subscribeRealtime(next);
       }
     });
-    if (_loading) return const WabwayLoadingScaffold();
+    if (loading) return const WabwayLoadingScaffold();
 
-    if (_error != null) {
+    if (error) {
       return Scaffold(
         backgroundColor: kColorCream,
         body: Center(
           child: WabwayEmptyState(
             icon: Icons.error_outline_rounded,
             title: 'Could not load travel',
-            description: _error!,
+            description: errorMessage,
           ),
         ),
       );
@@ -357,7 +347,7 @@ class _TravelScreenState extends ConsumerState<TravelScreen> {
 
     final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
     final base = isDesktop ? _buildDesktop(context) : _buildMobile(context);
-    if (!_offline) return base;
+    if (!offline) return base;
     return Stack(
       children: [
         base,

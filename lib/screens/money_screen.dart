@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/providers/trip_provider.dart';
+import '../core/async_screen_mixin.dart';
 import '../core/supabase/client.dart';
 import '../core/supabase/money_service.dart';
 import '../core/supabase/settlement_service.dart';
@@ -62,13 +63,10 @@ class MoneyScreen extends ConsumerStatefulWidget {
   ConsumerState<MoneyScreen> createState() => _MoneyScreenState();
 }
 
-class _MoneyScreenState extends ConsumerState<MoneyScreen> {
+class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin {
   List<Receipt> _receipts = [];
   List<CashWithdrawal> _withdrawals = [];
   _CashSort _cashSort = _CashSort.newest;
-  bool _loading = true;
-  bool _error = false;
-  bool _offline = false;
   int _pendingSyncCount = 0;
 
   _MoneyTab _tab = _MoneyTab.receipts;
@@ -87,7 +85,6 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
   String? _lastTripId;
   RealtimeChannel? _realtimeChannel;
   Timer? _debounce;
-  int _loadGen = 0;
 
   // Captured in didChangeDependencies and passed to add sheets.
   List<TripMember> _members = [];
@@ -344,9 +341,8 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
   Future<void> _loadAll({bool silent = false}) async {
     final tripId = _activeTripId;
     if (tripId == null) return;
-    final gen = ++_loadGen;
+    final gen = beginLoad(silent: silent);
     if (!silent) setState(() {
-      _loading = true; _error = false; _offline = false;
       _receipts = []; _withdrawals = [];
       if (_lastTripId != tripId) { _persistedSettlements = []; _pendingSyncCount = 0; }
     });
@@ -355,14 +351,14 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
       final cachedReceipts    = await MoneyService.loadReceiptsFromCache(tripId);
       final cachedWithdrawals = await MoneyService.loadWithdrawalsFromCache(tripId);
       final pending           = await SyncQueue.pendingCountFor(tripId);
-      if (!mounted || gen != _loadGen) return;
+      if (isStale(gen)) return;
       if (cachedReceipts != null) {
         setState(() {
           _receipts    = cachedReceipts;
           _withdrawals = cachedWithdrawals ?? [];
           if (_lastTripId != tripId) _persistedSettlements = [];
           _lastTripId  = tripId;
-          _loading = false;
+          loading          = false;
           _pendingSyncCount = pending;
         });
       }
@@ -374,27 +370,17 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
         MoneyService.loadWithdrawals(tripId),
         SettlementService.loadSettlements(tripId),
       ]);
-      if (!mounted || gen != _loadGen) return;
+      if (isStale(gen)) return;
       final pending = await SyncQueue.pendingCountFor(tripId);
-      if (!mounted || gen != _loadGen) return;
-      setState(() {
+      commitLoad(gen, () {
         _receipts             = List<Receipt>.from(futures[0] as List);
         _withdrawals          = List<CashWithdrawal>.from(futures[1] as List);
         _persistedSettlements = List<Settlement>.from(futures[2] as List);
         _lastTripId           = tripId;
-        _loading = false;
-        _offline = false;
-        _error   = false;
-        _pendingSyncCount = pending;
+        _pendingSyncCount     = pending;
       });
     } catch (_) {
-      if (!mounted || gen != _loadGen) return;
-      if (silent) { setState(() { _offline = true; _loading = false; }); return; }
-      if (_receipts.isEmpty) {
-        setState(() { _loading = false; _error = true; _offline = false; });
-      } else {
-        setState(() { _loading = false; _offline = true; });
-      }
+      failLoad(gen, silent: silent);
     }
   }
 
@@ -649,9 +635,9 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
         _subscribeRealtime(next);
       }
     });
-    if (_loading) return const WabwayLoadingScaffold();
+    if (loading) return const WabwayLoadingScaffold();
 
-    if (_error) {
+    if (error) {
       return Scaffold(
         backgroundColor: kColorCream,
         body: Center(
@@ -671,7 +657,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
 
     final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
     final base = isDesktop ? _buildDesktop(context) : _buildMobile(context);
-    if (!_offline) return base;
+    if (!offline) return base;
     return Stack(
       children: [
         base,

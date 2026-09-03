@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/async_screen_mixin.dart';
 import '../core/providers/profile_provider.dart';
 import '../core/providers/trip_provider.dart';
 import '../core/supabase/client.dart';
@@ -31,18 +32,13 @@ class DocsScreen extends ConsumerStatefulWidget {
   ConsumerState<DocsScreen> createState() => _DocsScreenState();
 }
 
-class _DocsScreenState extends ConsumerState<DocsScreen> {
+class _DocsScreenState extends ConsumerState<DocsScreen> with AsyncScreenMixin {
   List<TripDocument> _docs = [];
   List<Spot> _availableSpots = [];
-
-  bool _loading = true;
-  bool _error = false;
-  bool _offline = false;
 
   String? _activeTripId;
   RealtimeChannel? _realtimeChannel;
   Timer? _debounce;
-  int _loadGen = 0;
 
   // Uploader name resolver (built from TripState in didChangeDependencies)
   String Function(String) _memberName = (id) => id;
@@ -93,27 +89,20 @@ class _DocsScreenState extends ConsumerState<DocsScreen> {
   Future<void> _loadDocs({bool silent = false}) async {
     final tripId = _activeTripId;
     if (tripId == null) return;
-    final gen = ++_loadGen;
-    if (!silent) setState(() { _loading = true; _error = false; _offline = false; _docs = []; });
+    final gen = beginLoad(silent: silent);
+    if (!silent) setState(() => _docs = []);
 
     if (!silent) {
       final cached = await DocService.loadDocumentsFromCache(tripId);
-      if (!mounted || gen != _loadGen) return;
-      if (cached != null) setState(() { _docs = cached; _loading = false; });
+      if (isStale(gen)) return;
+      if (cached != null) setState(() { _docs = cached; loading = false; });
     }
 
     try {
       final docs = await DocService.loadDocuments(tripId);
-      if (!mounted || gen != _loadGen) return;
-      setState(() { _docs = docs; _loading = false; _offline = false; _error = false; });
+      commitLoad(gen, () => _docs = docs);
     } catch (_) {
-      if (!mounted || gen != _loadGen) return;
-      if (silent) { setState(() { _offline = true; _loading = false; }); return; }
-      if (_docs.isEmpty) {
-        setState(() { _loading = false; _error = true; _offline = false; });
-      } else {
-        setState(() { _loading = false; _offline = true; });
-      }
+      failLoad(gen, silent: silent || _docs.isNotEmpty);
     }
   }
 
@@ -316,9 +305,9 @@ class _DocsScreenState extends ConsumerState<DocsScreen> {
         _subscribeRealtime(next);
       }
     });
-    if (_loading) return const WabwayLoadingScaffold();
+    if (loading) return const WabwayLoadingScaffold();
 
-    if (_error) {
+    if (error) {
       return Scaffold(
         backgroundColor: kColorCream,
         body: Center(
@@ -338,7 +327,7 @@ class _DocsScreenState extends ConsumerState<DocsScreen> {
 
     final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
     final base = isDesktop ? _buildDesktop(context) : _buildMobile(context);
-    if (!_offline) return base;
+    if (!offline) return base;
     return Stack(
       children: [
         base,

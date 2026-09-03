@@ -9,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart'
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/providers/profile_provider.dart';
 import '../core/providers/trip_provider.dart';
+import '../core/async_screen_mixin.dart';
 import '../core/supabase/accommodation_service.dart';
 import '../data/connection_data.dart' show EntityType;
 import 'shared/connections_section.dart';
@@ -43,21 +44,15 @@ class SpotsScreen extends ConsumerStatefulWidget {
   ConsumerState<SpotsScreen> createState() => _SpotsScreenState();
 }
 
-class _SpotsScreenState extends ConsumerState<SpotsScreen> {
+class _SpotsScreenState extends ConsumerState<SpotsScreen> with AsyncScreenMixin {
   List<Spot> _spots = [];
   List<TripDocument> _docs = [];
   List<Accommodation> _stays = [];
   Map<String, VoteType> _myVotes = {};
-  bool _loading = true;
-  bool _error = false;
-  bool _offline = false;
 
   String? _activeTripId;
   RealtimeChannel? _realtimeChannel;
   Timer? _debounce;
-  int _loadGen = 0;
-  // Tracks spots for which we've already kicked off a thumbnail fetch this session.
-  // Without this, every silent reload would re-request images that already failed.
 
   String? _selectedId;
   SpotCategory? _filterCategory;
@@ -146,14 +141,14 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
   Future<void> _loadSpots({bool silent = false}) async {
     final tripId = _activeTripId;
     if (tripId == null) return;
-    final gen = ++_loadGen;
-    if (!silent) setState(() { _loading = true; _error = false; _offline = false; _spots = []; _docs = []; _stays = []; _myVotes = {}; });
+    final gen = beginLoad(silent: silent);
+    if (!silent) setState(() { _spots = []; _docs = []; _stays = []; _myVotes = {}; });
 
     if (!silent) {
       final cachedSpots = await SpotService.loadSpotsFromCache(tripId);
       final cachedDocs  = await DocService.loadDocumentsFromCache(tripId);
       final cachedStays = await AccommodationService.loadFromCache(tripId);
-      if (!mounted || gen != _loadGen) return;
+      if (isStale(gen)) return;
       if (cachedSpots != null) {
         final myId = supabase.auth.currentUser?.id;
         final cachedVotes = <String, VoteType>{};
@@ -172,7 +167,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
           _docs    = cachedDocs ?? [];
           _stays   = cachedStays ?? [];
           _myVotes = cachedVotes;
-          _loading = false;
+          loading  = false;
         });
       }
     }
@@ -187,7 +182,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
       final spots = await spotsFuture;
       final docs  = await docsFuture;
       final stays = await staysFuture; // null means fetch failed; keep cached _stays
-      if (!mounted || gen != _loadGen) return;
+      if (isStale(gen)) return;
 
       final myId = supabase.auth.currentUser?.id;
       final myVotes = <String, VoteType>{};
@@ -202,22 +197,14 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
         }
       }
 
-      setState(() {
+      commitLoad(gen, () {
         _spots = spots;
         _docs = docs;
         if (stays != null) _stays = stays;
         _myVotes = myVotes;
-        _loading = false;
-        _offline = false;
       });
     } catch (_) {
-      if (!mounted || gen != _loadGen) return;
-      if (silent) { setState(() { _offline = true; _loading = false; }); return; }
-      if (_spots.isEmpty) {
-        setState(() { _loading = false; _error = true; _offline = false; });
-      } else {
-        setState(() { _loading = false; _offline = true; });
-      }
+      failLoad(gen, silent: silent);
     }
   }
 
@@ -664,9 +651,9 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
         _subscribeRealtime(next);
       }
     });
-    if (_loading) return const WabwayLoadingScaffold();
+    if (loading) return const WabwayLoadingScaffold();
 
-    if (_error) {
+    if (error) {
       return Scaffold(
         backgroundColor: kColorCream,
         body: Center(
@@ -779,7 +766,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
             onExport: _exportSpots,
             onAdd: () => _addSpot(context),
           );
-    if (!_offline) return body;
+    if (!offline) return body;
     return Stack(
       children: [
         body,

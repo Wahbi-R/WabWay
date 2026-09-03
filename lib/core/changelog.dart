@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 344,
+    label: 'Fix: loading, error, and offline states are now consistent across all screens',
+    changes: [
+      'All screens now share a single loading pattern — fixing a bug on one screen automatically covers the same case everywhere else',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 343,
     label: 'Fix: sign-in, links, and trip-switch reliability',
     changes: [

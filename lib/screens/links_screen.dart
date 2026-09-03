@@ -10,6 +10,7 @@ import '../core/providers/profile_provider.dart';
 import '../core/providers/trip_provider.dart';
 import '../core/supabase/auto_links_service.dart';
 import '../core/supabase/client.dart';
+import '../core/async_screen_mixin.dart';
 import '../core/supabase/links_service.dart';
 import '../data/auto_link_data.dart';
 import '../data/links_data.dart';
@@ -28,13 +29,9 @@ class LinksScreen extends ConsumerStatefulWidget {
   ConsumerState<LinksScreen> createState() => _LinksScreenState();
 }
 
-class _LinksScreenState extends ConsumerState<LinksScreen> {
+class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin {
   List<TripLink> _links = [];
   Map<AutoLinkSource, List<AutoLink>> _autoLinks = {};
-  bool _loading = true;
-  bool _error   = false;
-  int  _loadGen = 0;
-  bool _offline = false;
   String? _activeTripId;
   RealtimeChannel? _channel;
   Timer? _debounce;
@@ -125,8 +122,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
   }
 
   Future<void> _load({bool silent = false}) async {
-    final gen = ++_loadGen;
-    if (!silent) setState(() { _loading = true; _error = false; });
+    final gen = beginLoad(silent: silent);
     try {
       final links = await LinksService.loadLinks(_activeTripId!);
       // Auto-links are best-effort — a failure here doesn't block manual links.
@@ -136,18 +132,12 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
       } catch (_) {
         autoLinks = {};
       }
-      if (!mounted || gen != _loadGen) return;
-      setState(() {
+      commitLoad(gen, () {
         _links     = links;
         _autoLinks = autoLinks;
-        _loading   = false;
-        _error     = false;
-        _offline   = false;
       });
     } catch (_) {
-      if (!mounted || gen != _loadGen) return;
-      if (silent) { setState(() { _offline = true; _loading = false; }); return; }
-      setState(() { _loading = false; _error = true; _offline = false; });
+      failLoad(gen, silent: silent);
     }
   }
 
@@ -308,9 +298,9 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
           const SizedBox(width: kSpace2),
         ],
       ),
-      body: _loading
+      body: loading
           ? const WabwayLoadingIndicator()
-          : _error
+          : error
               ? Center(
                   child: WabwayEmptyState(
                     icon: Icons.wifi_off_rounded,
@@ -465,7 +455,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
             )
           : null,
     );
-    if (!_offline) return scaffold;
+    if (!offline) return scaffold;
     return Stack(
       children: [
         scaffold,

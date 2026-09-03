@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/async_screen_mixin.dart';
 import '../../core/providers/profile_provider.dart';
-import '../../core/providers/trip_provider.dart';
 import '../../core/supabase/accommodation_service.dart';
 import '../../core/supabase/connection_service.dart';
 import '../../core/supabase/doc_service.dart';
@@ -50,18 +50,15 @@ class ConnectionsSection extends ConsumerStatefulWidget {
       _ConnectionsSectionState();
 }
 
-class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
+class _ConnectionsSectionState extends ConsumerState<ConnectionsSection>
+    with AsyncScreenMixin {
   List<TripConnection> _connections = [];
-  bool _loading = true;
 
   // Cache of entity names keyed by id — populated lazily as we resolve.
   final Map<String, String> _nameCache = {};
 
   // Cached stays list to avoid re-fetching on every chip tap.
   List<Accommodation>? _staysCache;
-
-  // Incremented on every _load() call; guards against stale async completions.
-  int _loadGen = 0;
 
   @override
   void initState() {
@@ -80,20 +77,15 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
   }
 
   Future<void> _load() async {
-    final gen = ++_loadGen;
-    setState(() => _loading = true);
+    final gen = beginLoad();
     try {
       final conns = await ConnectionService.fetchForEntity(widget.entityId);
-      if (!mounted || gen != _loadGen) return;
+      if (isStale(gen)) return;
       await _resolveNames(conns);
-      if (!mounted || gen != _loadGen) return;
-      setState(() {
-        _connections = conns;
-        _loading     = false;
-      });
+      if (isStale(gen)) return;
+      commitLoad(gen, () => _connections = conns);
     } catch (_) {
-      if (!mounted || gen != _loadGen) return;
-      setState(() => _loading = false);
+      failLoad(gen);
     }
   }
 
@@ -204,12 +196,11 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
 
   Future<void> _remove(TripConnection c) async {
     final idx = _connections.indexOf(c);
-    final gen = _loadGen;
     setState(() => _connections.remove(c));
     try {
       await ConnectionService.remove(c.id);
     } catch (_) {
-      if (!mounted || _loadGen != gen) return;
+      if (!mounted) return;
       setState(() => _connections.insert(idx.clamp(0, _connections.length), c));
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not remove connection. Please try again.')),
@@ -252,7 +243,7 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
+    if (loading) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: kSpace4),
         child: Center(
@@ -416,7 +407,7 @@ class _ConnectionPickerSheetState
     extends State<_ConnectionPickerSheet>
     with SingleTickerProviderStateMixin {
   late TabController _tabs;
-  bool _loading = true;
+  bool loading = true;
 
   List<Spot>          _spots  = [];
   List<TravelItem>    _travel = [];
@@ -459,11 +450,11 @@ class _ConnectionPickerSheetState
         _stays  = results[2] as List<Accommodation>;
         _docs   = results[3] as List<TripDocument>;
         _links  = results[4] as List<TripLink>;
-        _loading = false;
+        loading = false;
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _loading = false);
+      setState(() => loading = false);
     }
   }
 
@@ -548,7 +539,7 @@ class _ConnectionPickerSheetState
               ),
             ),
             Expanded(
-              child: _loading
+              child: loading
                   ? const Center(child: CircularProgressIndicator())
                   : TabBarView(
                       controller: _tabs,

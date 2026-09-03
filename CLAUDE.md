@@ -31,3 +31,40 @@ Before every commit+push to `wabway-server/`, update `wabway-server/FEATURES.md`
 ## TripState / ProfileState in routes
 
 These InheritedWidgets are not available inside a pushed `MaterialPageRoute`. Pass required data as explicit constructor parameters instead.
+
+## Async screen state — use AsyncScreenMixin
+
+Every `State` (or `ConsumerState`) that loads data asynchronously **must** use `AsyncScreenMixin` from `lib/core/async_screen_mixin.dart`. Never declare `_loadGen`, `_loading`, `_error`, or `_offline` fields directly on a screen — the mixin provides them.
+
+```dart
+import '../core/async_screen_mixin.dart';
+
+class _MyScreenState extends ConsumerState<MyScreen> with AsyncScreenMixin {
+  List<Item> _items = [];
+
+  Future<void> _load({bool silent = false}) async {
+    final gen = beginLoad(silent: silent);
+    try {
+      final items = await ItemService.load(widget.tripId);
+      commitLoad(gen, () => _items = items);
+    } catch (_) {
+      failLoad(gen, silent: silent);
+    }
+  }
+}
+```
+
+**Cache-first pattern** (show cached data while network refreshes):
+```dart
+final gen = beginLoad(silent: silent);
+try {
+  final cached = await Cache.read(...);
+  if (!isStale(gen)) setState(() { _items = cached; _loading = false; });
+  final fresh = await Service.load(...);
+  commitLoad(gen, () => _items = fresh);
+} catch (_) {
+  failLoad(gen, silent: silent);
+}
+```
+
+**Why:** Copy-pasting `_loadGen` + mounted checks across every screen was the source of 20+ bugs (stale loads overwriting fresh data, spinners stuck, error banners not clearing after success). The mixin makes the correct pattern the only pattern.

@@ -9,6 +9,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/async_screen_mixin.dart';
 import '../core/providers/trip_provider.dart';
 import '../core/supabase/accommodation_service.dart';
 import '../core/supabase/client.dart';
@@ -31,17 +32,14 @@ class MapScreen extends ConsumerStatefulWidget {
   ConsumerState<MapScreen> createState() => _MapScreenState();
 }
 
-class _MapScreenState extends ConsumerState<MapScreen> {
+class _MapScreenState extends ConsumerState<MapScreen> with AsyncScreenMixin {
   List<Spot> _spots = [];
   List<Accommodation> _accommodations = [];
-  bool _loading = true;
-  bool _error = false;
   bool _showMap = true;
   final Set<SpotCategory> _hiddenCategories = {};
   String? _activeTripId;
   RealtimeChannel? _realtimeChannel;
   Timer? _debounce;
-  int _loadGen = 0;
 
   final _mapController = MapController();
   bool _needsFit = true;   // fit-to-bounds on first successful load only
@@ -114,24 +112,19 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   }
 
   Future<void> _load(String tripId, {bool silent = false}) async {
-    final gen = ++_loadGen;
-    if (!silent) setState(() { _loading = true; _error = false; });
+    final gen = beginLoad(silent: silent);
     try {
       final results = await Future.wait([
         SpotService.loadSpots(tripId),
         AccommodationService.loadAll(tripId).catchError((_) => <Accommodation>[]),
       ]);
-      if (!mounted || gen != _loadGen) return;
-      setState(() {
+      commitLoad(gen, () {
         _spots = results[0] as List<Spot>;
         _accommodations = results[1] as List<Accommodation>;
-        _loading = false;
-        _error = false;
       });
       _fitIfNeeded();
     } catch (_) {
-      if (!mounted || gen != _loadGen) return;
-      if (!silent) setState(() { _loading = false; _error = true; });
+      failLoad(gen, silent: silent);
     }
   }
 
@@ -402,9 +395,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           ),
         ],
       ),
-      body: _loading
+      body: loading
           ? const Center(child: CircularProgressIndicator())
-          : _error
+          : error
               ? Center(
                   child: WabwayEmptyState(
                     icon: Icons.wifi_off_rounded,

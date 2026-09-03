@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../../core/image_cache_manager.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/async_screen_mixin.dart';
 import '../../core/providers/trip_provider.dart';
 import '../../core/supabase/client.dart';
 import '../../core/supabase/shopping_service.dart';
@@ -48,13 +49,11 @@ class ShoppingScreen extends ConsumerStatefulWidget {
   ConsumerState<ShoppingScreen> createState() => _ShoppingScreenState();
 }
 
-class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
+class _ShoppingScreenState extends ConsumerState<ShoppingScreen> with AsyncScreenMixin {
   String _tripId = '';
   List<ShoppingItem> _items   = [];
-  bool               _loading = true;
   RealtimeChannel?   _channel;
   Timer?             _debounce;
-  int                _loadGen = 0;
 
   String? get _userId => supabase.auth.currentUser?.id;
 
@@ -74,22 +73,20 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
 
   Future<void> _load({bool silent = false}) async {
     if (_tripId.isEmpty || !mounted) return;
-    final gen = ++_loadGen;
-    if (!silent) setState(() { _loading = true; _items = []; });
+    final gen = beginLoad(silent: silent);
+    if (!silent) setState(() { _items = []; });
 
     if (!silent) {
       final cached = await ShoppingService.loadFromCache(_tripId);
-      if (!mounted || gen != _loadGen) return;
-      if (cached != null) setState(() { _items = cached; _loading = false; });
+      if (isStale(gen)) return;
+      if (cached != null) setState(() { _items = cached; loading = false; });
     }
 
     try {
       final items = await ShoppingService.loadAll(_tripId);
-      if (!mounted || gen != _loadGen) return;
-      setState(() { _items = items; _loading = false; });
+      commitLoad(gen, () => _items = items);
     } catch (_) {
-      if (!mounted || gen != _loadGen) return;
-      setState(() => _loading = false);
+      failLoad(gen, silent: silent);
     }
   }
 
@@ -281,7 +278,7 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
             ),
         ],
       ),
-      body: _loading
+      body: loading
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [

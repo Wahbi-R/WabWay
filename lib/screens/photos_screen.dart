@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/async_screen_mixin.dart';
 import '../core/providers/profile_provider.dart';
 import '../core/providers/trip_provider.dart';
 import '../core/supabase/client.dart';
@@ -22,12 +23,8 @@ class PhotosScreen extends ConsumerStatefulWidget {
   ConsumerState<PhotosScreen> createState() => _PhotosScreenState();
 }
 
-class _PhotosScreenState extends ConsumerState<PhotosScreen> {
+class _PhotosScreenState extends ConsumerState<PhotosScreen> with AsyncScreenMixin {
   List<TripPhotoAlbum> _albums = [];
-  bool _loading = true;
-  bool _error   = false;
-  bool _offline  = false;
-  int  _loadGen  = 0;
   String? _activeTripId;
   RealtimeChannel? _channel;
   Timer? _debounce;
@@ -73,21 +70,12 @@ class _PhotosScreenState extends ConsumerState<PhotosScreen> {
   }
 
   Future<void> _load({bool silent = false}) async {
-    final gen = ++_loadGen;
-    if (!silent) setState(() { _loading = true; _error = false; });
+    final gen = beginLoad(silent: silent);
     try {
       final albums = await PhotoAlbumService.loadAlbums(_activeTripId!);
-      if (!mounted || gen != _loadGen) return;
-      setState(() {
-        _albums  = albums;
-        _loading = false;
-        _error   = false;
-        _offline  = false;
-      });
+      commitLoad(gen, () => _albums = albums);
     } catch (_) {
-      if (!mounted || gen != _loadGen) return;
-      if (silent) { setState(() { _offline = true; _loading = false; }); return; }
-      setState(() { _loading = false; _error = true; _offline = false; });
+      failLoad(gen, silent: silent);
     }
   }
 
@@ -163,9 +151,9 @@ class _PhotosScreenState extends ConsumerState<PhotosScreen> {
           const SizedBox(width: kSpace2),
         ],
       ),
-      body: _loading
+      body: loading
           ? const WabwayLoadingIndicator()
-          : _error
+          : error
               ? Center(
                   child: WabwayEmptyState(
                     icon: Icons.wifi_off_rounded,
@@ -230,7 +218,7 @@ class _PhotosScreenState extends ConsumerState<PhotosScreen> {
           : null,
     );
 
-    if (!_offline) return scaffold;
+    if (!offline) return scaffold;
     return Stack(
       children: [
         scaffold,

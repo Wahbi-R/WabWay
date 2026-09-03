@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show RealtimeChannel;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/async_screen_mixin.dart';
 import '../core/providers/profile_provider.dart';
 import '../core/providers/trip_provider.dart';
 import '../core/supabase/packing_service.dart';
@@ -21,12 +22,10 @@ class PackingScreen extends ConsumerStatefulWidget {
   ConsumerState<PackingScreen> createState() => _PackingScreenState();
 }
 
-class _PackingScreenState extends ConsumerState<PackingScreen> {
+class _PackingScreenState extends ConsumerState<PackingScreen> with AsyncScreenMixin {
   List<PackingItem> _items = [];
-  bool _loading = true;
   RealtimeChannel? _channel;
   Timer? _debounce;
-  int _loadGen = 0;
 
   String _tripId = '';
   String _myId   = '';
@@ -61,22 +60,20 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
 
   Future<void> _load({bool silent = false}) async {
     if (_tripId.isEmpty) return;
-    final gen = ++_loadGen;
-    if (!silent && mounted) setState(() { _loading = true; _items = []; });
+    final gen = beginLoad(silent: silent);
+    if (!silent) setState(() => _items = []);
 
     if (!silent) {
       final cached = await PackingService.loadFromCache(_tripId);
-      if (!mounted || gen != _loadGen) return;
-      if (cached != null) setState(() { _items = cached; _loading = false; });
+      if (isStale(gen)) return;
+      if (cached != null) setState(() { _items = cached; loading = false; });
     }
 
     try {
       final items = await PackingService.fetchAll(_tripId);
-      if (!mounted || gen != _loadGen) return;
-      setState(() { _items = items; _loading = false; });
+      commitLoad(gen, () => _items = items);
     } catch (_) {
-      if (!mounted || gen != _loadGen) return;
-      setState(() => _loading = false);
+      failLoad(gen, silent: silent);
     }
   }
 
@@ -437,7 +434,7 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
         _subscribe();
       }
     });
-    if (_loading) return const WabwayLoadingScaffold();
+    if (loading) return const WabwayLoadingScaffold();
 
     final myId     = _myId;
     final members  = ref.watch(tripMembersProvider);

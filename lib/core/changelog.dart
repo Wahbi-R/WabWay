@@ -13,7 +13,7 @@ const _kChangelog = <_Release>[
     version: '1.1.0',
     build: 320,
     label: 'Fix: "Add all days" button now visible in Plan toolbar',
-    bullets: [
+    changes: [
       '"Add all days" icon now appears in the Plan toolbar when your trip has a date range set — previously it was hidden by overflow',
     ],
   ),

@@ -2,6 +2,8 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **340. Fix code review: auto_links null name crash; sync_queue concurrent drain race** — auto_links_service now uses null-safe casts for name/title columns so a single row with a null name can no longer crash the entire load() and silently remove all auto-links from the screen; sync_queue drain() now sets a _draining flag in a try/finally so concurrent drain calls (connectivity-restored + retry timer) can no longer process the same queue simultaneously and create duplicate receipts (2026-09-03, build 340).
+
 - [x] **339. Fix code review: _showAdvanced gate erases URLs on save; SyncQueue catch spinner-stuck; add_spot mounted check** — _submit in add_item_sheet no longer gates mapsUrl/confirmationUrl on _showAdvanced so collapsing the advanced section and saving can no longer null out previously-saved URLs; SyncQueue.enqueueReceipt in add_receipt_sheet is now wrapped in its own try/catch so a local storage error doesn't leave the Save button frozen; add_spot_sheet now checks mounted before calling onSubmit after the final async photo-URL fetch (2026-09-03, build 339).
 
 - [x] **338. Fix code review: createItem drops linkedSpotId; time substring RangeError** — PlanService.createItem now includes linked_spot_id in the Supabase insert so "Add to Plan" from a spot detail actually saves the spot link (previously the parameter was accepted but silently omitted from the insert map, so spot-linked plan items always loaded with linkedSpotId=null); time/endTime/boardingTime substring(0,5) calls in plan_service and travel_service now guard against strings shorter than 5 chars to prevent RangeError on malformed rows (2026-09-03, build 338).

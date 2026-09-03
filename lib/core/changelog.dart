@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 340,
+    label: 'Fix: offline receipt sync and auto-link reliability',
+    changes: [
+      'A single item with a missing name can no longer cause all auto-detected links to disappear from the links screen',
+      'Offline receipts queued while disconnected can no longer be uploaded twice when connectivity returns',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 339,
     label: 'Fix: plan item URLs preserved when collapsing advanced section',
     changes: [

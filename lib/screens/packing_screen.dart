@@ -149,7 +149,8 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
     for (final title in titles) {
       await PackingService.addItem(tripId, title, userId);
     }
-    if (mounted && titles.length > 1) {
+    if (!mounted) return;
+    if (titles.length > 1) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Added ${titles.length} items',
             style: kStyleBody.copyWith(color: Colors.white)),

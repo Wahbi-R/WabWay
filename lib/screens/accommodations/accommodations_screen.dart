@@ -103,7 +103,7 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen> {
     try {
       final items = await AccommodationService.loadAll(tripId);
       if (!mounted || gen != _loadGen) return;
-      setState(() { _items = items; _loading = false; _offline = false; });
+      setState(() { _items = items; _loading = false; _offline = false; _error = false; });
     } catch (_) {
       if (!mounted || gen != _loadGen) return;
       if (silent) { setState(() { _offline = true; _loading = false; }); return; }

@@ -384,6 +384,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
         _lastTripId           = tripId;
         _loading = false;
         _offline = false;
+        _error   = false;
         _pendingSyncCount = pending;
       });
     } catch (_) {

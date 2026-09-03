@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 335,
+    label: 'Fix: error screen now clears when data reloads successfully',
+    changes: [
+      'Docs, money, and accommodations screens now properly dismiss the error message once a background refresh succeeds, instead of keeping the error visible with fresh data behind it',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 334,
     label: 'Fix: error screen no longer sticks after a successful refresh',
     changes: [

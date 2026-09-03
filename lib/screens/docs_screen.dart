@@ -105,7 +105,7 @@ class _DocsScreenState extends ConsumerState<DocsScreen> {
     try {
       final docs = await DocService.loadDocuments(tripId);
       if (!mounted || gen != _loadGen) return;
-      setState(() { _docs = docs; _loading = false; _offline = false; });
+      setState(() { _docs = docs; _loading = false; _offline = false; _error = false; });
     } catch (_) {
       if (!mounted || gen != _loadGen) return;
       if (silent) { setState(() { _offline = true; _loading = false; }); return; }

@@ -159,7 +159,7 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
       final allStays = _staysCache
           ?? await AccommodationService.loadFromCache(tripId)
           ?? await AccommodationService.loadAll(tripId).catchError((_) => <Accommodation>[]);
-      _staysCache = allStays;
+      if (allStays.isNotEmpty) _staysCache = allStays;
       final stay = allStays.where((s) => s.id == r.peerId).firstOrNull;
       if (!mounted || stay == null) return;
       _showStayDetailSheet(context, stay);

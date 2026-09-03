@@ -226,7 +226,7 @@ class _AddItemContentState extends State<_AddItemContent> {
         _mapsCtrl.text = spot.mapsUrl!;
         _showAdvanced  = true;
       } else {
-        _mapsCtrl.text = '';
+        _showAdvanced = false;
       }
       _linkedSpotId  = spot.id;
       _linkedStayId  = null;
@@ -246,6 +246,8 @@ class _AddItemContentState extends State<_AddItemContent> {
       _linkedStayId      = stay.id;
       _linkedSpotId      = null;
       _type              = ItineraryItemType.stay;
+      _mapsCtrl.text     = '';
+      _showAdvanced      = false;
     });
   }
 

@@ -108,7 +108,7 @@ class _DocsScreenState extends ConsumerState<DocsScreen> {
       setState(() { _docs = docs; _loading = false; _offline = false; });
     } catch (_) {
       if (!mounted || gen != _loadGen) return;
-      if (silent) { setState(() => _offline = true); return; }
+      if (silent) { setState(() { _offline = true; _loading = false; }); return; }
       if (_docs.isEmpty) {
         setState(() { _loading = false; _error = true; });
       } else {

@@ -11,6 +11,18 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 323,
+    label: 'Fix: loading spinners and data reliability across all screens',
+    changes: [
+      'Fixed a bug where the loading spinner could get permanently stuck on the Docs, Plan, Photos, Links, and Accommodations screens',
+      'Stays no longer disappear from the Spots and Plan screens when a network hiccup affects only the stays fetch',
+      'Picking a stay after previously picking a spot no longer carries over the spot\'s Maps link',
+      'Switching between spots in the plan item sheet now correctly collapses the Maps section when the new spot has no link',
+      'The offline banner now clears correctly after a member reload succeeds',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 322,
     label: 'Fix: stay search, chip count, spinner, and navigation reliability',
     changes: [

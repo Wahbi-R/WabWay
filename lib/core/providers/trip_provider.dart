@@ -156,7 +156,7 @@ class TripNotifier extends StateNotifier<TripData> {
     try {
       final members =
           await TripService.loadTripMembers(state.trips[state.selectedIndex].id);
-      state = state.copyWith(members: members);
+      state = state.copyWith(members: members, offline: false);
     } catch (_) {}
   }
 

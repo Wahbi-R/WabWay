@@ -183,10 +183,10 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
       // Accommodations fetched concurrently but caught separately so a transient
       // failure doesn't prevent spots from loading.
       final staysFuture = AccommodationService.loadAll(tripId)
-          .catchError((_) => <Accommodation>[]);
+          .then<List<Accommodation>?>((v) => v, onError: (_) => null);
       final spots = await spotsFuture;
       final docs  = await docsFuture;
-      final stays = await staysFuture;
+      final stays = await staysFuture; // null means fetch failed; keep cached _stays
       if (!mounted || gen != _loadGen) return;
 
       final myId = supabase.auth.currentUser?.id;
@@ -205,7 +205,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
       setState(() {
         _spots = spots;
         _docs = docs;
-        _stays = stays;
+        if (stays != null) _stays = stays;
         _myVotes = myVotes;
         _loading = false;
         _offline = false;

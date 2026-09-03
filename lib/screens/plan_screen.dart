@@ -229,7 +229,8 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
       final daysFuture  = PlanService.loadAll(_activeTripId);
       final spotsFuture = SpotService.loadSpots(_activeTripId);
       final docsFuture  = DocService.loadDocuments(_activeTripId);
-      final staysFuture = AccommodationService.loadAll(_activeTripId).catchError((_) => <Accommodation>[]);
+      final staysFuture = AccommodationService.loadAll(_activeTripId)
+          .then<List<Accommodation>?>((v) => v, onError: (_) => null);
       final days  = await daysFuture;
       final spots = await spotsFuture;
       final docs  = await docsFuture;
@@ -242,13 +243,13 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
         });
         _spots..clear()..addAll(spots);
         _docs..clear()..addAll(docs);
-        _stayItems..clear()..addAll(stays);
-        if (!silent) _loading = false;
+        if (stays != null) { _stayItems..clear()..addAll(stays); }
+        _loading = false;
         _offline = false;
       });
     } catch (e) {
       if (!mounted || gen != _loadGen) return;
-      if (silent) { setState(() => _offline = true); return; }
+      if (silent) { setState(() { _offline = true; _loading = false; }); return; }
       if (_days.isEmpty) {
         setState(() { _loading = false; _error = e.toString(); });
       } else {

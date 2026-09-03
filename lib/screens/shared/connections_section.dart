@@ -187,12 +187,13 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
   }
 
   Future<void> _remove(TripConnection c) async {
+    final idx = _connections.indexOf(c);
     setState(() => _connections.remove(c));
     try {
       await ConnectionService.remove(c.id);
     } catch (_) {
       if (!mounted) return;
-      setState(() => _connections.add(c));
+      setState(() => _connections.insert(idx.clamp(0, _connections.length), c));
     }
   }
 

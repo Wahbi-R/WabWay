@@ -2,6 +2,8 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **330. Fix code review: TripConnection dedup, _remove rollback order, plan _offline** — TripConnection now overrides == and hashCode by id so the Set spread in fetchForEntity correctly deduplicates connections that appear in both the entity_a and entity_b queries; _remove rollback re-inserts at the original index instead of appending to end so chip order is preserved after a failed network delete; _addAllTripDays success path now resets _offline=false consistent with all other success paths (2026-09-03, build 330).
+
 - [x] **329. Fix code review: _linkedStayId not restored in plan item edit mode** — initState in add_item_sheet was restoring _linkedSpotId and _linkedDocIds from the existing item but missing _linkedStayId; editing any plan item that had a stay link (e.g., hotel check-in) and saving would silently set linkedStayId=null in Supabase, permanently deleting the stay association (2026-09-03, build 329).
 
 - [x] **328. Fix code review: connection remove rollback, add mounted check, _staysCache perf fix** — _remove now wraps the server call in try/catch and re-adds the connection on failure so an optimistic UI removal that fails network is automatically reversed; _addConnection now checks !mounted after the async ConnectionService.add call so it can't call setState on a disposed widget when the user navigates away mid-add; removed unnecessary _staysCache=null reset from _load() since the "re-fetch if needed ID missing" check in _resolveNames already handles freshness, eliminating the redundant loadAll on every chip tap when names are already resolved (2026-09-03, build 328).

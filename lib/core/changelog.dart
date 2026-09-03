@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 330,
+    label: 'Fix: connection chips and plan screen minor reliability fixes',
+    changes: [
+      'If removing a connection fails due to a network error, the chip now reappears in its original position instead of jumping to the end of the list',
+      'Adding all trip days no longer leaves the offline banner visible after the operation succeeds',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 329,
     label: 'Fix: editing a plan item no longer removes its accommodation link',
     changes: [

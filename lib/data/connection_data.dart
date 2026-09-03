@@ -79,6 +79,11 @@ class TripConnection {
       entityAId == myId ? entityBType : entityAType;
   String peerId(String myId) =>
       entityAId == myId ? entityBId : entityAId;
+
+  @override
+  bool operator ==(Object other) => other is TripConnection && other.id == id;
+  @override
+  int get hashCode => id.hashCode;
 }
 
 // Resolved connection — the peer entity's name is looked up at display time.

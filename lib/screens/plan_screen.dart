@@ -711,6 +711,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
           return cmp != 0 ? cmp : a.dayNumber.compareTo(b.dayNumber);
         });
         _loading = false;
+        _offline = false;
       });
       unawaited(PlanService.writeDaysToCache(_activeTripId, _days));
     } catch (e) {

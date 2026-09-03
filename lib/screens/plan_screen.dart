@@ -1107,11 +1107,11 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
             ],
           ],
           if (() { final t = TripState.maybeOf(context)?.trip; return t?.startDate != null && t?.endDate != null; }())
-            TextButton.icon(
+            IconButton(
+              icon: const Icon(Icons.date_range_rounded, size: 20),
+              tooltip: 'Add all trip days',
+              color: kColorInkSoft,
               onPressed: () => _addAllTripDays(context),
-              icon: const Icon(Icons.date_range_rounded, size: 18),
-              label: Text('All days', style: kStyleCaptionMedium),
-              style: TextButton.styleFrom(foregroundColor: kColorInkSoft),
             ),
           TextButton.icon(
             onPressed: () => _addDay(context),

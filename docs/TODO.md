@@ -2,6 +2,7 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **320. Fix: "Add all days" button hidden by AppBar overflow** — converted from TextButton.icon (wide) to IconButton so it no longer gets clipped when the Plan toolbar is full (2026-09-02, build 320).
 - [x] **319. Fix Copilot review: cache-first stay navigation in connections panel** — tapping a stay chip now reads from AccommodationService cache first and only falls back to a network fetch when the stay isn't found in cache, making navigation instant when cached (2026-09-02, build 319).
 - [x] **318. Fix Copilot review: spot-banner swap tab and switch break statements** — spot banner's swap icon now sets _source to _FillSource.spot so the picker reopens on the Spots tab (matching stay banner behaviour); added explicit break statements to every case in _resolveNames switch to satisfy older-style Dart linters (2026-09-02, build 318).
 - [x] **317. Fix Copilot review: clear pending-sync badge on trip switch in money screen** — _pendingSyncCount was not reset on non-silent load start; switching trips could show the previous trip's badge count until the network load completed (2026-09-02, build 317).

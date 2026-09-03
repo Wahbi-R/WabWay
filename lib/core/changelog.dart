@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 320,
+    label: 'Fix: "Add all days" button now visible in Plan toolbar',
+    bullets: [
+      '"Add all days" icon now appears in the Plan toolbar when your trip has a date range set — previously it was hidden by overflow',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 319,
     label: 'Fix: stay details open instantly from cache',
     changes: [

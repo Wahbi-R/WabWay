@@ -246,6 +246,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
         if (stays != null) { _stayItems..clear()..addAll(stays); }
         _loading = false;
         _offline = false;
+        _error   = null;
       });
     } catch (e) {
       if (!mounted || gen != _loadGen) return;

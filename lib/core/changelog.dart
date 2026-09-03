@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 334,
+    label: 'Fix: error screen no longer sticks after a successful refresh',
+    changes: [
+      'If the plan or travel screen failed to load once and then refreshed successfully in the background, the error message no longer stays on screen with the new data hidden behind it',
+      'Tapping a vote button no longer briefly wipes the entire spots list if the vote fails to save',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 333,
     label: 'Fix: connection removal failure now shows an error message',
     changes: [

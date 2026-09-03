@@ -332,8 +332,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
         await SpotService.upsertVote(spotId: spotId, userId: myId, vote: type);
       }
     } catch (_) {
-      // Revert on failure
-      await _loadSpots();
+      await _loadSpots(silent: true);
     }
   }
 

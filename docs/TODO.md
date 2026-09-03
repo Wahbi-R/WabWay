@@ -2,6 +2,8 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **334. Fix code review: _error not cleared on success in plan/travel screens; _onVote silent reload** — plan_screen and travel_screen success setState now clears _error so a background refresh after a prior load failure no longer leaves the error scaffold visible with fresh data behind it; _onVote catch now calls _loadSpots(silent:true) instead of the default non-silent form so a failed vote no longer wipes the entire list and shows a full spinner to revert an optimistic UI change (2026-09-03, build 334).
+
 - [x] **333. Fix code review: silent connection remove failure in ConnectionsSection** — catch block in _remove now shows a snackbar when the server call fails so users understand why the chip reappeared instead of silently reverting with no feedback (2026-09-03, build 333).
 
 - [x] **332. Fix code review: _loadGen race and phantom chip rollback in ConnectionsSection** — added _loadGen generation counter to _load() so stale in-flight completions (from didUpdateWidget entity switch or concurrent calls) can no longer overwrite _connections with data from the old entity; _remove rollback now captures the gen before the network await and skips re-inserting the chip if the entity changed while the remove was in-flight, preventing a chip from the old entity appearing in the new entity's connection list (2026-09-03, build 332).

@@ -76,7 +76,7 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
       setState(() { _items = items; _loading = false; });
     } catch (_) {
       if (!mounted || gen != _loadGen) return;
-      if (!silent) setState(() => _loading = false);
+      setState(() => _loading = false);
     }
   }
 

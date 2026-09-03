@@ -89,7 +89,6 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
       setState(() { _items = items; _loading = false; });
     } catch (_) {
       if (!mounted || gen != _loadGen) return;
-      if (silent) return;
       setState(() => _loading = false);
     }
   }

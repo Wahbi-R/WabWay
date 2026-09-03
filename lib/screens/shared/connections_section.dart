@@ -156,9 +156,10 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
   Future<void> _navigate(BuildContext context, ResolvedConnection r) async {
     final tripId = widget.tripId;
     if (r.peerType == EntityType.stay) {
-      final allStays = _staysCache
-          ?? await AccommodationService.loadFromCache(tripId)
-          ?? await AccommodationService.loadAll(tripId).catchError((_) => <Accommodation>[]);
+      final cached = _staysCache ?? await AccommodationService.loadFromCache(tripId);
+      final allStays = (cached != null && cached.isNotEmpty)
+          ? cached
+          : await AccommodationService.loadAll(tripId).catchError((_) => <Accommodation>[]);
       if (allStays.isNotEmpty) _staysCache = allStays;
       final stay = allStays.where((s) => s.id == r.peerId).firstOrNull;
       if (!mounted || stay == null) return;
@@ -407,22 +408,27 @@ class _ConnectionPickerSheetState
 
   Future<void> _loadAll() async {
     final tid = widget.tripId;
-    final results = await Future.wait([
-      SpotService.loadSpots(tid),
-      TravelService.loadItems(tid),
-      AccommodationService.loadAll(tid).catchError((_) => <Accommodation>[]),
-      DocService.loadDocuments(tid),
-      LinksService.loadLinks(tid),
-    ]);
-    if (!mounted) return;
-    setState(() {
-      _spots  = results[0] as List<Spot>;
-      _travel = results[1] as List<TravelItem>;
-      _stays  = results[2] as List<Accommodation>;
-      _docs   = results[3] as List<TripDocument>;
-      _links  = results[4] as List<TripLink>;
-      _loading = false;
-    });
+    try {
+      final results = await Future.wait([
+        SpotService.loadSpots(tid),
+        TravelService.loadItems(tid),
+        AccommodationService.loadAll(tid).catchError((_) => <Accommodation>[]),
+        DocService.loadDocuments(tid),
+        LinksService.loadLinks(tid),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _spots  = results[0] as List<Spot>;
+        _travel = results[1] as List<TravelItem>;
+        _stays  = results[2] as List<Accommodation>;
+        _docs   = results[3] as List<TripDocument>;
+        _links  = results[4] as List<TripLink>;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
   }
 
   List<({String id, String name})> _itemsFor(EntityType t) {

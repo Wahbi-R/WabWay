@@ -11,6 +11,18 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 324,
+    label: 'Fix: reliability improvements across plan, packing, shopping, and connections',
+    changes: [
+      'Picking a spot with no Maps link no longer secretly carries over the previous spot\'s Maps URL when you save the plan item',
+      'Stay connection chips now reliably navigate even for trips that had no stays at all when the app last synced',
+      'Opening the "connect to…" sheet no longer freezes on a permanent spinner when a network call fails',
+      'The Packing and Shopping screens no longer get stuck on a loading spinner after a failed background sync',
+      'Adding all trip days at once no longer causes the spinner to briefly disappear mid-operation',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 323,
     label: 'Fix: loading spinners and data reliability across all screens',
     changes: [

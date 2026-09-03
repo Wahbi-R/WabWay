@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 333,
+    label: 'Fix: connection removal failure now shows an error message',
+    changes: [
+      'If removing a connection fails due to a network error, you now see a message explaining why the chip reappeared instead of it silently coming back',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 332,
     label: 'Fix: connection chips always show the right entity',
     changes: [

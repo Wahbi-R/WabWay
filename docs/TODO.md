@@ -2,6 +2,8 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **333. Fix code review: silent connection remove failure in ConnectionsSection** — catch block in _remove now shows a snackbar when the server call fails so users understand why the chip reappeared instead of silently reverting with no feedback (2026-09-03, build 333).
+
 - [x] **332. Fix code review: _loadGen race and phantom chip rollback in ConnectionsSection** — added _loadGen generation counter to _load() so stale in-flight completions (from didUpdateWidget entity switch or concurrent calls) can no longer overwrite _connections with data from the old entity; _remove rollback now captures the gen before the network await and skips re-inserting the chip if the entity changed while the remove was in-flight, preventing a chip from the old entity appearing in the new entity's connection list (2026-09-03, build 332).
 
 - [x] **331. Fix code review: planItem chip label inconsistency and didUpdateWidget for ConnectionsSection** — _resolveNames now formats planItem names as "Title (Day N)" matching the picker format so chips don't change label between add and reload; added didUpdateWidget that clears _nameCache/_staysCache and reloads when entityId or tripId changes so the widget doesn't show stale connections when its parent updates the entity (2026-09-03, build 331).

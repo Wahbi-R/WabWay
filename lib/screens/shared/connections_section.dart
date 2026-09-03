@@ -211,6 +211,9 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
     } catch (_) {
       if (!mounted || _loadGen != gen) return;
       setState(() => _connections.insert(idx.clamp(0, _connections.length), c));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not remove connection. Please try again.')),
+      );
     }
   }
 

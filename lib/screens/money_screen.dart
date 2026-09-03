@@ -390,7 +390,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
       if (!mounted || gen != _loadGen) return;
       if (silent) { setState(() { _offline = true; _loading = false; }); return; }
       if (_receipts.isEmpty) {
-        setState(() { _loading = false; _error = true; });
+        setState(() { _loading = false; _error = true; _offline = false; });
       } else {
         setState(() { _loading = false; _offline = true; });
       }

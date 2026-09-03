@@ -122,11 +122,12 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
           }
           break;
         case EntityType.stay:
-          final stays = _staysCache ??
-              await AccommodationService.loadAll(tripId)
-                  .catchError((_) => <Accommodation>[]);
-          if (stays.isNotEmpty) _staysCache = stays;
-          for (final s in stays) {
+          if (_staysCache == null) {
+            final result = await AccommodationService.loadAll(tripId)
+                .then<List<Accommodation>?>((v) => v, onError: (_) => null);
+            if (result != null) _staysCache = result;
+          }
+          for (final s in _staysCache ?? []) {
             if (ids.contains(s.id)) _nameCache[s.id] = s.name;
           }
           break;
@@ -160,11 +161,17 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
   Future<void> _navigate(BuildContext context, ResolvedConnection r) async {
     final tripId = widget.tripId;
     if (r.peerType == EntityType.stay) {
-      final cached = _staysCache ?? await AccommodationService.loadFromCache(tripId);
-      final allStays = (cached != null && cached.isNotEmpty)
-          ? cached
-          : await AccommodationService.loadAll(tripId).catchError((_) => <Accommodation>[]);
-      if (allStays.isNotEmpty) _staysCache = allStays;
+      if (_staysCache == null) {
+        final fromDisk = await AccommodationService.loadFromCache(tripId);
+        if (fromDisk != null && fromDisk.isNotEmpty) {
+          _staysCache = fromDisk;
+        } else {
+          final fromNet = await AccommodationService.loadAll(tripId)
+              .then<List<Accommodation>?>((v) => v, onError: (_) => null);
+          if (fromNet != null) _staysCache = fromNet;
+        }
+      }
+      final allStays = _staysCache ?? [];
       final stay = allStays.where((s) => s.id == r.peerId).firstOrNull;
       if (!mounted || stay == null) return;
       _showStayDetailSheet(context, stay);

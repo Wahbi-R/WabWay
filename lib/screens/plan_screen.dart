@@ -251,7 +251,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
       if (!mounted || gen != _loadGen) return;
       if (silent) { setState(() { _offline = true; _loading = false; }); return; }
       if (_days.isEmpty) {
-        setState(() { _loading = false; _error = e.toString(); });
+        setState(() { _loading = false; _error = e.toString(); _offline = false; });
       } else {
         setState(() { _loading = false; _offline = true; });
       }

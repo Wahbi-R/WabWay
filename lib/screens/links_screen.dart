@@ -147,7 +147,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
     } catch (_) {
       if (!mounted || gen != _loadGen) return;
       if (silent) { setState(() { _offline = true; _loading = false; }); return; }
-      setState(() { _loading = false; _error = true; });
+      setState(() { _loading = false; _error = true; _offline = false; });
     }
   }
 

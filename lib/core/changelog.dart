@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 326,
+    label: 'Fix: offline banner and error state no longer show at the same time',
+    changes: [
+      'After a brief network drop and recovery, the offline banner now correctly disappears when you tap Retry — it no longer stays on screen alongside the error message',
+      'Trips with no accommodations no longer trigger a network fetch every time you tap a connection chip',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 325,
     label: 'Fix: plan items, connections, links, and photos reliability',
     changes: [

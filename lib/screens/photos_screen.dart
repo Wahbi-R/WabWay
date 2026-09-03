@@ -27,6 +27,7 @@ class _PhotosScreenState extends ConsumerState<PhotosScreen> {
   bool _loading = true;
   bool _error   = false;
   bool _offline  = false;
+  int  _loadGen  = 0;
   String? _activeTripId;
   RealtimeChannel? _channel;
   Timer? _debounce;
@@ -72,19 +73,19 @@ class _PhotosScreenState extends ConsumerState<PhotosScreen> {
   }
 
   Future<void> _load({bool silent = false}) async {
+    final gen = ++_loadGen;
     if (!silent) setState(() { _loading = true; _error = false; });
     try {
       final albums = await PhotoAlbumService.loadAlbums(_activeTripId!);
-      if (mounted) {
-        setState(() {
-          _albums  = albums;
-          _loading = false;
-          _error   = false;
-          _offline  = false;
-        });
-      }
+      if (!mounted || gen != _loadGen) return;
+      setState(() {
+        _albums  = albums;
+        _loading = false;
+        _error   = false;
+        _offline  = false;
+      });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || gen != _loadGen) return;
       if (silent) { setState(() { _offline = true; _loading = false; }); return; }
       setState(() { _loading = false; _error = true; });
     }

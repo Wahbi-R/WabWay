@@ -11,6 +11,20 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 325,
+    label: 'Fix: plan items, connections, links, and photos reliability',
+    changes: [
+      'Switching between spots in the plan item sheet now correctly clears any stale Maps or Confirmation links from the previous spot',
+      'Linking a stay to a plan item now also clears any stale Confirmation link left from a previous entry',
+      'The Connected section on detail screens no longer freezes on a spinner when the network is unavailable',
+      'Links and Photos screens now show the correct trip\'s data immediately after switching trips',
+      'Connection name chips no longer go blank for large itineraries when a single network request fails',
+      'The link-to item picker now loads whichever categories succeed even if one category\'s request fails',
+      'The Plan screen loading spinner no longer gets permanently stuck after a background sync completes',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 324,
     label: 'Fix: reliability improvements across plan, packing, shopping, and connections',
     changes: [

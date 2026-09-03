@@ -33,6 +33,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
   Map<AutoLinkSource, List<AutoLink>> _autoLinks = {};
   bool _loading = true;
   bool _error   = false;
+  int  _loadGen = 0;
   bool _offline = false;
   String? _activeTripId;
   RealtimeChannel? _channel;
@@ -124,6 +125,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
   }
 
   Future<void> _load({bool silent = false}) async {
+    final gen = ++_loadGen;
     if (!silent) setState(() { _loading = true; _error = false; });
     try {
       final links = await LinksService.loadLinks(_activeTripId!);
@@ -134,7 +136,8 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
       } catch (_) {
         autoLinks = {};
       }
-      if (mounted) setState(() {
+      if (!mounted || gen != _loadGen) return;
+      setState(() {
         _links     = links;
         _autoLinks = autoLinks;
         _loading   = false;
@@ -142,7 +145,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
         _offline   = false;
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || gen != _loadGen) return;
       if (silent) { setState(() { _offline = true; _loading = false; }); return; }
       setState(() { _loading = false; _error = true; });
     }

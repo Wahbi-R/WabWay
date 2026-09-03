@@ -98,7 +98,8 @@ abstract final class ConnectionService {
       futures.add(supabase
           .from('trip_connections')
           .select('entity_a_id, entity_a_type, entity_b_id, entity_b_type')
-          .or('entity_a_id.in.(${chunk.join(',')}),entity_b_id.in.(${chunk.join(',')})'));
+          .or('entity_a_id.in.(${chunk.join(',')}),entity_b_id.in.(${chunk.join(',')})')
+          .catchError((_) => <Map<String, dynamic>>[]));
     }
     final allRows = (await Future.wait(futures)).expand((r) => r).toList();
     final spotMap = <String, String>{};

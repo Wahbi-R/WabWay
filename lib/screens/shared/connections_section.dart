@@ -68,15 +68,19 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    final conns =
-        await ConnectionService.fetchForEntity(widget.entityId);
-    if (!mounted) return;
-    await _resolveNames(conns);
-    if (!mounted) return;
-    setState(() {
-      _connections = conns;
-      _loading     = false;
-    });
+    try {
+      final conns = await ConnectionService.fetchForEntity(widget.entityId);
+      if (!mounted) return;
+      await _resolveNames(conns);
+      if (!mounted) return;
+      setState(() {
+        _connections = conns;
+        _loading     = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
   }
 
   // Resolve display names for all peer entities not yet in cache.
@@ -410,11 +414,11 @@ class _ConnectionPickerSheetState
     final tid = widget.tripId;
     try {
       final results = await Future.wait([
-        SpotService.loadSpots(tid),
-        TravelService.loadItems(tid),
+        SpotService.loadSpots(tid).catchError((_) => <Spot>[]),
+        TravelService.loadItems(tid).catchError((_) => <TravelItem>[]),
         AccommodationService.loadAll(tid).catchError((_) => <Accommodation>[]),
-        DocService.loadDocuments(tid),
-        LinksService.loadLinks(tid),
+        DocService.loadDocuments(tid).catchError((_) => <TripDocument>[]),
+        LinksService.loadLinks(tid).catchError((_) => <TripLink>[]),
       ]);
       if (!mounted) return;
       setState(() {

@@ -222,11 +222,13 @@ class _AddItemContentState extends State<_AddItemContent> {
       _titleCtrl.text    = spot.name;
       _cityCtrl.text     = spot.city.isNotEmpty ? spot.city : spot.area;
       _locationCtrl.text = spot.address ?? '';
+      _confirmCtrl.text = '';
       if (spot.mapsUrl != null) {
         _mapsCtrl.text = spot.mapsUrl!;
         _showAdvanced  = true;
       } else {
-        _showAdvanced = false;
+        _mapsCtrl.text = '';
+        _showAdvanced  = false;
       }
       _linkedSpotId  = spot.id;
       _linkedStayId  = null;
@@ -246,8 +248,9 @@ class _AddItemContentState extends State<_AddItemContent> {
       _linkedStayId      = stay.id;
       _linkedSpotId      = null;
       _type              = ItineraryItemType.stay;
-      _mapsCtrl.text     = '';
-      _showAdvanced      = false;
+      _mapsCtrl.text    = '';
+      _confirmCtrl.text = '';
+      _showAdvanced     = false;
     });
   }
 

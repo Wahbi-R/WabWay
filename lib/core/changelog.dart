@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 327,
+    label: 'Fix: connection chip names always up to date after adding a stay',
+    changes: [
+      'Connection chips on detail screens now correctly show the name of a stay that was added to the trip after the screen first loaded',
+      'Tapping a stay connection chip now reliably opens the stay — it no longer silently does nothing when the stay list was cached from a previous load',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 326,
     label: 'Fix: offline banner and error state no longer show at the same time',
     changes: [

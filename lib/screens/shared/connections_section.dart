@@ -68,6 +68,7 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
+    _staysCache = null; // invalidate so _resolveNames always fetches fresh stay data
     try {
       final conns = await ConnectionService.fetchForEntity(widget.entityId);
       if (!mounted) return;
@@ -122,7 +123,10 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
           }
           break;
         case EntityType.stay:
-          if (_staysCache == null) {
+          // Re-fetch if cache is absent or if any needed ID is missing from it.
+          final cachedStays = _staysCache;
+          if (cachedStays == null ||
+              ids.any((id) => !cachedStays.any((s) => s.id == id))) {
             final result = await AccommodationService.loadAll(tripId)
                 .then<List<Accommodation>?>((v) => v, onError: (_) => null);
             if (result != null) _staysCache = result;
@@ -162,14 +166,9 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
     final tripId = widget.tripId;
     if (r.peerType == EntityType.stay) {
       if (_staysCache == null) {
-        final fromDisk = await AccommodationService.loadFromCache(tripId);
-        if (fromDisk != null && fromDisk.isNotEmpty) {
-          _staysCache = fromDisk;
-        } else {
-          final fromNet = await AccommodationService.loadAll(tripId)
-              .then<List<Accommodation>?>((v) => v, onError: (_) => null);
-          if (fromNet != null) _staysCache = fromNet;
-        }
+        final result = await AccommodationService.loadAll(tripId)
+            .then<List<Accommodation>?>((v) => v, onError: (_) => null);
+        if (result != null) _staysCache = result;
       }
       final allStays = _staysCache ?? [];
       final stay = allStays.where((s) => s.id == r.peerId).firstOrNull;

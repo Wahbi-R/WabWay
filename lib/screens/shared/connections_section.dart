@@ -60,6 +60,9 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
   // Cached stays list to avoid re-fetching on every chip tap.
   List<Accommodation>? _staysCache;
 
+  // Incremented on every _load() call; guards against stale async completions.
+  int _loadGen = 0;
+
   @override
   void initState() {
     super.initState();
@@ -77,18 +80,19 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
   }
 
   Future<void> _load() async {
+    final gen = ++_loadGen;
     setState(() => _loading = true);
     try {
       final conns = await ConnectionService.fetchForEntity(widget.entityId);
-      if (!mounted) return;
+      if (!mounted || gen != _loadGen) return;
       await _resolveNames(conns);
-      if (!mounted) return;
+      if (!mounted || gen != _loadGen) return;
       setState(() {
         _connections = conns;
         _loading     = false;
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || gen != _loadGen) return;
       setState(() => _loading = false);
     }
   }
@@ -200,11 +204,12 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
 
   Future<void> _remove(TripConnection c) async {
     final idx = _connections.indexOf(c);
+    final gen = _loadGen;
     setState(() => _connections.remove(c));
     try {
       await ConnectionService.remove(c.id);
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || _loadGen != gen) return;
       setState(() => _connections.insert(idx.clamp(0, _connections.length), c));
     }
   }

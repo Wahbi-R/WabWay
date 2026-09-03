@@ -2,6 +2,8 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **332. Fix code review: _loadGen race and phantom chip rollback in ConnectionsSection** — added _loadGen generation counter to _load() so stale in-flight completions (from didUpdateWidget entity switch or concurrent calls) can no longer overwrite _connections with data from the old entity; _remove rollback now captures the gen before the network await and skips re-inserting the chip if the entity changed while the remove was in-flight, preventing a chip from the old entity appearing in the new entity's connection list (2026-09-03, build 332).
+
 - [x] **331. Fix code review: planItem chip label inconsistency and didUpdateWidget for ConnectionsSection** — _resolveNames now formats planItem names as "Title (Day N)" matching the picker format so chips don't change label between add and reload; added didUpdateWidget that clears _nameCache/_staysCache and reloads when entityId or tripId changes so the widget doesn't show stale connections when its parent updates the entity (2026-09-03, build 331).
 
 - [x] **330. Fix code review: TripConnection dedup, _remove rollback order, plan _offline** — TripConnection now overrides == and hashCode by id so the Set spread in fetchForEntity correctly deduplicates connections that appear in both the entity_a and entity_b queries; _remove rollback re-inserts at the original index instead of appending to end so chip order is preserved after a failed network delete; _addAllTripDays success path now resets _offline=false consistent with all other success paths (2026-09-03, build 330).

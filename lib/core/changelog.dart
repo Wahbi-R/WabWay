@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 332,
+    label: 'Fix: connection chips always show the right entity',
+    changes: [
+      'Switching quickly between items no longer briefly shows connections from the previous item',
+      'If a network error reverses a connection removal, the chip is no longer incorrectly added to the wrong item when you switch items at the same time',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 331,
     label: 'Fix: plan item connections now show correct day label',
     changes: [

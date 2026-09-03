@@ -57,6 +57,9 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
   // Cache of entity names keyed by id — populated lazily as we resolve.
   final Map<String, String> _nameCache = {};
 
+  // Cached stays list to avoid re-fetching on every chip tap.
+  List<Accommodation>? _staysCache;
+
   @override
   void initState() {
     super.initState();
@@ -115,8 +118,10 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
           }
           break;
         case EntityType.stay:
-          final stays = await AccommodationService.loadAll(tripId)
-              .catchError((_) => <Accommodation>[]);
+          final stays = _staysCache ??
+              await AccommodationService.loadAll(tripId)
+                  .catchError((_) => <Accommodation>[]);
+          _staysCache = stays;
           for (final s in stays) {
             if (ids.contains(s.id)) _nameCache[s.id] = s.name;
           }
@@ -151,10 +156,11 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
   Future<void> _navigate(BuildContext context, ResolvedConnection r) async {
     final tripId = widget.tripId;
     if (r.peerType == EntityType.stay) {
-      // Try cache first for instant navigation; fall back to network.
-      final cached = await AccommodationService.loadFromCache(tripId);
-      final stay = cached?.where((s) => s.id == r.peerId).firstOrNull
-          ?? (await AccommodationService.loadAll(tripId).catchError((_) => <Accommodation>[])).where((s) => s.id == r.peerId).firstOrNull;
+      final allStays = _staysCache
+          ?? await AccommodationService.loadFromCache(tripId)
+          ?? await AccommodationService.loadAll(tripId).catchError((_) => <Accommodation>[]);
+      _staysCache = allStays;
+      final stay = allStays.where((s) => s.id == r.peerId).firstOrNull;
       if (!mounted || stay == null) return;
       _showStayDetailSheet(context, stay);
     }

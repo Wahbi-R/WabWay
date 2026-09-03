@@ -90,14 +90,20 @@ abstract final class ConnectionService {
   static Future<(Map<String, String>, Map<String, String>)>
       fetchSpotAndStayMapsForItems(List<String> itemIds) async {
     if (itemIds.isEmpty) return (<String, String>{}, <String, String>{});
+    const chunkSize = 50;
     final idSet = itemIds.toSet();
-    final rows = await supabase
-        .from('trip_connections')
-        .select('entity_a_id, entity_a_type, entity_b_id, entity_b_type')
-        .or('entity_a_id.in.(${itemIds.join(',')}),entity_b_id.in.(${itemIds.join(',')})');
+    final allRows = <Map<String, dynamic>>[];
+    for (var i = 0; i < itemIds.length; i += chunkSize) {
+      final chunk = itemIds.sublist(i, i + chunkSize > itemIds.length ? itemIds.length : i + chunkSize);
+      final rows = await supabase
+          .from('trip_connections')
+          .select('entity_a_id, entity_a_type, entity_b_id, entity_b_type')
+          .or('entity_a_id.in.(${chunk.join(',')}),entity_b_id.in.(${chunk.join(',')})');
+      allRows.addAll(rows);
+    }
     final spotMap = <String, String>{};
     final stayMap = <String, String>{};
-    for (final r in rows) {
+    for (final r in allRows) {
       final aType = r['entity_a_type'] as String;
       final bType = r['entity_b_type'] as String;
       final aId   = r['entity_a_id'] as String;

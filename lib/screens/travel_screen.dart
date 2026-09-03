@@ -177,7 +177,7 @@ class _TravelScreenState extends ConsumerState<TravelScreen> {
       });
     } catch (e) {
       if (!mounted || gen != _loadGen) return;
-      if (silent) { setState(() => _offline = true); return; }
+      if (silent) { setState(() { _offline = true; _loading = false; }); return; }
       if (_items.isEmpty) {
         setState(() { _loading = false; _error = e.toString(); });
       } else {

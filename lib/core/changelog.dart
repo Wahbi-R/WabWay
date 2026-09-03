@@ -11,6 +11,20 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 321,
+    label: 'Fix: reliability improvements across Spots, Plan, Money and Connections',
+    changes: [
+      'Stays now show up correctly when you search in the Spots screen',
+      'Plan items now carry the spot\'s address when you pick a spot from the list',
+      'Switching trips clears any active multi-select in Spots automatically',
+      'Switching trips no longer leaves the screen in a broken state when offline and uncached',
+      'Stays chips in connections panels open instantly without re-fetching from the network every tap',
+      'Connection lookups for large itineraries no longer hit a URL length limit',
+      'Fixed a spinner that could get stuck indefinitely when a background data refresh failed',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 320,
     label: 'Fix: "Add all days" button now visible in Plan toolbar',
     changes: [

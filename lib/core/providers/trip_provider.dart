@@ -137,12 +137,16 @@ class TripNotifier extends StateNotifier<TripData> {
             .map((e) => AppTripMember.fromMap(e as Map<String, dynamic>))
             .toList(),
       );
-      state = state.copyWith(
-        selectedIndex: idx,
-        members:       cached ?? [],
-        loading:       false,
-        offline:       true,
-      );
+      if (cached != null) {
+        state = state.copyWith(
+          selectedIndex: idx,
+          members:       cached,
+          loading:       false,
+          offline:       true,
+        );
+      } else {
+        state = state.copyWith(loading: false, offline: true);
+      }
     }
   }
 

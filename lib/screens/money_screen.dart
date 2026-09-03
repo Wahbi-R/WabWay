@@ -388,7 +388,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
       });
     } catch (_) {
       if (!mounted || gen != _loadGen) return;
-      if (silent) { setState(() => _offline = true); return; }
+      if (silent) { setState(() { _offline = true; _loading = false; }); return; }
       if (_receipts.isEmpty) {
         setState(() { _loading = false; _error = true; });
       } else {

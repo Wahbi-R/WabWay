@@ -212,7 +212,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
       });
     } catch (_) {
       if (!mounted || gen != _loadGen) return;
-      if (silent) { setState(() => _offline = true); return; }
+      if (silent) { setState(() { _offline = true; _loading = false; }); return; }
       if (_spots.isEmpty) {
         setState(() { _loading = false; _error = true; });
       } else {
@@ -224,6 +224,15 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
   // Fired after every successful load. Kicks off background Wikipedia lookups
   // for spots that have no image yet. Each lookup is fire-and-forget — results
   // stream in over ~1-2 seconds and update the list row by row.
+  List<Accommodation> get _filteredStays {
+    final q = _searchQuery.toLowerCase();
+    if (q.isEmpty) return _stays;
+    return _stays.where((s) =>
+      s.name.toLowerCase().contains(q) ||
+      s.city.toLowerCase().contains(q)
+    ).toList();
+  }
+
   List<Spot> get _filtered {
     final list = _spots.where((s) {
       final q = _searchQuery.toLowerCase();
@@ -650,6 +659,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
     ref.listen<String>(activeTripIdProvider, (prev, next) {
       if (next != _activeTripId) {
         _activeTripId = next;
+        _exitSelectionMode();
         _loadSpots();
         _subscribeRealtime(next);
       }
@@ -680,7 +690,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
         ? _DesktopLayout(
             spots: _filterStays ? const [] : _filtered,
             allSpots: _spots,
-            stays: _stays,
+            stays: _filteredStays,
             docs: _docs,
             selected: _selected,
             myVotes: _myVotes,
@@ -727,7 +737,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
         : _MobileLayout(
             spots: _filterStays ? const [] : _filtered,
             allSpots: _spots,
-            stays: _stays,
+            stays: _filteredStays,
             myVotes: _myVotes,
             filterCategory: _filterCategory,
             filterStays: _filterStays,

@@ -221,7 +221,7 @@ class _AddItemContentState extends State<_AddItemContent> {
     setState(() {
       _titleCtrl.text    = spot.name;
       _cityCtrl.text     = spot.city.isNotEmpty ? spot.city : spot.area;
-      _locationCtrl.text = '';
+      _locationCtrl.text = spot.address ?? '';
       if (spot.mapsUrl != null) {
         _mapsCtrl.text = spot.mapsUrl!;
         _showAdvanced  = true;

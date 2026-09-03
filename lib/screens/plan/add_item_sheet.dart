@@ -225,6 +225,8 @@ class _AddItemContentState extends State<_AddItemContent> {
       if (spot.mapsUrl != null) {
         _mapsCtrl.text = spot.mapsUrl!;
         _showAdvanced  = true;
+      } else {
+        _mapsCtrl.text = '';
       }
       _linkedSpotId  = spot.id;
       _linkedStayId  = null;

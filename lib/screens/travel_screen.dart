@@ -172,7 +172,7 @@ class _TravelScreenState extends ConsumerState<TravelScreen> {
         _items..clear()..addAll(items);
         _docs..clear()..addAll(docs);
         _days..clear()..addAll(days);
-        if (!silent) _loading = false;
+        _loading = false;
         _offline = false;
       });
     } catch (e) {

@@ -229,7 +229,8 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
     if (q.isEmpty) return _stays;
     return _stays.where((s) =>
       s.name.toLowerCase().contains(q) ||
-      s.city.toLowerCase().contains(q)
+      s.city.toLowerCase().contains(q) ||
+      (s.address?.toLowerCase().contains(q) ?? false)
     ).toList();
   }
 
@@ -691,6 +692,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
             spots: _filterStays ? const [] : _filtered,
             allSpots: _spots,
             stays: _filteredStays,
+            totalStayCount: _stays.length,
             docs: _docs,
             selected: _selected,
             myVotes: _myVotes,
@@ -738,6 +740,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
             spots: _filterStays ? const [] : _filtered,
             allSpots: _spots,
             stays: _filteredStays,
+            totalStayCount: _stays.length,
             myVotes: _myVotes,
             filterCategory: _filterCategory,
             filterStays: _filterStays,
@@ -817,6 +820,7 @@ class _MobileLayout extends StatelessWidget {
     required this.spots,
     required this.allSpots,
     required this.stays,
+    required this.totalStayCount,
     required this.myVotes,
     required this.filterCategory,
     required this.filterStays,
@@ -848,6 +852,7 @@ class _MobileLayout extends StatelessWidget {
   final List<Spot> spots;
   final List<Spot> allSpots;
   final List<Accommodation> stays;
+  final int totalStayCount;
   final Map<String, VoteType> myVotes;
   final SpotCategory? filterCategory;
   final bool filterStays;
@@ -979,7 +984,7 @@ class _MobileLayout extends StatelessWidget {
             child: _CategoryFilterStrip(
               selected: filterCategory,
               staysSelected: filterStays,
-              stayCount: stays.length,
+              stayCount: totalStayCount,
               onChanged: onFilterCategory,
               onStaysSelected: onFilterStays,
               spots: allSpots,
@@ -1087,6 +1092,7 @@ class _DesktopLayout extends StatelessWidget {
     required this.spots,
     required this.allSpots,
     required this.stays,
+    required this.totalStayCount,
     required this.docs,
     required this.selected,
     required this.myVotes,
@@ -1122,6 +1128,7 @@ class _DesktopLayout extends StatelessWidget {
   final List<Spot> spots;
   final List<Spot> allSpots;
   final List<Accommodation> stays;
+  final int totalStayCount;
   final List<TripDocument> docs;
   final Spot? selected;
   final Map<String, VoteType> myVotes;
@@ -1186,7 +1193,7 @@ class _DesktopLayout extends StatelessWidget {
                       _CategoryFilterStrip(
                         selected: filterCategory,
                         staysSelected: filterStays,
-                        stayCount: stays.length,
+                        stayCount: totalStayCount,
                         onChanged: onFilterCategory,
                         onStaysSelected: onFilterStays,
                         spots: allSpots,

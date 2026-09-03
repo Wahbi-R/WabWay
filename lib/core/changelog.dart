@@ -11,6 +11,20 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 322,
+    label: 'Fix: stay search, chip count, spinner, and navigation reliability',
+    changes: [
+      'Searching stays by address now works — previously only name and city were matched',
+      'The "Stays" filter chip no longer disappears when you type a search that matches spots but not stays',
+      'The Travel screen no longer gets stuck on a loading spinner when a background refresh races the initial load',
+      'Switching trips clears the offline banner when the switch succeeds over the network',
+      'Picking a spot without a Maps link no longer keeps a previous spot\'s link in the plan item',
+      'Connection lookups for large itineraries now run in parallel, reducing load time',
+      'Fixed a rare case where going offline briefly could permanently block stay chip navigation',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 321,
     label: 'Fix: reliability improvements across Spots, Plan, Money and Connections',
     changes: [

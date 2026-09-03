@@ -129,6 +129,7 @@ class TripNotifier extends StateNotifier<TripData> {
         selectedIndex: idx,
         members:       members,
         loading:       false,
+        offline:       false,
       );
     } catch (_) {
       final cached = await OfflineCache.read<List<AppTripMember>>(

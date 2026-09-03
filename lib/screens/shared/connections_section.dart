@@ -121,7 +121,7 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
           final stays = _staysCache ??
               await AccommodationService.loadAll(tripId)
                   .catchError((_) => <Accommodation>[]);
-          _staysCache = stays;
+          if (stays.isNotEmpty) _staysCache = stays;
           for (final s in stays) {
             if (ids.contains(s.id)) _nameCache[s.id] = s.name;
           }

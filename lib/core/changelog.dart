@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 343,
+    label: 'Fix: sign-in, links, and trip-switch reliability',
+    changes: [
+      'The name entry screen no longer freezes after successfully setting your display name',
+      'Confirming link deletion can no longer crash if you navigate away while the dialog is open',
+      'Rapidly switching between trips no longer loads the wrong trip\'s members',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 342,
     label: 'Fix: map and trip-switch reliability improvements',
     changes: [

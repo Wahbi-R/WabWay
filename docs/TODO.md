@@ -2,6 +2,7 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **343. Fix code review: auth loading stuck, link delete mounted guard, switchTrip double-tap race** — name-prompt submit now resets its loading flag on success so the button doesn't freeze if the screen isn't replaced immediately; link delete no longer calls setState on a potentially-disposed widget after the confirmation dialog; rapid double-taps on trip switch no longer launch two concurrent member fetches that can pair the wrong members to the wrong trip (2026-09-03, build 343).
 - [x] **342. Fix code review: map stale-data and trip-switch race bugs** — map_screen now cancels the debounce timer on trip switch (preventing old-trip data loading into new trip view), adds a load-gen guard to prevent slower loads overwriting faster ones, and trip_provider.load() no longer reverts selectedIndex when switchTrip() completes during an in-flight member fetch (2026-09-03, build 342).
 - [x] **341. Fix code review: no error feedback on dialog-confirm link delete failure** — _deleteLink catch now shows a snackbar consistent with swipe-to-delete behaviour so users know why a deleted link reappeared (2026-09-03, build 341).
 

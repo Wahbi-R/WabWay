@@ -245,6 +245,7 @@ class _NamePromptScreenState extends State<_NamePromptScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       await widget.onNameSet(name);
+      if (mounted) setState(() => _loading = false);
     } catch (e) {
       if (mounted) setState(() { _loading = false; _error = e.toString(); });
     }

@@ -120,9 +120,13 @@ class TripNotifier extends StateNotifier<TripData> {
     if (tripId != null) await SyncQueue.drain(tripId, userId);
   }
 
+  bool _switching = false;
+
   Future<void> switchTrip(AppTrip trip) async {
+    if (_switching) return;
     final idx = state.trips.indexWhere((t) => t.id == trip.id);
     if (idx < 0 || idx == state.selectedIndex) return;
+    _switching = true;
     state = state.copyWith(loading: true, error: false);
     try {
       final members = await TripService.loadTripMembers(trip.id);
@@ -154,6 +158,8 @@ class TripNotifier extends StateNotifier<TripData> {
       } else {
         state = state.copyWith(loading: false, offline: true);
       }
+    } finally {
+      _switching = false;
     }
   }
 

@@ -225,6 +225,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
       ),
     );
     if (confirmed != true) return;
+    if (!mounted) return;
     setState(() => _links = _links.where((l) => l.id != link.id).toList());
     try {
       await LinksService.deleteLink(link.id);

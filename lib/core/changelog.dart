@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 331,
+    label: 'Fix: plan item connections now show correct day label',
+    changes: [
+      'Connection chips linking to a plan item now always show "Title (Day N)" — the format is now consistent whether you just added the connection or reopened the screen',
+      'If the screen stays open while you switch to a different entity, connection chips now correctly reload for the new item instead of showing stale connections from the previous one',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 330,
     label: 'Fix: connection chips and plan screen minor reliability fixes',
     changes: [

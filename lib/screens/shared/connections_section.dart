@@ -66,6 +66,16 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
     _load();
   }
 
+  @override
+  void didUpdateWidget(ConnectionsSection old) {
+    super.didUpdateWidget(old);
+    if (old.entityId != widget.entityId || old.tripId != widget.tripId) {
+      _nameCache.clear();
+      _staysCache = null;
+      _load();
+    }
+  }
+
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
@@ -151,7 +161,9 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
         case EntityType.planItem:
           for (final day in widget.days) {
             for (final item in day.items) {
-              if (ids.contains(item.id)) _nameCache[item.id] = item.title;
+              if (ids.contains(item.id)) {
+                _nameCache[item.id] = '${item.title} (Day ${day.dayNumber})';
+              }
             }
           }
           break;

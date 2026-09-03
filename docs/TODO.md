@@ -2,6 +2,8 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **331. Fix code review: planItem chip label inconsistency and didUpdateWidget for ConnectionsSection** — _resolveNames now formats planItem names as "Title (Day N)" matching the picker format so chips don't change label between add and reload; added didUpdateWidget that clears _nameCache/_staysCache and reloads when entityId or tripId changes so the widget doesn't show stale connections when its parent updates the entity (2026-09-03, build 331).
+
 - [x] **330. Fix code review: TripConnection dedup, _remove rollback order, plan _offline** — TripConnection now overrides == and hashCode by id so the Set spread in fetchForEntity correctly deduplicates connections that appear in both the entity_a and entity_b queries; _remove rollback re-inserts at the original index instead of appending to end so chip order is preserved after a failed network delete; _addAllTripDays success path now resets _offline=false consistent with all other success paths (2026-09-03, build 330).
 
 - [x] **329. Fix code review: _linkedStayId not restored in plan item edit mode** — initState in add_item_sheet was restoring _linkedSpotId and _linkedDocIds from the existing item but missing _linkedStayId; editing any plan item that had a stay link (e.g., hotel check-in) and saving would silently set linkedStayId=null in Supabase, permanently deleting the stay association (2026-09-03, build 329).

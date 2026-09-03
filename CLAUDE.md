@@ -32,6 +32,18 @@ Before every commit+push to `wabway-server/`, update `wabway-server/FEATURES.md`
 
 These InheritedWidgets are not available inside a pushed `MaterialPageRoute`. Pass required data as explicit constructor parameters instead.
 
+## Before creating anything new — check for an existing equivalent
+
+Before writing a new helper, widget, service method, mixin, or pattern, grep for it first. If something equivalent already exists, extend or reuse it. If it's close but not quite right, generalise the existing thing rather than duplicating it.
+
+Concrete checks before creating:
+- **New screen state pattern** → does `AsyncScreenMixin` already cover it?
+- **New service call** → does `*Service` already have this method under a different name?
+- **New widget** → check `lib/widgets/` and nearby screens for the same UI element.
+- **New utility function** → grep the function body's core logic; it may already exist.
+
+Duplicating something means every future bug-fix or improvement has to be applied in two places. The rule: if you would write `// same as X but with Y changed`, that's a signal to parameterise X, not copy it.
+
 ## Async screen state — use AsyncScreenMixin
 
 Every `State` (or `ConsumerState`) that loads data asynchronously **must** use `AsyncScreenMixin` from `lib/core/async_screen_mixin.dart`. Never declare `_loadGen`, `_loading`, `_error`, or `_offline` fields directly on a screen — the mixin provides them.

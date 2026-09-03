@@ -500,30 +500,34 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
         final connectivity = await Connectivity().checkConnectivity();
         final isOffline = connectivity.every((r) => r == ConnectivityResult.none);
         if (isOffline) {
-          await SyncQueue.enqueueReceipt(
-            widget.tripId!,
-            paidBy:            _paidById,
-            title:             title,
-            amount:            total,
-            currency:          _currency,
-            homeAmount:        homeTotal,
-            exchangeRate:      exchangeRate,
-            transactionFeePct: feePct,
-            category:          _category,
-            date:              DateTime.now(),
-            splits:            splits,
-            notes:             notes,
-          );
-          if (mounted) {
-            Navigator.of(context).pop();
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Saved offline — will sync when you reconnect'),
-                duration: Duration(seconds: 4),
-              ),
+          try {
+            await SyncQueue.enqueueReceipt(
+              widget.tripId!,
+              paidBy:            _paidById,
+              title:             title,
+              amount:            total,
+              currency:          _currency,
+              homeAmount:        homeTotal,
+              exchangeRate:      exchangeRate,
+              transactionFeePct: feePct,
+              category:          _category,
+              date:              DateTime.now(),
+              splits:            splits,
+              notes:             notes,
             );
+            if (mounted) {
+              Navigator.of(context).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Saved offline — will sync when you reconnect'),
+                  duration: Duration(seconds: 4),
+                ),
+              );
+            }
+            return;
+          } catch (_) {
+            // Fall through to generic error state below.
           }
-          return;
         }
       }
       if (mounted) setState(() { _loading = false; _error = 'Could not save receipt.'; });

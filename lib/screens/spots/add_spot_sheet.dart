@@ -454,6 +454,7 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
           imageUrl:    imageUrl,
         );
       }
+      if (!mounted) return;
       widget.onSubmit(spot);
       if (!widget.isEditing && _notifyOnAdd) {
         pushNotify(

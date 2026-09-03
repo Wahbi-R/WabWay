@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 339,
+    label: 'Fix: plan item URLs preserved when collapsing advanced section',
+    changes: [
+      'Collapsing the advanced section of a plan item and saving no longer wipes the Maps URL and confirmation number that were already saved — those fields are only cleared when you explicitly empty them',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 338,
     label: 'Fix: "Add to Plan" from a spot now saves the spot link',
     changes: [

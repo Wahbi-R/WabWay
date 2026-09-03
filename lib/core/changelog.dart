@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 328,
+    label: 'Fix: removing a connection now rolls back if the network fails',
+    changes: [
+      'Removing a connection chip while offline no longer permanently deletes it from the screen — if the network call fails, the chip reappears automatically',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 327,
     label: 'Fix: connection chip names always up to date after adding a stay',
     changes: [

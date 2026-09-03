@@ -68,7 +68,6 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    _staysCache = null; // invalidate so _resolveNames always fetches fresh stay data
     try {
       final conns = await ConnectionService.fetchForEntity(widget.entityId);
       if (!mounted) return;
@@ -189,7 +188,12 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
 
   Future<void> _remove(TripConnection c) async {
     setState(() => _connections.remove(c));
-    await ConnectionService.remove(c.id);
+    try {
+      await ConnectionService.remove(c.id);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _connections.add(c));
+    }
   }
 
   Future<void> _addConnection() async {
@@ -220,6 +224,7 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
       typeB:  result.type,
       idB:    result.id,
     );
+    if (!mounted) return;
     _nameCache[result.id] = result.name;
     setState(() => _connections.add(conn));
   }

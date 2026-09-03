@@ -39,7 +39,7 @@ abstract final class PlanService {
   }) {
     // Postgres returns time as "HH:MM:SS"; the model uses "HH:MM".
     final rawTime = row['time'] as String?;
-    final time = rawTime?.substring(0, 5);
+    final time = (rawTime != null && rawTime.length >= 5) ? rawTime.substring(0, 5) : rawTime;
     return ItineraryItem(
       id:              row['id'] as String,
       dayId:           row['day_id'] as String,
@@ -243,6 +243,7 @@ abstract final class PlanService {
       if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
       if (plannedCost != null) 'planned_cost': plannedCost,
       if (currency != null) 'currency': currency,
+      if (linkedSpotId != null) 'linked_spot_id': linkedSpotId,
     }).select().single();
 
     final itemId = row['id'] as String;

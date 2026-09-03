@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 338,
+    label: 'Fix: "Add to Plan" from a spot now saves the spot link',
+    changes: [
+      'Adding a plan item directly from a spot\'s detail page now correctly saves the link to that spot — previously the link was silently dropped and the plan item appeared unlinked',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 337,
     label: 'Fix: crew chat and accommodation reliability fixes',
     changes: [

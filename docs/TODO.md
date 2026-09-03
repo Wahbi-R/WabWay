@@ -2,6 +2,8 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **329. Fix code review: _linkedStayId not restored in plan item edit mode** — initState in add_item_sheet was restoring _linkedSpotId and _linkedDocIds from the existing item but missing _linkedStayId; editing any plan item that had a stay link (e.g., hotel check-in) and saving would silently set linkedStayId=null in Supabase, permanently deleting the stay association (2026-09-03, build 329).
+
 - [x] **328. Fix code review: connection remove rollback, add mounted check, _staysCache perf fix** — _remove now wraps the server call in try/catch and re-adds the connection on failure so an optimistic UI removal that fails network is automatically reversed; _addConnection now checks !mounted after the async ConnectionService.add call so it can't call setState on a disposed widget when the user navigates away mid-add; removed unnecessary _staysCache=null reset from _load() since the "re-fetch if needed ID missing" check in _resolveNames already handles freshness, eliminating the redundant loadAll on every chip tap when names are already resolved (2026-09-03, build 328).
 
 - [x] **327. Fix code review: _staysCache invalidation in connections section** — _load() now clears _staysCache at the start of each call so _resolveNames always fetches fresh stay data on realtime events; _resolveNames re-fetches even when cache is non-null if a needed connection ID is absent (handles stays added mid-session); _navigate simplified to call loadAll directly instead of reading potentially stale disk cache (2026-09-03, build 327).

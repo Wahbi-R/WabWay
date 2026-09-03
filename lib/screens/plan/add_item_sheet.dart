@@ -182,6 +182,7 @@ class _AddItemContentState extends State<_AddItemContent> {
       _notesCtrl.text    = item.notes ?? '';
       _type              = item.type;
       _linkedSpotId      = item.linkedSpotId;
+      _linkedStayId      = item.linkedStayId;
       _linkedDocIds.addAll(item.linkedDocIds);
       if (item.plannedCost != null) {
         _costCtrl.text = item.plannedCost!.toStringAsFixed(

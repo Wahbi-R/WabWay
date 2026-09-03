@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 329,
+    label: 'Fix: editing a plan item no longer removes its accommodation link',
+    changes: [
+      'Opening an existing plan item to edit it no longer silently disconnects it from the accommodation it was linked to when you save',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 328,
     label: 'Fix: removing a connection now rolls back if the network fails',
     changes: [

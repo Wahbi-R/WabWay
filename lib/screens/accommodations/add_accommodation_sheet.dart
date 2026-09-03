@@ -82,6 +82,7 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
       _checkOut   = e.checkOut;
       _imageUrl        = e.imageUrl;
       _linkedSpotId    = e.spotId;
+      if (e.spotId != null) _loadLinkedSpot(e.spotId!);
     } else if (widget.prefilled != null) {
       _applyPrefilled(widget.prefilled!);
       if (widget.initialUrl != null) _urlCtrl.text = widget.initialUrl!;
@@ -220,6 +221,14 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
         behavior: SnackBarBehavior.floating,
       ));
     }
+  }
+
+  Future<void> _loadLinkedSpot(String spotId) async {
+    try {
+      final spots = await SpotService.loadSpots(widget.tripId);
+      if (!mounted) return;
+      setState(() => _linkedSpot = spots.where((s) => s.id == spotId).firstOrNull);
+    } catch (_) {}
   }
 
   Future<void> _pickSpot() async {

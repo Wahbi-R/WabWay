@@ -110,10 +110,12 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
 
   Future<void> _onNewMessage() async {
     if (_tripId == null) return;
-    final messages = await CrewService.fetchMessages(_tripId!);
-    if (!mounted) return;
-    setState(() => _messages = messages);
-    _scrollToBottom();
+    try {
+      final messages = await CrewService.fetchMessages(_tripId!);
+      if (!mounted) return;
+      setState(() => _messages = messages);
+      _scrollToBottom();
+    } catch (_) {}
   }
 
   Future<void> _onLocationsChanged() async {
@@ -130,11 +132,13 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
     if (idx == -1) return;
     final msg = _messages[idx];
     final myReacted = (msg.reactions[emoji] ?? []).contains(userId);
-    if (myReacted) {
-      await CrewService.removeReaction(messageId: messageId, userId: userId, emoji: emoji);
-    } else {
-      await CrewService.addReaction(messageId: messageId, userId: userId, emoji: emoji);
-    }
+    try {
+      if (myReacted) {
+        await CrewService.removeReaction(messageId: messageId, userId: userId, emoji: emoji);
+      } else {
+        await CrewService.addReaction(messageId: messageId, userId: userId, emoji: emoji);
+      }
+    } catch (_) {}
     // Reactions refresh via the realtime subscription; no extra setState needed.
   }
 
@@ -164,7 +168,7 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
   Future<void> _toggleLocationSharing() async {
     final mgr = LocationSharingManager.instance;
     if (mgr.isSharing.value) {
-      await mgr.stop();
+      try { await mgr.stop(); } catch (_) {}
       return;
     }
 
@@ -281,7 +285,6 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
   Future<void> _sendMessage() async {
     final text = _textController.text.trim();
     if (text.isEmpty || _sending) return;
-    _textController.clear();
     setState(() => _sending = true);
     try {
       await CrewService.sendMessage(
@@ -289,6 +292,7 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
         authorId: _userId!,
         body: text,
       );
+      if (mounted) _textController.clear();
       // Refresh immediately so the sender sees their message without waiting
       // for the realtime subscription (which requires the table to be in the
       // Supabase realtime publication).

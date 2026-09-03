@@ -2,6 +2,8 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **337. Fix code review: crew message text lost on send failure; missing try/catch in crew/home** — _sendMessage now clears the text field only after the network call succeeds so a send failure preserves the draft; _onNewMessage, _onReact, and _toggleLocationSharing.stop() now have try/catch so network errors don't crash or kill the realtime subscription; home screen pinboard _load wrapped in try/catch so a fetch error doesn't leave the pinboard permanently invisible; add_accommodation_sheet now loads the linked spot name when editing an existing accommodation so the tile shows the spot name instead of the generic 'Spot linked' fallback (2026-09-03, build 337).
+
 - [x] **336. Fix code review: shopping save spinner-stuck; switchTrip error flag not cleared** — shopping item save sheet now wraps onSave in try/catch so a network error resets the saving state instead of permanently disabling the Save button; switchTrip in trip_provider now clears error both before the async gap and on success so switching trips after an initial load failure can no longer leave the error UI stuck (2026-09-03, build 336).
 
 - [x] **335. Fix code review: _error not cleared on success in docs/money/accommodations; packing mounted check** — docs, money, and accommodations success setState now clears _error so a background realtime refresh after a prior load failure can actually dismiss the error screen; _addItem in packing_screen adds a mounted check before calling _load so it cannot call setState on a disposed widget when the user navigates away while bulk-adding items (2026-09-03, build 335).

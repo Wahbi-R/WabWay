@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 337,
+    label: 'Fix: crew chat and accommodation reliability fixes',
+    changes: [
+      'If a crew message fails to send, your typed text is now preserved in the field so you can try again instead of losing it',
+      'Opening an accommodation for editing now shows the linked spot\'s name instead of a generic placeholder',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 336,
     label: 'Fix: shopping save and trip switch reliability fixes',
     changes: [

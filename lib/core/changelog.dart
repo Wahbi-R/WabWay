@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 336,
+    label: 'Fix: shopping save and trip switch reliability fixes',
+    changes: [
+      'Saving a shopping list item no longer permanently freezes if the network request fails — the Save button re-enables so you can try again',
+      'Switching trips after an initial load error no longer keeps the error screen visible once the switch succeeds',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 335,
     label: 'Fix: error screen now clears when data reloads successfully',
     changes: [

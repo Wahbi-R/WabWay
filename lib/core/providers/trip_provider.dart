@@ -118,7 +118,7 @@ class TripNotifier extends StateNotifier<TripData> {
   Future<void> switchTrip(AppTrip trip) async {
     final idx = state.trips.indexWhere((t) => t.id == trip.id);
     if (idx < 0 || idx == state.selectedIndex) return;
-    state = state.copyWith(loading: true);
+    state = state.copyWith(loading: true, error: false);
     try {
       final members = await TripService.loadTripMembers(trip.id);
       await OfflineCache.write(
@@ -130,6 +130,7 @@ class TripNotifier extends StateNotifier<TripData> {
         members:       members,
         loading:       false,
         offline:       false,
+        error:         false,
       );
     } catch (_) {
       final cached = await OfflineCache.read<List<AppTripMember>>(

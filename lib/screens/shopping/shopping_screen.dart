@@ -701,8 +701,12 @@ class _ItemSheetState extends State<_ItemSheet> {
       linkUrl:  link,
       imageUrl: _imageUrl,
     );
-    await widget.onSave(updated);
-    if (mounted) Navigator.pop(context);
+    try {
+      await widget.onSave(updated);
+      if (mounted) Navigator.pop(context);
+    } catch (_) {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   Future<void> _delete() async {

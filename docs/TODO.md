@@ -2,6 +2,8 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **336. Fix code review: shopping save spinner-stuck; switchTrip error flag not cleared** — shopping item save sheet now wraps onSave in try/catch so a network error resets the saving state instead of permanently disabling the Save button; switchTrip in trip_provider now clears error both before the async gap and on success so switching trips after an initial load failure can no longer leave the error UI stuck (2026-09-03, build 336).
+
 - [x] **335. Fix code review: _error not cleared on success in docs/money/accommodations; packing mounted check** — docs, money, and accommodations success setState now clears _error so a background realtime refresh after a prior load failure can actually dismiss the error screen; _addItem in packing_screen adds a mounted check before calling _load so it cannot call setState on a disposed widget when the user navigates away while bulk-adding items (2026-09-03, build 335).
 
 - [x] **334. Fix code review: _error not cleared on success in plan/travel screens; _onVote silent reload** — plan_screen and travel_screen success setState now clears _error so a background refresh after a prior load failure no longer leaves the error scaffold visible with fresh data behind it; _onVote catch now calls _loadSpots(silent:true) instead of the default non-silent form so a failed vote no longer wipes the entire list and shows a full spinner to revert an optimistic UI change (2026-09-03, build 334).

@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 341,
+    label: 'Fix: deleting a link now shows an error if it fails',
+    changes: [
+      'If deleting a link via the confirmation dialog fails, you now see an error message explaining why the link reappeared — matching the behaviour of swipe-to-delete',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 340,
     label: 'Fix: offline receipt sync and auto-link reliability',
     changes: [

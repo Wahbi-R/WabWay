@@ -2,6 +2,8 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **341. Fix code review: no error feedback on dialog-confirm link delete failure** — _deleteLink catch now shows a snackbar consistent with swipe-to-delete behaviour so users know why a deleted link reappeared (2026-09-03, build 341).
+
 - [x] **340. Fix code review: auto_links null name crash; sync_queue concurrent drain race** — auto_links_service now uses null-safe casts for name/title columns so a single row with a null name can no longer crash the entire load() and silently remove all auto-links from the screen; sync_queue drain() now sets a _draining flag in a try/finally so concurrent drain calls (connectivity-restored + retry timer) can no longer process the same queue simultaneously and create duplicate receipts (2026-09-03, build 340).
 
 - [x] **339. Fix code review: _showAdvanced gate erases URLs on save; SyncQueue catch spinner-stuck; add_spot mounted check** — _submit in add_item_sheet no longer gates mapsUrl/confirmationUrl on _showAdvanced so collapsing the advanced section and saving can no longer null out previously-saved URLs; SyncQueue.enqueueReceipt in add_receipt_sheet is now wrapped in its own try/catch so a local storage error doesn't leave the Save button frozen; add_spot_sheet now checks mounted before calling onSubmit after the final async photo-URL fetch (2026-09-03, build 339).

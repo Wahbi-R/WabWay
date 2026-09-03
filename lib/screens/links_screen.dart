@@ -229,7 +229,11 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
     try {
       await LinksService.deleteLink(link.id);
     } catch (_) {
-      if (mounted) _load(); // revert on failure
+      if (!mounted) return;
+      _load();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not delete link. Please try again.')),
+      );
     }
   }
 

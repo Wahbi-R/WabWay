@@ -467,6 +467,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
         createdBy:    _userId,
         time:         timeStr,
         city:         spot.city.isNotEmpty ? spot.city : spot.area,
+        location:     (spot.address?.isNotEmpty == true) ? spot.address : spot.name,
         mapsUrl:      spot.mapsUrl,
         sortOrder:    day.items.length,
       );

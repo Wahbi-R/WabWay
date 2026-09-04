@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 357,
+    label: 'Bug fixes',
+    bullets: [
+      'Adding a spot to the plan now correctly pre-fills the address/location field',
+      'Connection picker retry button no longer risks showing a partial failure state after a slow network',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 356,
     label: 'Bug fixes',
     bullets: [

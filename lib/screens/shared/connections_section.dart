@@ -415,10 +415,8 @@ class _ConnectionPickerSheet extends StatefulWidget {
 
 class _ConnectionPickerSheetState
     extends State<_ConnectionPickerSheet>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, AsyncScreenMixin {
   late TabController _tabs;
-  bool loading = true;
-  bool _loadFailed = false;
 
   List<Spot>          _spots  = [];
   List<TravelItem>    _travel = [];
@@ -446,8 +444,8 @@ class _ConnectionPickerSheetState
 
   Future<void> _loadAll() async {
     final tid = widget.tripId;
+    final gen = beginLoad();
     bool anyFailed = false;
-    setState(() { loading = true; _loadFailed = false; });
     try {
       final results = await Future.wait([
         SpotService.loadSpots(tid).catchError((e) { anyFailed = true; return <Spot>[]; }),
@@ -456,19 +454,16 @@ class _ConnectionPickerSheetState
         DocService.loadDocuments(tid).catchError((e) { anyFailed = true; return <TripDocument>[]; }),
         LinksService.loadLinks(tid).catchError((e) { anyFailed = true; return <TripLink>[]; }),
       ]);
-      if (!mounted) return;
-      setState(() {
+      commitLoad(gen, () {
         _spots  = results[0] as List<Spot>;
         _travel = results[1] as List<TravelItem>;
         _stays  = results[2] as List<Accommodation>;
         _docs   = results[3] as List<TripDocument>;
         _links  = results[4] as List<TripLink>;
-        loading = false;
-        _loadFailed = anyFailed;
+        offline = anyFailed;
       });
     } catch (_) {
-      if (!mounted) return;
-      setState(() { loading = false; _loadFailed = true; });
+      failLoad(gen);
     }
   }
 
@@ -552,7 +547,7 @@ class _ConnectionPickerSheetState
                 ],
               ),
             ),
-            if (_loadFailed)
+            if (offline)
               Padding(
                 padding: const EdgeInsets.fromLTRB(kSpace4, kSpace2, kSpace4, 0),
                 child: Row(

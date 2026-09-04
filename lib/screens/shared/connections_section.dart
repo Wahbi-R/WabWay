@@ -85,7 +85,7 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection>
       if (isStale(gen)) return;
       commitLoad(gen, () => _connections = conns);
     } catch (_) {
-      failLoad(gen);
+      failLoad(gen, silent: true);
     }
   }
 
@@ -219,8 +219,9 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection>
   }
 
   Future<void> _addConnection() async {
-    final tripId = widget.tripId;
-    final userId = ref.read(profileProvider)?.id ?? '';
+    final tripId  = widget.tripId;
+    final entityId = widget.entityId;
+    final userId  = ref.read(profileProvider)?.id ?? '';
 
     // Load all entities for the picker (excluding the current entity type
     // only if it makes no sense to link to itself — allow same-type links).
@@ -231,22 +232,22 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection>
       builder: (_) => _ConnectionPickerSheet(
         tripId:         tripId,
         myEntityType:   widget.entityType,
-        myEntityId:     widget.entityId,
+        myEntityId:     entityId,
         days:           widget.days,
-        alreadyLinked:  _connections.map((c) => c.peerId(widget.entityId)).toSet(),
+        alreadyLinked:  _connections.map((c) => c.peerId(entityId)).toSet(),
       ),
     );
-    if (result == null || !mounted) return;
+    if (result == null || !mounted || widget.entityId != entityId) return;
 
     final conn = await ConnectionService.add(
       tripId: tripId,
       userId: userId,
       typeA:  widget.entityType,
-      idA:    widget.entityId,
+      idA:    entityId,
       typeB:  result.type,
       idB:    result.id,
     );
-    if (!mounted) return;
+    if (!mounted || widget.entityId != entityId) return;
     _nameCache[result.id] = result.name;
     setState(() => _connections.add(conn));
   }
@@ -261,6 +262,23 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection>
                 width: 20,
                 height: 20,
                 child: CircularProgressIndicator(strokeWidth: 2))),
+      );
+    }
+
+    if (offline) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Connected', style: kStyleOverline),
+          const SizedBox(height: kSpace2),
+          GestureDetector(
+            onTap: _load,
+            child: Text(
+              'Could not load connections · Tap to retry',
+              style: kStyleCaption.copyWith(color: kColorPrimary),
+            ),
+          ),
+        ],
       );
     }
 

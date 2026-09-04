@@ -11,6 +11,17 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 359,
+    label: 'Bug fixes',
+    bullets: [
+      'Connected section now shows a retry prompt when connections fail to load',
+      'Logging out now works correctly when you are offline',
+      'Moving a plan item to another day no longer briefly loses its completion status or stay link',
+      'Plan items already linked to a spot or stay no longer show as unlinked after switching trips while offline',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 358,
     label: 'Bug fixes',
     bullets: [

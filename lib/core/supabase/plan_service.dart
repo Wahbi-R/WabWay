@@ -108,9 +108,14 @@ abstract final class PlanService {
 
     // Load spot and stay connections from trip_connections for all items.
     // Isolate failures: a transient connection error should not fail the whole plan load.
+    // Track if the fetch failed so we skip poisoning the cache with null-linked items.
+    var connectionsFailed = false;
     final (spotMap, stayMap) = itemIds.isNotEmpty
         ? await ConnectionService.fetchSpotAndStayMapsForItems(itemIds)
-            .catchError((_) => (<String, String>{}, <String, String>{}))
+            .catchError((_) {
+              connectionsFailed = true;
+              return (<String, String>{}, <String, String>{});
+            })
         : (<String, String>{}, <String, String>{});
 
     final allItems = itemsData
@@ -131,7 +136,9 @@ abstract final class PlanService {
     final days = daysData
         .map<TripDay>((r) => _dayFromRow(r, dayItems[r['id'] as String] ?? []))
         .toList();
-    await OfflineCache.write(OfflineCache.planKey(tripId), days.map(_dayToJson).toList());
+    if (!connectionsFailed) {
+      await OfflineCache.write(OfflineCache.planKey(tripId), days.map(_dayToJson).toList());
+    }
     return days;
   }
 

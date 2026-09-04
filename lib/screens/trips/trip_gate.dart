@@ -5,6 +5,7 @@ import '../../core/connectivity_service.dart';
 import '../../core/invite/invite_link_handler.dart';
 import '../../core/providers/profile_provider.dart';
 import '../../core/providers/trip_provider.dart';
+import '../../core/supabase/auth_service.dart';
 import '../../core/supabase/client.dart';
 import '../../core/supabase/invite_service.dart';
 import '../../core/trip/app_trip.dart';
@@ -205,7 +206,7 @@ class _NoTripsScreen extends StatelessWidget {
                   WabwayButton(
                     label: 'Log out',
                     variant: WabwayButtonVariant.ghost,
-                    onPressed: () => Supabase.instance.client.auth.signOut(),
+                    onPressed: () => AuthService.signOut(),
                     fullWidth: true,
                     icon: Icons.logout_rounded,
                   ),

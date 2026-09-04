@@ -581,10 +581,13 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
     if (fromDay == null || toDay == null) return;
     final moved = ItineraryItem(
       id: item.id, dayId: newDayId, title: item.title, type: item.type,
-      time: item.time, city: item.city, location: item.location,
-      mapsUrl: item.mapsUrl, confirmationUrl: item.confirmationUrl,
-      notes: item.notes, linkedSpotId: item.linkedSpotId,
-      linkedDocIds: item.linkedDocIds,
+      time: item.time, city: item.city, country: item.country,
+      location: item.location, mapsUrl: item.mapsUrl,
+      confirmationUrl: item.confirmationUrl, notes: item.notes,
+      linkedSpotId: item.linkedSpotId, linkedStayId: item.linkedStayId,
+      linkedDocIds: item.linkedDocIds, sortOrder: item.sortOrder,
+      isDone: item.isDone, plannedCost: item.plannedCost,
+      currency: item.currency,
     );
     setState(() {
       fromDay.items.removeWhere((i) => i.id == item.id);

@@ -683,7 +683,8 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
     }
     if (_activeTripId.isEmpty || _userId.isEmpty) return;
 
-    final gen = beginLoad();
+    // Use a silent load so the existing plan stays visible while days are created.
+    final gen = beginLoad(silent: true);
     int nextDayNumber = _days.isEmpty ? 0 : _days.map((d) => d.dayNumber).reduce((a, b) => a > b ? a : b);
     final newDays = <TripDay>[];
     try {
@@ -708,7 +709,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
       });
       if (!isStale(gen)) unawaited(PlanService.writeDaysToCache(_activeTripId, _days));
     } catch (e) {
-      failLoad(gen);
+      failLoad(gen, silent: true);
       messenger.showSnackBar(SnackBar(
         content: Text('Failed to add days: $e', style: kStyleBody.copyWith(color: Colors.white)),
         backgroundColor: kColorDanger,

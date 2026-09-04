@@ -380,7 +380,9 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
         _pendingSyncCount     = pending;
       });
     } catch (_) {
-      failLoad(gen, silent: silent);
+      // If cached data is already visible, degrade gracefully to offline banner
+      // rather than replacing it with a full-screen error.
+      failLoad(gen, silent: silent || _receipts.isNotEmpty);
     }
   }
 

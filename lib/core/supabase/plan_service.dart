@@ -107,8 +107,10 @@ abstract final class PlanService {
     }
 
     // Load spot and stay connections from trip_connections for all items.
+    // Isolate failures: a transient connection error should not fail the whole plan load.
     final (spotMap, stayMap) = itemIds.isNotEmpty
         ? await ConnectionService.fetchSpotAndStayMapsForItems(itemIds)
+            .catchError((_) => (<String, String>{}, <String, String>{}))
         : (<String, String>{}, <String, String>{});
 
     final allItems = itemsData

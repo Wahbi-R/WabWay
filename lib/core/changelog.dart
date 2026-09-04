@@ -11,6 +11,20 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 352,
+    label: 'Bug fixes',
+    bullets: [
+      'Adding all trip days no longer shows a loading spinner over your existing plan',
+      'Money screen now shows an offline banner instead of an error page when network drops with receipts already visible',
+      'Sending a crew photo no longer crashes if your profile hasn\'t loaded yet',
+      'A slow connection to one plan section no longer prevents the rest of the plan from loading',
+      'Links screen now shows results from all sections even if one section fails to load',
+      'App no longer gets stuck on the splash screen if cached profile data is corrupted',
+      'Connection chips no longer show wrong names when quickly switching between items',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 351,
     label: 'Bug fixes',
     bullets: [

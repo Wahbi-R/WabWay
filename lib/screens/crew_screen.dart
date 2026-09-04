@@ -449,15 +449,18 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
       return;
     }
     if (file == null || !mounted) return;
+    final tripId = _tripId;
+    final userId = _userId;
+    if (tripId == null || userId == null) return;
     setState(() => _sendingImage = true);
     try {
       final bytes = await file.readAsBytes();
       final ext = file.name.contains('.') ? file.name.split('.').last.toLowerCase() : 'jpg';
-      final (:path, :url) = await CrewService.uploadChatImage(_tripId!, _userId!, bytes, ext);
+      final (:path, :url) = await CrewService.uploadChatImage(tripId, userId, bytes, ext);
       try {
         await CrewService.sendImageMessage(
-          tripId: _tripId!,
-          authorId: _userId!,
+          tripId: tripId,
+          authorId: userId,
           imageUrl: url,
         );
       } catch (e) {

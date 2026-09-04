@@ -5,11 +5,11 @@ class AutoLinksService {
   static Future<Map<AutoLinkSource, List<AutoLink>>> load(String tripId) async {
     // Use explicit keyed futures to avoid fragile positional coupling with the enum.
     final entries = await Future.wait([
-      _loadSpots(tripId).then((r) => MapEntry(AutoLinkSource.spot, r)),
-      _loadShopping(tripId).then((r) => MapEntry(AutoLinkSource.shopping, r)),
-      _loadItinerary(tripId).then((r) => MapEntry(AutoLinkSource.itinerary, r)),
-      _loadTravel(tripId).then((r) => MapEntry(AutoLinkSource.travel, r)),
-      _loadAccommodations(tripId).then((r) => MapEntry(AutoLinkSource.accommodation, r)),
+      _loadSpots(tripId).then((r) => MapEntry(AutoLinkSource.spot, r)).catchError((_) => MapEntry(AutoLinkSource.spot, <AutoLink>[])),
+      _loadShopping(tripId).then((r) => MapEntry(AutoLinkSource.shopping, r)).catchError((_) => MapEntry(AutoLinkSource.shopping, <AutoLink>[])),
+      _loadItinerary(tripId).then((r) => MapEntry(AutoLinkSource.itinerary, r)).catchError((_) => MapEntry(AutoLinkSource.itinerary, <AutoLink>[])),
+      _loadTravel(tripId).then((r) => MapEntry(AutoLinkSource.travel, r)).catchError((_) => MapEntry(AutoLinkSource.travel, <AutoLink>[])),
+      _loadAccommodations(tripId).then((r) => MapEntry(AutoLinkSource.accommodation, r)).catchError((_) => MapEntry(AutoLinkSource.accommodation, <AutoLink>[])),
     ]);
     return Map.fromEntries(entries.where((e) => e.value.isNotEmpty));
   }

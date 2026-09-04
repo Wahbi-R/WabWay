@@ -65,10 +65,13 @@ class _AuthGateState extends ConsumerState<AuthGate> {
         // but always honour an explicit user-initiated sign-out.
         final isOnline = ref.read(connectivityProvider);
         if (!isOnline && !AuthService.consumeUserInitiatedSignOut()) {
-          final cached = await OfflineCache.read<AppProfile>(
-            OfflineCache.profileKey,
-            (json) => AppProfile.fromMap(json as Map<String, dynamic>),
-          );
+          AppProfile? cached;
+          try {
+            cached = await OfflineCache.read<AppProfile>(
+              OfflineCache.profileKey,
+              (json) => AppProfile.fromMap(json as Map<String, dynamic>),
+            );
+          } catch (_) {}
           if (cached != null && mounted) {
             ref.read(profileProvider.notifier).set(cached);
             setState(() { _loading = false; _showPasswordRecovery = false; });

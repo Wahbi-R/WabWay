@@ -50,6 +50,10 @@ mixin AsyncScreenMixin<T extends StatefulWidget> on State<T> {
   /// Returns the generation token — pass it unchanged to [commitLoad],
   /// [failLoad], or [isStale].
   int beginLoad({bool silent = false}) {
+    // Don't supersede an in-progress non-silent load with a background refresh:
+    // the non-silent result would be discarded as stale. Return -1 so any
+    // commitLoad/failLoad call for this silent load is immediately a no-op.
+    if (silent && loading) return -1;
     final gen = ++_loadGen;
     if (!silent) {
       setState(() {
@@ -62,9 +66,9 @@ mixin AsyncScreenMixin<T extends StatefulWidget> on State<T> {
     return gen;
   }
 
-  /// Returns `true` if [gen] is stale — the widget was unmounted or a newer
-  /// load has started. Use to short-circuit async callbacks.
-  bool isStale(int gen) => !mounted || gen != _loadGen;
+  /// Returns `true` if [gen] is stale — the widget was unmounted, a newer
+  /// load has started, or [gen] is -1 (silent load that was pre-empted).
+  bool isStale(int gen) => !mounted || gen < 0 || gen != _loadGen;
 
   /// Commits a successful load. Runs [onData] inside [setState] along with
   /// clearing [loading], [error], and [offline]. No-ops when stale.

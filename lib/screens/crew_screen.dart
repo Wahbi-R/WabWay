@@ -49,6 +49,7 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
   final _scrollController = ScrollController();
   final _textController = TextEditingController();
 
+  int _loadGen = 0;
   String? _tripId;
   String? _userId;
 
@@ -81,13 +82,14 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
   }
 
   Future<void> _load(String tripId) async {
+    final gen = ++_loadGen;
     setState(() => _loadingMessages = true);
     try {
       final results = await Future.wait([
         CrewService.fetchMessages(tripId),
         CrewService.fetchActiveLocations(tripId),
       ]);
-      if (!mounted) return;
+      if (!mounted || gen != _loadGen) return;
       setState(() {
         _messages = results[0] as List<TripMessage>;
         _locations = results[1] as List<LocationShare>;
@@ -96,7 +98,7 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
       _scrollToBottom();
       _subscribe(tripId);
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || gen != _loadGen) return;
       setState(() => _loadingMessages = false);
     }
   }

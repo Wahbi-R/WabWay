@@ -35,7 +35,7 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
   Future<void> _load() async {
     final tripId = _activeTripId;
     final info = await EmergencyService.fetch(tripId);
-    if (!mounted) return;
+    if (!mounted || tripId != _activeTripId) return;
     setState(() {
       _info = info;
       _loading = false;

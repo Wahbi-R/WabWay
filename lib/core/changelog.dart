@@ -11,6 +11,17 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 345,
+    label: 'Fix: stuck spinners, wrong trip data, and offline banner reliability',
+    changes: [
+      'Corrupt cached data no longer causes a permanent loading spinner with no way to recover',
+      'The offline banner now appears correctly even when a background refresh fails during startup',
+      'Background refreshes no longer throw away a successful data load that finished at the same time',
+      'Switching trips on the pinboard, crew chat, and emergency screens now always shows the correct trip\'s data',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 344,
     label: 'Fix: loading, error, and offline states are now consistent across all screens',
     changes: [

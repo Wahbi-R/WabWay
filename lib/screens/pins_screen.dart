@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show RealtimeChannel;
+import '../core/async_screen_mixin.dart';
 import '../core/providers/profile_provider.dart';
 import '../core/providers/trip_provider.dart';
 import '../core/supabase/pins_service.dart';
@@ -18,9 +19,8 @@ class PinsScreen extends ConsumerStatefulWidget {
   ConsumerState<PinsScreen> createState() => _PinsScreenState();
 }
 
-class _PinsScreenState extends ConsumerState<PinsScreen> {
+class _PinsScreenState extends ConsumerState<PinsScreen> with AsyncScreenMixin {
   List<TripPin> _pins = [];
-  bool _loading = true;
   String _tripId = '';
   String _myId = '';
   RealtimeChannel? _channel;
@@ -50,9 +50,13 @@ class _PinsScreenState extends ConsumerState<PinsScreen> {
   }
 
   Future<void> _load({bool silent = false}) async {
-    if (!silent) setState(() => _loading = true);
-    final pins = await PinsService.fetchAll(_tripId);
-    if (mounted) setState(() { _pins = pins; _loading = false; });
+    final gen = beginLoad(silent: silent);
+    try {
+      final pins = await PinsService.fetchAll(_tripId);
+      commitLoad(gen, () => _pins = pins);
+    } catch (_) {
+      failLoad(gen, silent: silent);
+    }
   }
 
   void _addPin() async {
@@ -117,11 +121,17 @@ class _PinsScreenState extends ConsumerState<PinsScreen> {
       if (next != _tripId) {
         _tripId = next;
         _myId = ref.read(profileProvider)?.id ?? '';
+        _channel?.unsubscribe();
+        _channel = PinsService.subscribe(_tripId, () {
+          _debounce?.cancel();
+          _debounce = Timer(
+              const Duration(milliseconds: 400), () => _load(silent: true));
+        });
         _load();
       }
     });
 
-    if (_loading) return const WabwayLoadingScaffold();
+    if (loading) return const WabwayLoadingScaffold();
 
     return Scaffold(
       backgroundColor: kColorCream,

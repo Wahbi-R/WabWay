@@ -985,8 +985,10 @@ class _PinboardCardState extends State<_PinboardCard> {
   }
 
   Future<void> _load() async {
-    final pins = await PinsService.fetchPinned(widget.tripId);
-    if (mounted) setState(() { _pins = pins; _loaded = true; });
+    try {
+      final pins = await PinsService.fetchPinned(widget.tripId);
+      if (mounted) setState(() { _pins = pins; _loaded = true; });
+    } catch (_) {}
   }
 
   @override

@@ -9,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart'
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/providers/profile_provider.dart';
 import '../core/providers/trip_provider.dart';
+import '../core/async_screen_mixin.dart';
 import '../core/supabase/accommodation_service.dart';
 import '../data/connection_data.dart' show EntityType;
 import 'shared/connections_section.dart';
@@ -43,21 +44,15 @@ class SpotsScreen extends ConsumerStatefulWidget {
   ConsumerState<SpotsScreen> createState() => _SpotsScreenState();
 }
 
-class _SpotsScreenState extends ConsumerState<SpotsScreen> {
+class _SpotsScreenState extends ConsumerState<SpotsScreen> with AsyncScreenMixin {
   List<Spot> _spots = [];
   List<TripDocument> _docs = [];
   List<Accommodation> _stays = [];
   Map<String, VoteType> _myVotes = {};
-  bool _loading = true;
-  bool _error = false;
-  bool _offline = false;
 
   String? _activeTripId;
   RealtimeChannel? _realtimeChannel;
   Timer? _debounce;
-  int _loadGen = 0;
-  // Tracks spots for which we've already kicked off a thumbnail fetch this session.
-  // Without this, every silent reload would re-request images that already failed.
 
   String? _selectedId;
   SpotCategory? _filterCategory;
@@ -146,14 +141,14 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
   Future<void> _loadSpots({bool silent = false}) async {
     final tripId = _activeTripId;
     if (tripId == null) return;
-    final gen = ++_loadGen;
-    if (!silent) setState(() { _loading = true; _error = false; _offline = false; _spots = []; _docs = []; _stays = []; _myVotes = {}; });
+    final gen = beginLoad(silent: silent);
+    if (!silent) setState(() { _spots = []; _docs = []; _stays = []; _myVotes = {}; });
 
     if (!silent) {
       final cachedSpots = await SpotService.loadSpotsFromCache(tripId);
       final cachedDocs  = await DocService.loadDocumentsFromCache(tripId);
       final cachedStays = await AccommodationService.loadFromCache(tripId);
-      if (!mounted || gen != _loadGen) return;
+      if (isStale(gen)) return;
       if (cachedSpots != null) {
         final myId = supabase.auth.currentUser?.id;
         final cachedVotes = <String, VoteType>{};
@@ -172,7 +167,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
           _docs    = cachedDocs ?? [];
           _stays   = cachedStays ?? [];
           _myVotes = cachedVotes;
-          _loading = false;
+          loading  = false;
         });
       }
     }
@@ -183,11 +178,11 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
       // Accommodations fetched concurrently but caught separately so a transient
       // failure doesn't prevent spots from loading.
       final staysFuture = AccommodationService.loadAll(tripId)
-          .catchError((_) => <Accommodation>[]);
+          .then<List<Accommodation>?>((v) => v, onError: (_) => null);
       final spots = await spotsFuture;
       final docs  = await docsFuture;
-      final stays = await staysFuture;
-      if (!mounted || gen != _loadGen) return;
+      final stays = await staysFuture; // null means fetch failed; keep cached _stays
+      if (isStale(gen)) return;
 
       final myId = supabase.auth.currentUser?.id;
       final myVotes = <String, VoteType>{};
@@ -202,28 +197,30 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
         }
       }
 
-      setState(() {
+      commitLoad(gen, () {
         _spots = spots;
         _docs = docs;
-        _stays = stays;
+        if (stays != null) _stays = stays;
         _myVotes = myVotes;
-        _loading = false;
-        _offline = false;
       });
     } catch (_) {
-      if (!mounted || gen != _loadGen) return;
-      if (silent) { setState(() => _offline = true); return; }
-      if (_spots.isEmpty) {
-        setState(() { _loading = false; _error = true; });
-      } else {
-        setState(() { _loading = false; _offline = true; });
-      }
+      failLoad(gen, silent: silent);
     }
   }
 
   // Fired after every successful load. Kicks off background Wikipedia lookups
   // for spots that have no image yet. Each lookup is fire-and-forget — results
   // stream in over ~1-2 seconds and update the list row by row.
+  List<Accommodation> get _filteredStays {
+    final q = _searchQuery.toLowerCase();
+    if (q.isEmpty) return _stays;
+    return _stays.where((s) =>
+      s.name.toLowerCase().contains(q) ||
+      s.city.toLowerCase().contains(q) ||
+      (s.address?.toLowerCase().contains(q) ?? false)
+    ).toList();
+  }
+
   List<Spot> get _filtered {
     final list = _spots.where((s) {
       final q = _searchQuery.toLowerCase();
@@ -322,8 +319,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
         await SpotService.upsertVote(spotId: spotId, userId: myId, vote: type);
       }
     } catch (_) {
-      // Revert on failure
-      await _loadSpots();
+      await _loadSpots(silent: true);
     }
   }
 
@@ -650,13 +646,14 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
     ref.listen<String>(activeTripIdProvider, (prev, next) {
       if (next != _activeTripId) {
         _activeTripId = next;
+        _exitSelectionMode();
         _loadSpots();
         _subscribeRealtime(next);
       }
     });
-    if (_loading) return const WabwayLoadingScaffold();
+    if (loading) return const WabwayLoadingScaffold();
 
-    if (_error) {
+    if (error) {
       return Scaffold(
         backgroundColor: kColorCream,
         body: Center(
@@ -680,7 +677,8 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
         ? _DesktopLayout(
             spots: _filterStays ? const [] : _filtered,
             allSpots: _spots,
-            stays: _stays,
+            stays: _filteredStays,
+            totalStayCount: _stays.length,
             docs: _docs,
             selected: _selected,
             myVotes: _myVotes,
@@ -727,7 +725,8 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
         : _MobileLayout(
             spots: _filterStays ? const [] : _filtered,
             allSpots: _spots,
-            stays: _stays,
+            stays: _filteredStays,
+            totalStayCount: _stays.length,
             myVotes: _myVotes,
             filterCategory: _filterCategory,
             filterStays: _filterStays,
@@ -767,7 +766,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
             onExport: _exportSpots,
             onAdd: () => _addSpot(context),
           );
-    if (!_offline) return body;
+    if (!offline) return body;
     return Stack(
       children: [
         body,
@@ -807,6 +806,7 @@ class _MobileLayout extends StatelessWidget {
     required this.spots,
     required this.allSpots,
     required this.stays,
+    required this.totalStayCount,
     required this.myVotes,
     required this.filterCategory,
     required this.filterStays,
@@ -838,6 +838,7 @@ class _MobileLayout extends StatelessWidget {
   final List<Spot> spots;
   final List<Spot> allSpots;
   final List<Accommodation> stays;
+  final int totalStayCount;
   final Map<String, VoteType> myVotes;
   final SpotCategory? filterCategory;
   final bool filterStays;
@@ -969,7 +970,7 @@ class _MobileLayout extends StatelessWidget {
             child: _CategoryFilterStrip(
               selected: filterCategory,
               staysSelected: filterStays,
-              stayCount: stays.length,
+              stayCount: totalStayCount,
               onChanged: onFilterCategory,
               onStaysSelected: onFilterStays,
               spots: allSpots,
@@ -1077,6 +1078,7 @@ class _DesktopLayout extends StatelessWidget {
     required this.spots,
     required this.allSpots,
     required this.stays,
+    required this.totalStayCount,
     required this.docs,
     required this.selected,
     required this.myVotes,
@@ -1112,6 +1114,7 @@ class _DesktopLayout extends StatelessWidget {
   final List<Spot> spots;
   final List<Spot> allSpots;
   final List<Accommodation> stays;
+  final int totalStayCount;
   final List<TripDocument> docs;
   final Spot? selected;
   final Map<String, VoteType> myVotes;
@@ -1176,7 +1179,7 @@ class _DesktopLayout extends StatelessWidget {
                       _CategoryFilterStrip(
                         selected: filterCategory,
                         staysSelected: filterStays,
-                        stayCount: stays.length,
+                        stayCount: totalStayCount,
                         onChanged: onFilterCategory,
                         onStaysSelected: onFilterStays,
                         spots: allSpots,

@@ -182,6 +182,7 @@ class _AddItemContentState extends State<_AddItemContent> {
       _notesCtrl.text    = item.notes ?? '';
       _type              = item.type;
       _linkedSpotId      = item.linkedSpotId;
+      _linkedStayId      = item.linkedStayId;
       _linkedDocIds.addAll(item.linkedDocIds);
       if (item.plannedCost != null) {
         _costCtrl.text = item.plannedCost!.toStringAsFixed(
@@ -221,10 +222,14 @@ class _AddItemContentState extends State<_AddItemContent> {
     setState(() {
       _titleCtrl.text    = spot.name;
       _cityCtrl.text     = spot.city.isNotEmpty ? spot.city : spot.area;
-      _locationCtrl.text = '';
+      _locationCtrl.text = spot.address ?? '';
+      _confirmCtrl.text = '';
       if (spot.mapsUrl != null) {
         _mapsCtrl.text = spot.mapsUrl!;
         _showAdvanced  = true;
+      } else {
+        _mapsCtrl.text = '';
+        _showAdvanced  = false;
       }
       _linkedSpotId  = spot.id;
       _linkedStayId  = null;
@@ -244,6 +249,9 @@ class _AddItemContentState extends State<_AddItemContent> {
       _linkedStayId      = stay.id;
       _linkedSpotId      = null;
       _type              = ItineraryItemType.stay;
+      _mapsCtrl.text    = '';
+      _confirmCtrl.text = '';
+      _showAdvanced     = false;
     });
   }
 
@@ -265,8 +273,8 @@ class _AddItemContentState extends State<_AddItemContent> {
       location:        _locationCtrl.text.trim().isEmpty ? null : _locationCtrl.text.trim(),
       city:            _cityCtrl.text.trim().isEmpty ? null : _cityCtrl.text.trim(),
       country:         _countryCtrl.text.trim().isEmpty ? null : _countryCtrl.text.trim(),
-      mapsUrl:         _mapsCtrl.text.trim().isEmpty ? null : _mapsCtrl.text.trim(),
-      confirmationUrl: _confirmCtrl.text.trim().isEmpty ? null : _confirmCtrl.text.trim(),
+      mapsUrl:         _mapsCtrl.text.trim().isNotEmpty ? _mapsCtrl.text.trim() : null,
+      confirmationUrl: _confirmCtrl.text.trim().isNotEmpty ? _confirmCtrl.text.trim() : null,
       notes:           _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
       linkedSpotId:    _linkedSpotId,
       linkedStayId:    _linkedStayId,

@@ -11,6 +11,305 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 350,
+    label: 'Test suite improvements',
+    changes: [
+      'Under-the-hood: integration tests now reliably skip the onboarding screen on fresh installs so every navigation test actually exercises the real screens',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 349,
+    label: 'Test suite improvements',
+    changes: [
+      'Under-the-hood: test suite reliability improved — the basic smoke test no longer requires a live Supabase connection to run',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 348,
+    label: 'Fix: stale trips, crew chat state, and plan data reliability',
+    changes: [
+      'Leaving all your trips now correctly clears the local cache — reopening the app offline no longer shows trips you\'ve left',
+      'Switching trips while offline no longer shows the previous trip\'s chat messages',
+      'Crew chat shows a refresh-failed notice with a retry tap when messages are already loaded',
+      'A plan screen load failure no longer erases your cached accommodation data',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 347,
+    label: 'Fix: offline data, crew error state, and plan loading reliability',
+    changes: [
+      'Switching trips while offline no longer shows the previous trip\'s crew members',
+      'Your cached trips are no longer erased if you temporarily have no active trips',
+      'Crew chat now shows a "Could not load" message with a Retry button on network failure',
+      'Loading the plan screen is more reliable — a single service error no longer silently breaks the others',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 346,
+    label: 'Fix: Retry button, realtime reliability, and offline trip switch',
+    changes: [
+      'The Retry button on the offline banner now always triggers a fresh reload',
+      'Adding all trip days to the plan no longer blocks live updates from syncing in the background',
+      'Crew chat and location tabs now reconnect correctly even after a failed initial load',
+      'Switching trips while offline now correctly shows the right trip\'s data',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 345,
+    label: 'Fix: stuck spinners, wrong trip data, and offline banner reliability',
+    changes: [
+      'Corrupt cached data no longer causes a permanent loading spinner with no way to recover',
+      'The offline banner now appears correctly even when a background refresh fails during startup',
+      'Background refreshes no longer throw away a successful data load that finished at the same time',
+      'Switching trips on the pinboard, crew chat, and emergency screens now always shows the correct trip\'s data',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 344,
+    label: 'Fix: loading, error, and offline states are now consistent across all screens',
+    changes: [
+      'All screens now share a single loading pattern — fixing a bug on one screen automatically covers the same case everywhere else',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 343,
+    label: 'Fix: sign-in, links, and trip-switch reliability',
+    changes: [
+      'The name entry screen no longer freezes after successfully setting your display name',
+      'Confirming link deletion can no longer crash if you navigate away while the dialog is open',
+      'Rapidly switching between trips no longer loads the wrong trip\'s members',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 342,
+    label: 'Fix: map and trip-switch reliability improvements',
+    changes: [
+      'Switching trips no longer briefly shows the previous trip\'s spots on the map',
+      'The map no longer snaps back to an older spot list when a refresh and a realtime update overlap',
+      'Switching trips quickly no longer occasionally jumps you back to the previous trip',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 341,
+    label: 'Fix: deleting a link now shows an error if it fails',
+    changes: [
+      'If deleting a link via the confirmation dialog fails, you now see an error message explaining why the link reappeared — matching the behaviour of swipe-to-delete',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 340,
+    label: 'Fix: offline receipt sync and auto-link reliability',
+    changes: [
+      'A single item with a missing name can no longer cause all auto-detected links to disappear from the links screen',
+      'Offline receipts queued while disconnected can no longer be uploaded twice when connectivity returns',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 339,
+    label: 'Fix: plan item URLs preserved when collapsing advanced section',
+    changes: [
+      'Collapsing the advanced section of a plan item and saving no longer wipes the Maps URL and confirmation number that were already saved — those fields are only cleared when you explicitly empty them',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 338,
+    label: 'Fix: "Add to Plan" from a spot now saves the spot link',
+    changes: [
+      'Adding a plan item directly from a spot\'s detail page now correctly saves the link to that spot — previously the link was silently dropped and the plan item appeared unlinked',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 337,
+    label: 'Fix: crew chat and accommodation reliability fixes',
+    changes: [
+      'If a crew message fails to send, your typed text is now preserved in the field so you can try again instead of losing it',
+      'Opening an accommodation for editing now shows the linked spot\'s name instead of a generic placeholder',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 336,
+    label: 'Fix: shopping save and trip switch reliability fixes',
+    changes: [
+      'Saving a shopping list item no longer permanently freezes if the network request fails — the Save button re-enables so you can try again',
+      'Switching trips after an initial load error no longer keeps the error screen visible once the switch succeeds',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 335,
+    label: 'Fix: error screen now clears when data reloads successfully',
+    changes: [
+      'Docs, money, and accommodations screens now properly dismiss the error message once a background refresh succeeds, instead of keeping the error visible with fresh data behind it',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 334,
+    label: 'Fix: error screen no longer sticks after a successful refresh',
+    changes: [
+      'If the plan or travel screen failed to load once and then refreshed successfully in the background, the error message no longer stays on screen with the new data hidden behind it',
+      'Tapping a vote button no longer briefly wipes the entire spots list if the vote fails to save',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 333,
+    label: 'Fix: connection removal failure now shows an error message',
+    changes: [
+      'If removing a connection fails due to a network error, you now see a message explaining why the chip reappeared instead of it silently coming back',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 332,
+    label: 'Fix: connection chips always show the right entity',
+    changes: [
+      'Switching quickly between items no longer briefly shows connections from the previous item',
+      'If a network error reverses a connection removal, the chip is no longer incorrectly added to the wrong item when you switch items at the same time',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 331,
+    label: 'Fix: plan item connections now show correct day label',
+    changes: [
+      'Connection chips linking to a plan item now always show "Title (Day N)" — the format is now consistent whether you just added the connection or reopened the screen',
+      'If the screen stays open while you switch to a different entity, connection chips now correctly reload for the new item instead of showing stale connections from the previous one',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 330,
+    label: 'Fix: connection chips and plan screen minor reliability fixes',
+    changes: [
+      'If removing a connection fails due to a network error, the chip now reappears in its original position instead of jumping to the end of the list',
+      'Adding all trip days no longer leaves the offline banner visible after the operation succeeds',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 329,
+    label: 'Fix: editing a plan item no longer removes its accommodation link',
+    changes: [
+      'Opening an existing plan item to edit it no longer silently disconnects it from the accommodation it was linked to when you save',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 328,
+    label: 'Fix: removing a connection now rolls back if the network fails',
+    changes: [
+      'Removing a connection chip while offline no longer permanently deletes it from the screen — if the network call fails, the chip reappears automatically',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 327,
+    label: 'Fix: connection chip names always up to date after adding a stay',
+    changes: [
+      'Connection chips on detail screens now correctly show the name of a stay that was added to the trip after the screen first loaded',
+      'Tapping a stay connection chip now reliably opens the stay — it no longer silently does nothing when the stay list was cached from a previous load',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 326,
+    label: 'Fix: offline banner and error state no longer show at the same time',
+    changes: [
+      'After a brief network drop and recovery, the offline banner now correctly disappears when you tap Retry — it no longer stays on screen alongside the error message',
+      'Trips with no accommodations no longer trigger a network fetch every time you tap a connection chip',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 325,
+    label: 'Fix: plan items, connections, links, and photos reliability',
+    changes: [
+      'Switching between spots in the plan item sheet now correctly clears any stale Maps or Confirmation links from the previous spot',
+      'Linking a stay to a plan item now also clears any stale Confirmation link left from a previous entry',
+      'The Connected section on detail screens no longer freezes on a spinner when the network is unavailable',
+      'Links and Photos screens now show the correct trip\'s data immediately after switching trips',
+      'Connection name chips no longer go blank for large itineraries when a single network request fails',
+      'The link-to item picker now loads whichever categories succeed even if one category\'s request fails',
+      'The Plan screen loading spinner no longer gets permanently stuck after a background sync completes',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 324,
+    label: 'Fix: reliability improvements across plan, packing, shopping, and connections',
+    changes: [
+      'Picking a spot with no Maps link no longer secretly carries over the previous spot\'s Maps URL when you save the plan item',
+      'Stay connection chips now reliably navigate even for trips that had no stays at all when the app last synced',
+      'Opening the "connect to…" sheet no longer freezes on a permanent spinner when a network call fails',
+      'The Packing and Shopping screens no longer get stuck on a loading spinner after a failed background sync',
+      'Adding all trip days at once no longer causes the spinner to briefly disappear mid-operation',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 323,
+    label: 'Fix: loading spinners and data reliability across all screens',
+    changes: [
+      'Fixed a bug where the loading spinner could get permanently stuck on the Docs, Plan, Photos, Links, and Accommodations screens',
+      'Stays no longer disappear from the Spots and Plan screens when a network hiccup affects only the stays fetch',
+      'Picking a stay after previously picking a spot no longer carries over the spot\'s Maps link',
+      'Switching between spots in the plan item sheet now correctly collapses the Maps section when the new spot has no link',
+      'The offline banner now clears correctly after a member reload succeeds',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 322,
+    label: 'Fix: stay search, chip count, spinner, and navigation reliability',
+    changes: [
+      'Searching stays by address now works — previously only name and city were matched',
+      'The "Stays" filter chip no longer disappears when you type a search that matches spots but not stays',
+      'The Travel screen no longer gets stuck on a loading spinner when a background refresh races the initial load',
+      'Switching trips clears the offline banner when the switch succeeds over the network',
+      'Picking a spot without a Maps link no longer keeps a previous spot\'s link in the plan item',
+      'Connection lookups for large itineraries now run in parallel, reducing load time',
+      'Fixed a rare case where going offline briefly could permanently block stay chip navigation',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 321,
+    label: 'Fix: reliability improvements across Spots, Plan, Money and Connections',
+    changes: [
+      'Stays now show up correctly when you search in the Spots screen',
+      'Plan items now carry the spot\'s address when you pick a spot from the list',
+      'Switching trips clears any active multi-select in Spots automatically',
+      'Switching trips no longer leaves the screen in a broken state when offline and uncached',
+      'Stays chips in connections panels open instantly without re-fetching from the network every tap',
+      'Connection lookups for large itineraries no longer hit a URL length limit',
+      'Fixed a spinner that could get stuck indefinitely when a background data refresh failed',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 320,
+    label: 'Fix: "Add all days" button now visible in Plan toolbar',
+    changes: [
+      '"Add all days" icon now appears in the Plan toolbar when your trip has a date range set — previously it was hidden by overflow',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 319,
     label: 'Fix: stay details open instantly from cache',
     changes: [

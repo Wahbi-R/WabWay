@@ -54,20 +54,31 @@ class TripNotifier extends StateNotifier<TripData> {
     if (!silent) state = state.copyWith(loading: true, error: false, offline: false);
     try {
       final trips = await TripService.loadUserTrips();
-      await OfflineCache.write(
-        OfflineCache.userTripsKey,
-        trips.map((t) => t.toMap()).toList(),
-      );
+      // Always persist what the server returned — even [] evicts a stale cache
+      // so a user who left all trips won't see phantom trips on the next offline launch.
+      try {
+        await OfflineCache.write(
+          OfflineCache.userTripsKey,
+          trips.map((t) => t.toMap()).toList(),
+        );
+      } catch (_) {}
       if (trips.isEmpty) {
         state = state.copyWith(trips: [], members: [], loading: false, offline: false);
         return;
       }
       final idx     = state.selectedIndex.clamp(0, trips.length - 1);
       final members = await TripService.loadTripMembers(trips[idx].id);
-      await OfflineCache.write(
-        OfflineCache.membersKey(trips[idx].id),
-        members.map((m) => m.toMap()).toList(),
-      );
+      try {
+        await OfflineCache.write(
+          OfflineCache.membersKey(trips[idx].id),
+          members.map((m) => m.toMap()).toList(),
+        );
+      } catch (_) {}
+      // If switchTrip() completed while we were fetching members, don't revert it.
+      if (state.selectedIndex != idx) {
+        state = state.copyWith(trips: trips, loading: false, offline: false);
+        return;
+      }
       state = state.copyWith(
         trips:        trips,
         members:      members,
@@ -77,23 +88,29 @@ class TripNotifier extends StateNotifier<TripData> {
       );
     } catch (_) {
       if (silent) {
-        state = state.copyWith(offline: true);
+        state = state.copyWith(loading: false, offline: true);
         return;
       }
-      final cachedTrips = await OfflineCache.read<List<AppTrip>>(
-        OfflineCache.userTripsKey,
-        (json) => (json as List)
-            .map((m) => AppTrip.fromMap(m as Map<String, dynamic>))
-            .toList(),
-      );
+      List<AppTrip>? cachedTrips;
+      try {
+        cachedTrips = await OfflineCache.read<List<AppTrip>>(
+          OfflineCache.userTripsKey,
+          (json) => (json as List)
+              .map((m) => AppTrip.fromMap(m as Map<String, dynamic>))
+              .toList(),
+        );
+      } catch (_) {}
       if (cachedTrips != null && cachedTrips.isNotEmpty) {
         final idx = state.selectedIndex.clamp(0, cachedTrips.length - 1);
-        final cachedMembers = await OfflineCache.read<List<AppTripMember>>(
-          OfflineCache.membersKey(cachedTrips[idx].id),
-          (json) => (json as List)
-              .map((m) => AppTripMember.fromMap(m as Map<String, dynamic>))
-              .toList(),
-        ) ?? const [];
+        List<AppTripMember> cachedMembers = const [];
+        try {
+          cachedMembers = await OfflineCache.read<List<AppTripMember>>(
+            OfflineCache.membersKey(cachedTrips[idx].id),
+            (json) => (json as List)
+                .map((m) => AppTripMember.fromMap(m as Map<String, dynamic>))
+                .toList(),
+          ) ?? const [];
+        } catch (_) {}
         state = state.copyWith(
           trips:         cachedTrips,
           members:       cachedMembers,
@@ -115,34 +132,51 @@ class TripNotifier extends StateNotifier<TripData> {
     if (tripId != null) await SyncQueue.drain(tripId, userId);
   }
 
+  bool _switching = false;
+
   Future<void> switchTrip(AppTrip trip) async {
+    if (_switching) return;
     final idx = state.trips.indexWhere((t) => t.id == trip.id);
     if (idx < 0 || idx == state.selectedIndex) return;
-    state = state.copyWith(loading: true);
+    _switching = true;
+    state = state.copyWith(loading: true, error: false);
     try {
       final members = await TripService.loadTripMembers(trip.id);
-      await OfflineCache.write(
-        OfflineCache.membersKey(trip.id),
-        members.map((m) => m.toMap()).toList(),
-      );
+      try {
+        await OfflineCache.write(
+          OfflineCache.membersKey(trip.id),
+          members.map((m) => m.toMap()).toList(),
+        );
+      } catch (_) {}
       state = state.copyWith(
         selectedIndex: idx,
         members:       members,
         loading:       false,
+        offline:       false,
+        error:         false,
       );
     } catch (_) {
-      final cached = await OfflineCache.read<List<AppTripMember>>(
-        OfflineCache.membersKey(trip.id),
-        (json) => (json as List)
-            .map((e) => AppTripMember.fromMap(e as Map<String, dynamic>))
-            .toList(),
-      );
-      state = state.copyWith(
-        selectedIndex: idx,
-        members:       cached ?? [],
-        loading:       false,
-        offline:       true,
-      );
+      List<AppTripMember>? cached;
+      try {
+        cached = await OfflineCache.read<List<AppTripMember>>(
+          OfflineCache.membersKey(trip.id),
+          (json) => (json as List)
+              .map((e) => AppTripMember.fromMap(e as Map<String, dynamic>))
+              .toList(),
+        );
+      } catch (_) {}
+      if (cached != null) {
+        state = state.copyWith(
+          selectedIndex: idx,
+          members:       cached,
+          loading:       false,
+          offline:       true,
+        );
+      } else {
+        state = state.copyWith(selectedIndex: idx, members: const [], loading: false, offline: true);
+      }
+    } finally {
+      _switching = false;
     }
   }
 
@@ -151,7 +185,7 @@ class TripNotifier extends StateNotifier<TripData> {
     try {
       final members =
           await TripService.loadTripMembers(state.trips[state.selectedIndex].id);
-      state = state.copyWith(members: members);
+      state = state.copyWith(members: members, offline: false);
     } catch (_) {}
   }
 

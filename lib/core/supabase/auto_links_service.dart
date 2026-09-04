@@ -30,7 +30,7 @@ class AutoLinksService {
         .map((r) => AutoLink(
               source: AutoLinkSource.spot,
               itemId: r['id'] as String,
-              itemName: r['name'] as String,
+              itemName: (r['name'] as String?) ?? '',
               url: r['source_url'] as String,
             ))
         .toList();
@@ -47,7 +47,7 @@ class AutoLinksService {
         .map((r) => AutoLink(
               source: AutoLinkSource.shopping,
               itemId: r['id'] as String,
-              itemName: r['name'] as String,
+              itemName: (r['name'] as String?) ?? '',
               url: r['link_url'] as String,
             ))
         .toList();
@@ -64,7 +64,7 @@ class AutoLinksService {
         .map((r) => AutoLink(
               source: AutoLinkSource.itinerary,
               itemId: r['id'] as String,
-              itemName: r['title'] as String,
+              itemName: (r['title'] as String?) ?? '',
               url: r['confirmation_url'] as String,
             ))
         .toList();
@@ -81,7 +81,7 @@ class AutoLinksService {
         .map((r) => AutoLink(
               source: AutoLinkSource.travel,
               itemId: r['id'] as String,
-              itemName: r['title'] as String,
+              itemName: (r['title'] as String?) ?? '',
               url: r['url'] as String,
             ))
         .toList();
@@ -98,7 +98,7 @@ class AutoLinksService {
         .map((r) => AutoLink(
               source: AutoLinkSource.accommodation,
               itemId: r['id'] as String,
-              itemName: r['name'] as String,
+              itemName: (r['name'] as String?) ?? '',
               url: r['url'] as String,
             ))
         .toList();

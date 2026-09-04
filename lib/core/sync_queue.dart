@@ -6,6 +6,7 @@ import '../data/money_data.dart';
 /// Queues failed receipt creates so they can be replayed when connectivity returns.
 abstract final class SyncQueue {
   static const _prefix = 'sync_queue_receipts_';
+  static bool _draining = false;
 
   static String _key(String tripId) => '$_prefix$tripId';
 
@@ -63,8 +64,11 @@ abstract final class SyncQueue {
 
   /// Drain queued receipts for [tripId]. Removes successfully replayed entries.
   static Future<void> drain(String tripId, String userId) async {
+    if (_draining) return;
+    _draining = true;
+    try {
     final list = await _pending(tripId);
-    if (list.isEmpty) return;
+    if (list.isEmpty) { _draining = false; return; }
 
     final failed = <Map<String, dynamic>>[];
     for (final item in list) {
@@ -106,6 +110,9 @@ abstract final class SyncQueue {
       }
     }
     await _save(tripId, failed);
+    } finally {
+      _draining = false;
+    }
   }
 
   static Future<int> pendingCount() async {

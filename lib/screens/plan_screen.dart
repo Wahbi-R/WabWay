@@ -25,6 +25,7 @@ import '../data/docs_data.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
+import '../core/async_screen_mixin.dart';
 import '../widgets/widgets.dart';
 import 'plan/day_card.dart';
 import 'plan/item_detail.dart';
@@ -38,21 +39,17 @@ class PlanScreen extends ConsumerStatefulWidget {
   ConsumerState<PlanScreen> createState() => _PlanScreenState();
 }
 
-class _PlanScreenState extends ConsumerState<PlanScreen> {
+class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
   final List<TripDay> _days = [];
   final List<Spot> _spots = [];
   final List<TripDocument> _docs = [];
   final List<Accommodation> _stayItems = [];
 
-  bool _loading = false;
-  bool _offline = false;
-  String? _error;
   String _activeTripId = '';
   String _userId = '';
 
   RealtimeChannel? _channel;
   Timer? _debounce;
-  int _loadGen = 0;
 
   String? _selectedItemId;
   String? _selectedDayId;
@@ -198,8 +195,8 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
   // real-time CDC events — the loading spinner stays hidden to avoid a flash.
   Future<void> _loadAll({bool silent = false}) async {
     if (_activeTripId.isEmpty) return;
-    final gen = ++_loadGen;
-    if (!silent) setState(() { _loading = true; _error = null; _offline = false; _days.clear(); _spots.clear(); _docs.clear(); _stayItems.clear(); });
+    final gen = beginLoad(silent: silent);
+    if (!silent) setState(() { _days.clear(); _spots.clear(); _docs.clear(); _stayItems.clear(); });
 
     if (!silent) {
       final cachedDaysFuture  = PlanService.loadFromCache(_activeTripId);
@@ -210,7 +207,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
       final cachedSpots = await cachedSpotsFuture;
       final cachedDocs  = await cachedDocsFuture;
       final cachedStays = await cachedStaysFuture;
-      if (!mounted || gen != _loadGen) return;
+      if (isStale(gen)) return;
       if (cachedDays != null) {
         setState(() {
           _days..clear()..addAll(cachedDays)..sort((a, b) {
@@ -220,39 +217,39 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
           _spots..clear()..addAll(cachedSpots ?? []);
           _docs..clear()..addAll(cachedDocs ?? []);
           _stayItems..clear()..addAll(cachedStays ?? []);
-          _loading = false;
+          loading = false;
         });
       }
     }
 
     try {
-      final daysFuture  = PlanService.loadAll(_activeTripId);
-      final spotsFuture = SpotService.loadSpots(_activeTripId);
-      final docsFuture  = DocService.loadDocuments(_activeTripId);
-      final staysFuture = AccommodationService.loadAll(_activeTripId).catchError((_) => <Accommodation>[]);
-      final days  = await daysFuture;
-      final spots = await spotsFuture;
-      final docs  = await docsFuture;
-      final stays = await staysFuture;
-      if (!mounted || gen != _loadGen) return;
-      setState(() {
+      final results = await Future.wait([
+        PlanService.loadAll(_activeTripId),
+        SpotService.loadSpots(_activeTripId),
+        DocService.loadDocuments(_activeTripId),
+        // Silenced: accommodation failure should not fail the whole plan load,
+        // and null preserves cached stays from the cache-first phase.
+        AccommodationService.loadAll(_activeTripId)
+            .then<List<Accommodation>?>((v) => v, onError: (_) => null),
+      ]);
+      final days  = results[0] as List<TripDay>;
+      final spots = results[1] as List<Spot>;
+      final docs  = results[2] as List<TripDocument>;
+      final stays = results[3] as List<Accommodation>?;
+      commitLoad(gen, () {
         _days..clear()..addAll(days)..sort((a, b) {
           final cmp = a.date.compareTo(b.date);
           return cmp != 0 ? cmp : a.dayNumber.compareTo(b.dayNumber);
         });
         _spots..clear()..addAll(spots);
         _docs..clear()..addAll(docs);
-        _stayItems..clear()..addAll(stays);
-        if (!silent) _loading = false;
-        _offline = false;
+        if (stays != null) { _stayItems..clear()..addAll(stays); }
       });
     } catch (e) {
-      if (!mounted || gen != _loadGen) return;
-      if (silent) { setState(() => _offline = true); return; }
-      if (_days.isEmpty) {
-        setState(() { _loading = false; _error = e.toString(); });
+      if (silent || _days.isNotEmpty) {
+        failLoad(gen, silent: true);
       } else {
-        setState(() { _loading = false; _offline = true; });
+        failLoad(gen, message: e.toString());
       }
     }
   }
@@ -686,7 +683,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
     }
     if (_activeTripId.isEmpty || _userId.isEmpty) return;
 
-    setState(() => _loading = true);
+    final gen = beginLoad();
     int nextDayNumber = _days.isEmpty ? 0 : _days.map((d) => d.dayNumber).reduce((a, b) => a > b ? a : b);
     final newDays = <TripDay>[];
     try {
@@ -702,19 +699,16 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
         );
         newDays.add(day);
       }
-      if (!mounted) return;
-      setState(() {
+      commitLoad(gen, () {
         _days.addAll(newDays);
         _days.sort((a, b) {
           final cmp = a.date.compareTo(b.date);
           return cmp != 0 ? cmp : a.dayNumber.compareTo(b.dayNumber);
         });
-        _loading = false;
       });
-      unawaited(PlanService.writeDaysToCache(_activeTripId, _days));
+      if (!isStale(gen)) unawaited(PlanService.writeDaysToCache(_activeTripId, _days));
     } catch (e) {
-      if (!mounted) return;
-      setState(() => _loading = false);
+      failLoad(gen);
       messenger.showSnackBar(SnackBar(
         content: Text('Failed to add days: $e', style: kStyleBody.copyWith(color: Colors.white)),
         backgroundColor: kColorDanger,
@@ -849,13 +843,13 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
     });
     final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
     final base = isDesktop ? _buildDesktop(context) : _buildMobile(context);
-    if (!_offline) return base;
+    if (!offline) return base;
     return Stack(
       children: [
         base,
         Positioned(
           left: 0, right: 0, bottom: 0,
-          child: OfflineBanner(onRetry: () => _loadAll(silent: true)),
+          child: OfflineBanner(onRetry: _loadAll),
         ),
       ],
     );
@@ -881,14 +875,14 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
                 : null,
           ),
           Expanded(
-            child: _loading
+            child: loading
                 ? const Center(child: CircularProgressIndicator())
-                : _error != null
+                : error
                     ? Center(
                         child: WabwayEmptyState(
                           icon: Icons.error_outline_rounded,
                           title: 'Could not load plan',
-                          description: _error!,
+                          description: errorMessage,
                         ),
                       )
                     : Row(
@@ -1107,11 +1101,11 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
             ],
           ],
           if (() { final t = TripState.maybeOf(context)?.trip; return t?.startDate != null && t?.endDate != null; }())
-            TextButton.icon(
+            IconButton(
+              icon: const Icon(Icons.date_range_rounded, size: 20),
+              tooltip: 'Add all trip days',
+              color: kColorInkSoft,
               onPressed: () => _addAllTripDays(context),
-              icon: const Icon(Icons.date_range_rounded, size: 18),
-              label: Text('All days', style: kStyleCaptionMedium),
-              style: TextButton.styleFrom(foregroundColor: kColorInkSoft),
             ),
           TextButton.icon(
             onPressed: () => _addDay(context),
@@ -1122,14 +1116,14 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
           const SizedBox(width: kSpace2),
         ],
       ),
-      body: _loading
+      body: loading
           ? const WabwayLoadingIndicator()
-          : _error != null
+          : error
               ? Center(
                   child: WabwayEmptyState(
                     icon: Icons.error_outline_rounded,
                     title: 'Could not load plan',
-                    description: _error!,
+                    description: errorMessage,
                   ),
                 )
               : _showCalendar

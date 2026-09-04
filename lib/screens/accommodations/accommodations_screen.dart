@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import '../../core/async_screen_mixin.dart';
 import '../../core/image_cache_manager.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
@@ -29,11 +30,9 @@ class AccommodationsScreen extends ConsumerStatefulWidget {
   ConsumerState<AccommodationsScreen> createState() => _AccommodationsScreenState();
 }
 
-class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen> {
+class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen>
+    with AsyncScreenMixin {
   List<Accommodation> _items = [];
-  bool _loading = true;
-  bool _error   = false;
-  bool _offline  = false;
 
   String? _activeTripId;
   AccommodationStatus? _filterStatus;
@@ -41,7 +40,6 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen> {
   String _search = '';
   RealtimeChannel? _channel;
   Timer? _debounce;
-  int _loadGen = 0;
 
   final _searchCtrl = TextEditingController();
 
@@ -91,27 +89,20 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen> {
   Future<void> _load({bool silent = false}) async {
     final tripId = _activeTripId;
     if (tripId == null) return;
-    final gen = ++_loadGen;
-    if (!silent) setState(() { _loading = true; _error = false; _offline = false; _items = []; });
+    final gen = beginLoad(silent: silent);
+    if (!silent) setState(() => _items = []);
 
     if (!silent) {
       final cached = await AccommodationService.loadFromCache(tripId);
-      if (!mounted || gen != _loadGen) return;
-      if (cached != null) setState(() { _items = cached; _loading = false; });
+      if (isStale(gen)) return;
+      if (cached != null) setState(() { _items = cached; loading = false; });
     }
 
     try {
       final items = await AccommodationService.loadAll(tripId);
-      if (!mounted || gen != _loadGen) return;
-      setState(() { _items = items; _loading = false; _offline = false; });
+      commitLoad(gen, () => _items = items);
     } catch (_) {
-      if (!mounted || gen != _loadGen) return;
-      if (silent) { setState(() => _offline = true); return; }
-      if (_items.isEmpty) {
-        setState(() { _loading = false; _error = true; });
-      } else {
-        setState(() { _loading = false; _offline = true; });
-      }
+      failLoad(gen, silent: silent || _items.isNotEmpty);
     }
   }
 
@@ -236,9 +227,9 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen> {
         _subscribe(next);
       }
     });
-    if (_loading) return const WabwayLoadingScaffold();
+    if (loading) return const WabwayLoadingScaffold();
 
-    if (_error) {
+    if (error) {
       return Scaffold(
         backgroundColor: kColorCream,
         body: Center(
@@ -382,7 +373,7 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen> {
         ),
       ),
     );
-    if (!_offline) return scaffold;
+    if (!offline) return scaffold;
     return Stack(
       children: [
         scaffold,

@@ -3,20 +3,15 @@ import 'client.dart';
 
 class AutoLinksService {
   static Future<Map<AutoLinkSource, List<AutoLink>>> load(String tripId) async {
-    final results = await Future.wait([
-      _loadSpots(tripId),
-      _loadShopping(tripId),
-      _loadItinerary(tripId),
-      _loadTravel(tripId),
-      _loadAccommodations(tripId),
+    // Use explicit keyed futures to avoid fragile positional coupling with the enum.
+    final entries = await Future.wait([
+      _loadSpots(tripId).then((r) => MapEntry(AutoLinkSource.spot, r)),
+      _loadShopping(tripId).then((r) => MapEntry(AutoLinkSource.shopping, r)),
+      _loadItinerary(tripId).then((r) => MapEntry(AutoLinkSource.itinerary, r)),
+      _loadTravel(tripId).then((r) => MapEntry(AutoLinkSource.travel, r)),
+      _loadAccommodations(tripId).then((r) => MapEntry(AutoLinkSource.accommodation, r)),
     ]);
-
-    final map = <AutoLinkSource, List<AutoLink>>{};
-    const sources = AutoLinkSource.values;
-    for (var i = 0; i < sources.length; i++) {
-      if (results[i].isNotEmpty) map[sources[i]] = results[i];
-    }
-    return map;
+    return Map.fromEntries(entries.where((e) => e.value.isNotEmpty));
   }
 
   static Future<List<AutoLink>> _loadSpots(String tripId) async {

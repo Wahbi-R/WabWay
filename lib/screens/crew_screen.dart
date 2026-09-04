@@ -288,13 +288,14 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
     final text = _textController.text.trim();
     if (text.isEmpty || _sending) return;
     setState(() => _sending = true);
+    // Clear immediately so text typed while the send is in-flight isn't wiped.
+    _textController.clear();
     try {
       await CrewService.sendMessage(
         tripId: _tripId!,
         authorId: _userId!,
         body: text,
       );
-      if (mounted) _textController.clear();
       // Refresh immediately so the sender sees their message without waiting
       // for the realtime subscription (which requires the table to be in the
       // Supabase realtime publication).

@@ -196,12 +196,16 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection>
 
   Future<void> _remove(TripConnection c) async {
     final idx = _connections.indexOf(c);
+    // Guard: if realtime already removed c from the list, indexOf returns -1.
+    // Remove by identity to be safe; skip revert insert if c was already gone.
     setState(() => _connections.remove(c));
     try {
       await ConnectionService.remove(c.id);
     } catch (_) {
       if (!mounted) return;
-      setState(() => _connections.insert(idx.clamp(0, _connections.length), c));
+      if (idx >= 0) {
+        setState(() => _connections.insert(idx.clamp(0, _connections.length), c));
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not remove connection. Please try again.')),
       );
@@ -408,6 +412,7 @@ class _ConnectionPickerSheetState
     with SingleTickerProviderStateMixin {
   late TabController _tabs;
   bool loading = true;
+  bool _loadFailed = false;
 
   List<Spot>          _spots  = [];
   List<TravelItem>    _travel = [];
@@ -435,13 +440,15 @@ class _ConnectionPickerSheetState
 
   Future<void> _loadAll() async {
     final tid = widget.tripId;
+    bool anyFailed = false;
+    setState(() { loading = true; _loadFailed = false; });
     try {
       final results = await Future.wait([
-        SpotService.loadSpots(tid).catchError((_) => <Spot>[]),
-        TravelService.loadItems(tid).catchError((_) => <TravelItem>[]),
-        AccommodationService.loadAll(tid).catchError((_) => <Accommodation>[]),
-        DocService.loadDocuments(tid).catchError((_) => <TripDocument>[]),
-        LinksService.loadLinks(tid).catchError((_) => <TripLink>[]),
+        SpotService.loadSpots(tid).catchError((e) { anyFailed = true; return <Spot>[]; }),
+        TravelService.loadItems(tid).catchError((e) { anyFailed = true; return <TravelItem>[]; }),
+        AccommodationService.loadAll(tid).catchError((e) { anyFailed = true; return <Accommodation>[]; }),
+        DocService.loadDocuments(tid).catchError((e) { anyFailed = true; return <TripDocument>[]; }),
+        LinksService.loadLinks(tid).catchError((e) { anyFailed = true; return <TripLink>[]; }),
       ]);
       if (!mounted) return;
       setState(() {
@@ -451,10 +458,11 @@ class _ConnectionPickerSheetState
         _docs   = results[3] as List<TripDocument>;
         _links  = results[4] as List<TripLink>;
         loading = false;
+        _loadFailed = anyFailed;
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => loading = false);
+      setState(() { loading = false; _loadFailed = true; });
     }
   }
 
@@ -538,6 +546,18 @@ class _ConnectionPickerSheetState
                 ],
               ),
             ),
+            if (_loadFailed)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(kSpace4, kSpace2, kSpace4, 0),
+                child: Row(
+                  children: [
+                    const Icon(Icons.wifi_off_rounded, size: 14, color: kColorInkSoft),
+                    const SizedBox(width: 6),
+                    Expanded(child: Text('Some items couldn\'t load.', style: kStyleCaption.copyWith(color: kColorInkSoft))),
+                    TextButton(onPressed: _loadAll, child: const Text('Retry')),
+                  ],
+                ),
+              ),
             Expanded(
               child: loading
                   ? const Center(child: CircularProgressIndicator())

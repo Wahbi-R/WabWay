@@ -11,6 +11,20 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 351,
+    label: 'Bug fixes',
+    bullets: [
+      'Connections no longer show phantom duplicates after a realtime update races with a remove tap',
+      'App no longer shows the password-recovery screen when returning from offline with a valid session',
+      'Offline receipts from multiple trips now sync correctly when you reconnect',
+      'Plan screen no longer silently drops connection links when a Supabase request partially fails',
+      'Typing a follow-up message in crew chat while a send is in progress is no longer wiped on success',
+      'Connection picker now shows a retry banner instead of empty tabs when offline',
+      'Tapping Retry on the plan screen offline banner no longer flashes blank content',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 350,
     label: 'Test suite improvements',
     changes: [

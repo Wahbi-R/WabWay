@@ -849,7 +849,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
         base,
         Positioned(
           left: 0, right: 0, bottom: 0,
-          child: OfflineBanner(onRetry: _loadAll),
+          child: OfflineBanner(onRetry: () => _loadAll(silent: true)),
         ),
       ],
     );

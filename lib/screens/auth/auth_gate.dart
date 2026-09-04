@@ -71,7 +71,7 @@ class _AuthGateState extends ConsumerState<AuthGate> {
           );
           if (cached != null && mounted) {
             ref.read(profileProvider.notifier).set(cached);
-            setState(() => _loading = false);
+            setState(() { _loading = false; _showPasswordRecovery = false; });
             return;
           }
         }

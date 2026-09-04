@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 358,
+    label: 'Bug fixes',
+    bullets: [
+      'Connection picker now shows a retry banner when some data sources fail to load',
+      'Connection picker total network failure now shows a retry banner instead of silent empty tabs',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 357,
     label: 'Bug fixes',
     bullets: [

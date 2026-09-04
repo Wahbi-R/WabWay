@@ -460,10 +460,11 @@ class _ConnectionPickerSheetState
         _stays  = results[2] as List<Accommodation>;
         _docs   = results[3] as List<TripDocument>;
         _links  = results[4] as List<TripLink>;
-        offline = anyFailed;
       });
+      // Set offline AFTER commitLoad — the mixin resets offline=false inside onData.
+      if (anyFailed && !isStale(gen)) setState(() => offline = true);
     } catch (_) {
-      failLoad(gen);
+      failLoad(gen, silent: true);
     }
   }
 

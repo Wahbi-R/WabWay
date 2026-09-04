@@ -85,7 +85,7 @@ abstract final class SyncQueue {
         // Guard against empty splits (older payloads or corrupted cache) by
         // falling back to a single split covering the full amount for the payer.
         if (rawSplits.isEmpty) {
-          rawSplits = [ReceiptSplit(memberId: paidBy, amount: homeAmount)];
+          rawSplits = [ReceiptSplit(memberId: paidBy, amount: (item['amount'] as num).toDouble())];
         }
         final category = ReceiptCategory.values.firstWhere(
           (c) => c.name == item['category'],

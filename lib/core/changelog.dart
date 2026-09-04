@@ -11,6 +11,18 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 360,
+    label: 'Bug fixes',
+    bullets: [
+      'Switching trips while travel screen loads no longer flashes stale data',
+      'Crew messages and live locations now update correctly after switching trips',
+      'After a brief crew connection error, real-time updates clear the error banner automatically',
+      'Foreign-currency receipt balances are now calculated correctly in the money screen',
+      'Spots and links no longer vanish when a background refresh fails — existing data stays visible',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 359,
     label: 'Bug fixes',
     bullets: [

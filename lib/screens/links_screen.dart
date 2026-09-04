@@ -137,7 +137,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin
         _autoLinks = autoLinks;
       });
     } catch (_) {
-      failLoad(gen, silent: silent);
+      failLoad(gen, silent: silent || _links.isNotEmpty);
     }
   }
 

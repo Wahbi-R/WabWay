@@ -204,7 +204,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> with AsyncScreenMixin
         _myVotes = myVotes;
       });
     } catch (_) {
-      failLoad(gen, silent: silent);
+      failLoad(gen, silent: silent || _spots.isNotEmpty);
     }
   }
 

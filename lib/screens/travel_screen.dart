@@ -147,12 +147,14 @@ class _TravelScreenState extends ConsumerState<TravelScreen> with AsyncScreenMix
       final cachedDays  = await cachedDaysFuture;
       if (isStale(gen)) return;
       if (cachedItems != null) {
-        setState(() {
+        commitLoad(gen, () {
           _items..clear()..addAll(cachedItems);
           _docs..clear()..addAll(cachedDocs ?? []);
           _days..clear()..addAll(cachedDays ?? []);
-          loading = false;
         });
+        if (isStale(gen)) return;
+        unawaited(_loadAll(silent: true));
+        return;
       }
     }
 

@@ -109,20 +109,22 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
   }
 
   Future<void> _onNewMessage() async {
-    if (_tripId == null) return;
+    final tripId = _tripId;
+    if (tripId == null) return;
     try {
-      final messages = await CrewService.fetchMessages(_tripId!);
-      if (!mounted) return;
-      setState(() => _messages = messages);
+      final messages = await CrewService.fetchMessages(tripId);
+      if (!mounted || _tripId != tripId) return;
+      setState(() { _messages = messages; error = false; });
       _scrollToBottom();
     } catch (_) {}
   }
 
   Future<void> _onLocationsChanged() async {
-    if (_tripId == null) return;
+    final tripId = _tripId;
+    if (tripId == null) return;
     try {
-      final locations = await CrewService.fetchActiveLocations(_tripId!);
-      if (!mounted) return;
+      final locations = await CrewService.fetchActiveLocations(tripId);
+      if (!mounted || _tripId != tripId) return;
       setState(() => _locations = locations);
     } catch (_) {}
   }

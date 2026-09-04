@@ -11,6 +11,17 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 346,
+    label: 'Fix: Retry button, realtime reliability, and offline trip switch',
+    changes: [
+      'The Retry button on the offline banner now always triggers a fresh reload',
+      'Adding all trip days to the plan no longer blocks live updates from syncing in the background',
+      'Crew chat and location tabs now reconnect correctly even after a failed initial load',
+      'Switching trips while offline now correctly shows the right trip\'s data',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 345,
     label: 'Fix: stuck spinners, wrong trip data, and offline banner reliability',
     changes: [

@@ -10,6 +10,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show RealtimeChannel;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/async_screen_mixin.dart';
 import '../core/image_cache_manager.dart';
 import '../core/providers/profile_provider.dart';
 import '../core/providers/trip_provider.dart';
@@ -32,12 +33,11 @@ class CrewScreen extends ConsumerStatefulWidget {
 }
 
 class _CrewScreenState extends ConsumerState<CrewScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, AsyncScreenMixin {
   late final TabController _tabs;
 
   List<TripMessage> _messages = [];
   List<LocationShare> _locations = [];
-  bool _loadingMessages = true;
   bool _sendingPing = false;
   bool _sendingFindMe = false;
   bool _sending = false;
@@ -49,7 +49,6 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
   final _scrollController = ScrollController();
   final _textController = TextEditingController();
 
-  int _loadGen = 0;
   String? _tripId;
   String? _userId;
 
@@ -82,24 +81,23 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
   }
 
   Future<void> _load(String tripId) async {
-    final gen = ++_loadGen;
-    setState(() => _loadingMessages = true);
+    final gen = beginLoad();
     try {
       final results = await Future.wait([
         CrewService.fetchMessages(tripId),
         CrewService.fetchActiveLocations(tripId),
       ]);
-      if (!mounted || gen != _loadGen) return;
-      setState(() {
+      commitLoad(gen, () {
         _messages = results[0] as List<TripMessage>;
         _locations = results[1] as List<LocationShare>;
-        _loadingMessages = false;
       });
-      _scrollToBottom();
-      _subscribe(tripId);
+      if (!isStale(gen)) {
+        _scrollToBottom();
+        _subscribe(tripId);
+      }
     } catch (_) {
-      if (!mounted || gen != _loadGen) return;
-      setState(() => _loadingMessages = false);
+      failLoad(gen);
+      if (!isStale(gen)) _subscribe(tripId);
     }
   }
 
@@ -122,9 +120,11 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
 
   Future<void> _onLocationsChanged() async {
     if (_tripId == null) return;
-    final locations = await CrewService.fetchActiveLocations(_tripId!);
-    if (!mounted) return;
-    setState(() => _locations = locations);
+    try {
+      final locations = await CrewService.fetchActiveLocations(_tripId!);
+      if (!mounted) return;
+      setState(() => _locations = locations);
+    } catch (_) {}
   }
 
   Future<void> _onReact(String messageId, String emoji) async {
@@ -541,6 +541,10 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
       if (next != _tripId) {
         _tripId = next;
         _userId = ref.read(profileProvider)?.id;
+        _messageChannel?.unsubscribe();
+        _locationChannel?.unsubscribe();
+        _messageChannel = null;
+        _locationChannel = null;
         _load(next);
       }
     });
@@ -581,7 +585,7 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
         children: [
           _ChatTab(
             messages: _messages,
-            loading: _loadingMessages,
+            loading: loading,
             members: members,
             currentUserId: _userId ?? '',
             scrollController: _scrollController,

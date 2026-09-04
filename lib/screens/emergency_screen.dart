@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../core/async_screen_mixin.dart';
 import '../core/providers/trip_provider.dart';
 import '../core/supabase/emergency_service.dart';
 import '../data/emergency_data.dart';
@@ -17,9 +18,9 @@ class EmergencyScreen extends ConsumerStatefulWidget {
   ConsumerState<EmergencyScreen> createState() => _EmergencyScreenState();
 }
 
-class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
+class _EmergencyScreenState extends ConsumerState<EmergencyScreen>
+    with AsyncScreenMixin {
   TripEmergencyInfo? _info;
-  bool _loading = true;
   String _activeTripId = '';
 
   @override
@@ -33,13 +34,13 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
   }
 
   Future<void> _load() async {
-    final tripId = _activeTripId;
-    final info = await EmergencyService.fetch(tripId);
-    if (!mounted || tripId != _activeTripId) return;
-    setState(() {
-      _info = info;
-      _loading = false;
-    });
+    final gen = beginLoad();
+    try {
+      final info = await EmergencyService.fetch(_activeTripId);
+      commitLoad(gen, () => _info = info);
+    } catch (_) {
+      failLoad(gen);
+    }
   }
 
   void _edit() async {
@@ -66,7 +67,7 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
         _load();
       }
     });
-    if (_loading) return const WabwayLoadingScaffold();
+    if (loading) return const WabwayLoadingScaffold();
 
     return Scaffold(
       backgroundColor: kColorCream,

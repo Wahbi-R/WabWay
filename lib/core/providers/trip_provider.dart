@@ -171,7 +171,7 @@ class TripNotifier extends StateNotifier<TripData> {
           offline:       true,
         );
       } else {
-        state = state.copyWith(loading: false, offline: true);
+        state = state.copyWith(selectedIndex: idx, loading: false, offline: true);
       }
     } finally {
       _switching = false;

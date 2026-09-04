@@ -353,7 +353,7 @@ class _TravelScreenState extends ConsumerState<TravelScreen> with AsyncScreenMix
         base,
         Positioned(
           left: 0, right: 0, bottom: 0,
-          child: OfflineBanner(onRetry: () => _loadAll(silent: true)),
+          child: OfflineBanner(onRetry: _loadAll),
         ),
       ],
     );

@@ -679,7 +679,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
     }
     if (_activeTripId.isEmpty || _userId.isEmpty) return;
 
-    setState(() => loading = true);
+    final gen = beginLoad();
     int nextDayNumber = _days.isEmpty ? 0 : _days.map((d) => d.dayNumber).reduce((a, b) => a > b ? a : b);
     final newDays = <TripDay>[];
     try {
@@ -695,20 +695,16 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
         );
         newDays.add(day);
       }
-      if (!mounted) return;
-      setState(() {
+      commitLoad(gen, () {
         _days.addAll(newDays);
         _days.sort((a, b) {
           final cmp = a.date.compareTo(b.date);
           return cmp != 0 ? cmp : a.dayNumber.compareTo(b.dayNumber);
         });
-        loading = false;
-        offline = false;
       });
-      unawaited(PlanService.writeDaysToCache(_activeTripId, _days));
+      if (!isStale(gen)) unawaited(PlanService.writeDaysToCache(_activeTripId, _days));
     } catch (e) {
-      if (!mounted) return;
-      setState(() => loading = false);
+      failLoad(gen);
       messenger.showSnackBar(SnackBar(
         content: Text('Failed to add days: $e', style: kStyleBody.copyWith(color: Colors.white)),
         backgroundColor: kColorDanger,
@@ -849,7 +845,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
         base,
         Positioned(
           left: 0, right: 0, bottom: 0,
-          child: OfflineBanner(onRetry: () => _loadAll(silent: true)),
+          child: OfflineBanner(onRetry: _loadAll),
         ),
       ],
     );

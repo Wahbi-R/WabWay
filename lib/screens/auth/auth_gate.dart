@@ -29,6 +29,7 @@ class _AuthGateState extends ConsumerState<AuthGate> {
   bool _loading = true;
   bool _showPasswordRecovery = false;
   bool _authChangeBusy = false;
+  bool _fetchingProfile = false;
 
   AppProfile? get _profile => ref.read(profileProvider);
 
@@ -52,18 +53,23 @@ class _AuthGateState extends ConsumerState<AuthGate> {
   }
 
   Future<void> _onAuthChange(AuthState state) async {
-    if (_authChangeBusy) return;
-    _authChangeBusy = true;
     AppLogger.instance.log(
         'authStateChange → ${state.event}  uid=${state.session?.user.id}',
         tag: 'AUTH');
+    // Handle signedIn outside the mutex so a token-refresh signedIn (which
+    // Supabase emits immediately after a signedOut) is never silently dropped
+    // while the signedOut handler holds _authChangeBusy.
+    if (state.event == AuthChangeEvent.signedIn) {
+      final uid = state.session?.user.id;
+      if (uid != null && _profile == null) await _fetchProfile(uid);
+      return;
+    }
+    if (_authChangeBusy) return;
+    _authChangeBusy = true;
     try {
     switch (state.event) {
       case AuthChangeEvent.passwordRecovery:
         if (mounted) setState(() { _showPasswordRecovery = true; _loading = false; });
-      case AuthChangeEvent.signedIn:
-        final uid = state.session?.user.id;
-        if (uid != null && _profile == null) await _fetchProfile(uid);
       case AuthChangeEvent.signedOut:
         // Suppress automatic sign-out (e.g. failed token refresh) when offline,
         // but always honour an explicit user-initiated sign-out.
@@ -95,6 +101,8 @@ class _AuthGateState extends ConsumerState<AuthGate> {
   }
 
   Future<void> _fetchProfile(String userId) async {
+    if (_fetchingProfile) return;
+    _fetchingProfile = true;
     try {
       final data = await supabase
           .from('profiles')
@@ -133,6 +141,8 @@ class _AuthGateState extends ConsumerState<AuthGate> {
         ref.read(profileProvider.notifier).set(cached);
       }
       setState(() => _loading = false);
+    } finally {
+      _fetchingProfile = false;
     }
   }
 

@@ -711,6 +711,10 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
         });
       });
       if (!isStale(gen)) unawaited(PlanService.writeDaysToCache(tripId, _days));
+      // If gen was pre-empted (e.g. a non-silent load was in progress when we
+      // called beginLoad), commitLoad was a no-op and the new days are in the DB
+      // but not in _days. Reload silently so they become visible.
+      else if (_activeTripId == tripId) unawaited(_loadAll(silent: true));
     } catch (e) {
       failLoad(gen, silent: true);
       // Only reload for the trip the days were being created for — if the user

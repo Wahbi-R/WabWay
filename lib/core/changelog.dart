@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 355,
+    label: 'Bug fixes',
+    bullets: [
+      'Signing back in after an automatic sign-out now reliably refreshes your profile',
+      'Adding all trip days while the plan is first loading now shows the new days immediately',
+      'Profile refresh on reconnect can no longer race with an in-progress sign-in',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 354,
     label: 'Bug fixes',
     bullets: [

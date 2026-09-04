@@ -54,16 +54,16 @@ class TripNotifier extends StateNotifier<TripData> {
     if (!silent) state = state.copyWith(loading: true, error: false, offline: false);
     try {
       final trips = await TripService.loadUserTrips();
+      if (trips.isEmpty) {
+        state = state.copyWith(trips: [], members: [], loading: false, offline: false);
+        return;
+      }
       try {
         await OfflineCache.write(
           OfflineCache.userTripsKey,
           trips.map((t) => t.toMap()).toList(),
         );
       } catch (_) {}
-      if (trips.isEmpty) {
-        state = state.copyWith(trips: [], members: [], loading: false, offline: false);
-        return;
-      }
       final idx     = state.selectedIndex.clamp(0, trips.length - 1);
       final members = await TripService.loadTripMembers(trips[idx].id);
       try {
@@ -171,7 +171,7 @@ class TripNotifier extends StateNotifier<TripData> {
           offline:       true,
         );
       } else {
-        state = state.copyWith(selectedIndex: idx, loading: false, offline: true);
+        state = state.copyWith(selectedIndex: idx, members: const [], loading: false, offline: true);
       }
     } finally {
       _switching = false;

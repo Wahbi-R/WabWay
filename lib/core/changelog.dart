@@ -11,6 +11,17 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 347,
+    label: 'Fix: offline data, crew error state, and plan loading reliability',
+    changes: [
+      'Switching trips while offline no longer shows the previous trip\'s crew members',
+      'Your cached trips are no longer erased if you temporarily have no active trips',
+      'Crew chat now shows a "Could not load" message with a Retry button on network failure',
+      'Loading the plan screen is more reliable — a single service error no longer silently breaks the others',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 346,
     label: 'Fix: Retry button, realtime reliability, and offline trip switch',
     changes: [

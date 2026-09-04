@@ -404,38 +404,33 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
   void _showImageSourceSheet() {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: Colors.transparent,
+      backgroundColor: kColorPaper,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
       builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(kSpace4, kSpace3, kSpace4, kSpace4),
-          child: Container(
-            decoration: const BoxDecoration(
-              color: kColorPaper,
-              borderRadius: kRadiusXl,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_rounded),
+              title: Text('Camera', style: kStyleBodyMedium),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickAndSendImage(ImageSource.camera);
+              },
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.camera_alt_rounded),
-                  title: Text('Camera', style: kStyleBodyMedium),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _pickAndSendImage(ImageSource.camera);
-                  },
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.photo_library_rounded),
-                  title: Text('Photo library', style: kStyleBodyMedium),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _pickAndSendImage(ImageSource.gallery);
-                  },
-                ),
-              ],
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded),
+              title: Text('Photo library', style: kStyleBodyMedium),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickAndSendImage(ImageSource.gallery);
+              },
             ),
-          ),
+            const SizedBox(height: kSpace2),
+          ],
         ),
       ),
     );
@@ -586,6 +581,7 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
           _ChatTab(
             messages: _messages,
             loading: loading,
+            error: error,
             members: members,
             currentUserId: _userId ?? '',
             scrollController: _scrollController,
@@ -598,6 +594,7 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
             onLinkUp: _sendLocationPing,
             onFindMe: _sendFindMe,
             onSendImage: _showImageSourceSheet,
+            onRetry: () => _load(_tripId ?? ''),
             onReact: _onReact,
           ),
           _MapTab(
@@ -664,6 +661,7 @@ class _ChatTab extends StatelessWidget {
   const _ChatTab({
     required this.messages,
     required this.loading,
+    required this.error,
     required this.members,
     required this.currentUserId,
     required this.scrollController,
@@ -676,11 +674,13 @@ class _ChatTab extends StatelessWidget {
     required this.onLinkUp,
     required this.onFindMe,
     required this.onSendImage,
+    required this.onRetry,
     required this.onReact,
   });
 
   final List<TripMessage> messages;
   final bool loading;
+  final bool error;
   final List<AppTripMember> members;
   final String currentUserId;
   final ScrollController scrollController;
@@ -693,6 +693,7 @@ class _ChatTab extends StatelessWidget {
   final VoidCallback onLinkUp;
   final VoidCallback onFindMe;
   final VoidCallback onSendImage;
+  final VoidCallback onRetry;
   final Future<void> Function(String messageId, String emoji) onReact;
 
   AppTripMember? _memberById(String userId) {
@@ -710,6 +711,36 @@ class _ChatTab extends StatelessWidget {
       body = const Center(
           child: CircularProgressIndicator(
               color: kColorPrimary, strokeWidth: 2));
+    } else if (error && messages.isEmpty) {
+      body = Center(
+        child: Padding(
+          padding: const EdgeInsets.all(kSpace8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.cloud_off_rounded,
+                  size: 48,
+                  color: kColorInkSoft.withValues(alpha: 0.35)),
+              const SizedBox(height: kSpace3),
+              Text('Could not load messages',
+                  style: kStyleBodyMedium.copyWith(color: kColorInkSoft)),
+              const SizedBox(height: kSpace1),
+              Text(
+                'Check your connection and try again',
+                style: kStyleCaption,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: kSpace4),
+              FilledButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh_rounded, size: 16),
+                label: const Text('Retry'),
+                style: FilledButton.styleFrom(backgroundColor: kColorPrimary),
+              ),
+            ],
+          ),
+        ),
+      );
     } else if (messages.isEmpty) {
       body = Center(
         child: Padding(

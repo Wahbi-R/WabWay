@@ -65,9 +65,21 @@ Future<void> signOut() async {
 // ── Widget helpers ───────────────────────────────────────────────────────────
 
 /// Pumps the app and waits for initial load (auth + providers).
+/// Also dismisses the onboarding dialog if it appears (first install on a fresh emulator).
 Future<void> pumpApp(WidgetTester t, {Duration settle = const Duration(seconds: 6)}) async {
   await t.pumpWidget(testApp());
   await t.pumpAndSettle(settle);
+  await dismissOnboarding(t);
+}
+
+/// Taps the Skip button on the onboarding wizard if it is visible.
+Future<void> dismissOnboarding(WidgetTester t) async {
+  final skip = find.text('Skip');
+  if (skip.evaluate().isNotEmpty) {
+    print('[test] onboarding visible — tapping Skip');
+    await t.tap(skip.first, warnIfMissed: false);
+    await t.pumpAndSettle(const Duration(seconds: 2));
+  }
 }
 
 /// Taps the bottom nav tab with [label] and waits to settle.

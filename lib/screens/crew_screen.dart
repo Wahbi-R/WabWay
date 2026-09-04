@@ -405,9 +405,7 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: kColorPaper,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
+      shape: const RoundedRectangleBorder(borderRadius: kRadiusSheet),
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -540,6 +538,9 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
         _locationChannel?.unsubscribe();
         _messageChannel = null;
         _locationChannel = null;
+        // Clear stale data immediately so a load failure never shows the
+        // previous trip's messages under the new trip's context.
+        setState(() { _messages = []; _locations = []; });
         _load(next);
       }
     });
@@ -804,6 +805,26 @@ class _ChatTab extends StatelessWidget {
     return Column(
       children: [
         Expanded(child: body),
+        // Show a compact error banner when messages exist but a reload failed,
+        // so stale chat is visibly flagged without hiding the message history.
+        if (error && messages.isNotEmpty)
+          Material(
+            color: kColorSurfaceSunken,
+            child: InkWell(
+              onTap: onRetry,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: kSpace4, vertical: kSpace2),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.cloud_off_rounded, size: 14, color: kColorInkSoft),
+                    const SizedBox(width: kSpace1),
+                    Text('Could not refresh · Tap to retry', style: kStyleCaption),
+                  ],
+                ),
+              ),
+            ),
+          ),
         _InputBar(
           textController: textController,
           sending: sending,

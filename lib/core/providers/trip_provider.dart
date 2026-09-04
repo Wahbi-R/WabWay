@@ -54,16 +54,18 @@ class TripNotifier extends StateNotifier<TripData> {
     if (!silent) state = state.copyWith(loading: true, error: false, offline: false);
     try {
       final trips = await TripService.loadUserTrips();
-      if (trips.isEmpty) {
-        state = state.copyWith(trips: [], members: [], loading: false, offline: false);
-        return;
-      }
+      // Always persist what the server returned — even [] evicts a stale cache
+      // so a user who left all trips won't see phantom trips on the next offline launch.
       try {
         await OfflineCache.write(
           OfflineCache.userTripsKey,
           trips.map((t) => t.toMap()).toList(),
         );
       } catch (_) {}
+      if (trips.isEmpty) {
+        state = state.copyWith(trips: [], members: [], loading: false, offline: false);
+        return;
+      }
       final idx     = state.selectedIndex.clamp(0, trips.length - 1);
       final members = await TripService.loadTripMembers(trips[idx].id);
       try {

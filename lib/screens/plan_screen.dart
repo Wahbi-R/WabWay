@@ -227,12 +227,15 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
         PlanService.loadAll(_activeTripId),
         SpotService.loadSpots(_activeTripId),
         DocService.loadDocuments(_activeTripId),
-        AccommodationService.loadAll(_activeTripId).catchError((_) => <Accommodation>[]),
+        // Silenced: accommodation failure should not fail the whole plan load,
+        // and null preserves cached stays from the cache-first phase.
+        AccommodationService.loadAll(_activeTripId)
+            .then<List<Accommodation>?>((v) => v, onError: (_) => null),
       ]);
       final days  = results[0] as List<TripDay>;
       final spots = results[1] as List<Spot>;
       final docs  = results[2] as List<TripDocument>;
-      final stays = results[3] as List<Accommodation>;
+      final stays = results[3] as List<Accommodation>?;
       commitLoad(gen, () {
         _days..clear()..addAll(days)..sort((a, b) {
           final cmp = a.date.compareTo(b.date);
@@ -240,7 +243,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
         });
         _spots..clear()..addAll(spots);
         _docs..clear()..addAll(docs);
-        _stayItems..clear()..addAll(stays);
+        if (stays != null) { _stayItems..clear()..addAll(stays); }
       });
     } catch (e) {
       if (silent || _days.isNotEmpty) {

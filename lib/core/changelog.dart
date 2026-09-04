@@ -11,6 +11,17 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 348,
+    label: 'Fix: stale trips, crew chat state, and plan data reliability',
+    changes: [
+      'Leaving all your trips now correctly clears the local cache — reopening the app offline no longer shows trips you\'ve left',
+      'Switching trips while offline no longer shows the previous trip\'s chat messages',
+      'Crew chat shows a refresh-failed notice with a retry tap when messages are already loaded',
+      'A plan screen load failure no longer erases your cached accommodation data',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 347,
     label: 'Fix: offline data, crew error state, and plan loading reliability',
     changes: [

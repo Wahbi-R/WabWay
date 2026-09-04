@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 356,
+    label: 'Bug fixes',
+    bullets: [
+      'Switching accounts quickly no longer shows the previous account\'s profile',
+      'Tapping "Add all days" while the plan is still loading no longer creates hidden days',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 355,
     label: 'Bug fixes',
     bullets: [

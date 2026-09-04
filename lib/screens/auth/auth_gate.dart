@@ -61,7 +61,11 @@ class _AuthGateState extends ConsumerState<AuthGate> {
     // while the signedOut handler holds _authChangeBusy.
     if (state.event == AuthChangeEvent.signedIn) {
       final uid = state.session?.user.id;
-      if (uid != null && _profile == null) await _fetchProfile(uid);
+      // Also re-fetch when the signed-in user differs from the cached profile
+      // (e.g. rapid user-switch while signedOut is still clearing the old profile).
+      if (uid != null && (_profile == null || _profile!.id != uid)) {
+        await _fetchProfile(uid);
+      }
       return;
     }
     if (_authChangeBusy) return;

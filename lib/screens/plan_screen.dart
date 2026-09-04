@@ -660,6 +660,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
   }
 
   Future<void> _addAllTripDays(BuildContext context) async {
+    if (loading) return; // plan not yet loaded; days would be invisible (gen pre-empted)
     final trip = TripState.maybeOf(context)?.trip;
     if (trip == null || trip.startDate == null || trip.endDate == null) return;
     final messenger = ScaffoldMessenger.of(context);

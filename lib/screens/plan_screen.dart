@@ -209,7 +209,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
       final cachedStays = await cachedStaysFuture;
       if (isStale(gen)) return;
       if (cachedDays != null) {
-        setState(() {
+        commitLoad(gen, () {
           _days..clear()..addAll(cachedDays)..sort((a, b) {
             final cmp = a.date.compareTo(b.date);
             return cmp != 0 ? cmp : a.dayNumber.compareTo(b.dayNumber);
@@ -217,8 +217,9 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
           _spots..clear()..addAll(cachedSpots ?? []);
           _docs..clear()..addAll(cachedDocs ?? []);
           _stayItems..clear()..addAll(cachedStays ?? []);
-          loading = false;
         });
+        unawaited(_loadAll(silent: true));
+        return;
       }
     }
 
@@ -712,9 +713,9 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
       if (!isStale(gen)) unawaited(PlanService.writeDaysToCache(tripId, _days));
     } catch (e) {
       failLoad(gen, silent: true);
-      // Some days may have been created before the failure — reload silently
-      // so the screen reflects actual DB state rather than showing nothing.
-      unawaited(_loadAll(silent: true));
+      // Only reload for the trip the days were being created for — if the user
+      // switched trips mid-loop, don't overwrite the new trip's plan data.
+      if (_activeTripId == tripId) unawaited(_loadAll(silent: true));
       messenger.showSnackBar(SnackBar(
         content: Text('Failed to add days: $e', style: kStyleBody.copyWith(color: Colors.white)),
         backgroundColor: kColorDanger,

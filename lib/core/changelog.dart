@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 354,
+    label: 'Bug fixes',
+    bullets: [
+      'Signing in is now fully protected against overlapping auth events during the profile load',
+      'Plan screen now shows the offline banner correctly if the network fails while cached data is visible',
+      'Switching trips mid-"add all days" no longer interferes with the new trip\'s plan display',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 353,
     label: 'Bug fixes',
     bullets: [

@@ -63,7 +63,7 @@ class _AuthGateState extends ConsumerState<AuthGate> {
         if (mounted) setState(() { _showPasswordRecovery = true; _loading = false; });
       case AuthChangeEvent.signedIn:
         final uid = state.session?.user.id;
-        if (uid != null && _profile == null) _fetchProfile(uid);
+        if (uid != null && _profile == null) await _fetchProfile(uid);
       case AuthChangeEvent.signedOut:
         // Suppress automatic sign-out (e.g. failed token refresh) when offline,
         // but always honour an explicit user-initiated sign-out.

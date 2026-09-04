@@ -11,6 +11,18 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 353,
+    label: 'Bug fixes',
+    bullets: [
+      'App can no longer get permanently stuck on the splash screen if your cached profile data is unreadable',
+      'Signing in and out quickly no longer leaves the app in a mixed auth state',
+      'Adding all trip days no longer creates days in the wrong trip if you switch trips mid-operation',
+      'Cached receipts are now shown correctly while the money screen fetches fresh data in the background',
+      'If adding all trip days fails partway through, the days that were created now appear immediately',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 352,
     label: 'Bug fixes',
     bullets: [

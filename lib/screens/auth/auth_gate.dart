@@ -28,6 +28,7 @@ class _AuthGateState extends ConsumerState<AuthGate> {
   late final StreamSubscription<AuthState> _sub;
   bool _loading = true;
   bool _showPasswordRecovery = false;
+  bool _authChangeBusy = false;
 
   AppProfile? get _profile => ref.read(profileProvider);
 
@@ -51,9 +52,12 @@ class _AuthGateState extends ConsumerState<AuthGate> {
   }
 
   Future<void> _onAuthChange(AuthState state) async {
+    if (_authChangeBusy) return;
+    _authChangeBusy = true;
     AppLogger.instance.log(
         'authStateChange → ${state.event}  uid=${state.session?.user.id}',
         tag: 'AUTH');
+    try {
     switch (state.event) {
       case AuthChangeEvent.passwordRecovery:
         if (mounted) setState(() { _showPasswordRecovery = true; _loading = false; });
@@ -85,6 +89,9 @@ class _AuthGateState extends ConsumerState<AuthGate> {
       default:
         break;
     }
+    } finally {
+      _authChangeBusy = false;
+    }
   }
 
   Future<void> _fetchProfile(String userId) async {
@@ -114,10 +121,13 @@ class _AuthGateState extends ConsumerState<AuthGate> {
     } catch (_) {
       // Network unavailable — fall back to cached profile so the user can
       // browse their trips offline without being stuck on the splash screen.
-      final cached = await OfflineCache.read<AppProfile>(
-        OfflineCache.profileKey,
-        (json) => AppProfile.fromMap(json as Map<String, dynamic>),
-      );
+      AppProfile? cached;
+      try {
+        cached = await OfflineCache.read<AppProfile>(
+          OfflineCache.profileKey,
+          (json) => AppProfile.fromMap(json as Map<String, dynamic>),
+        );
+      } catch (_) {}
       if (!mounted) return;
       if (cached != null) {
         ref.read(profileProvider.notifier).set(cached);

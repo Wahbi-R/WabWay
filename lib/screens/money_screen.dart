@@ -353,14 +353,18 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
       final pending           = await SyncQueue.pendingCountFor(tripId);
       if (isStale(gen)) return;
       if (cachedReceipts != null) {
-        setState(() {
-          _receipts    = cachedReceipts;
-          _withdrawals = cachedWithdrawals ?? [];
+        // Commit cached data so the UI is immediately visible, then kick off a
+        // silent network refresh. Using commitLoad (rather than mutating
+        // loading directly) preserves the mixin's silent-load preemption guard.
+        commitLoad(gen, () {
+          _receipts         = cachedReceipts;
+          _withdrawals      = cachedWithdrawals ?? [];
           if (_lastTripId != tripId) _persistedSettlements = [];
-          _lastTripId  = tripId;
-          loading          = false;
+          _lastTripId       = tripId;
           _pendingSyncCount = pending;
         });
+        unawaited(_loadAll(silent: true));
+        return;
       }
     }
 

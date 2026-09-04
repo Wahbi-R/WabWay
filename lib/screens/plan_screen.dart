@@ -681,7 +681,9 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
       messenger.showSnackBar(const SnackBar(content: Text('All trip days are already added.')));
       return;
     }
-    if (_activeTripId.isEmpty || _userId.isEmpty) return;
+    final tripId = _activeTripId;
+    final userId = _userId;
+    if (tripId.isEmpty || userId.isEmpty) return;
 
     // Use a silent load so the existing plan stays visible while days are created.
     final gen = beginLoad(silent: true);
@@ -691,11 +693,11 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
       for (final date in missingDates) {
         nextDayNumber++;
         final day = await PlanService.createDay(
-          tripId:    _activeTripId,
+          tripId:    tripId,
           dayNumber: nextDayNumber,
           date:      date,
           city:      '',
-          createdBy: _userId,
+          createdBy: userId,
           notes:     null,
         );
         newDays.add(day);
@@ -707,9 +709,12 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
           return cmp != 0 ? cmp : a.dayNumber.compareTo(b.dayNumber);
         });
       });
-      if (!isStale(gen)) unawaited(PlanService.writeDaysToCache(_activeTripId, _days));
+      if (!isStale(gen)) unawaited(PlanService.writeDaysToCache(tripId, _days));
     } catch (e) {
       failLoad(gen, silent: true);
+      // Some days may have been created before the failure — reload silently
+      // so the screen reflects actual DB state rather than showing nothing.
+      unawaited(_loadAll(silent: true));
       messenger.showSnackBar(SnackBar(
         content: Text('Failed to add days: $e', style: kStyleBody.copyWith(color: Colors.white)),
         backgroundColor: kColorDanger,

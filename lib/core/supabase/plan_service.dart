@@ -78,17 +78,10 @@ abstract final class PlanService {
   /// Loads all itinerary days and items for [tripId] in three round-trips:
   /// days → items → document_links for items.
   static Future<List<TripDay>> loadAll(String tripId) async {
-    final daysData = await supabase
-        .from('itinerary_days')
-        .select()
-        .eq('trip_id', tripId)
-        .order('day_number');
-
-    final itemsData = await supabase
-        .from('itinerary_items')
-        .select()
-        .eq('trip_id', tripId)
-        .order('sort_order');
+    final [daysData, itemsData] = await Future.wait([
+      supabase.from('itinerary_days').select().eq('trip_id', tripId).order('day_number'),
+      supabase.from('itinerary_items').select().eq('trip_id', tripId).order('sort_order'),
+    ]);
 
     // Build a map of itemId → [docId, ...] from document_links
     final Map<String, List<String>> itemDocIds = {};
@@ -340,14 +333,11 @@ abstract final class PlanService {
 
   static Future<ItineraryItem> duplicateItem(
     ItineraryItem item, {
+    required String tripId,
     required String createdBy,
   }) async {
     final row = await supabase.from('itinerary_items').insert({
-      'trip_id':    (await supabase
-              .from('itinerary_items')
-              .select('trip_id')
-              .eq('id', item.id)
-              .single())['trip_id'],
+      'trip_id':    tripId,
       'day_id':     item.dayId,
       'title':      '${item.title} (copy)',
       'type':       _typeToDb(item.type),

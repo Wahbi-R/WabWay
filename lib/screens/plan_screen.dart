@@ -613,7 +613,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
   Future<void> _onDuplicateItem(ItineraryItem item) async {
     if (_userId.isEmpty) return;
     try {
-      final copy = await PlanService.duplicateItem(item, createdBy: _userId);
+      final copy = await PlanService.duplicateItem(item, tripId: _activeTripId, createdBy: _userId);
       if (!mounted) return;
       final day = _days.where((d) => d.id == copy.dayId).firstOrNull;
       if (day == null) return;

@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 369,
+    label: 'Bug fixes',
+    bullets: [
+      'Editing a receipt with many members now updates all splits in parallel, reducing save time and preventing partial failures',
+      'Plan screen loads days and items in parallel instead of sequentially, cutting load time roughly in half',
+      'Duplicating a plan item no longer makes an extra network call to look up the trip',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 368,
     label: 'Bug fixes',
     bullets: [

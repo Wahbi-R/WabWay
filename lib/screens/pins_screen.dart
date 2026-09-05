@@ -101,18 +101,42 @@ class _PinsScreenState extends ConsumerState<PinsScreen> with AsyncScreenMixin {
       ),
     );
     if (confirmed != true || !mounted || ctrl.text.trim().isEmpty) return;
-    await PinsService.post(tripId: _tripId, authorId: _myId, body: ctrl.text.trim());
-    _load(silent: true);
+    try {
+      await PinsService.post(tripId: _tripId, authorId: _myId, body: ctrl.text.trim());
+      _load(silent: true);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Could not post. Try again.'),
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
   }
 
   Future<void> _unpin(TripPin pin) async {
-    await PinsService.unpin(pin.id);
-    _load(silent: true);
+    try {
+      await PinsService.unpin(pin.id);
+      _load(silent: true);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Could not unpin. Try again.'),
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
   }
 
   Future<void> _delete(TripPin pin) async {
-    await PinsService.delete(pin.id);
-    _load(silent: true);
+    try {
+      await PinsService.delete(pin.id);
+      _load(silent: true);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Could not delete. Try again.'),
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
   }
 
   @override

@@ -148,17 +148,26 @@ class _PackingScreenState extends ConsumerState<PackingScreen> with AsyncScreenM
         .map((s) => s.trim())
         .where((s) => s.isNotEmpty)
         .toList();
-    await Future.wait(titles.map((t) => PackingService.addItem(tripId, t, userId)));
-    if (!mounted) return;
-    if (titles.length > 1) {
+    try {
+      await Future.wait(titles.map((t) => PackingService.addItem(tripId, t, userId)));
+      if (!mounted) return;
+      if (titles.length > 1) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Added ${titles.length} items',
+              style: kStyleBody.copyWith(color: Colors.white)),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ));
+      }
+      _load(silent: true);
+    } catch (_) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Added ${titles.length} items',
+        content: Text('Could not add items. Try again.',
             style: kStyleBody.copyWith(color: Colors.white)),
         behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
       ));
     }
-    _load(silent: true);
   }
 
   Future<void> _toggle(PackingItem item) async {

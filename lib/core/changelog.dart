@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 372,
+    label: 'Bug fixes',
+    bullets: [
+      'Packing list now shows an error message if adding items fails instead of silently doing nothing',
+      'Pinboard now shows error feedback when posting, unpinning, or deleting a pin fails',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 371,
     label: 'Bug fixes',
     bullets: [

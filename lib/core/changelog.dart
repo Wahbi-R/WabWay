@@ -11,6 +11,18 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 368,
+    label: 'Bug fixes',
+    bullets: [
+      'Signing back in while offline no longer gets stuck at the loading screen',
+      'Dragging itinerary items to reorder no longer corrupts the order when the connection drops mid-way',
+      'Creating a plan item with linked documents no longer creates a duplicate item if the link step fails',
+      'Joining a trip and then quickly navigating away no longer causes a crash',
+      'Loading connections is now faster and more reliable on slow connections',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 367,
     label: 'Bug fixes',
     bullets: [

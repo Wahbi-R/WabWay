@@ -89,7 +89,7 @@ class _TripGateState extends ConsumerState<TripGate> {
       backgroundColor: Colors.transparent,
       builder: (_) => JoinWithCodeSheet(initialCode: initialCode),
     );
-    if (tripId != null) await _reload();
+    if (tripId != null && mounted) await _reload();
   }
 
   @override

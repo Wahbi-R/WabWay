@@ -257,20 +257,25 @@ abstract final class PlanService {
 
     final itemId = row['id'] as String;
 
+    var savedDocIds = linkedDocIds;
     if (linkedDocIds.isNotEmpty) {
-      await supabase.from('document_links').insert(
-        linkedDocIds
-            .map((docId) => {
-                  'document_id': docId,
-                  'linked_type': 'itinerary_item',
-                  'linked_id':   itemId,
-                  'created_by':  createdBy,
-                })
-            .toList(),
-      );
+      try {
+        await supabase.from('document_links').insert(
+          linkedDocIds
+              .map((docId) => {
+                    'document_id': docId,
+                    'linked_type': 'itinerary_item',
+                    'linked_id':   itemId,
+                    'created_by':  createdBy,
+                  })
+              .toList(),
+        );
+      } catch (_) {
+        savedDocIds = []; // non-fatal; links can be re-added later
+      }
     }
 
-    return _itemFromRow(row, linkedDocIds);
+    return _itemFromRow(row, savedDocIds);
   }
 
   static Future<void> updateItem(ItineraryItem item) async {
@@ -360,14 +365,16 @@ abstract final class PlanService {
   }
 
   static Future<void> reorderItemsInDay(List<ItineraryItem> items) async {
+    final futures = <Future<void>>[];
     for (var i = 0; i < items.length; i++) {
       if (items[i].sortOrder != i) {
-        await supabase
+        futures.add(supabase
             .from('itinerary_items')
             .update({'sort_order': i})
-            .eq('id', items[i].id);
+            .eq('id', items[i].id));
       }
     }
+    await Future.wait(futures);
   }
 
   // ── Item comments ─────────────────────────────────────────────────────────────

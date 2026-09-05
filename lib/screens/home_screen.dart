@@ -148,6 +148,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   _HomeData? _data;
   Object? _error;
   bool _loaded = false;
+  bool _loadInFlight = false;
 
   @override
   void initState() {
@@ -163,6 +164,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _load() async {
+    if (_loadInFlight) return;
+    _loadInFlight = true;
     final trip = ref.read(activeTripProvider);
     final members = ref.read(tripMembersProvider);
     final myId = ref.read(profileProvider)?.id ?? '';
@@ -223,6 +226,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = e);
+    } finally {
+      _loadInFlight = false;
     }
   }
 

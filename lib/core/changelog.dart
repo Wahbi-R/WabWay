@@ -11,6 +11,18 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 361,
+    label: 'Bug fixes',
+    bullets: [
+      'Packing and shopping lists refresh correctly when a real-time change arrives while loading',
+      'Packing and shopping screens now show an offline indicator when a background refresh fails',
+      'Photos screen no longer crashes on trip switch or slow startup',
+      'Map view stays correctly centred on the active trip after switching trips quickly',
+      'Home screen no longer shows mixed data when pull-to-refresh races with the initial load',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 360,
     label: 'Bug fixes',
     bullets: [

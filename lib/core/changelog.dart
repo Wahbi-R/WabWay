@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 371,
+    label: 'Bug fixes',
+    bullets: [
+      'Saving a receipt with linked documents is now faster — all doc-link changes are applied in parallel',
+      '"Add all trip days" in the Plan tab now creates all missing days at once instead of one by one',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 370,
     label: 'Bug fixes',
     bullets: [

@@ -695,21 +695,20 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
 
     // Use a silent load so the existing plan stays visible while days are created.
     final gen = beginLoad(silent: true);
-    int nextDayNumber = _days.isEmpty ? 0 : _days.map((d) => d.dayNumber).reduce((a, b) => a > b ? a : b);
-    final newDays = <TripDay>[];
+    final baseNumber = _days.isEmpty ? 0 : _days.map((d) => d.dayNumber).reduce((a, b) => a > b ? a : b);
+    final List<TripDay> newDays;
     try {
-      for (final date in missingDates) {
-        nextDayNumber++;
-        final day = await PlanService.createDay(
+      // Pre-assign day numbers and create all missing days in parallel.
+      newDays = await Future.wait(
+        List.generate(missingDates.length, (i) => PlanService.createDay(
           tripId:    tripId,
-          dayNumber: nextDayNumber,
-          date:      date,
+          dayNumber: baseNumber + i + 1,
+          date:      missingDates[i],
           city:      '',
           createdBy: userId,
           notes:     null,
-        );
-        newDays.add(day);
-      }
+        )),
+      );
       commitLoad(gen, () {
         _days.addAll(newDays);
         _days.sort((a, b) {

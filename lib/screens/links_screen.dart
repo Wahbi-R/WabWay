@@ -122,13 +122,15 @@ class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin
   }
 
   Future<void> _load({bool silent = false}) async {
+    final tripId = _activeTripId;
+    if (tripId == null) return;
     final gen = beginLoad(silent: silent);
     try {
-      final links = await LinksService.loadLinks(_activeTripId!);
+      final links = await LinksService.loadLinks(tripId);
       // Auto-links are best-effort — a failure here doesn't block manual links.
       Map<AutoLinkSource, List<AutoLink>> autoLinks;
       try {
-        autoLinks = await AutoLinksService.load(_activeTripId!);
+        autoLinks = await AutoLinksService.load(tripId);
       } catch (_) {
         autoLinks = {};
       }

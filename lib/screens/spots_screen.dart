@@ -162,12 +162,11 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> with AsyncScreenMixin
             }
           }
         }
-        setState(() {
+        commitLoad(gen, () {
           _spots   = cachedSpots;
           _docs    = cachedDocs ?? [];
           _stays   = cachedStays ?? [];
           _myVotes = cachedVotes;
-          loading  = false;
         });
       }
     }

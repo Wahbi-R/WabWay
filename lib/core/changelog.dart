@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 363,
+    label: 'Bug fixes',
+    bullets: [
+      'Spots screen no longer flashes an error banner over cached spots during a fresh load after a prior failure',
+      'Links screen no longer mixes manual links from one trip with auto-links from another after switching trips mid-load',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 362,
     label: 'Bug fixes',
     bullets: [

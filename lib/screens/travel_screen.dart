@@ -159,12 +159,14 @@ class _TravelScreenState extends ConsumerState<TravelScreen> with AsyncScreenMix
     }
 
     try {
-      final itemsFuture = TravelService.loadItems(_activeTripId);
-      final docsFuture  = DocService.loadDocuments(_activeTripId);
-      final daysFuture  = PlanService.loadAll(_activeTripId);
-      final items = await itemsFuture;
-      final docs  = await docsFuture;
-      final days  = await daysFuture;
+      final results = await Future.wait([
+        TravelService.loadItems(_activeTripId),
+        DocService.loadDocuments(_activeTripId),
+        PlanService.loadAll(_activeTripId),
+      ]);
+      final items = results[0] as List<TravelItem>;
+      final docs  = results[1] as List<TripDocument>;
+      final days  = results[2] as List<TripDay>;
       commitLoad(gen, () {
         _items..clear()..addAll(items);
         _docs..clear()..addAll(docs);

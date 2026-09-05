@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 364,
+    label: 'Bug fixes',
+    bullets: [
+      'Travel screen loads all data sources in parallel and handles failures cleanly without unhandled error logs',
+      'Home screen pull-to-refresh no longer blanks the screen when a load is already in progress',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 363,
     label: 'Bug fixes',
     bullets: [

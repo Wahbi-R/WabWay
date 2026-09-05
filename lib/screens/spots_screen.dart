@@ -172,15 +172,17 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> with AsyncScreenMixin
     }
 
     try {
-      final spotsFuture = SpotService.loadSpots(tripId);
-      final docsFuture  = DocService.loadDocuments(tripId);
-      // Accommodations fetched concurrently but caught separately so a transient
-      // failure doesn't prevent spots from loading.
-      final staysFuture = AccommodationService.loadAll(tripId)
-          .then<List<Accommodation>?>((v) => v, onError: (_) => null);
-      final spots = await spotsFuture;
-      final docs  = await docsFuture;
-      final stays = await staysFuture; // null means fetch failed; keep cached _stays
+      final results = await Future.wait([
+        SpotService.loadSpots(tripId),
+        DocService.loadDocuments(tripId),
+        // Accommodations caught separately so a transient failure doesn't
+        // prevent spots/docs from loading.
+        AccommodationService.loadAll(tripId)
+            .then<List<Accommodation>?>((v) => v, onError: (_) => null),
+      ]);
+      final spots = results[0] as List<Spot>;
+      final docs  = results[1] as List<TripDocument>;
+      final stays = results[2] as List<Accommodation>?; // null means fetch failed; keep cached _stays
       if (isStale(gen)) return;
 
       final myId = supabase.auth.currentUser?.id;

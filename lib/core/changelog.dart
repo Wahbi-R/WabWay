@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 366,
+    label: 'Bug fixes',
+    bullets: [
+      'Spots screen no longer logs unhandled network errors when the document fetch fails alongside a spot fetch failure',
+      'Plan and travel cache reads now run in a single parallel batch so a cache read failure no longer orphans sibling reads',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 365,
     label: 'Bug fixes',
     bullets: [

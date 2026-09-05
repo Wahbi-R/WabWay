@@ -139,12 +139,14 @@ class _TravelScreenState extends ConsumerState<TravelScreen> with AsyncScreenMix
     if (!silent) setState(() { _items.clear(); _docs.clear(); _days.clear(); });
 
     if (!silent) {
-      final cachedItemsFuture = TravelService.loadFromCache(_activeTripId);
-      final cachedDocsFuture  = DocService.loadDocumentsFromCache(_activeTripId);
-      final cachedDaysFuture  = PlanService.loadFromCache(_activeTripId);
-      final cachedItems = await cachedItemsFuture;
-      final cachedDocs  = await cachedDocsFuture;
-      final cachedDays  = await cachedDaysFuture;
+      final cached = await Future.wait([
+        TravelService.loadFromCache(_activeTripId),
+        DocService.loadDocumentsFromCache(_activeTripId),
+        PlanService.loadFromCache(_activeTripId),
+      ]);
+      final cachedItems = cached[0] as List<TravelItem>?;
+      final cachedDocs  = cached[1] as List<TripDocument>?;
+      final cachedDays  = cached[2] as List<TripDay>?;
       if (isStale(gen)) return;
       if (cachedItems != null) {
         commitLoad(gen, () {

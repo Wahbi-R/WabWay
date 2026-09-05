@@ -199,14 +199,16 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
     if (!silent) setState(() { _days.clear(); _spots.clear(); _docs.clear(); _stayItems.clear(); });
 
     if (!silent) {
-      final cachedDaysFuture  = PlanService.loadFromCache(_activeTripId);
-      final cachedSpotsFuture = SpotService.loadSpotsFromCache(_activeTripId);
-      final cachedDocsFuture  = DocService.loadDocumentsFromCache(_activeTripId);
-      final cachedStaysFuture = AccommodationService.loadFromCache(_activeTripId);
-      final cachedDays  = await cachedDaysFuture;
-      final cachedSpots = await cachedSpotsFuture;
-      final cachedDocs  = await cachedDocsFuture;
-      final cachedStays = await cachedStaysFuture;
+      final cached = await Future.wait([
+        PlanService.loadFromCache(_activeTripId),
+        SpotService.loadSpotsFromCache(_activeTripId),
+        DocService.loadDocumentsFromCache(_activeTripId),
+        AccommodationService.loadFromCache(_activeTripId),
+      ]);
+      final cachedDays  = cached[0] as List<TripDay>?;
+      final cachedSpots = cached[1] as List<Spot>?;
+      final cachedDocs  = cached[2] as List<TripDocument>?;
+      final cachedStays = cached[3] as List<Accommodation>?;
       if (isStale(gen)) return;
       if (cachedDays != null) {
         commitLoad(gen, () {

@@ -11,6 +11,18 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 373,
+    label: 'Bug fixes',
+    bullets: [
+      'Signing out now correctly returns you to the sign-in screen (a guard was preventing the profile from clearing)',
+      'Editing document links on a plan item no longer loses the item\'s linked stay',
+      'Attaching docs when creating a plan item now shows an error if the link fails instead of silently losing them',
+      'Applying a packing template now shows an error message if any items could not be added',
+      'Dragging to reorder plan items is safer: a partial failure now leaves items in a recoverable order instead of arbitrary corruption',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 372,
     label: 'Bug fixes',
     bullets: [

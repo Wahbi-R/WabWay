@@ -264,7 +264,7 @@ abstract final class PlanService {
               .toList(),
         );
       } catch (_) {
-        savedDocIds = []; // non-fatal; links can be re-added later
+        rethrow;
       }
     }
 
@@ -355,16 +355,14 @@ abstract final class PlanService {
   }
 
   static Future<void> reorderItemsInDay(List<ItineraryItem> items) async {
-    final futures = <Future<void>>[];
     for (var i = 0; i < items.length; i++) {
       if (items[i].sortOrder != i) {
-        futures.add(supabase
+        await supabase
             .from('itinerary_items')
             .update({'sort_order': i})
-            .eq('id', items[i].id));
+            .eq('id', items[i].id);
       }
     }
-    await Future.wait(futures);
   }
 
   // ── Item comments ─────────────────────────────────────────────────────────────

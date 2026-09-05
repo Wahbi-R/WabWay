@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../core/async_screen_mixin.dart';
 import '../core/supabase/accommodation_service.dart';
 import '../core/supabase/doc_service.dart';
 import '../core/supabase/links_service.dart';
@@ -91,11 +92,9 @@ class _GlobalSearchScreen extends StatefulWidget {
   State<_GlobalSearchScreen> createState() => _GlobalSearchScreenState();
 }
 
-class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
+class _GlobalSearchScreenState extends State<_GlobalSearchScreen> with AsyncScreenMixin {
   final _ctrl = TextEditingController();
   String _query = '';
-  bool _loading = true;
-  bool _error   = false;
 
   List<Spot> _spots = [];
   List<TripDocument> _docs = [];
@@ -124,6 +123,7 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
   // All data sources are fetched in parallel so the search screen is ready
   // in one round-trip. The order of results must match the Future.wait list.
   Future<void> _loadAll() async {
+    final gen = beginLoad();
     try {
       final results = await Future.wait([
         SpotService.loadSpots(widget.tripId),
@@ -136,9 +136,8 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
         PackingService.fetchAll(widget.tripId),
         LinksService.loadLinks(widget.tripId),
       ]);
-      if (!mounted) return;
       final days = results[5] as List<TripDay>;
-      setState(() {
+      commitLoad(gen, () {
         _spots        = results[0] as List<Spot>;
         _docs         = results[1] as List<TripDocument>;
         _travel       = results[2] as List<TravelItem>;
@@ -149,10 +148,9 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
         _stays        = results[6] as List<Accommodation>;
         _packingItems = results[7] as List<PackingItem>;
         _links        = results[8] as List<TripLink>;
-        _loading      = false;
       });
     } catch (_) {
-      if (mounted) setState(() { _loading = false; _error = true; });
+      failLoad(gen);
     }
   }
 
@@ -434,7 +432,7 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
           const SizedBox(width: kSpace2),
         ],
       ),
-      body: _loading
+      body: loading
           ? const Center(
               child: SizedBox(
                 width: 20, height: 20,
@@ -444,7 +442,7 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
                 ),
               ),
             )
-          : _error
+          : error
               ? Center(
                   child: WabwayEmptyState(
                     icon: Icons.wifi_off_rounded,

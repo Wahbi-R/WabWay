@@ -91,10 +91,11 @@ class _AuthGateState extends ConsumerState<AuthGate> {
             setState(() { _loading = false; _showPasswordRecovery = false; });
             return;
           }
+          // A concurrent signedIn may have fetched a real profile while we
+          // awaited the cache read — don't overwrite it with null.
+          if (_profile != null || !mounted) return;
         }
-        // A concurrent signedIn may have fetched a real profile while we
-        // awaited the cache read — don't overwrite it with null.
-        if (_profile != null || !mounted) return;
+        if (!mounted) return;
         ref.read(profileProvider.notifier).set(null);
         setState(() { _loading = false; _showPasswordRecovery = false; });
       default:

@@ -570,6 +570,7 @@ class _ActionsSectionState extends ConsumerState<_ActionsSection> {
         confirmationUrl: widget.item.confirmationUrl,
         notes: widget.item.notes,
         linkedSpotId: widget.item.linkedSpotId,
+        linkedStayId: widget.item.linkedStayId,
         linkedDocIds: newIds,
         sortOrder: widget.item.sortOrder,
         isDone: widget.item.isDone,

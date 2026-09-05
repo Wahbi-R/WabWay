@@ -76,7 +76,7 @@ class _PhotosScreenState extends ConsumerState<PhotosScreen> with AsyncScreenMix
       final albums = await PhotoAlbumService.loadAlbums(_activeTripId!);
       commitLoad(gen, () => _albums = albums);
     } catch (_) {
-      failLoad(gen, silent: silent);
+      failLoad(gen, silent: silent || _albums.isNotEmpty);
     }
   }
 

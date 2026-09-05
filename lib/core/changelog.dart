@@ -11,6 +11,18 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 362,
+    label: 'Bug fixes',
+    bullets: [
+      'Accommodations and docs screens no longer show an error banner over cached data after a prior failed load',
+      'Pins board no longer flashes an offline banner over existing pins during a background refresh failure',
+      'Photos screen no longer shows an offline banner over loaded albums during a brief network blip',
+      'Map no longer shows an offline overlay over existing spots when a background refresh fails',
+      'Linking a spot to a document now uses the correct trip\'s spots after a trip switch mid-request',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 361,
     label: 'Bug fixes',
     bullets: [

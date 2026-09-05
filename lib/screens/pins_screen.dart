@@ -55,7 +55,7 @@ class _PinsScreenState extends ConsumerState<PinsScreen> with AsyncScreenMixin {
       final pins = await PinsService.fetchAll(_tripId);
       commitLoad(gen, () => _pins = pins);
     } catch (_) {
-      failLoad(gen, silent: silent);
+      failLoad(gen, silent: silent || _pins.isNotEmpty);
     }
   }
 

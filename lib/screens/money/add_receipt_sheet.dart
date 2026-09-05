@@ -457,33 +457,35 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
           );
         } catch (_) {}
       }
-      // Sync document links: add new ones, remove deleted ones (non-fatal).
+      // Sync document links: add new ones, remove deleted ones.
+      // All operations are independent — run in parallel; track any failures.
       final userId       = supabase.auth.currentUser?.id ?? '';
       final currentIds   = _linkedDocs.map((d) => d.id).toSet();
-      for (final doc in _linkedDocs) {
-        if (!_originalDocIds.contains(doc.id)) {
-          try {
-            await DocService.addLink(
-              documentId: doc.id,
-              linkedType: DocLinkedType.receipt,
-              linkedId:   receipt.id,
-              createdBy:  userId,
-            );
-          } catch (_) {}
-        }
+      bool anyLinkFailed = false;
+      await Future.wait([
+        ..._linkedDocs
+            .where((doc) => !_originalDocIds.contains(doc.id))
+            .map((doc) => DocService.addLink(
+                  documentId: doc.id,
+                  linkedType: DocLinkedType.receipt,
+                  linkedId:   receipt.id,
+                  createdBy:  userId,
+                ).catchError((_) { anyLinkFailed = true; })),
+        ..._originalDocIds
+            .where((id) => !currentIds.contains(id))
+            .map((id) => DocService.deleteLink(
+                  documentId: id,
+                  linkedType: DocLinkedType.receipt,
+                  linkedId:   receipt.id,
+                ).catchError((_) { anyLinkFailed = true; })),
+      ]);
+      if (!mounted) return;
+      if (anyLinkFailed) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Receipt saved, but some document links could not be synced.'),
+        ));
       }
-      for (final removedId in _originalDocIds) {
-        if (!currentIds.contains(removedId)) {
-          try {
-            await DocService.deleteLink(
-              documentId: removedId,
-              linkedType: DocLinkedType.receipt,
-              linkedId:   receipt.id,
-            );
-          } catch (_) {}
-        }
-      }
-      if (mounted) widget.onSubmit(receipt);
+      widget.onSubmit(receipt);
       if (!_isEditing && widget.tripId != null) {
         pushNotify(
           tripId: widget.tripId!,

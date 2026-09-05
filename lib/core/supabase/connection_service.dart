@@ -15,15 +15,11 @@ abstract final class ConnectionService {
 
   /// All connections that involve [entityId] (on either side).
   static Future<List<TripConnection>> fetchForEntity(String entityId) async {
-    final a = await supabase
-        .from('trip_connections')
-        .select()
-        .eq('entity_a_id', entityId);
-    final b = await supabase
-        .from('trip_connections')
-        .select()
-        .eq('entity_b_id', entityId);
-    final all = {...a.map(_fromRow), ...b.map(_fromRow)};
+    final results = await Future.wait([
+      supabase.from('trip_connections').select().eq('entity_a_id', entityId),
+      supabase.from('trip_connections').select().eq('entity_b_id', entityId),
+    ]);
+    final all = {...results[0].map(_fromRow), ...results[1].map(_fromRow)};
     return all.toList()..sort((x, y) => x.createdAt.compareTo(y.createdAt));
   }
 
@@ -98,8 +94,7 @@ abstract final class ConnectionService {
       futures.add(supabase
           .from('trip_connections')
           .select('entity_a_id, entity_a_type, entity_b_id, entity_b_type')
-          .or('entity_a_id.in.(${chunk.join(',')}),entity_b_id.in.(${chunk.join(',')})')
-          .catchError((_) => <Map<String, dynamic>>[]));
+          .or('entity_a_id.in.(${chunk.join(',')}),entity_b_id.in.(${chunk.join(',')})'));
     }
     final allRows = (await Future.wait(futures)).expand((r) => r).toList();
     final spotMap = <String, String>{};

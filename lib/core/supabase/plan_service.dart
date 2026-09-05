@@ -78,17 +78,10 @@ abstract final class PlanService {
   /// Loads all itinerary days and items for [tripId] in three round-trips:
   /// days → items → document_links for items.
   static Future<List<TripDay>> loadAll(String tripId) async {
-    final daysData = await supabase
-        .from('itinerary_days')
-        .select()
-        .eq('trip_id', tripId)
-        .order('day_number');
-
-    final itemsData = await supabase
-        .from('itinerary_items')
-        .select()
-        .eq('trip_id', tripId)
-        .order('sort_order');
+    final [daysData, itemsData] = await Future.wait([
+      supabase.from('itinerary_days').select().eq('trip_id', tripId).order('day_number'),
+      supabase.from('itinerary_items').select().eq('trip_id', tripId).order('sort_order'),
+    ]);
 
     // Build a map of itemId → [docId, ...] from document_links
     final Map<String, List<String>> itemDocIds = {};
@@ -107,8 +100,15 @@ abstract final class PlanService {
     }
 
     // Load spot and stay connections from trip_connections for all items.
+    // Isolate failures: a transient connection error should not fail the whole plan load.
+    // Track if the fetch failed so we skip poisoning the cache with null-linked items.
+    var connectionsFailed = false;
     final (spotMap, stayMap) = itemIds.isNotEmpty
         ? await ConnectionService.fetchSpotAndStayMapsForItems(itemIds)
+            .catchError((_) {
+              connectionsFailed = true;
+              return (<String, String>{}, <String, String>{});
+            })
         : (<String, String>{}, <String, String>{});
 
     final allItems = itemsData
@@ -129,7 +129,9 @@ abstract final class PlanService {
     final days = daysData
         .map<TripDay>((r) => _dayFromRow(r, dayItems[r['id'] as String] ?? []))
         .toList();
-    await OfflineCache.write(OfflineCache.planKey(tripId), days.map(_dayToJson).toList());
+    if (!connectionsFailed) {
+      await OfflineCache.write(OfflineCache.planKey(tripId), days.map(_dayToJson).toList());
+    }
     return days;
   }
 
@@ -248,20 +250,25 @@ abstract final class PlanService {
 
     final itemId = row['id'] as String;
 
+    var savedDocIds = linkedDocIds;
     if (linkedDocIds.isNotEmpty) {
-      await supabase.from('document_links').insert(
-        linkedDocIds
-            .map((docId) => {
-                  'document_id': docId,
-                  'linked_type': 'itinerary_item',
-                  'linked_id':   itemId,
-                  'created_by':  createdBy,
-                })
-            .toList(),
-      );
+      try {
+        await supabase.from('document_links').insert(
+          linkedDocIds
+              .map((docId) => {
+                    'document_id': docId,
+                    'linked_type': 'itinerary_item',
+                    'linked_id':   itemId,
+                    'created_by':  createdBy,
+                  })
+              .toList(),
+        );
+      } catch (_) {
+        rethrow;
+      }
     }
 
-    return _itemFromRow(row, linkedDocIds);
+    return _itemFromRow(row, savedDocIds);
   }
 
   static Future<void> updateItem(ItineraryItem item) async {
@@ -326,14 +333,11 @@ abstract final class PlanService {
 
   static Future<ItineraryItem> duplicateItem(
     ItineraryItem item, {
+    required String tripId,
     required String createdBy,
   }) async {
     final row = await supabase.from('itinerary_items').insert({
-      'trip_id':    (await supabase
-              .from('itinerary_items')
-              .select('trip_id')
-              .eq('id', item.id)
-              .single())['trip_id'],
+      'trip_id':    tripId,
       'day_id':     item.dayId,
       'title':      '${item.title} (copy)',
       'type':       _typeToDb(item.type),

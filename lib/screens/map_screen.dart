@@ -122,9 +122,9 @@ class _MapScreenState extends ConsumerState<MapScreen> with AsyncScreenMixin {
         _spots = results[0] as List<Spot>;
         _accommodations = results[1] as List<Accommodation>;
       });
-      _fitIfNeeded();
+      if (!isStale(gen)) _fitIfNeeded();
     } catch (_) {
-      failLoad(gen, silent: silent);
+      failLoad(gen, silent: silent || _spots.isNotEmpty);
     }
   }
 

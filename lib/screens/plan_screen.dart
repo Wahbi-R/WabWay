@@ -199,17 +199,19 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
     if (!silent) setState(() { _days.clear(); _spots.clear(); _docs.clear(); _stayItems.clear(); });
 
     if (!silent) {
-      final cachedDaysFuture  = PlanService.loadFromCache(_activeTripId);
-      final cachedSpotsFuture = SpotService.loadSpotsFromCache(_activeTripId);
-      final cachedDocsFuture  = DocService.loadDocumentsFromCache(_activeTripId);
-      final cachedStaysFuture = AccommodationService.loadFromCache(_activeTripId);
-      final cachedDays  = await cachedDaysFuture;
-      final cachedSpots = await cachedSpotsFuture;
-      final cachedDocs  = await cachedDocsFuture;
-      final cachedStays = await cachedStaysFuture;
+      final cached = await Future.wait([
+        PlanService.loadFromCache(_activeTripId),
+        SpotService.loadSpotsFromCache(_activeTripId),
+        DocService.loadDocumentsFromCache(_activeTripId),
+        AccommodationService.loadFromCache(_activeTripId),
+      ]);
+      final cachedDays  = cached[0] as List<TripDay>?;
+      final cachedSpots = cached[1] as List<Spot>?;
+      final cachedDocs  = cached[2] as List<TripDocument>?;
+      final cachedStays = cached[3] as List<Accommodation>?;
       if (isStale(gen)) return;
       if (cachedDays != null) {
-        setState(() {
+        commitLoad(gen, () {
           _days..clear()..addAll(cachedDays)..sort((a, b) {
             final cmp = a.date.compareTo(b.date);
             return cmp != 0 ? cmp : a.dayNumber.compareTo(b.dayNumber);
@@ -217,8 +219,9 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
           _spots..clear()..addAll(cachedSpots ?? []);
           _docs..clear()..addAll(cachedDocs ?? []);
           _stayItems..clear()..addAll(cachedStays ?? []);
-          loading = false;
         });
+        unawaited(_loadAll(silent: true));
+        return;
       }
     }
 
@@ -309,11 +312,12 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
   }
 
   void _updateItem(ItineraryItem updated) {
-    // Detect spot connection changes before updating local state.
+    // Detect spot/stay connection changes before updating local state.
     String? oldSpotId;
+    String? oldStayId;
     for (final day in _days) {
       final old = day.items.where((i) => i.id == updated.id).firstOrNull;
-      if (old != null) { oldSpotId = old.linkedSpotId; break; }
+      if (old != null) { oldSpotId = old.linkedSpotId; oldStayId = old.linkedStayId; break; }
     }
 
     setState(() {
@@ -342,6 +346,24 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
           idA:    updated.id,
           typeB:  EntityType.spot,
           idB:    newSpotId,
+        );
+      }
+    }
+
+    // Sync stay connection in trip_connections.
+    final newStayId = updated.linkedStayId;
+    if (oldStayId != newStayId) {
+      if (oldStayId != null) {
+        ConnectionService.removeForEntityPair(updated.id, oldStayId);
+      }
+      if (newStayId != null) {
+        ConnectionService.add(
+          tripId: _activeTripId,
+          userId: _userId,
+          typeA:  EntityType.planItem,
+          idA:    updated.id,
+          typeB:  EntityType.stay,
+          idB:    newStayId,
         );
       }
     }
@@ -466,6 +488,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
         createdBy:    _userId,
         time:         timeStr,
         city:         spot.city.isNotEmpty ? spot.city : spot.area,
+        location:     (spot.address?.isNotEmpty == true) ? spot.address : spot.name,
         mapsUrl:      spot.mapsUrl,
         sortOrder:    day.items.length,
       );
@@ -579,10 +602,13 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
     if (fromDay == null || toDay == null) return;
     final moved = ItineraryItem(
       id: item.id, dayId: newDayId, title: item.title, type: item.type,
-      time: item.time, city: item.city, location: item.location,
-      mapsUrl: item.mapsUrl, confirmationUrl: item.confirmationUrl,
-      notes: item.notes, linkedSpotId: item.linkedSpotId,
-      linkedDocIds: item.linkedDocIds,
+      time: item.time, city: item.city, country: item.country,
+      location: item.location, mapsUrl: item.mapsUrl,
+      confirmationUrl: item.confirmationUrl, notes: item.notes,
+      linkedSpotId: item.linkedSpotId, linkedStayId: item.linkedStayId,
+      linkedDocIds: item.linkedDocIds, sortOrder: item.sortOrder,
+      isDone: item.isDone, plannedCost: item.plannedCost,
+      currency: item.currency,
     );
     setState(() {
       fromDay.items.removeWhere((i) => i.id == item.id);
@@ -606,7 +632,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
   Future<void> _onDuplicateItem(ItineraryItem item) async {
     if (_userId.isEmpty) return;
     try {
-      final copy = await PlanService.duplicateItem(item, createdBy: _userId);
+      final copy = await PlanService.duplicateItem(item, tripId: _activeTripId, createdBy: _userId);
       if (!mounted) return;
       final day = _days.where((d) => d.id == copy.dayId).firstOrNull;
       if (day == null) return;
@@ -659,6 +685,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
   }
 
   Future<void> _addAllTripDays(BuildContext context) async {
+    if (loading) return; // plan not yet loaded; days would be invisible (gen pre-empted)
     final trip = TripState.maybeOf(context)?.trip;
     if (trip == null || trip.startDate == null || trip.endDate == null) return;
     final messenger = ScaffoldMessenger.of(context);
@@ -681,24 +708,26 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
       messenger.showSnackBar(const SnackBar(content: Text('All trip days are already added.')));
       return;
     }
-    if (_activeTripId.isEmpty || _userId.isEmpty) return;
+    final tripId = _activeTripId;
+    final userId = _userId;
+    if (tripId.isEmpty || userId.isEmpty) return;
 
-    final gen = beginLoad();
-    int nextDayNumber = _days.isEmpty ? 0 : _days.map((d) => d.dayNumber).reduce((a, b) => a > b ? a : b);
-    final newDays = <TripDay>[];
+    // Use a silent load so the existing plan stays visible while days are created.
+    final gen = beginLoad(silent: true);
+    final baseNumber = _days.isEmpty ? 0 : _days.map((d) => d.dayNumber).reduce((a, b) => a > b ? a : b);
+    final List<TripDay> newDays;
     try {
-      for (final date in missingDates) {
-        nextDayNumber++;
-        final day = await PlanService.createDay(
-          tripId:    _activeTripId,
-          dayNumber: nextDayNumber,
-          date:      date,
+      // Pre-assign day numbers and create all missing days in parallel.
+      newDays = await Future.wait(
+        List.generate(missingDates.length, (i) => PlanService.createDay(
+          tripId:    tripId,
+          dayNumber: baseNumber + i + 1,
+          date:      missingDates[i],
           city:      '',
-          createdBy: _userId,
+          createdBy: userId,
           notes:     null,
-        );
-        newDays.add(day);
-      }
+        )),
+      );
       commitLoad(gen, () {
         _days.addAll(newDays);
         _days.sort((a, b) {
@@ -706,9 +735,16 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
           return cmp != 0 ? cmp : a.dayNumber.compareTo(b.dayNumber);
         });
       });
-      if (!isStale(gen)) unawaited(PlanService.writeDaysToCache(_activeTripId, _days));
+      if (!isStale(gen)) unawaited(PlanService.writeDaysToCache(tripId, _days));
+      // If gen was pre-empted (e.g. a non-silent load was in progress when we
+      // called beginLoad), commitLoad was a no-op and the new days are in the DB
+      // but not in _days. Reload silently so they become visible.
+      else if (_activeTripId == tripId) unawaited(_loadAll(silent: true));
     } catch (e) {
-      failLoad(gen);
+      failLoad(gen, silent: true);
+      // Only reload for the trip the days were being created for — if the user
+      // switched trips mid-loop, don't overwrite the new trip's plan data.
+      if (_activeTripId == tripId) unawaited(_loadAll(silent: true));
       messenger.showSnackBar(SnackBar(
         content: Text('Failed to add days: $e', style: kStyleBody.copyWith(color: Colors.white)),
         backgroundColor: kColorDanger,
@@ -849,7 +885,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
         base,
         Positioned(
           left: 0, right: 0, bottom: 0,
-          child: OfflineBanner(onRetry: _loadAll),
+          child: OfflineBanner(onRetry: () => _loadAll(silent: true)),
         ),
       ],
     );
@@ -1206,6 +1242,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
                                                   day: day,
                                                   spots: spots,
                                                   docs: docs,
+                                                  stays: _stayItems,
                                                   days: days,
                                                   onDelete: () => _deleteItem(id),
                                                   onUpdated: _updateItem,
@@ -1428,6 +1465,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
                           day: day,
                           spots: spots,
                           docs: docs,
+                          stays: _stayItems,
                           days: days,
                           onDelete: () => _deleteItem(item.id),
                           onUpdated: _updateItem,

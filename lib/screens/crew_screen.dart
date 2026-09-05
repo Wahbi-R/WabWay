@@ -109,20 +109,22 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
   }
 
   Future<void> _onNewMessage() async {
-    if (_tripId == null) return;
+    final tripId = _tripId;
+    if (tripId == null) return;
     try {
-      final messages = await CrewService.fetchMessages(_tripId!);
-      if (!mounted) return;
-      setState(() => _messages = messages);
+      final messages = await CrewService.fetchMessages(tripId);
+      if (!mounted || _tripId != tripId) return;
+      setState(() { _messages = messages; error = false; });
       _scrollToBottom();
     } catch (_) {}
   }
 
   Future<void> _onLocationsChanged() async {
-    if (_tripId == null) return;
+    final tripId = _tripId;
+    if (tripId == null) return;
     try {
-      final locations = await CrewService.fetchActiveLocations(_tripId!);
-      if (!mounted) return;
+      final locations = await CrewService.fetchActiveLocations(tripId);
+      if (!mounted || _tripId != tripId) return;
       setState(() => _locations = locations);
     } catch (_) {}
   }
@@ -288,13 +290,14 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
     final text = _textController.text.trim();
     if (text.isEmpty || _sending) return;
     setState(() => _sending = true);
+    // Clear immediately so text typed while the send is in-flight isn't wiped.
+    _textController.clear();
     try {
       await CrewService.sendMessage(
         tripId: _tripId!,
         authorId: _userId!,
         body: text,
       );
-      if (mounted) _textController.clear();
       // Refresh immediately so the sender sees their message without waiting
       // for the realtime subscription (which requires the table to be in the
       // Supabase realtime publication).
@@ -448,15 +451,18 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
       return;
     }
     if (file == null || !mounted) return;
+    final tripId = _tripId;
+    final userId = _userId;
+    if (tripId == null || userId == null) return;
     setState(() => _sendingImage = true);
     try {
       final bytes = await file.readAsBytes();
       final ext = file.name.contains('.') ? file.name.split('.').last.toLowerCase() : 'jpg';
-      final (:path, :url) = await CrewService.uploadChatImage(_tripId!, _userId!, bytes, ext);
+      final (:path, :url) = await CrewService.uploadChatImage(tripId, userId, bytes, ext);
       try {
         await CrewService.sendImageMessage(
-          tripId: _tripId!,
-          authorId: _userId!,
+          tripId: tripId,
+          authorId: userId,
           imageUrl: url,
         );
       } catch (e) {

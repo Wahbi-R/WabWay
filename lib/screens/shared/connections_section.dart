@@ -81,16 +81,17 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection>
     try {
       final conns = await ConnectionService.fetchForEntity(widget.entityId);
       if (isStale(gen)) return;
-      await _resolveNames(conns);
+      await _resolveNames(conns, gen);
       if (isStale(gen)) return;
       commitLoad(gen, () => _connections = conns);
     } catch (_) {
-      failLoad(gen);
+      failLoad(gen, silent: true);
     }
   }
 
   // Resolve display names for all peer entities not yet in cache.
-  Future<void> _resolveNames(List<TripConnection> conns) async {
+  // [gen] is used to abort writes if the widget was updated mid-flight.
+  Future<void> _resolveNames(List<TripConnection> conns, int gen) async {
     final toResolve = <MapEntry<EntityType, String>>[];
     for (final c in conns) {
       final type = c.peerType(widget.entityId);
@@ -116,6 +117,7 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection>
         case EntityType.spot:
           final spots = await SpotService.loadSpots(tripId)
               .catchError((_) => <Spot>[]);
+          if (isStale(gen)) return;
           for (final s in spots) {
             if (ids.contains(s.id)) _nameCache[s.id] = s.name;
           }
@@ -123,6 +125,7 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection>
         case EntityType.travel:
           final items = await TravelService.loadItems(tripId)
               .catchError((_) => <TravelItem>[]);
+          if (isStale(gen)) return;
           for (final i in items) {
             if (ids.contains(i.id)) _nameCache[i.id] = i.title;
           }
@@ -134,6 +137,7 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection>
               ids.any((id) => !cachedStays.any((s) => s.id == id))) {
             final result = await AccommodationService.loadAll(tripId)
                 .then<List<Accommodation>?>((v) => v, onError: (_) => null);
+            if (isStale(gen)) return;
             if (result != null) _staysCache = result;
           }
           for (final s in _staysCache ?? []) {
@@ -143,6 +147,7 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection>
         case EntityType.doc:
           final docs = await DocService.loadDocuments(tripId)
               .catchError((_) => <TripDocument>[]);
+          if (isStale(gen)) return;
           for (final d in docs) {
             if (ids.contains(d.id)) _nameCache[d.id] = d.title;
           }
@@ -150,6 +155,7 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection>
         case EntityType.link:
           final links = await LinksService.loadLinks(tripId)
               .catchError((_) => <TripLink>[]);
+          if (isStale(gen)) return;
           for (final l in links) {
             if (ids.contains(l.id)) _nameCache[l.id] = l.title;
           }
@@ -196,12 +202,16 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection>
 
   Future<void> _remove(TripConnection c) async {
     final idx = _connections.indexOf(c);
+    // Guard: if realtime already removed c from the list, indexOf returns -1.
+    // Remove by identity to be safe; skip revert insert if c was already gone.
     setState(() => _connections.remove(c));
     try {
       await ConnectionService.remove(c.id);
     } catch (_) {
       if (!mounted) return;
-      setState(() => _connections.insert(idx.clamp(0, _connections.length), c));
+      if (idx >= 0) {
+        setState(() => _connections.insert(idx.clamp(0, _connections.length), c));
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not remove connection. Please try again.')),
       );
@@ -209,8 +219,9 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection>
   }
 
   Future<void> _addConnection() async {
-    final tripId = widget.tripId;
-    final userId = ref.read(profileProvider)?.id ?? '';
+    final tripId  = widget.tripId;
+    final entityId = widget.entityId;
+    final userId  = ref.read(profileProvider)?.id ?? '';
 
     // Load all entities for the picker (excluding the current entity type
     // only if it makes no sense to link to itself — allow same-type links).
@@ -221,22 +232,22 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection>
       builder: (_) => _ConnectionPickerSheet(
         tripId:         tripId,
         myEntityType:   widget.entityType,
-        myEntityId:     widget.entityId,
+        myEntityId:     entityId,
         days:           widget.days,
-        alreadyLinked:  _connections.map((c) => c.peerId(widget.entityId)).toSet(),
+        alreadyLinked:  _connections.map((c) => c.peerId(entityId)).toSet(),
       ),
     );
-    if (result == null || !mounted) return;
+    if (result == null || !mounted || widget.entityId != entityId) return;
 
     final conn = await ConnectionService.add(
       tripId: tripId,
       userId: userId,
       typeA:  widget.entityType,
-      idA:    widget.entityId,
+      idA:    entityId,
       typeB:  result.type,
       idB:    result.id,
     );
-    if (!mounted) return;
+    if (!mounted || widget.entityId != entityId) return;
     _nameCache[result.id] = result.name;
     setState(() => _connections.add(conn));
   }
@@ -251,6 +262,23 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection>
                 width: 20,
                 height: 20,
                 child: CircularProgressIndicator(strokeWidth: 2))),
+      );
+    }
+
+    if (offline) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Connected', style: kStyleOverline),
+          const SizedBox(height: kSpace2),
+          GestureDetector(
+            onTap: _load,
+            child: Text(
+              'Could not load connections · Tap to retry',
+              style: kStyleCaption.copyWith(color: kColorPrimary),
+            ),
+          ),
+        ],
       );
     }
 
@@ -405,9 +433,8 @@ class _ConnectionPickerSheet extends StatefulWidget {
 
 class _ConnectionPickerSheetState
     extends State<_ConnectionPickerSheet>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, AsyncScreenMixin {
   late TabController _tabs;
-  bool loading = true;
 
   List<Spot>          _spots  = [];
   List<TravelItem>    _travel = [];
@@ -435,26 +462,27 @@ class _ConnectionPickerSheetState
 
   Future<void> _loadAll() async {
     final tid = widget.tripId;
+    final gen = beginLoad();
+    bool anyFailed = false;
     try {
       final results = await Future.wait([
-        SpotService.loadSpots(tid).catchError((_) => <Spot>[]),
-        TravelService.loadItems(tid).catchError((_) => <TravelItem>[]),
-        AccommodationService.loadAll(tid).catchError((_) => <Accommodation>[]),
-        DocService.loadDocuments(tid).catchError((_) => <TripDocument>[]),
-        LinksService.loadLinks(tid).catchError((_) => <TripLink>[]),
+        SpotService.loadSpots(tid).catchError((e) { anyFailed = true; return <Spot>[]; }),
+        TravelService.loadItems(tid).catchError((e) { anyFailed = true; return <TravelItem>[]; }),
+        AccommodationService.loadAll(tid).catchError((e) { anyFailed = true; return <Accommodation>[]; }),
+        DocService.loadDocuments(tid).catchError((e) { anyFailed = true; return <TripDocument>[]; }),
+        LinksService.loadLinks(tid).catchError((e) { anyFailed = true; return <TripLink>[]; }),
       ]);
-      if (!mounted) return;
-      setState(() {
+      commitLoad(gen, () {
         _spots  = results[0] as List<Spot>;
         _travel = results[1] as List<TravelItem>;
         _stays  = results[2] as List<Accommodation>;
         _docs   = results[3] as List<TripDocument>;
         _links  = results[4] as List<TripLink>;
-        loading = false;
       });
+      // Set offline AFTER commitLoad — the mixin resets offline=false inside onData.
+      if (anyFailed && !isStale(gen)) setState(() => offline = true);
     } catch (_) {
-      if (!mounted) return;
-      setState(() => loading = false);
+      failLoad(gen, silent: true);
     }
   }
 
@@ -538,6 +566,18 @@ class _ConnectionPickerSheetState
                 ],
               ),
             ),
+            if (offline)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(kSpace4, kSpace2, kSpace4, 0),
+                child: Row(
+                  children: [
+                    const Icon(Icons.wifi_off_rounded, size: 14, color: kColorInkSoft),
+                    const SizedBox(width: 6),
+                    Expanded(child: Text('Some items couldn\'t load.', style: kStyleCaption.copyWith(color: kColorInkSoft))),
+                    TextButton(onPressed: _loadAll, child: const Text('Retry')),
+                  ],
+                ),
+              ),
             Expanded(
               child: loading
                   ? const Center(child: CircularProgressIndicator())

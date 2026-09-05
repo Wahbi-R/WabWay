@@ -93,6 +93,59 @@ class _ParsedItineraryScreenState extends State<ParsedItineraryScreen> {
     super.dispose();
   }
 
+  Future<void> _saveBooking(int i, String? docId) async {
+    final b     = widget.bookings[i];
+    final title = _titleCtrls[i].text.trim().isEmpty ? b.title : _titleCtrls[i].text.trim();
+
+    String? planItemId;
+    if (_addToPlan[i]) {
+      final day = _matchingDay(b.date);
+      if (day != null) {
+        final planItem = await PlanService.createItem(
+          tripId:       widget.tripId,
+          dayId:        day.id,
+          title:        title,
+          type:         _planType(b.itemType),
+          createdBy:    widget.userId,
+          time:         b.departureTime,
+          notes:        b.notes.isEmpty ? null : b.notes,
+          linkedDocIds: docId != null ? [docId] : [],
+        );
+        planItemId = planItem.id;
+      }
+    }
+
+    final travelItem = await TravelService.createItem(
+      tripId:                widget.tripId,
+      title:                 title,
+      type:                  b.itemType,
+      createdBy:             widget.userId,
+      date:                  b.date,
+      time:                  b.departureTime,
+      notes:                 b.notes.isEmpty ? null : b.notes,
+      linkedItineraryItemId: planItemId,
+      linkedDocIds:          docId != null ? [docId] : [],
+    );
+
+    if (docId != null) {
+      await DocService.addLink(
+        documentId: docId,
+        linkedType: DocLinkedType.travelItem,
+        linkedId:   travelItem.id,
+        createdBy:  widget.userId,
+      );
+    }
+
+    if (docId != null && planItemId != null) {
+      await DocService.addLink(
+        documentId: docId,
+        linkedType: DocLinkedType.itineraryItem,
+        linkedId:   planItemId,
+        createdBy:  widget.userId,
+      );
+    }
+  }
+
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
@@ -111,67 +164,13 @@ class _ParsedItineraryScreenState extends State<ParsedItineraryScreen> {
         docId = doc.id;
       }
 
-      // 2. Save each selected booking
-      int count = 0;
-      for (int i = 0; i < widget.bookings.length; i++) {
-        if (!_selected[i]) continue;
-        final b     = widget.bookings[i];
-        final title = _titleCtrls[i].text.trim().isEmpty ? b.title : _titleCtrls[i].text.trim();
-
-        // 2a. Create plan item first (if requested) so we get its ID for linking
-        String? planItemId;
-        if (_addToPlan[i]) {
-          final day = _matchingDay(b.date);
-          if (day != null) {
-            final planItem = await PlanService.createItem(
-              tripId:      widget.tripId,
-              dayId:       day.id,
-              title:       title,
-              type:        _planType(b.itemType),
-              createdBy:   widget.userId,
-              time:        b.departureTime,
-              notes:       b.notes.isEmpty ? null : b.notes,
-              linkedDocIds: docId != null ? [docId] : [],
-            );
-            planItemId = planItem.id;
-          }
-        }
-
-        // 2b. Create travel item
-        final travelItem = await TravelService.createItem(
-          tripId:                widget.tripId,
-          title:                 title,
-          type:                  b.itemType,
-          createdBy:             widget.userId,
-          date:                  b.date,
-          time:                  b.departureTime,
-          notes:                 b.notes.isEmpty ? null : b.notes,
-          linkedItineraryItemId: planItemId,
-          linkedDocIds:          docId != null ? [docId] : [],
-        );
-
-        // 2c. Link doc → travel item
-        if (docId != null) {
-          await DocService.addLink(
-            documentId: docId,
-            linkedType: DocLinkedType.travelItem,
-            linkedId:   travelItem.id,
-            createdBy:  widget.userId,
-          );
-        }
-
-        // 2d. Link doc → plan item
-        if (docId != null && planItemId != null) {
-          await DocService.addLink(
-            documentId: docId,
-            linkedType: DocLinkedType.itineraryItem,
-            linkedId:   planItemId,
-            createdBy:  widget.userId,
-          );
-        }
-
-        count++;
-      }
+      // 2. Save each selected booking in parallel (bookings are independent)
+      final selectedIndices = [
+        for (int i = 0; i < widget.bookings.length; i++)
+          if (_selected[i]) i,
+      ];
+      await Future.wait(selectedIndices.map((i) => _saveBooking(i, docId)));
+      final count = selectedIndices.length;
 
       if (!mounted) return;
       final planCount = _selected

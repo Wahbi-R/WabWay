@@ -428,19 +428,17 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> with AsyncScreenMixin
     if (confirmed != true || !mounted) return;
 
     int failed = 0;
-    for (final id in deletable) {
+    await Future.wait(deletable.map((id) async {
       try {
         await SpotService.deleteSpot(id);
-        if (mounted) {
-          setState(() {
-            _spots.removeWhere((s) => s.id == id);
-            if (_selectedId == id) _selectedId = null;
-          });
-        }
+        if (mounted) setState(() {
+          _spots.removeWhere((s) => s.id == id);
+          if (_selectedId == id) _selectedId = null;
+        });
       } catch (_) {
         failed++;
       }
-    }
+    }));
     if (!mounted) return;
     _exitSelectionMode();
     if (failed > 0) {

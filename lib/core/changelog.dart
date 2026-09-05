@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 370,
+    label: 'Bug fixes',
+    bullets: [
+      'Adding multiple packing items at once (bulk import or template) is now much faster',
+      'Deleting multiple spots at once now runs in parallel instead of one by one',
+      'Importing multiple bookings from a document now saves them all in parallel',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 369,
     label: 'Bug fixes',
     bullets: [

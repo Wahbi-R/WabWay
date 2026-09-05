@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 367,
+    label: 'Bug fixes',
+    bullets: [
+      'Money screen no longer gets stuck on a loading spinner when a cache read fails on startup',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 366,
     label: 'Bug fixes',
     bullets: [

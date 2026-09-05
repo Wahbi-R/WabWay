@@ -148,6 +148,8 @@ class _ParsedItineraryScreenState extends State<ParsedItineraryScreen> {
 
   Future<void> _save() async {
     setState(() => _saving = true);
+    // Declared outside try so catch can deselect already-saved bookings on partial failure.
+    final succeeded = <int>[];
     try {
       // 1. Upload source file once if provided
       String? docId;
@@ -164,12 +166,17 @@ class _ParsedItineraryScreenState extends State<ParsedItineraryScreen> {
         docId = doc.id;
       }
 
-      // 2. Save each selected booking in parallel (bookings are independent)
+      // 2. Save each selected booking in parallel (bookings are independent).
+      // Track successes so a partial failure leaves already-saved items deselected,
+      // preventing duplicates on retry.
       final selectedIndices = [
         for (int i = 0; i < widget.bookings.length; i++)
           if (_selected[i]) i,
       ];
-      await Future.wait(selectedIndices.map((i) => _saveBooking(i, docId)));
+      await Future.wait(selectedIndices.map((i) async {
+        await _saveBooking(i, docId);
+        succeeded.add(i);
+      }));
       final count = selectedIndices.length;
 
       if (!mounted) return;
@@ -192,6 +199,12 @@ class _ParsedItineraryScreenState extends State<ParsedItineraryScreen> {
       widget.onDone?.call();
     } catch (e) {
       if (!mounted) return;
+      // Deselect already-saved bookings so retry doesn't duplicate them.
+      if (succeeded.isNotEmpty) {
+        setState(() {
+          for (final i in succeeded) _selected[i] = false;
+        });
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
       );

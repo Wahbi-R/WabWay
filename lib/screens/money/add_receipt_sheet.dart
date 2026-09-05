@@ -457,10 +457,11 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
           );
         } catch (_) {}
       }
-      // Sync document links: add new ones, remove deleted ones (non-fatal).
-      // All operations are independent — run them in parallel.
+      // Sync document links: add new ones, remove deleted ones.
+      // All operations are independent — run in parallel; track any failures.
       final userId       = supabase.auth.currentUser?.id ?? '';
       final currentIds   = _linkedDocs.map((d) => d.id).toSet();
+      bool anyLinkFailed = false;
       await Future.wait([
         ..._linkedDocs
             .where((doc) => !_originalDocIds.contains(doc.id))
@@ -469,16 +470,22 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
                   linkedType: DocLinkedType.receipt,
                   linkedId:   receipt.id,
                   createdBy:  userId,
-                ).catchError((_) {})),
+                ).catchError((_) { anyLinkFailed = true; })),
         ..._originalDocIds
             .where((id) => !currentIds.contains(id))
             .map((id) => DocService.deleteLink(
                   documentId: id,
                   linkedType: DocLinkedType.receipt,
                   linkedId:   receipt.id,
-                ).catchError((_) {})),
+                ).catchError((_) { anyLinkFailed = true; })),
       ]);
-      if (mounted) widget.onSubmit(receipt);
+      if (!mounted) return;
+      if (anyLinkFailed) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Receipt saved, but some document links could not be synced.'),
+        ));
+      }
+      widget.onSubmit(receipt);
       if (!_isEditing && widget.tripId != null) {
         pushNotify(
           tripId: widget.tripId!,

@@ -312,11 +312,12 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
   }
 
   void _updateItem(ItineraryItem updated) {
-    // Detect spot connection changes before updating local state.
+    // Detect spot/stay connection changes before updating local state.
     String? oldSpotId;
+    String? oldStayId;
     for (final day in _days) {
       final old = day.items.where((i) => i.id == updated.id).firstOrNull;
-      if (old != null) { oldSpotId = old.linkedSpotId; break; }
+      if (old != null) { oldSpotId = old.linkedSpotId; oldStayId = old.linkedStayId; break; }
     }
 
     setState(() {
@@ -345,6 +346,24 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
           idA:    updated.id,
           typeB:  EntityType.spot,
           idB:    newSpotId,
+        );
+      }
+    }
+
+    // Sync stay connection in trip_connections.
+    final newStayId = updated.linkedStayId;
+    if (oldStayId != newStayId) {
+      if (oldStayId != null) {
+        ConnectionService.removeForEntityPair(updated.id, oldStayId);
+      }
+      if (newStayId != null) {
+        ConnectionService.add(
+          tripId: _activeTripId,
+          userId: _userId,
+          typeA:  EntityType.planItem,
+          idA:    updated.id,
+          typeB:  EntityType.stay,
+          idB:    newStayId,
         );
       }
     }
@@ -1223,6 +1242,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
                                                   day: day,
                                                   spots: spots,
                                                   docs: docs,
+                                                  stays: _stayItems,
                                                   days: days,
                                                   onDelete: () => _deleteItem(id),
                                                   onUpdated: _updateItem,
@@ -1445,6 +1465,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
                           day: day,
                           spots: spots,
                           docs: docs,
+                          stays: _stayItems,
                           days: days,
                           onDelete: () => _deleteItem(item.id),
                           onUpdated: _updateItem,

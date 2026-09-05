@@ -167,6 +167,7 @@ class _PackingScreenState extends ConsumerState<PackingScreen> with AsyncScreenM
             style: kStyleBody.copyWith(color: Colors.white)),
         behavior: SnackBarBehavior.floating,
       ));
+      _load(silent: true);
     }
   }
 

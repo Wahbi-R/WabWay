@@ -8,6 +8,7 @@ import '../../core/supabase/client.dart';
 import '../../core/supabase/doc_service.dart';
 import '../../core/supabase/plan_service.dart';
 import '../../data/money_data.dart' show fmtAmount;
+import '../../data/accommodation_data.dart' show Accommodation;
 import '../../data/plan_data.dart';
 import '../../data/docs_data.dart';
 import '../../data/spot_data.dart' show Spot, fmtCommentTime;
@@ -29,6 +30,7 @@ class ItemDetailScreen extends ConsumerWidget {
     required this.day,
     this.spots = const [],
     this.docs = const [],
+    this.stays = const [],
     this.days = const [],
     this.onDelete,
     this.onUpdated,
@@ -40,6 +42,7 @@ class ItemDetailScreen extends ConsumerWidget {
   final TripDay day;
   final List<Spot> spots;
   final List<TripDocument> docs;
+  final List<Accommodation> stays;
   final List<TripDay> days;
   final VoidCallback? onDelete;
   final ValueChanged<ItineraryItem>? onUpdated;
@@ -59,7 +62,7 @@ class ItemDetailScreen extends ConsumerWidget {
             color: kColorInkSoft,
             onPressed: () => _showActionsSheet(
               context, item, spots, docs, onDelete, onUpdated,
-              days: days, onMove: onMove, onDuplicate: onDuplicate,
+              stays: stays, days: days, onMove: onMove, onDuplicate: onDuplicate,
               defaultCurrency: defaultCurrency,
             ),
           ),
@@ -72,6 +75,7 @@ class ItemDetailScreen extends ConsumerWidget {
           day: day,
           spots: spots,
           docs: docs,
+          stays: stays,
           days: days,
           onDelete: onDelete,
           onUpdated: onUpdated,
@@ -92,6 +96,7 @@ class ItemDetailContent extends ConsumerStatefulWidget {
     required this.day,
     this.spots = const [],
     this.docs = const [],
+    this.stays = const [],
     this.days = const [],
     this.onDelete,
     this.onUpdated,
@@ -103,6 +108,7 @@ class ItemDetailContent extends ConsumerStatefulWidget {
   final TripDay day;
   final List<Spot> spots;
   final List<TripDocument> docs;
+  final List<Accommodation> stays;
   final List<TripDay> days;
   final VoidCallback? onDelete;
   final ValueChanged<ItineraryItem>? onUpdated;
@@ -191,7 +197,8 @@ class _ItemDetailContentState extends ConsumerState<ItemDetailContent> {
 
               const SizedBox(height: kSpace4),
               _ActionsSection(
-                item: widget.item, spots: widget.spots, docs: widget.docs, days: widget.days,
+                item: widget.item, spots: widget.spots, docs: widget.docs,
+                stays: widget.stays, days: widget.days,
                 onDelete: widget.onDelete, onUpdated: widget.onUpdated,
                 onMove: widget.onMove, onDuplicate: widget.onDuplicate,
               ),
@@ -515,6 +522,7 @@ class _ActionsSection extends ConsumerStatefulWidget {
     required this.item,
     this.spots = const [],
     this.docs = const [],
+    this.stays = const [],
     this.days = const [],
     this.onDelete,
     this.onUpdated,
@@ -524,6 +532,7 @@ class _ActionsSection extends ConsumerStatefulWidget {
   final ItineraryItem item;
   final List<Spot> spots;
   final List<TripDocument> docs;
+  final List<Accommodation> stays;
   final List<TripDay> days;
   final VoidCallback? onDelete;
   final ValueChanged<ItineraryItem>? onUpdated;
@@ -654,6 +663,7 @@ class _ActionsSectionState extends ConsumerState<_ActionsSection> {
       defaultCurrency: ref.read(activeTripProvider)?.homeCurrency ?? '',
       spots: widget.spots,
       docs: widget.docs,
+      stays: widget.stays,
       initialItem: widget.item,
     );
     if (updated != null && context.mounted) {
@@ -764,6 +774,7 @@ void _showActionsSheet(
   List<TripDocument> docs,
   VoidCallback? onDelete,
   ValueChanged<ItineraryItem>? onUpdated, {
+  List<Accommodation> stays = const [],
   List<TripDay> days = const [],
   ValueChanged<String>? onMove,
   VoidCallback? onDuplicate,
@@ -798,6 +809,7 @@ void _showActionsSheet(
                 defaultCurrency: defaultCurrency,
                 spots: spots,
                 docs: docs,
+                stays: stays,
                 initialItem: item,
               );
               if (updated != null && context.mounted) {

@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 365,
+    label: 'Bug fixes',
+    bullets: [
+      'Switching trips no longer leaves a ghost packing-list subscription active in the background',
+      'Global search now shows an offline error state instead of a blank list when data fails to load',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 364,
     label: 'Bug fixes',
     bullets: [

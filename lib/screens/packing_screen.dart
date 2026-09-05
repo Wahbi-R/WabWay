@@ -82,6 +82,7 @@ class _PackingScreenState extends ConsumerState<PackingScreen> with AsyncScreenM
   }
 
   void _subscribe() {
+    _channel?.unsubscribe();
     _channel = PackingService.subscribe(_tripId, () {
       _debounce?.cancel();
       _debounce = Timer(

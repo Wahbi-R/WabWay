@@ -95,6 +95,7 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
   final _ctrl = TextEditingController();
   String _query = '';
   bool _loading = true;
+  bool _error   = false;
 
   List<Spot> _spots = [];
   List<TripDocument> _docs = [];
@@ -151,7 +152,7 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
         _loading      = false;
       });
     } catch (_) {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) setState(() { _loading = false; _error = true; });
     }
   }
 
@@ -443,6 +444,14 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> {
                 ),
               ),
             )
+          : _error
+              ? Center(
+                  child: WabwayEmptyState(
+                    icon: Icons.wifi_off_rounded,
+                    title: 'Could not load',
+                    description: 'Check your connection and try again.',
+                  ),
+                )
           : _query.trim().isEmpty
               ? const Center(
                   child: WabwayEmptyState(

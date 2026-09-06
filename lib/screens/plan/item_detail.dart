@@ -246,6 +246,14 @@ class _ItemDetailContentState extends ConsumerState<ItemDetailContent>
 
               if (loading)
                 const Center(child: WabwayLoadingIndicator())
+              else if (error)
+                WabwayErrorState(
+                  title: "Couldn't load comments",
+                  action: TextButton(
+                    onPressed: _loadComments,
+                    child: const Text('Retry'),
+                  ),
+                )
               else if (_comments.isEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: kSpace3),

@@ -11,6 +11,18 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 376,
+    label: 'Bug fixes',
+    changes: [
+      'Tapping the upcoming plan item card or an activity notification now shows all trip accommodations in the stay picker',
+      'Comments section on a plan item detail now shows an error message with a retry button if comments fail to load, instead of looking empty',
+      'Changing a plan item\'s linked spot or stay no longer risks a sync conflict — the old connection is removed before the new one is written',
+      'Adding a plan item with both a spot and a stay linked now correctly saves both connections',
+      'Duplicating a plan item now preserves its spot and stay connection records',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 375,
     label: 'Bug fixes',
     changes: [

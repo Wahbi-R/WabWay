@@ -339,19 +339,21 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
   void _syncItemConnection(
       String itemId, String? oldId, String? newId, EntityType linkedType) {
     if (oldId == newId) return;
-    if (oldId != null) {
-      ConnectionService.removeForEntityPair(itemId, oldId)
-          .catchError((_) => _loadAll(silent: true));
-    }
+    final removeFuture = oldId != null
+        ? ConnectionService.removeForEntityPair(itemId, oldId)
+            .catchError((_) => _loadAll(silent: true))
+        : Future<void>.value();
     if (newId != null) {
-      ConnectionService.add(
-        tripId: _activeTripId,
-        userId: _userId,
-        typeA:  EntityType.planItem,
-        idA:    itemId,
-        typeB:  linkedType,
-        idB:    newId,
-      ).then<void>((_) {}, onError: (_) => _loadAll(silent: true));
+      removeFuture.then<void>((_) {
+        ConnectionService.add(
+          tripId: _activeTripId,
+          userId: _userId,
+          typeA:  EntityType.planItem,
+          idA:    itemId,
+          typeB:  linkedType,
+          idB:    newId,
+        ).then<void>((_) {}, onError: (_) => _loadAll(silent: true));
+      });
     }
   }
 
@@ -410,7 +412,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
         sortOrder:       day.items.length,
       );
       if (!mounted) return;
-      // Write spot or stay connection to trip_connections if one was picked.
+      // Write spot and/or stay connections to trip_connections.
       if (draft.linkedSpotId != null) {
         await ConnectionService.add(
           tripId: _activeTripId,
@@ -420,7 +422,8 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
           typeB:  EntityType.spot,
           idB:    draft.linkedSpotId!,
         );
-      } else if (draft.linkedStayId != null) {
+      }
+      if (draft.linkedStayId != null) {
         await ConnectionService.add(
           tripId: _activeTripId,
           userId: _userId,
@@ -623,6 +626,26 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
       final day = _days.where((d) => d.id == copy.dayId).firstOrNull;
       if (day == null) return;
       setState(() => day.items.add(copy));
+      if (copy.linkedSpotId != null) {
+        ConnectionService.add(
+          tripId: _activeTripId,
+          userId: _userId,
+          typeA:  EntityType.planItem,
+          idA:    copy.id,
+          typeB:  EntityType.spot,
+          idB:    copy.linkedSpotId!,
+        ).then<void>((_) {}, onError: (_) => _loadAll(silent: true));
+      }
+      if (copy.linkedStayId != null) {
+        ConnectionService.add(
+          tripId: _activeTripId,
+          userId: _userId,
+          typeA:  EntityType.planItem,
+          idA:    copy.id,
+          typeB:  EntityType.stay,
+          idB:    copy.linkedStayId!,
+        ).then<void>((_) {}, onError: (_) => _loadAll(silent: true));
+      }
     } catch (_) {}
   }
 

@@ -8,6 +8,7 @@ import '../../data/invite_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
+import '../../core/async_screen_mixin.dart';
 import '../../widgets/widgets.dart';
 
 Future<void> showInviteSheet(
@@ -35,9 +36,8 @@ class _InviteSheet extends StatefulWidget {
   State<_InviteSheet> createState() => _InviteSheetState();
 }
 
-class _InviteSheetState extends State<_InviteSheet> {
+class _InviteSheetState extends State<_InviteSheet> with AsyncScreenMixin {
   List<InviteCode> _codes = [];
-  bool _loading = true;
   bool _generating = false;
   String? _error;
   final Set<String> _copied = {};
@@ -49,14 +49,13 @@ class _InviteSheetState extends State<_InviteSheet> {
   }
 
   Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
+    final gen = beginLoad();
     try {
       final codes = await InviteService.loadInvites(widget.tripId);
-      if (!mounted) return;
-      setState(() { _codes = codes; _loading = false; });
+      commitLoad(gen, () { _codes = codes; _error = null; });
     } catch (_) {
-      if (!mounted) return;
-      setState(() { _loading = false; _error = 'Could not load invite codes.'; });
+      failLoad(gen);
+      if (mounted) setState(() => _error = 'Could not load invite codes.');
     }
   }
 
@@ -168,7 +167,7 @@ class _InviteSheetState extends State<_InviteSheet> {
                   ),
                   const SizedBox(height: kSpace5),
 
-                  if (_loading)
+                  if (loading)
                     const Center(
                       child: Padding(
                         padding: EdgeInsets.all(kSpace6),

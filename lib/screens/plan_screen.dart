@@ -339,21 +339,24 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
   void _syncItemConnection(
       String itemId, String? oldId, String? newId, EntityType linkedType) {
     if (oldId == newId) return;
-    final removeFuture = oldId != null
-        ? ConnectionService.removeForEntityPair(itemId, oldId)
-            .catchError((_) => _loadAll(silent: true))
-        : Future<void>.value();
-    if (newId != null) {
-      removeFuture.then<void>((_) {
-        ConnectionService.add(
-          tripId: _activeTripId,
-          userId: _userId,
-          typeA:  EntityType.planItem,
-          idA:    itemId,
-          typeB:  linkedType,
-          idB:    newId,
-        ).then<void>((_) {}, onError: (_) => _loadAll(silent: true));
-      });
+    void addNew() {
+      if (newId == null) return;
+      ConnectionService.add(
+        tripId: _activeTripId,
+        userId: _userId,
+        typeA:  EntityType.planItem,
+        idA:    itemId,
+        typeB:  linkedType,
+        idB:    newId,
+      ).then<void>((_) {}, onError: (_) => _loadAll(silent: true));
+    }
+    if (oldId != null) {
+      ConnectionService.removeForEntityPair(itemId, oldId).then<void>(
+        (_) => addNew(),
+        onError: (_) => _loadAll(silent: true),
+      );
+    } else {
+      addNew();
     }
   }
 
@@ -412,32 +415,31 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
         sortOrder:       day.items.length,
       );
       if (!mounted) return;
-      // Write spot and/or stay connections to trip_connections.
+      setState(() {
+        day.items.add(item.copyWith(linkedSpotId: draft.linkedSpotId, linkedStayId: draft.linkedStayId));
+        _selectedItemId = item.id;
+      });
+      // Write spot and/or stay connections to trip_connections independently.
       if (draft.linkedSpotId != null) {
-        await ConnectionService.add(
+        ConnectionService.add(
           tripId: _activeTripId,
           userId: _userId,
           typeA:  EntityType.planItem,
           idA:    item.id,
           typeB:  EntityType.spot,
           idB:    draft.linkedSpotId!,
-        );
+        ).then<void>((_) {}, onError: (_) => _loadAll(silent: true));
       }
       if (draft.linkedStayId != null) {
-        await ConnectionService.add(
+        ConnectionService.add(
           tripId: _activeTripId,
           userId: _userId,
           typeA:  EntityType.planItem,
           idA:    item.id,
           typeB:  EntityType.stay,
           idB:    draft.linkedStayId!,
-        );
+        ).then<void>((_) {}, onError: (_) => _loadAll(silent: true));
       }
-      if (!mounted) return;
-      setState(() {
-        day.items.add(item.copyWith(linkedSpotId: draft.linkedSpotId, linkedStayId: draft.linkedStayId));
-        _selectedItemId = item.id;
-      });
     } catch (e) {
       if (!mounted) return;
       messenger.showSnackBar(SnackBar(
@@ -634,7 +636,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
           idA:    copy.id,
           typeB:  EntityType.spot,
           idB:    copy.linkedSpotId!,
-        ).then<void>((_) {}, onError: (_) => _loadAll(silent: true));
+        ).then<void>((_) {}, onError: (_) { if (mounted) _loadAll(silent: true); });
       }
       if (copy.linkedStayId != null) {
         ConnectionService.add(
@@ -644,7 +646,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
           idA:    copy.id,
           typeB:  EntityType.stay,
           idB:    copy.linkedStayId!,
-        ).then<void>((_) {}, onError: (_) => _loadAll(silent: true));
+        ).then<void>((_) {}, onError: (_) { if (mounted) _loadAll(silent: true); });
       }
     } catch (_) {}
   }

@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 377,
+    label: 'Bug fixes',
+    changes: [
+      'Changing a plan item\'s linked spot or stay is now more reliable — if removing the old connection fails, the new one is not added prematurely',
+      'Adding a plan item no longer disappears if the spot or stay connection fails to write — the item appears immediately and the connection syncs in the background',
+      'Duplicating a plan item is safer when navigating away quickly — a background error no longer causes a crash',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 376,
     label: 'Bug fixes',
     changes: [

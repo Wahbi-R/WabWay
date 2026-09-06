@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 383,
+    label: 'Bug fixes',
+    changes: [
+      'Creating a plan item with a linked spot or stay now saves those links correctly — they were previously lost on next reload',
+      'Re-linking a spot or stay on a plan item is now more reliable when navigating away quickly',
+      'Home screen stays loading independently so a network issue on stays data no longer prevents the rest of the home screen from loading',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 382,
     label: 'Bug fixes',
     changes: [

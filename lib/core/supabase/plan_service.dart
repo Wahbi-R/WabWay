@@ -223,6 +223,7 @@ abstract final class PlanService {
     String? confirmationUrl,
     String? notes,
     String? linkedSpotId,
+    String? linkedStayId,
     List<String> linkedDocIds = const [],
     int sortOrder = 0,
     double? plannedCost,
@@ -246,6 +247,7 @@ abstract final class PlanService {
       if (plannedCost != null) 'planned_cost': plannedCost,
       if (currency != null) 'currency': currency,
       if (linkedSpotId != null) 'linked_spot_id': linkedSpotId,
+      if (linkedStayId != null) 'linked_stay_id': linkedStayId,
     }).select().single();
 
     final itemId = row['id'] as String;

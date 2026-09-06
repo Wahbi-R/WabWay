@@ -352,7 +352,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
     }
     if (oldId != null) {
       ConnectionService.removeForEntityPair(itemId, oldId).then<void>(
-        (_) { if (mounted) addNew(); },
+        (_) { addNew(); },
         onError: (_) { if (mounted) _loadAll(silent: true); },
       );
     } else {
@@ -411,6 +411,8 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
         mapsUrl:         draft.mapsUrl,
         confirmationUrl: draft.confirmationUrl,
         notes:           draft.notes,
+        linkedSpotId:    draft.linkedSpotId,
+        linkedStayId:    draft.linkedStayId,
         linkedDocIds:    draft.linkedDocIds,
         sortOrder:       day.items.length,
       );

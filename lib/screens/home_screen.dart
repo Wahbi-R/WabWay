@@ -187,7 +187,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         MoneyService.loadWithdrawals(tripId),
         ActivityService.loadEvents(tripId),
         LinksService.loadLinks(tripId),
-        AccommodationService.loadAll(tripId),
       ]);
 
       final spots         = results[0] as List<Spot>;
@@ -198,7 +197,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       final withdrawals   = results[5] as List;
       final activities    = results[6] as List<ActivityEvent>;
       final links         = results[7] as List<TripLink>;
-      final stays         = results[8] as List<Accommodation>;
+      List<Accommodation> stays = [];
+      try {
+        stays = await AccommodationService.loadAll(tripId);
+      } catch (_) {}
 
       final memberMap = {for (final m in members) m.userId: m.profile.displayName};
       final tripMembers = members

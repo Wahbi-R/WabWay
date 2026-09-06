@@ -2,6 +2,7 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **387. Fix code review: invite_sheet generate success clears mixin error state** — _generate() success setState now sets error=false/offline=false so if the initial load had failed, a successful generate makes the codes section visible without requiring the user to tap Retry (2026-09-06, build 387).
 - [x] **386. Fix code review: parsed_itinerary_screen failLoad restored to silent:true** — screen has no error UI so failLoad(gen) (non-silent, sets error=true) was wrong; silent:true sets offline=true which is also not displayed but matches the "no UI for this failure" intent (2026-09-06, build 386).
 - [x] **385. Fix code review: 2 simplification bugs in parsed_itinerary_screen, doc_detail** — parsed itinerary failLoad changed from silent:true to non-silent so foreground load failure correctly sets error=true not offline=true; doc_detail link picker failLoad dead message: argument removed since build reads the hardcoded title not errorMessage (2026-09-06, build 385).
 - [x] **384. Fix code review: 2 efficiency/correctness bugs in home_screen, doc_detail** — AccommodationService.loadAll moved back into Future.wait with .catchError so all 9 sources load in parallel instead of stays being fetched sequentially after the other 8; _ImagePreviewState error path changed from commitLoad (signals success) to failLoad(silent:true) for correct mixin semantics (2026-09-06, build 384).

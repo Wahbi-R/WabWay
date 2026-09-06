@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 386,
+    label: 'Bug fixes',
+    changes: [
+      'Internal loading state fix in booking import screen',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 385,
     label: 'Bug fixes',
     changes: [

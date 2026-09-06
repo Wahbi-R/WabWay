@@ -418,7 +418,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
       );
       if (!mounted) return;
       setState(() {
-        day.items.add(item.copyWith(linkedSpotId: draft.linkedSpotId, linkedStayId: draft.linkedStayId));
+        day.items.add(item);
         _selectedItemId = item.id;
       });
       _syncItemConnection(item.id, null, draft.linkedSpotId, EntityType.spot);

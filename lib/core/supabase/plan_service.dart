@@ -350,6 +350,7 @@ abstract final class PlanService {
       if (item.confirmationUrl != null) 'confirmation_url': item.confirmationUrl,
       if (item.notes != null) 'notes': item.notes,
       if (item.linkedSpotId != null) 'linked_spot_id': item.linkedSpotId,
+      if (item.linkedStayId != null) 'linked_stay_id': item.linkedStayId,
     }).select().single();
     return _itemFromRow(row, []);
   }

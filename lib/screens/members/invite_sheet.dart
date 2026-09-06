@@ -39,7 +39,7 @@ class _InviteSheet extends StatefulWidget {
 class _InviteSheetState extends State<_InviteSheet> with AsyncScreenMixin {
   List<InviteCode> _codes = [];
   bool _generating = false;
-  String? _error;
+  String? _generateError;
   final Set<String> _copied = {};
 
   @override
@@ -52,14 +52,14 @@ class _InviteSheetState extends State<_InviteSheet> with AsyncScreenMixin {
     final gen = beginLoad();
     try {
       final codes = await InviteService.loadInvites(widget.tripId);
-      commitLoad(gen, () => _codes = codes);
+      commitLoad(gen, () { _codes = codes; _generateError = null; });
     } catch (_) {
       failLoad(gen, message: 'Could not load invite codes.');
     }
   }
 
   Future<void> _generate() async {
-    setState(() { _generating = true; _error = null; });
+    setState(() { _generating = true; _generateError = null; });
     try {
       final code = await InviteService.createInvite(widget.tripId);
       if (!mounted) return;
@@ -68,7 +68,7 @@ class _InviteSheetState extends State<_InviteSheet> with AsyncScreenMixin {
       if (!mounted) return;
       setState(() {
         _generating = false;
-        _error = 'Could not generate a code. Try again.';
+        _generateError = 'Could not generate a code. Try again.';
       });
     }
   }
@@ -183,8 +183,8 @@ class _InviteSheetState extends State<_InviteSheet> with AsyncScreenMixin {
                       onPressed: _load,
                     ),
                   ] else ...[
-                    if (_error != null) ...[
-                      Text(_error!,
+                    if (_generateError != null) ...[
+                      Text(_generateError!,
                           style: kStyleCaption.copyWith(color: kColorDanger)),
                       const SizedBox(height: kSpace3),
                     ],

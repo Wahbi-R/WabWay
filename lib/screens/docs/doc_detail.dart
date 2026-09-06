@@ -819,7 +819,7 @@ class _ImagePreviewState extends State<_ImagePreview> with AsyncScreenMixin {
       final url = await DocService.getSignedUrl(widget.storagePath);
       commitLoad(gen, () => _url = url);
     } catch (_) {
-      commitLoad(gen, () {});
+      failLoad(gen, silent: true);
     }
   }
 

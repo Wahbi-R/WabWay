@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 384,
+    label: 'Performance',
+    changes: [
+      'Home screen now loads all data sources in parallel instead of fetching stays data in a separate sequential request',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 383,
     label: 'Bug fixes',
     changes: [

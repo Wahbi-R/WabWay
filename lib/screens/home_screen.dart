@@ -175,7 +175,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final myId = ref.read(profileProvider)?.id ?? '';
 
     try {
-      // All nine sources in one round-trip so the home screen loads in parallel.
+      // All nine sources in parallel; stays failure is isolated via catchError.
       // results[0..8] must stay in sync with the list order below.
       final tripId = trip?.id ?? '';
       final results = await Future.wait([
@@ -187,6 +187,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         MoneyService.loadWithdrawals(tripId),
         ActivityService.loadEvents(tripId),
         LinksService.loadLinks(tripId),
+        AccommodationService.loadAll(tripId)
+            .catchError((_) => <Accommodation>[]),
       ]);
 
       final spots         = results[0] as List<Spot>;
@@ -197,10 +199,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       final withdrawals   = results[5] as List;
       final activities    = results[6] as List<ActivityEvent>;
       final links         = results[7] as List<TripLink>;
-      List<Accommodation> stays = [];
-      try {
-        stays = await AccommodationService.loadAll(tripId);
-      } catch (_) {}
+      final stays         = results[8] as List<Accommodation>;
 
       final memberMap = {for (final m in members) m.userId: m.profile.displayName};
       final tripMembers = members

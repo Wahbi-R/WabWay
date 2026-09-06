@@ -464,6 +464,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
         city:         spot.city.isNotEmpty ? spot.city : spot.area,
         location:     (spot.address?.isNotEmpty == true) ? spot.address : spot.name,
         mapsUrl:      spot.mapsUrl,
+        linkedSpotId: spot.id,
         sortOrder:    day.items.length,
       );
       if (!mounted) return;
@@ -477,7 +478,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
       );
       if (!mounted) return;
       setState(() {
-        day.items.add(item.copyWith(linkedSpotId: spot.id));
+        day.items.add(item);
         _selectedItemId = item.id;
       });
     } catch (e) {

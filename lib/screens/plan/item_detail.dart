@@ -165,6 +165,8 @@ class _ItemDetailContentState extends ConsumerState<ItemDetailContent>
           _comments.add(comment);
           _commentCtrl.clear();
           _commentSubmitting = false;
+          error = false;
+          offline = false;
         });
       }
     } catch (_) {

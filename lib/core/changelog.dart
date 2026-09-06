@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 390,
+    label: 'Bug fixes',
+    changes: [
+      'Submitting a comment now shows the list correctly even when a previous load had failed',
+      'Adding a plan item from a spot now correctly saves the spot link — it was only in connections but not in the item record',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 389,
     label: 'Bug fixes',
     changes: [

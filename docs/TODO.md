@@ -2,6 +2,7 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **390. Fix code review: 2 correctness bugs in item_detail, plan_screen** — _submitComment success now clears mixin error/offline so the comment list is visible after a comment succeeds when a prior load had failed; _addItemForSpot now passes linkedSpotId to createItem so the FK column is written (previously only trip_connections was written and the next reload lost the spot link) (2026-09-06, build 390).
 - [x] **389. Fix code review: updateItem omits linked_spot_id/linked_stay_id** — editing a plan item's spot/stay connection updated trip_connections but left the itinerary_items FK columns stale; next _loadAll reverted the item to its old link; now both columns are included in the UPDATE (null to allow unlinking) (2026-09-06, build 389).
 - [x] **388. Fix code review: remove redundant copyWith in _addItem** — item returned by createItem already carries linkedSpotId/linkedStayId from the DB row after build 383; copyWith was left over from when createItem did not receive those IDs (2026-09-06, build 388).
 - [x] **387. Fix code review: invite_sheet generate success clears mixin error state** — _generate() success setState now sets error=false/offline=false so if the initial load had failed, a successful generate makes the codes section visible without requiring the user to tap Retry (2026-09-06, build 387).

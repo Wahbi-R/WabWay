@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 389,
+    label: 'Bug fixes',
+    changes: [
+      'Editing a plan item\'s linked spot or stay now saves correctly — the change no longer reverts on next reload',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 388,
     label: 'Bug fixes',
     changes: [

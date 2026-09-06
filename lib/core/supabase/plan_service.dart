@@ -287,6 +287,8 @@ abstract final class PlanService {
       'is_done':          item.isDone,
       'planned_cost':     item.plannedCost,
       'currency':         item.currency,
+      'linked_spot_id':   item.linkedSpotId,
+      'linked_stay_id':   item.linkedStayId,
     }).eq('id', item.id);
   }
 

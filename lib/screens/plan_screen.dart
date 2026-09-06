@@ -348,12 +348,12 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
         idA:    itemId,
         typeB:  linkedType,
         idB:    newId,
-      ).then<void>((_) {}, onError: (_) => _loadAll(silent: true));
+      ).then<void>((_) {}, onError: (_) { if (mounted) _loadAll(silent: true); });
     }
     if (oldId != null) {
       ConnectionService.removeForEntityPair(itemId, oldId).then<void>(
-        (_) => addNew(),
-        onError: (_) => _loadAll(silent: true),
+        (_) { if (mounted) addNew(); },
+        onError: (_) { if (mounted) _loadAll(silent: true); },
       );
     } else {
       addNew();
@@ -428,7 +428,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
           idA:    item.id,
           typeB:  EntityType.spot,
           idB:    draft.linkedSpotId!,
-        ).then<void>((_) {}, onError: (_) => _loadAll(silent: true));
+        ).then<void>((_) {}, onError: (_) { if (mounted) _loadAll(silent: true); });
       }
       if (draft.linkedStayId != null) {
         ConnectionService.add(
@@ -438,7 +438,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
           idA:    item.id,
           typeB:  EntityType.stay,
           idB:    draft.linkedStayId!,
-        ).then<void>((_) {}, onError: (_) => _loadAll(silent: true));
+        ).then<void>((_) {}, onError: (_) { if (mounted) _loadAll(silent: true); });
       }
     } catch (e) {
       if (!mounted) return;

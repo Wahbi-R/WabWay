@@ -55,7 +55,7 @@ class _InviteSheetState extends State<_InviteSheet> with AsyncScreenMixin {
       commitLoad(gen, () { _codes = codes; _error = null; });
     } catch (_) {
       failLoad(gen);
-      if (mounted) setState(() => _error = 'Could not load invite codes.');
+      if (mounted && !isStale(gen)) setState(() => _error = 'Could not load invite codes.');
     }
   }
 

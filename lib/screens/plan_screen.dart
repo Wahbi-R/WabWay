@@ -419,27 +419,8 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
         day.items.add(item.copyWith(linkedSpotId: draft.linkedSpotId, linkedStayId: draft.linkedStayId));
         _selectedItemId = item.id;
       });
-      // Write spot and/or stay connections to trip_connections independently.
-      if (draft.linkedSpotId != null) {
-        ConnectionService.add(
-          tripId: _activeTripId,
-          userId: _userId,
-          typeA:  EntityType.planItem,
-          idA:    item.id,
-          typeB:  EntityType.spot,
-          idB:    draft.linkedSpotId!,
-        ).then<void>((_) {}, onError: (_) { if (mounted) _loadAll(silent: true); });
-      }
-      if (draft.linkedStayId != null) {
-        ConnectionService.add(
-          tripId: _activeTripId,
-          userId: _userId,
-          typeA:  EntityType.planItem,
-          idA:    item.id,
-          typeB:  EntityType.stay,
-          idB:    draft.linkedStayId!,
-        ).then<void>((_) {}, onError: (_) { if (mounted) _loadAll(silent: true); });
-      }
+      _syncItemConnection(item.id, null, draft.linkedSpotId, EntityType.spot);
+      _syncItemConnection(item.id, null, draft.linkedStayId, EntityType.stay);
     } catch (e) {
       if (!mounted) return;
       messenger.showSnackBar(SnackBar(
@@ -628,26 +609,8 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
       final day = _days.where((d) => d.id == copy.dayId).firstOrNull;
       if (day == null) return;
       setState(() => day.items.add(copy));
-      if (copy.linkedSpotId != null) {
-        ConnectionService.add(
-          tripId: _activeTripId,
-          userId: _userId,
-          typeA:  EntityType.planItem,
-          idA:    copy.id,
-          typeB:  EntityType.spot,
-          idB:    copy.linkedSpotId!,
-        ).then<void>((_) {}, onError: (_) { if (mounted) _loadAll(silent: true); });
-      }
-      if (copy.linkedStayId != null) {
-        ConnectionService.add(
-          tripId: _activeTripId,
-          userId: _userId,
-          typeA:  EntityType.planItem,
-          idA:    copy.id,
-          typeB:  EntityType.stay,
-          idB:    copy.linkedStayId!,
-        ).then<void>((_) {}, onError: (_) { if (mounted) _loadAll(silent: true); });
-      }
+      _syncItemConnection(copy.id, null, copy.linkedSpotId, EntityType.spot);
+      _syncItemConnection(copy.id, null, copy.linkedStayId, EntityType.stay);
     } catch (_) {}
   }
 

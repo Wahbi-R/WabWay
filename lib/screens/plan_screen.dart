@@ -468,19 +468,11 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
         sortOrder:    day.items.length,
       );
       if (!mounted) return;
-      await ConnectionService.add(
-        tripId: _activeTripId,
-        userId: _userId,
-        typeA:  EntityType.planItem,
-        idA:    item.id,
-        typeB:  EntityType.spot,
-        idB:    spot.id,
-      );
-      if (!mounted) return;
       setState(() {
         day.items.add(item);
         _selectedItemId = item.id;
       });
+      _syncItemConnection(item.id, null, spot.id, EntityType.spot);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(

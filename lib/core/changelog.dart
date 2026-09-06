@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 391,
+    label: 'Bug fixes',
+    changes: [
+      'Spot and stay links are now reliably preserved when adding or duplicating a plan item — the links were only stored in connections but not on the item itself',
+      'Adding a plan item from a spot no longer disappears from the list if the connection write fails',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 390,
     label: 'Bug fixes',
     changes: [

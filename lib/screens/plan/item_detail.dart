@@ -18,6 +18,7 @@ import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 import '../../data/connection_data.dart';
 import '../shared/connections_section.dart';
+import '../../core/async_screen_mixin.dart';
 import 'add_item_sheet.dart';
 import 'doc_attach_sheet.dart';
 
@@ -119,9 +120,9 @@ class ItemDetailContent extends ConsumerStatefulWidget {
   ConsumerState<ItemDetailContent> createState() => _ItemDetailContentState();
 }
 
-class _ItemDetailContentState extends ConsumerState<ItemDetailContent> {
+class _ItemDetailContentState extends ConsumerState<ItemDetailContent>
+    with AsyncScreenMixin {
   List<ItineraryItemComment> _comments = [];
-  bool _commentsLoading = true;
   bool _commentSubmitting = false;
   final _commentCtrl = TextEditingController();
 
@@ -138,8 +139,13 @@ class _ItemDetailContentState extends ConsumerState<ItemDetailContent> {
   }
 
   Future<void> _loadComments() async {
-    final comments = await PlanService.fetchComments(widget.item.id);
-    if (mounted) setState(() { _comments = comments; _commentsLoading = false; });
+    final gen = beginLoad();
+    try {
+      final comments = await PlanService.fetchComments(widget.item.id);
+      commitLoad(gen, () => _comments = comments);
+    } catch (_) {
+      failLoad(gen);
+    }
   }
 
   Future<void> _submitComment() async {
@@ -238,7 +244,7 @@ class _ItemDetailContentState extends ConsumerState<ItemDetailContent> {
               ),
               const SizedBox(height: kSpace3),
 
-              if (_commentsLoading)
+              if (loading)
                 const Center(child: WabwayLoadingIndicator())
               else if (_comments.isEmpty)
                 Padding(

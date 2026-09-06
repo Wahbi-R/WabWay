@@ -315,6 +315,7 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> with AsyncScre
                 day:   day,
                 docs:  docs,
                 spots: spots,
+                stays: _stays,
                 days:  days,
               ),
             ),

@@ -332,40 +332,26 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
     });
     PlanService.updateItem(updated).catchError((_) => _loadAll(silent: true));
 
-    // Sync spot connection in trip_connections.
-    final newSpotId = updated.linkedSpotId;
-    if (oldSpotId != newSpotId) {
-      if (oldSpotId != null) {
-        ConnectionService.removeForEntityPair(updated.id, oldSpotId);
-      }
-      if (newSpotId != null) {
-        ConnectionService.add(
-          tripId: _activeTripId,
-          userId: _userId,
-          typeA:  EntityType.planItem,
-          idA:    updated.id,
-          typeB:  EntityType.spot,
-          idB:    newSpotId,
-        );
-      }
-    }
+    _syncItemConnection(updated.id, oldSpotId, updated.linkedSpotId, EntityType.spot);
+    _syncItemConnection(updated.id, oldStayId, updated.linkedStayId, EntityType.stay);
+  }
 
-    // Sync stay connection in trip_connections.
-    final newStayId = updated.linkedStayId;
-    if (oldStayId != newStayId) {
-      if (oldStayId != null) {
-        ConnectionService.removeForEntityPair(updated.id, oldStayId);
-      }
-      if (newStayId != null) {
-        ConnectionService.add(
-          tripId: _activeTripId,
-          userId: _userId,
-          typeA:  EntityType.planItem,
-          idA:    updated.id,
-          typeB:  EntityType.stay,
-          idB:    newStayId,
-        );
-      }
+  void _syncItemConnection(
+      String itemId, String? oldId, String? newId, EntityType linkedType) {
+    if (oldId == newId) return;
+    if (oldId != null) {
+      ConnectionService.removeForEntityPair(itemId, oldId)
+          .catchError((_) => _loadAll(silent: true));
+    }
+    if (newId != null) {
+      ConnectionService.add(
+        tripId: _activeTripId,
+        userId: _userId,
+        typeA:  EntityType.planItem,
+        idA:    itemId,
+        typeB:  linkedType,
+        idB:    newId,
+      ).then<void>((_) {}, onError: (_) => _loadAll(silent: true));
     }
   }
 
@@ -1015,6 +1001,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
           day: day,
           spots: _spots,
           docs: _docs,
+          stays: _stayItems,
           days: _days,
           onDelete: () => _deleteItem(item.id),
           onUpdated: _updateItem,
@@ -1563,6 +1550,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
                 day:       r.day,
                 spots:     spots,
                 docs:      docs,
+                stays:     _stayItems,
                 days:      days,
                 onDelete:  () => _deleteItem(r.item.id),
                 onUpdated: _updateItem,

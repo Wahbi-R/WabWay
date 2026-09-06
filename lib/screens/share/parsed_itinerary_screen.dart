@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import '../../core/async_screen_mixin.dart';
 import '../../core/ocr/parse_counter.dart';
 import '../../core/ocr/parsed_booking.dart';
 import '../../core/supabase/doc_service.dart';
@@ -38,14 +39,14 @@ class ParsedItineraryScreen extends StatefulWidget {
   State<ParsedItineraryScreen> createState() => _ParsedItineraryScreenState();
 }
 
-class _ParsedItineraryScreenState extends State<ParsedItineraryScreen> {
+class _ParsedItineraryScreenState extends State<ParsedItineraryScreen>
+    with AsyncScreenMixin {
   late final List<bool> _selected;
   late final List<bool> _addToPlan;
   late final List<TextEditingController> _titleCtrls;
   bool   _saving      = false;
   int    _remaining   = ParseCounter.dailyLimit;
   List<TripDay> _days = [];
-  bool   _daysLoading = false;
 
   @override
   void initState() {
@@ -69,12 +70,12 @@ class _ParsedItineraryScreenState extends State<ParsedItineraryScreen> {
   }
 
   Future<void> _loadDays() async {
-    setState(() => _daysLoading = true);
+    final gen = beginLoad();
     try {
       final days = await PlanService.loadAll(widget.tripId);
-      if (mounted) setState(() => _days = days);
-    } finally {
-      if (mounted) setState(() => _daysLoading = false);
+      commitLoad(gen, () => _days = days);
+    } catch (_) {
+      failLoad(gen);
     }
   }
 
@@ -271,7 +272,7 @@ class _ParsedItineraryScreenState extends State<ParsedItineraryScreen> {
                 addToPlan:  _addToPlan[i],
                 titleCtrl:  _titleCtrls[i],
                 matchingDay: _matchingDay(widget.bookings[i].date),
-                daysLoading: _daysLoading,
+                daysLoading: loading,
                 onToggle:    (v) => setState(() => _selected[i] = v),
                 onPlanToggle: (v) => setState(() => _addToPlan[i] = v),
               ),

@@ -11,6 +11,17 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 375,
+    label: 'Bug fixes',
+    changes: [
+      'Editing a plan item from any screen now always shows your trip\'s accommodations in the stay picker',
+      'Changing a plan item\'s linked spot or stay is now more reliable — a sync failure triggers a silent refresh instead of leaving connections out of date',
+      'Comment loading on a plan item detail now shows an error state if the request fails instead of showing a spinner forever',
+      'Day loading on the booking import screen now shows an error state if the request fails',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 374,
     label: 'Bug fixes',
     changes: [

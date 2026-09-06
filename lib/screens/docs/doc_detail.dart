@@ -626,7 +626,7 @@ class _LinkPickerSheetState extends State<_LinkPickerSheet>
         _days        = results[3] as List<TripDay>;
       });
     } catch (_) {
-      failLoad(gen, message: 'Could not load links. Tap to retry.');
+      failLoad(gen);
     }
   }
 

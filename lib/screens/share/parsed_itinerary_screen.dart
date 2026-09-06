@@ -75,7 +75,7 @@ class _ParsedItineraryScreenState extends State<ParsedItineraryScreen>
       final days = await PlanService.loadAll(widget.tripId);
       commitLoad(gen, () => _days = days);
     } catch (_) {
-      failLoad(gen, silent: true);
+      failLoad(gen);
     }
   }
 

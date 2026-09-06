@@ -70,6 +70,12 @@ mixin AsyncScreenMixin<T extends StatefulWidget> on State<T> {
   /// load has started, or [gen] is -1 (silent load that was pre-empted).
   bool isStale(int gen) => !mounted || gen < 0 || gen != _loadGen;
 
+  /// Invalidates any in-flight load without changing visible state.
+  ///
+  /// Call this when a concurrent operation (e.g. a successful mutation) means
+  /// any pending load result should be discarded if/when it completes.
+  void cancelLoad() => _loadGen++;
+
   /// Commits a successful load. Runs [onData] inside [setState] along with
   /// clearing [loading], [error], and [offline]. No-ops when stale.
   ///

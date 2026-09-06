@@ -63,6 +63,7 @@ class _InviteSheetState extends State<_InviteSheet> with AsyncScreenMixin {
     try {
       final code = await InviteService.createInvite(widget.tripId);
       if (!mounted) return;
+      cancelLoad();
       setState(() { _codes = [code, ..._codes]; _generating = false; error = false; offline = false; });
     } catch (_) {
       if (!mounted) return;

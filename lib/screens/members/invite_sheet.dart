@@ -52,10 +52,9 @@ class _InviteSheetState extends State<_InviteSheet> with AsyncScreenMixin {
     final gen = beginLoad();
     try {
       final codes = await InviteService.loadInvites(widget.tripId);
-      commitLoad(gen, () { _codes = codes; _error = null; });
+      commitLoad(gen, () => _codes = codes);
     } catch (_) {
-      failLoad(gen);
-      if (mounted && !isStale(gen)) setState(() => _error = 'Could not load invite codes.');
+      failLoad(gen, message: 'Could not load invite codes.');
     }
   }
 
@@ -174,8 +173,8 @@ class _InviteSheetState extends State<_InviteSheet> with AsyncScreenMixin {
                         child: CircularProgressIndicator(),
                       ),
                     )
-                  else if (_error != null) ...[
-                    Text(_error!,
+                  else if (error) ...[
+                    Text(errorMessage,
                         style: kStyleCaption.copyWith(color: kColorDanger)),
                     const SizedBox(height: kSpace3),
                     WabwayButton(
@@ -183,7 +182,12 @@ class _InviteSheetState extends State<_InviteSheet> with AsyncScreenMixin {
                       fullWidth: true,
                       onPressed: _load,
                     ),
-                  ] else
+                  ] else ...[
+                    if (_error != null) ...[
+                      Text(_error!,
+                          style: kStyleCaption.copyWith(color: kColorDanger)),
+                      const SizedBox(height: kSpace3),
+                    ],
                     _CodesSection(
                       codes: _codes,
                       copied: _copied,
@@ -191,6 +195,7 @@ class _InviteSheetState extends State<_InviteSheet> with AsyncScreenMixin {
                       onShareLink: _shareLink,
                       onRevoke: widget.canRevoke ? _revoke : null,
                     ),
+                  ],
 
                   WabwayButton(
                     label: 'Generate new code',

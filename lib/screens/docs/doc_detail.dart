@@ -626,7 +626,7 @@ class _LinkPickerSheetState extends State<_LinkPickerSheet>
         _days        = results[3] as List<TripDay>;
       });
     } catch (_) {
-      failLoad(gen);
+      failLoad(gen, message: 'Could not load links. Tap to retry.');
     }
   }
 
@@ -655,6 +655,16 @@ class _LinkPickerSheetState extends State<_LinkPickerSheet>
           Expanded(
             child: loading
                 ? const Center(child: CircularProgressIndicator())
+                : error
+                    ? Center(
+                        child: WabwayErrorState(
+                          title: 'Could not load links',
+                          action: TextButton(
+                            onPressed: _load,
+                            child: const Text('Retry'),
+                          ),
+                        ),
+                      )
                 : ListView(
                     controller: ctrl,
                     padding: const EdgeInsets.only(bottom: kSpace8),

@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 381,
+    label: 'Bug fixes',
+    changes: [
+      'Link picker in docs now shows an error state with retry when loading fails instead of silently showing an empty list',
+      'Generate-code errors in invite sheet are now shown inline alongside the codes list, not blocking it',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 380,
     label: 'Bug fixes',
     changes: [

@@ -156,7 +156,8 @@ class SettingsScreen extends ConsumerWidget {
           Text('TRIP', style: kStyleOverline),
           const SizedBox(height: kSpace3),
           Builder(builder: (ctx) {
-            final trip = ref.watch(activeTripProvider)!;
+            final trip = ref.watch(activeTripProvider);
+            if (trip == null) return const SizedBox.shrink();
             final members = ref.watch(tripMembersProvider);
             final currentUserId = ref.watch(profileProvider)?.id;
             final isOwner = members.any((m) => m.userId == currentUserId && m.isOwner);

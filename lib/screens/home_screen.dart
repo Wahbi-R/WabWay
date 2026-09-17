@@ -6,6 +6,7 @@ import '../core/image_cache_manager.dart';
 import '../widgets/android_download_banner.dart';
 import '../widgets/update_checker_banner.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../core/async_screen_mixin.dart';
 import '../core/providers/profile_provider.dart';
 import '../core/providers/trip_provider.dart';
 import '../core/supabase/activity_service.dart';
@@ -148,11 +149,8 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> with AsyncScreenMixin {
   _HomeData? _data;
-  Object? _error;
-  bool _loaded = false;
-  bool _loadInFlight = false;
 
   @override
   void initState() {
@@ -160,16 +158,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       showOnboardingIfNeeded(context);
-      if (!_loaded) {
-        _loaded = true;
-        _load();
-      }
+      _load();
     });
   }
 
-  Future<void> _load() async {
-    if (_loadInFlight) return;
-    _loadInFlight = true;
+  Future<void> _load({bool silent = false}) async {
+    final gen = beginLoad(silent: silent);
     final trip = ref.read(activeTripProvider);
     final members = ref.read(tripMembersProvider);
     final myId = ref.read(profileProvider)?.id ?? '';
@@ -178,6 +172,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       // All nine sources in parallel; stays failure is isolated via catchError.
       // results[0..8] must stay in sync with the list order below.
       final tripId = trip?.id ?? '';
+      if (tripId.isEmpty) {
+        commitLoad(gen, () => _data = null);
+        return;
+      }
       final results = await Future.wait([
         SpotService.loadSpots(tripId),
         DocService.loadDocuments(tripId),
@@ -213,9 +211,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         members: tripMembers,
       );
 
-      if (!mounted) return;
-      setState(() {
-        _error = null;
+      commitLoad(gen, () {
         _data = _HomeData(
           spots: spots,
           docs: docs,
@@ -231,21 +227,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           activityEvents: activities,
         );
       });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e);
-    } finally {
-      _loadInFlight = false;
+    } catch (_) {
+      failLoad(gen, silent: silent);
     }
   }
 
   Future<void> _refresh() async {
-    if (_loadInFlight) return;
     if (!mounted) return;
-    setState(() {
-      _data = null;
-      _error = null;
-    });
+    setState(() => _data = null);
     return _load();
   }
 
@@ -305,7 +294,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final trip    = ref.watch(activeTripProvider);
     final members = ref.watch(tripMembersProvider);
 
-    if (_error != null && _data == null) {
+    if (error && _data == null) {
       return Scaffold(
         backgroundColor: kColorCream,
         appBar: AppBar(
@@ -982,16 +971,15 @@ class _PinboardCard extends StatefulWidget {
   State<_PinboardCard> createState() => _PinboardCardState();
 }
 
-class _PinboardCardState extends State<_PinboardCard> {
+class _PinboardCardState extends State<_PinboardCard> with AsyncScreenMixin {
   List<TripPin> _pins = [];
-  bool _loaded = false;
   RealtimeChannel? _channel;
 
   @override
   void initState() {
     super.initState();
     _load();
-    _channel = PinsService.subscribe(widget.tripId, () => _load());
+    _channel = PinsService.subscribe(widget.tripId, () => _load(silent: true));
   }
 
   @override
@@ -1000,16 +988,19 @@ class _PinboardCardState extends State<_PinboardCard> {
     super.dispose();
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool silent = false}) async {
+    final gen = beginLoad(silent: silent);
     try {
       final pins = await PinsService.fetchPinned(widget.tripId);
-      if (mounted) setState(() { _pins = pins; _loaded = true; });
-    } catch (_) {}
+      commitLoad(gen, () => _pins = pins);
+    } catch (_) {
+      failLoad(gen, silent: silent || _pins.isNotEmpty);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_loaded || _pins.isEmpty) return const SizedBox.shrink();
+    if (loading || _pins.isEmpty) return const SizedBox.shrink();
 
     return DecoratedBox(
       decoration: kCardDecoration(),

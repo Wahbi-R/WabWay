@@ -540,7 +540,7 @@ class _SpotDetailContentState extends ConsumerState<SpotDetailContent> {
               ConnectionsSection(
                 entityType: EntityType.spot,
                 entityId:   widget.spot.id,
-                tripId:     ref.read(activeTripIdProvider),
+                tripId:     ref.watch(activeTripIdProvider),
               ),
 
               const SizedBox(height: kSpace4),

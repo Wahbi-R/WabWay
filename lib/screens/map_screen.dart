@@ -37,7 +37,7 @@ class _MapScreenState extends ConsumerState<MapScreen> with AsyncScreenMixin {
   List<Accommodation> _accommodations = [];
   bool _showMap = true;
   final Set<SpotCategory> _hiddenCategories = {};
-  String? _activeTripId;
+  String _activeTripId = '';
   RealtimeChannel? _realtimeChannel;
   Timer? _debounce;
 
@@ -51,8 +51,10 @@ class _MapScreenState extends ConsumerState<MapScreen> with AsyncScreenMixin {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _activeTripId = ref.read(activeTripIdProvider);
-      _load(_activeTripId!);
-      _subscribeRealtime(_activeTripId!);
+      if (_activeTripId.isNotEmpty) {
+        _load(_activeTripId);
+        _subscribeRealtime(_activeTripId);
+      }
     });
   }
 
@@ -367,7 +369,7 @@ class _MapScreenState extends ConsumerState<MapScreen> with AsyncScreenMixin {
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
             tooltip: 'Refresh',
-            onPressed: _activeTripId == null ? null : () => _load(_activeTripId!), // explicit user refresh — show spinner
+            onPressed: _activeTripId.isEmpty ? null : () => _load(_activeTripId),
           ),
           // Map / List toggle
           Padding(
@@ -405,7 +407,7 @@ class _MapScreenState extends ConsumerState<MapScreen> with AsyncScreenMixin {
                     description: 'Could not load spots.',
                     action: WabwayButton(
                       label: 'Retry',
-                      onPressed: () => _load(_activeTripId!),
+                      onPressed: () => _load(_activeTripId),
                     ),
                   ),
                 )
@@ -640,7 +642,7 @@ class _MapScreenState extends ConsumerState<MapScreen> with AsyncScreenMixin {
     final unmappedStays   = _accommodations.where((a) => a.latitude == null || a.longitude == null).toList();
 
     return RefreshIndicator(
-      onRefresh: () => _load(_activeTripId!),
+      onRefresh: () => _load(_activeTripId),
       child: ListView(
         padding: EdgeInsets.fromLTRB(
             kSpace4, kSpace3, kSpace4,

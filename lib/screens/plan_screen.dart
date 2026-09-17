@@ -389,13 +389,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
     final day = _days.where((d) => d.id == dayId).firstOrNull;
     if (day == null) return;
 
-    if (_activeTripId.isEmpty || _userId.isEmpty) {
-      setState(() {
-        day.items.add(draft);
-        _selectedItemId = draft.id;
-      });
-      return;
-    }
+    if (_activeTripId.isEmpty || _userId.isEmpty) return;
 
     try {
       final item = await PlanService.createItem(
@@ -606,7 +600,13 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
       setState(() => day.items.add(copy));
       _syncItemConnection(copy.id, null, copy.linkedSpotId, EntityType.spot);
       _syncItemConnection(copy.id, null, copy.linkedStayId, EntityType.stay);
-    } catch (_) {}
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to duplicate item — please try again')),
+        );
+      }
+    }
   }
 
   Future<void> _addDay(BuildContext context) async {
@@ -1215,7 +1215,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
                                                   day: day,
                                                   spots: spots,
                                                   docs: docs,
-                                                  stays: _stayItems,
+                                                  stays: List.from(_stayItems),
                                                   days: days,
                                                   onDelete: () => _deleteItem(id),
                                                   onUpdated: _updateItem,

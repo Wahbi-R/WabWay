@@ -36,7 +36,7 @@ class _DocsScreenState extends ConsumerState<DocsScreen> with AsyncScreenMixin {
   List<TripDocument> _docs = [];
   List<Spot> _availableSpots = [];
 
-  String? _activeTripId;
+  String _activeTripId = '';
   RealtimeChannel? _realtimeChannel;
   Timer? _debounce;
 
@@ -71,7 +71,7 @@ class _DocsScreenState extends ConsumerState<DocsScreen> with AsyncScreenMixin {
       _rebuildMemberName();
       _loadDocs();
       _loadAvailableSpots();
-      _subscribeRealtime(_activeTripId!);
+      if (_activeTripId.isNotEmpty) _subscribeRealtime(_activeTripId);
     });
   }
 
@@ -88,7 +88,7 @@ class _DocsScreenState extends ConsumerState<DocsScreen> with AsyncScreenMixin {
 
   Future<void> _loadDocs({bool silent = false}) async {
     final tripId = _activeTripId;
-    if (tripId == null) return;
+    if (tripId.isEmpty) return;
     final gen = beginLoad(silent: silent);
     if (!silent) setState(() => _docs = []);
 
@@ -108,7 +108,8 @@ class _DocsScreenState extends ConsumerState<DocsScreen> with AsyncScreenMixin {
 
   Future<void> _loadAvailableSpots() async {
     try {
-      final tripId = _activeTripId!;
+      final tripId = _activeTripId;
+      if (tripId.isEmpty) return;
       final spots = await SpotService.loadSpots(tripId);
       if (mounted && _activeTripId == tripId) setState(() => _availableSpots = spots);
     } catch (_) {}
@@ -151,7 +152,7 @@ class _DocsScreenState extends ConsumerState<DocsScreen> with AsyncScreenMixin {
 
   Future<void> _addDoc(BuildContext context) async {
     final trip = ref.read(activeTripProvider);
-    final tripId   = trip?.id ?? _activeTripId ?? '';
+    final tripId   = trip?.id ?? _activeTripId;
     final tripName = trip?.name ?? 'Trip';
     final userId   = ref.read(profileProvider)?.id ?? '';
 
@@ -424,7 +425,7 @@ class _DocsScreenState extends ConsumerState<DocsScreen> with AsyncScreenMixin {
       child: DocDetailContent(
         key: ValueKey(doc.id),
         doc: doc,
-        tripId: trip?.id ?? _activeTripId ?? '',
+        tripId: trip?.id ?? _activeTripId,
         tripName: trip?.name ?? 'Trip',
         availableSpots: _availableSpots,
         onDelete: () => _deleteDoc(doc),
@@ -526,7 +527,7 @@ class _DocsScreenState extends ConsumerState<DocsScreen> with AsyncScreenMixin {
                           MaterialPageRoute(
                             builder: (_) => DocDetailScreen(
                               doc: doc,
-                              tripId: trip?.id ?? _activeTripId ?? '',
+                              tripId: trip?.id ?? _activeTripId,
                               tripName: trip?.name ?? 'Trip',
                               availableSpots: _availableSpots,
                               onDelete: () => _deleteDoc(doc),

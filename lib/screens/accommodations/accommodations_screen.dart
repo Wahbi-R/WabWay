@@ -34,7 +34,7 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen>
     with AsyncScreenMixin {
   List<Accommodation> _items = [];
 
-  String? _activeTripId;
+  String _activeTripId = '';
   AccommodationStatus? _filterStatus;
   _StaySort _sort = _StaySort.checkIn;
   String _search = '';
@@ -50,7 +50,7 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen>
       if (!mounted) return;
       _activeTripId = ref.read(activeTripIdProvider);
       _load();
-      _subscribe(_activeTripId!);
+      if (_activeTripId.isNotEmpty) _subscribe(_activeTripId);
     });
   }
 
@@ -88,7 +88,7 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen>
 
   Future<void> _load({bool silent = false}) async {
     final tripId = _activeTripId;
-    if (tripId == null) return;
+    if (tripId.isEmpty) return;
     final gen = beginLoad(silent: silent);
     if (!silent) setState(() => _items = []);
 
@@ -190,7 +190,8 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen>
   }
 
   Future<void> _openAdd(BuildContext context, {Accommodation? editing}) async {
-    final tripId = _activeTripId!;
+    final tripId = _activeTripId;
+    if (tripId.isEmpty) return;
     final userId = supabase.auth.currentUser?.id ?? '';
     final result = await showModalBottomSheet<AccommodationSheetResult>(
       context: context,

@@ -32,7 +32,7 @@ class LinksScreen extends ConsumerStatefulWidget {
 class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin {
   List<TripLink> _links = [];
   Map<AutoLinkSource, List<AutoLink>> _autoLinks = {};
-  String? _activeTripId;
+  String _activeTripId = '';
   RealtimeChannel? _channel;
   Timer? _debounce;
   LinkCategory? _filterCategory;
@@ -88,7 +88,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin
       if (!mounted) return;
       _activeTripId = ref.read(activeTripIdProvider);
       _load();
-      _subscribe(_activeTripId!);
+      if (_activeTripId.isNotEmpty) _subscribe(_activeTripId);
     });
   }
 
@@ -123,7 +123,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin
 
   Future<void> _load({bool silent = false}) async {
     final tripId = _activeTripId;
-    if (tripId == null) return;
+    if (tripId.isEmpty) return;
     final gen = beginLoad(silent: silent);
     try {
       final links = await LinksService.loadLinks(tripId);
@@ -147,7 +147,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin
     final userId = ref.read(profileProvider)!.id;
     final link = await showAddLinkSheet(
       context,
-      tripId: _activeTripId!,
+      tripId: _activeTripId,
       userId: userId,
     );
     if (link != null && mounted) {
@@ -159,7 +159,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin
     final userId = ref.read(profileProvider)!.id;
     final updated = await showAddLinkSheet(
       context,
-      tripId: _activeTripId!,
+      tripId: _activeTripId,
       userId: userId,
       existing: link,
     );
@@ -233,7 +233,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin
   void _shareLinks() {
     final list = _filteredLinks;
     if (list.isEmpty || kIsWeb) return;
-    final tripName = ref.read(activeTripProvider)!.name;
+    final tripName = ref.read(activeTripProvider)?.name ?? 'Trip';
     final buf = StringBuffer();
     buf.writeln('$tripName — Links');
     buf.writeln();

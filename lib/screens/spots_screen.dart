@@ -50,7 +50,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> with AsyncScreenMixin
   List<Accommodation> _stays = [];
   Map<String, VoteType> _myVotes = {};
 
-  String? _activeTripId;
+  String _activeTripId = '';
   RealtimeChannel? _realtimeChannel;
   Timer? _debounce;
 
@@ -78,7 +78,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> with AsyncScreenMixin
       if (!mounted) return;
       _activeTripId = ref.read(activeTripIdProvider);
       _loadSpots();
-      _subscribeRealtime(_activeTripId!);
+      if (_activeTripId.isNotEmpty) _subscribeRealtime(_activeTripId);
     });
   }
 
@@ -140,7 +140,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> with AsyncScreenMixin
 
   Future<void> _loadSpots({bool silent = false}) async {
     final tripId = _activeTripId;
-    if (tripId == null) return;
+    if (tripId.isEmpty) return;
     final gen = beginLoad(silent: silent);
     if (!silent) setState(() { _spots = []; _docs = []; _stays = []; _myVotes = {}; });
 
@@ -283,7 +283,8 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> with AsyncScreenMixin
   // ─── Mutations ───────────────────────────────────────────────────────────────
 
   Future<void> _addSpot(BuildContext context) async {
-    final tripId = _activeTripId!;
+    final tripId = _activeTripId;
+    if (tripId.isEmpty) return;
     final userId = ref.read(profileProvider)?.id ?? '';
     final spot = await showAddSpotSheet(context, tripId: tripId, userId: userId);
     if (spot != null && mounted) {
@@ -527,7 +528,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> with AsyncScreenMixin
       builder: (_) => _StayMiniSheet(
         stay: stay,
         linkedSpot: linkedSpot,
-        tripId: _activeTripId ?? '',
+        tripId: _activeTripId,
       ),
     );
   }
@@ -637,7 +638,13 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> with AsyncScreenMixin
         address: spot.address,
       );
       if (mounted) _onEditSpot(updated);
-    } catch (_) {}
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to update status — please try again')),
+        );
+      }
+    }
   }
 
   @override

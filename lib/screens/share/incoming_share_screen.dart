@@ -302,43 +302,51 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
       ));
       return;
     }
-    TripDocument? doc;
-    final filePath = _activeShare?.filePath;
-    final planBytes = _fileBytes ?? (filePath != null ? await readFileAsBytes(filePath) : null);
-    if (planBytes != null) {
-      final ext = _fileExt ?? filePath?.split('.').last.toLowerCase() ?? 'bin';
-      doc = await DocService.uploadAndCreate(
+    try {
+      TripDocument? doc;
+      final filePath = _activeShare?.filePath;
+      final planBytes = _fileBytes ?? (filePath != null ? await readFileAsBytes(filePath) : null);
+      if (planBytes != null) {
+        final ext = _fileExt ?? filePath?.split('.').last.toLowerCase() ?? 'bin';
+        doc = await DocService.uploadAndCreate(
+          tripId: widget.tripId,
+          userId: widget.userId,
+          title: title,
+          type: DocType.other,
+          ext: ext,
+          bytes: planBytes,
+          fileSizeKb: (planBytes.length / 1024).round(),
+        );
+      }
+      await PlanService.createItem(
         tripId: widget.tripId,
-        userId: widget.userId,
+        dayId: _selectedDay!.id,
         title: title,
-        type: DocType.other,
-        ext: ext,
-        bytes: planBytes,
-        fileSizeKb: (planBytes.length / 1024).round(),
+        type: _planItemType,
+        createdBy: widget.userId,
+        notes: _planNotesCtrl.text.trim().isEmpty ? null : _planNotesCtrl.text.trim(),
+        linkedDocIds: doc != null ? [doc.id] : [],
       );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(
+          'Saved as plan item',
+          style: kStyleBodyMedium.copyWith(color: kColorTextOnPrimary),
+        ),
+        backgroundColor: kColorPrimary,
+        behavior: SnackBarBehavior.floating,
+        shape: const RoundedRectangleBorder(borderRadius: kRadiusMd),
+        margin: const EdgeInsets.all(kSpace4),
+        duration: const Duration(seconds: 2),
+      ));
+      widget.onDone?.call();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Failed to save — please try again'),
+        behavior: SnackBarBehavior.floating,
+      ));
     }
-    await PlanService.createItem(
-      tripId: widget.tripId,
-      dayId: _selectedDay!.id,
-      title: title,
-      type: _planItemType,
-      createdBy: widget.userId,
-      notes: _planNotesCtrl.text.trim().isEmpty ? null : _planNotesCtrl.text.trim(),
-      linkedDocIds: doc != null ? [doc.id] : [],
-    );
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(
-        'Saved as plan item',
-        style: kStyleBodyMedium.copyWith(color: kColorTextOnPrimary),
-      ),
-      backgroundColor: kColorPrimary,
-      behavior: SnackBarBehavior.floating,
-      shape: const RoundedRectangleBorder(borderRadius: kRadiusMd),
-      margin: const EdgeInsets.all(kSpace4),
-      duration: const Duration(seconds: 2),
-    ));
-    widget.onDone?.call();
   }
 
   // ─── Scanning actions ──────────────────────────────────────────────────────

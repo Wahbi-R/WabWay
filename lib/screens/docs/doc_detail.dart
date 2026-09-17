@@ -1248,7 +1248,13 @@ class _ActionsSheetContentState extends State<_ActionsSheetContent> {
               try {
                 await DocService.renameDocument(widget.doc.id, newTitle);
                 widget.onRenamed?.call(newTitle);
-              } catch (_) {}
+              } catch (_) {
+                if (widget.context.mounted) {
+                  ScaffoldMessenger.of(widget.context).showSnackBar(
+                    const SnackBar(content: Text('Rename failed — please try again')),
+                  );
+                }
+              }
             },
           ),
           WabwayActionTile(

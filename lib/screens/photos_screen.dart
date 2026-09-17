@@ -25,7 +25,7 @@ class PhotosScreen extends ConsumerStatefulWidget {
 
 class _PhotosScreenState extends ConsumerState<PhotosScreen> with AsyncScreenMixin {
   List<TripPhotoAlbum> _albums = [];
-  String? _activeTripId;
+  String _activeTripId = '';
   RealtimeChannel? _channel;
   Timer? _debounce;
 
@@ -36,7 +36,7 @@ class _PhotosScreenState extends ConsumerState<PhotosScreen> with AsyncScreenMix
       if (!mounted) return;
       _activeTripId = ref.read(activeTripIdProvider);
       _load();
-      _subscribe(_activeTripId!);
+      if (_activeTripId.isNotEmpty) _subscribe(_activeTripId);
     });
   }
 
@@ -70,10 +70,10 @@ class _PhotosScreenState extends ConsumerState<PhotosScreen> with AsyncScreenMix
   }
 
   Future<void> _load({bool silent = false}) async {
-    if (_activeTripId == null) return;
+    if (_activeTripId.isEmpty) return;
     final gen = beginLoad(silent: silent);
     try {
-      final albums = await PhotoAlbumService.loadAlbums(_activeTripId!);
+      final albums = await PhotoAlbumService.loadAlbums(_activeTripId);
       commitLoad(gen, () => _albums = albums);
     } catch (_) {
       failLoad(gen, silent: silent || _albums.isNotEmpty);
@@ -84,7 +84,7 @@ class _PhotosScreenState extends ConsumerState<PhotosScreen> with AsyncScreenMix
     final userId = ref.read(profileProvider)?.id ?? '';
     final album  = await showAddAlbumSheet(
       context,
-      tripId: _activeTripId!,
+      tripId: _activeTripId,
       userId: userId,
     );
     if (album != null && mounted) {

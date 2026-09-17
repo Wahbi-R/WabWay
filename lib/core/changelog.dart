@@ -11,6 +11,25 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 394,
+    label: 'Bug fixes',
+    changes: [
+      'Switching trips now correctly refreshes connection links in item and spot detail screens',
+      'Spots, money, docs, links, map, photos, and accommodations screens no longer fire database queries when no trip is active',
+      'Adding a plan item now shows an error if it fails, instead of silently doing nothing',
+      'Duplicating a plan item now shows an error if it fails',
+      'Changing a spot\'s status now shows an error if the update fails',
+      'Renaming a document now shows an error if the rename fails',
+      'Plan item reordering is now an atomic operation — a network failure can no longer leave days in a scrambled order',
+      'Adding a linked document to a new plan item no longer leaves an orphaned plan item if the link fails',
+      'Creating a trip no longer shows a failure if only the secondary currency update fails — the trip is still created',
+      'Document thumbnails no longer break after 1 hour — signed URL cache now refreshes before expiry',
+      'Saving a share as a plan item now shows an error if it fails, instead of silently doing nothing',
+      'Profile changes on another device (e.g. name rename) are now picked up on next app open, even if a fetch was in progress',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 393,
     label: 'Bug fixes',
     changes: [

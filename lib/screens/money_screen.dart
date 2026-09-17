@@ -81,7 +81,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
   String? _selectedReceiptId;
   String? _selectedWithdrawalId;
 
-  String? _activeTripId;
+  String _activeTripId = '';
   String? _lastTripId;
   RealtimeChannel? _realtimeChannel;
   Timer? _debounce;
@@ -115,7 +115,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
       _rebuildMembers();
       _activeTripId = ref.read(activeTripIdProvider);
       _loadAll();
-      _subscribeRealtime(_activeTripId!);
+      if (_activeTripId.isNotEmpty) _subscribeRealtime(_activeTripId);
     });
   }
 
@@ -340,7 +340,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
 
   Future<void> _loadAll({bool silent = false}) async {
     final tripId = _activeTripId;
-    if (tripId == null) return;
+    if (tripId.isEmpty) return;
     final gen = beginLoad(silent: silent);
     if (!silent) setState(() {
       _receipts = []; _withdrawals = [];
@@ -588,10 +588,10 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
   static String _csvCell(String v) => '"${v.replaceAll('"', '""')}"';
 
   Future<void> _addReceipt(BuildContext context) async {
-    if (_activeTripId == null) return;
+    if (_activeTripId.isEmpty) return;
     final receipt = await showAddReceiptSheet(
       context,
-      tripId:       _activeTripId!,
+      tripId:       _activeTripId,
       userId:       _userId,
       members:      _members,
       homeCurrency: _homeCurrency,
@@ -606,10 +606,10 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
   }
 
   Future<void> _addWithdrawal(BuildContext context) async {
-    if (_activeTripId == null) return;
+    if (_activeTripId.isEmpty) return;
     final w = await showAddCashSheet(
       context,
-      tripId:  _activeTripId!,
+      tripId:  _activeTripId,
       userId:  _userId,
       members: _members,
     );
@@ -706,7 +706,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
                     balancesByCurrency:    _balancesByCurrency,
                     suggestionsByCurrency: _suggestionsByCurrency,
                     members:               _members,
-                    tripId:                _activeTripId ?? '',
+                    tripId:                _activeTripId,
                     myId:                  _userId,
                     existingSettlements:   _persistedSettlements,
                     onSettled:             () => _loadAll(silent: true),
@@ -909,7 +909,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
       balancesByCurrency:    _balancesByCurrency,
       suggestionsByCurrency: _suggestionsByCurrency,
       members:               _members,
-      tripId:                _activeTripId ?? '',
+      tripId:                _activeTripId,
       myId:                  _userId,
       existingSettlements:   _persistedSettlements,
       onSettled:             () => _loadAll(silent: true),
@@ -938,7 +938,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
           receipt:   receipt,
           myId:      _userId,
           members:   _members,
-          tripId:    _activeTripId!,
+          tripId:    _activeTripId,
           onDelete:  () => _deleteReceipt(receipt.id),
           onUpdated: (r) => setState(() {
             final idx = _receipts.indexWhere((x) => x.id == r.id);
@@ -964,7 +964,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
         withdrawal: withdrawal,
         myId:       _userId,
         members:    _members,
-        tripId:     _activeTripId ?? '',
+        tripId:     _activeTripId,
         onDelete:   () => _deleteWithdrawal(withdrawal.id),
       ),
     );
@@ -1198,7 +1198,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
                                             receipt:   r,
                                             myId:      _userId,
                                             members:   _members,
-                                            tripId:    _activeTripId!,
+                                            tripId:    _activeTripId,
                                             onDelete:  () => _deleteReceipt(r.id),
                                             onUpdated: (updated) {
                                               if (mounted) {
@@ -1267,7 +1267,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
                                       withdrawal: w,
                                       myId:       _userId,
                                       members:    _members,
-                                      tripId:     _activeTripId ?? '',
+                                      tripId:     _activeTripId,
                                       onDelete:   () => _deleteWithdrawal(w.id),
                                     ),
                                   ),
@@ -1285,7 +1285,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
               balancesByCurrency:    _balancesByCurrency,
               suggestionsByCurrency: _suggestionsByCurrency,
               members:               _members,
-              tripId:                _activeTripId ?? '',
+              tripId:                _activeTripId,
               myId:                  _userId,
               existingSettlements:   _persistedSettlements,
               onSettled:             () => _loadAll(silent: true),

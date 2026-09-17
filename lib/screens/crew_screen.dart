@@ -179,14 +179,6 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
     final granted = await _ensureLocationPermission();
     if (!granted || !mounted) return;
 
-    pushNotify(
-      tripId: _tripId!,
-      title: '\u{1F4CD} $_myDisplayName started sharing location',
-      body: 'Check the Live Map in crew',
-      excludeUserId: _userId,
-      data: {'screen': 'crew', 'trip_id': _tripId!},
-    );
-
     await mgr.start(
       tripId: _tripId!,
       userId: _userId!,
@@ -200,6 +192,15 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
           _showError('Location sharing stopped unexpectedly');
         }
       },
+    );
+
+    if (!mounted) return;
+    pushNotify(
+      tripId: _tripId!,
+      title: '\u{1F4CD} $_myDisplayName started sharing location',
+      body: 'Check the Live Map in crew',
+      excludeUserId: _userId,
+      data: {'screen': 'crew', 'trip_id': _tripId!},
     );
   }
 

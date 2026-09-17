@@ -76,6 +76,7 @@ class _ExtractedSpotsScreenState extends State<ExtractedSpotsScreen> {
         count++;
       }
       if (!mounted) return;
+      setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(
           'Added $count spot${count == 1 ? '' : 's'}',

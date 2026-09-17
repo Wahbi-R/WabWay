@@ -26,7 +26,7 @@ class TripData {
   final bool                offline;
 
   AppTrip? get activeTrip =>
-      trips.isEmpty ? null : trips[selectedIndex];
+      trips.isEmpty ? null : trips[selectedIndex.clamp(0, trips.length - 1)];
 
   TripData copyWith({
     List<AppTrip>?       trips,
@@ -76,7 +76,7 @@ class TripNotifier extends StateNotifier<TripData> {
       } catch (_) {}
       // If switchTrip() completed while we were fetching members, don't revert it.
       if (state.selectedIndex != idx) {
-        state = state.copyWith(trips: trips, loading: false, offline: false);
+        state = state.copyWith(trips: trips, selectedIndex: idx, loading: false, offline: false);
         return;
       }
       state = state.copyWith(

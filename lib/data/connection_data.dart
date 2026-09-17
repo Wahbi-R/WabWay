@@ -24,7 +24,7 @@ enum EntityType {
         'stay'      => EntityType.stay,
         'doc'       => EntityType.doc,
         'link'      => EntityType.link,
-        _           => throw ArgumentError('Unknown entity type: $v'),
+        _           => EntityType.spot,
       };
 
   String get label => switch (this) {

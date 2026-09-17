@@ -241,6 +241,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Future<void> _refresh() async {
     if (_loadInFlight) return;
+    if (!mounted) return;
     setState(() {
       _data = null;
       _error = null;

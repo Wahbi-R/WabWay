@@ -11,6 +11,23 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 393,
+    label: 'Bug fixes',
+    changes: [
+      'Editing a receipt now correctly adds or removes members from the split — previously only existing members\' amounts were updated',
+      'Importing spots and places no longer leaves the save button permanently disabled after a successful save',
+      'Saving during geocoding (finding locations) is now blocked until all locations are resolved, preventing spots from being saved without coordinates',
+      'Calendar export now correctly escapes special characters in event titles and descriptions',
+      'Adding a nightlife spot to the itinerary now correctly creates an Activity item, matching the quick-add from the Spots screen',
+      'App no longer crashes when a trip member\'s profile is missing from the database',
+      'App no longer crashes when switching trips causes the active trip index to fall out of range',
+      'Location sharing now sends a crew notification only after it has successfully started, not before',
+      'Trip name changes and currency changes now update the trip header immediately without requiring navigation',
+      'Parsing a booking confirmation no longer consumes your daily AI quota when Gemini returns an unexpected response',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 392,
     label: 'Bug fixes',
     changes: [

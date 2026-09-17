@@ -15,8 +15,9 @@ import '../../widgets/widgets.dart';
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 ItineraryItemType _typeFromCategory(SpotCategory cat) => switch (cat) {
-  SpotCategory.food => ItineraryItemType.food,
-  _                 => ItineraryItemType.spot,
+  SpotCategory.food      => ItineraryItemType.food,
+  SpotCategory.nightlife => ItineraryItemType.activity,
+  _                      => ItineraryItemType.spot,
 };
 
 // ─── Show add item sheet / dialog ─────────────────────────────────────────────

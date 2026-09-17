@@ -49,7 +49,8 @@ abstract final class TripService {
   }
 
   static Future<void> leaveTrip(String tripId) async {
-    final userId = supabase.auth.currentUser!.id;
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) return;
     await supabase
         .from('trip_members')
         .delete()

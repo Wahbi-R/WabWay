@@ -44,11 +44,13 @@ import 'share_form.dart';
 void showImportScreen(BuildContext context, WidgetRef ref) {
   final tripId = ref.read(activeTripIdProvider);
   final userId = ref.read(profileProvider)!.id;
+  final homeCurrency = ref.read(activeTripProvider)?.homeCurrency ?? 'JPY';
   Navigator.of(context).push(MaterialPageRoute<void>(
     builder: (_) => IncomingShareScreen(
       share: null,
       tripId: tripId,
       userId: userId,
+      homeCurrency: homeCurrency,
       onDone: () => Navigator.of(context).pop(),
     ),
   ));
@@ -62,12 +64,14 @@ class IncomingShareScreen extends StatefulWidget {
     required this.share,
     required this.tripId,
     required this.userId,
+    this.homeCurrency = 'JPY',
     this.onDone,
   });
 
   final IncomingShare? share;
   final String tripId;
   final String userId;
+  final String homeCurrency;
   final VoidCallback? onDone;
 
   @override
@@ -746,7 +750,7 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
           paidBy:            userId,
           title:             data.title,
           amount:            amount,
-          currency:          'JPY',
+          currency:          widget.homeCurrency,
           homeAmount:        amount,
           exchangeRate:      1.0,
           transactionFeePct: 0.0,

@@ -19,7 +19,8 @@ class AppTripMember {
   bool get hasDates => arrivalDate != null || departureDate != null;
 
   factory AppTripMember.fromMap(Map<String, dynamic> map) {
-    final profileMap = map['profiles'] as Map<String, dynamic>;
+    final profileMap = map['profiles'] as Map<String, dynamic>?
+        ?? {'id': map['user_id'] as String, 'display_name': null, 'email': ''};
     return AppTripMember(
       userId:        map['user_id'] as String,
       role:          map['role'] as String,

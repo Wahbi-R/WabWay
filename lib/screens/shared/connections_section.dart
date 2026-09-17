@@ -181,6 +181,7 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection>
       if (_staysCache == null) {
         final result = await AccommodationService.loadAll(tripId)
             .then<List<Accommodation>?>((v) => v, onError: (_) => null);
+        if (!mounted) return;
         if (result != null) _staysCache = result;
       }
       final allStays = _staysCache ?? [];
@@ -473,14 +474,13 @@ class _ConnectionPickerSheetState
         LinksService.loadLinks(tid).catchError((e) { anyFailed = true; return <TripLink>[]; }),
       ]);
       commitLoad(gen, () {
+        offline = anyFailed;
         _spots  = results[0] as List<Spot>;
         _travel = results[1] as List<TravelItem>;
         _stays  = results[2] as List<Accommodation>;
         _docs   = results[3] as List<TripDocument>;
         _links  = results[4] as List<TripLink>;
       });
-      // Set offline AFTER commitLoad — the mixin resets offline=false inside onData.
-      if (anyFailed && !isStale(gen)) setState(() => offline = true);
     } catch (_) {
       failLoad(gen, silent: true);
     }

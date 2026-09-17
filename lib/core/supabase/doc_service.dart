@@ -90,7 +90,7 @@ abstract final class DocService {
         .select('*, document_links(*)')
         .eq('trip_id', tripId)
         .order('created_at', ascending: false);
-    OfflineCache.write(OfflineCache.docsKey(tripId), data);
+    await OfflineCache.write(OfflineCache.docsKey(tripId), data);
     return data.map<TripDocument>((r) => _docFromRow(r)).toList();
   }
 

@@ -785,6 +785,9 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
     String icsDate(DateTime d) =>
         '${d.year.toString().padLeft(4, '0')}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}';
 
+    String icsEscape(String s) =>
+        s.replaceAll(r'\', r'\\').replaceAll(';', r'\;').replaceAll(',', r'\,');
+
     String icsDateTime(DateTime d, String? timeStr) {
       if (timeStr == null) return icsDate(d);
       final parts = timeStr.split(':');
@@ -796,7 +799,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
       for (final item in day.sortedItems) {
         buf.writeln('BEGIN:VEVENT');
         buf.writeln('UID:wabway-${item.id}@wabway.app');
-        buf.writeln('SUMMARY:${item.title.replaceAll(',', '\\,')}');
+        buf.writeln('SUMMARY:${icsEscape(item.title)}');
         if (item.time != null) {
           buf.writeln('DTSTART:${icsDateTime(day.date, item.time)}');
           buf.writeln('DTEND:${icsDateTime(day.date, item.time)}');
@@ -805,10 +808,10 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
           buf.writeln('DTEND;VALUE=DATE:${icsDate(day.date)}');
         }
         if (item.location != null && item.location!.isNotEmpty) {
-          buf.writeln('LOCATION:${item.location!.replaceAll(',', '\\,')}');
+          buf.writeln('LOCATION:${icsEscape(item.location!)}');
         }
         if (item.notes != null && item.notes!.isNotEmpty) {
-          buf.writeln('DESCRIPTION:${item.notes!.replaceAll('\n', '\\n').replaceAll(',', '\\,')}');
+          buf.writeln('DESCRIPTION:${icsEscape(item.notes!).replaceAll('\n', '\\n')}');
         }
         buf.writeln('END:VEVENT');
       }

@@ -149,7 +149,9 @@ class _PackingScreenState extends ConsumerState<PackingScreen> with AsyncScreenM
         .where((s) => s.isNotEmpty)
         .toList();
     try {
-      await Future.wait(titles.map((t) => PackingService.addItem(tripId, t, userId)));
+      for (final t in titles) {
+        await PackingService.addItem(tripId, t, userId);
+      }
       if (!mounted) return;
       if (titles.length > 1) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(

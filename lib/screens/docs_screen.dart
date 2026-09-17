@@ -303,7 +303,7 @@ class _DocsScreenState extends ConsumerState<DocsScreen> with AsyncScreenMixin {
         _rebuildMemberName();
         _loadDocs();
         _loadAvailableSpots();
-        _subscribeRealtime(next);
+        if (next.isNotEmpty) _subscribeRealtime(next);
       }
     });
     if (loading) return const WabwayLoadingScaffold();

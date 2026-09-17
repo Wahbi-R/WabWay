@@ -358,7 +358,7 @@ class _MapScreenState extends ConsumerState<MapScreen> with AsyncScreenMixin {
         _activeTripId = next;
         _debounce?.cancel();
         _load(next);
-        _subscribeRealtime(next);
+        if (next.isNotEmpty) _subscribeRealtime(next);
       }
     });
     return Scaffold(

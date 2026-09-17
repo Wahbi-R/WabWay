@@ -647,7 +647,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
         _activeTripId = next;
         _rebuildMembers();
         _loadAll();
-        _subscribeRealtime(next);
+        if (next.isNotEmpty) _subscribeRealtime(next);
       }
     });
     if (loading) return const WabwayLoadingScaffold();

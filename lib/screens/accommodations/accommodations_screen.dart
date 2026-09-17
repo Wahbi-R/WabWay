@@ -225,7 +225,7 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen>
       if (next != _activeTripId) {
         _activeTripId = next;
         _load();
-        _subscribe(next);
+        if (next.isNotEmpty) _subscribe(next);
       }
     });
     if (loading) return const WabwayLoadingScaffold();

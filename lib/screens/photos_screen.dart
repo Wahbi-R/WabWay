@@ -132,7 +132,7 @@ class _PhotosScreenState extends ConsumerState<PhotosScreen> with AsyncScreenMix
       if (next != _activeTripId) {
         _activeTripId = next;
         _load();
-        _subscribe(next);
+        if (next.isNotEmpty) _subscribe(next);
       }
     });
     final currentUserId = ref.watch(profileProvider)?.id;

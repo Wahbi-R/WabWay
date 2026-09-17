@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 396,
+    label: 'Bug fixes',
+    changes: [
+      'Money, docs, links, map, photos, and accommodations screens no longer subscribe to real-time events with an empty trip ID',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 395,
     label: 'Bug fixes',
     changes: [

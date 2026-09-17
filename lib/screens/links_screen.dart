@@ -261,7 +261,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin
       if (next != _activeTripId) {
         _activeTripId = next;
         _load();
-        _subscribe(next);
+        if (next.isNotEmpty) _subscribe(next);
       }
     });
     final scaffold = Scaffold(

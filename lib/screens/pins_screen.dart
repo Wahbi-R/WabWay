@@ -63,55 +63,59 @@ class _PinsScreenState extends ConsumerState<PinsScreen> with AsyncScreenMixin {
 
   void _addPin() async {
     final ctrl = TextEditingController();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: kColorPaper,
-        shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
-        title: Text('Post to pinboard', style: kStyleBodySemibold),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Share a note with the whole group (check-in codes, meet times, reminders).',
-              style: kStyleCaption,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: ctrl,
-              autofocus: true,
-              maxLines: 3,
-              maxLength: 500,
-              style: kStyleBody,
-              decoration: InputDecoration(
-                hintText: 'e.g. Airbnb code is 4821, check-in after 3 pm…',
-                hintStyle: TextStyle(color: kColorInkSoft.withAlpha(120)),
-                border: OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorBorder)),
-                focusedBorder: OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorPrimary, width: 1.5)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: kColorPaper,
+          shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
+          title: Text('Post to pinboard', style: kStyleBodySemibold),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Share a note with the whole group (check-in codes, meet times, reminders).',
+                style: kStyleCaption,
               ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: ctrl,
+                autofocus: true,
+                maxLines: 3,
+                maxLength: 500,
+                style: kStyleBody,
+                decoration: InputDecoration(
+                  hintText: 'e.g. Airbnb code is 4821, check-in after 3 pm…',
+                  hintStyle: TextStyle(color: kColorInkSoft.withAlpha(120)),
+                  border: OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorBorder)),
+                  focusedBorder: OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorPrimary, width: 1.5)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text('Post', style: TextStyle(color: kColorPrimary)),
             ),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('Post', style: TextStyle(color: kColorPrimary)),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted || ctrl.text.trim().isEmpty) return;
-    try {
-      await PinsService.post(tripId: _tripId, authorId: _myId, body: ctrl.text.trim());
-      _load(silent: true);
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Could not post. Try again.'),
-        behavior: SnackBarBehavior.floating,
-      ));
+      );
+      if (confirmed != true || !mounted || ctrl.text.trim().isEmpty) return;
+      try {
+        await PinsService.post(tripId: _tripId, authorId: _myId, body: ctrl.text.trim());
+        _load(silent: true);
+      } catch (_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Could not post. Try again.'),
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    } finally {
+      ctrl.dispose();
     }
   }
 

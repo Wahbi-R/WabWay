@@ -172,7 +172,7 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen>
     } catch (_) {
       if (!mounted) return;
       setState(() => _items.insert(0, item));
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(
         content: Text('Could not delete "${item.name}". Try again.',
             style: kStyleBody.copyWith(color: Colors.white)),
         behavior: SnackBarBehavior.floating,
@@ -180,7 +180,7 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen>
       return;
     }
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
+    ScaffoldMessenger.of(this.context).showSnackBar(
       SnackBar(
         content: Text('"${item.name}" deleted.',
             style: kStyleBody.copyWith(color: Colors.white)),

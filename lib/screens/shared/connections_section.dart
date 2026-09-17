@@ -187,7 +187,7 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection>
       final allStays = _staysCache ?? [];
       final stay = allStays.where((s) => s.id == r.peerId).firstOrNull;
       if (!mounted || stay == null) return;
-      _showStayDetailSheet(context, stay);
+      _showStayDetailSheet(this.context, stay);
     }
   }
 

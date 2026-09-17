@@ -177,8 +177,8 @@ class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin
       await LinksService.deleteLink(link.id);
     } catch (_) {
       if (!mounted) return;
-      if (mounted) _load();
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      _load();
+      ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(
         content: Text('Could not delete "${link.title}". Try again.',
             style: kStyleBody.copyWith(color: Colors.white)),
         behavior: SnackBarBehavior.floating,
@@ -186,7 +186,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin
       return;
     }
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+    ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(
       content: Text('"${link.title}" removed.',
           style: kStyleBody.copyWith(color: Colors.white)),
       behavior: SnackBarBehavior.floating,

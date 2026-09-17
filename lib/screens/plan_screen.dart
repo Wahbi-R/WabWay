@@ -469,7 +469,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
       _syncItemConnection(item.id, null, spot.id, EntityType.spot);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(
         content: Text('Failed to add item: $e', style: kStyleBody.copyWith(color: Colors.white)),
         backgroundColor: kColorDanger,
         behavior: SnackBarBehavior.floating,
@@ -1254,7 +1254,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
             final result = await showDayPickerSheet(context, days: _days);
             if (result == null || !mounted) return;
             final (dayId, _) = result;
-            _addItem(context, dayId);
+            _addItem(this.context, dayId);
           }
         },
         icon: const Icon(Icons.event_note_rounded),

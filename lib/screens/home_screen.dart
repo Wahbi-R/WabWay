@@ -639,7 +639,7 @@ class _TripHero extends StatelessWidget {
                                 context,
                                 MaterialPageRoute(
                                   builder: (_) => TravelItemDetailScreen(
-                                    item: nextTravel!,
+                                    item: nextTravel,
                                     docs: data!.docs,
                                     days: data!.days,
                                   ),
@@ -659,8 +659,8 @@ class _TripHero extends StatelessWidget {
                                 context,
                                 MaterialPageRoute(
                                   builder: (_) => ItemDetailScreen(
-                                    item: nextDay!.sortedItems.first,
-                                    day: nextDay!,
+                                    item: nextDay.sortedItems.first,
+                                    day: nextDay,
                                     docs: data!.docs,
                                     spots: data!.spots,
                                     stays: data!.stays,

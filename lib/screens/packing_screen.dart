@@ -46,7 +46,7 @@ class _PackingScreenState extends ConsumerState<PackingScreen> with AsyncScreenM
       _tripId = ref.read(activeTripIdProvider);
       _myId   = ref.read(profileProvider)?.id ?? '';
       _load();
-      _subscribe();
+      if (_tripId.isNotEmpty) _subscribe();
     });
   }
 
@@ -452,7 +452,7 @@ class _PackingScreenState extends ConsumerState<PackingScreen> with AsyncScreenM
         _tripId = next;
         _myId   = ref.read(profileProvider)?.id ?? '';
         _load();
-        _subscribe();
+        if (next.isNotEmpty) _subscribe();
       }
     });
     if (loading) return const WabwayLoadingScaffold();

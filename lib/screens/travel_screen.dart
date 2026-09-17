@@ -88,7 +88,7 @@ class _TravelScreenState extends ConsumerState<TravelScreen> with AsyncScreenMix
       _userId = supabase.auth.currentUser?.id ?? '';
       _activeTripId = ref.read(activeTripIdProvider);
       _loadAll();
-      _subscribeRealtime(_activeTripId);
+      if (_activeTripId.isNotEmpty) _subscribeRealtime(_activeTripId);
     });
   }
 
@@ -333,7 +333,7 @@ class _TravelScreenState extends ConsumerState<TravelScreen> with AsyncScreenMix
       if (next != _activeTripId) {
         _activeTripId = next;
         _loadAll();
-        _subscribeRealtime(next);
+        if (next.isNotEmpty) _subscribeRealtime(next);
       }
     });
     if (loading) return const WabwayLoadingScaffold();

@@ -237,7 +237,7 @@ class MoreScreen extends ConsumerWidget {
                             color: kColorTextTertiary()),
                         onTap: () => showAddMemberSheet(
                           context,
-                          tripId: trip?.id ?? '',
+                          tripId: trip.id,
                           existingMemberIds: members.map((m) => m.userId).toSet(),
                           onMemberAdded: reload,
                         ),
@@ -655,7 +655,7 @@ class _TransferOwnershipSheetState extends State<_TransferOwnershipSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final candidates = (widget.members as List)
+    final candidates = widget.members
         .where((m) => m.userId != widget.currentUserId)
         .toList();
 

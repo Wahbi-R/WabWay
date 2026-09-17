@@ -34,11 +34,13 @@ class _PinsScreenState extends ConsumerState<PinsScreen> with AsyncScreenMixin {
       _tripId = ref.read(activeTripIdProvider);
       _myId   = ref.read(profileProvider)?.id ?? '';
       _load();
-      _channel ??= PinsService.subscribe(_tripId, () {
-        _debounce?.cancel();
-        _debounce = Timer(
-            const Duration(milliseconds: 400), () => _load(silent: true));
-      });
+      if (_tripId.isNotEmpty) {
+        _channel ??= PinsService.subscribe(_tripId, () {
+          _debounce?.cancel();
+          _debounce = Timer(
+              const Duration(milliseconds: 400), () => _load(silent: true));
+        });
+      }
     });
   }
 
@@ -146,11 +148,14 @@ class _PinsScreenState extends ConsumerState<PinsScreen> with AsyncScreenMixin {
         _tripId = next;
         _myId = ref.read(profileProvider)?.id ?? '';
         _channel?.unsubscribe();
-        _channel = PinsService.subscribe(_tripId, () {
-          _debounce?.cancel();
-          _debounce = Timer(
-              const Duration(milliseconds: 400), () => _load(silent: true));
-        });
+        _channel = null;
+        if (next.isNotEmpty) {
+          _channel = PinsService.subscribe(_tripId, () {
+            _debounce?.cancel();
+            _debounce = Timer(
+                const Duration(milliseconds: 400), () => _load(silent: true));
+          });
+        }
         _load();
       }
     });

@@ -157,7 +157,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
       _userId = supabase.auth.currentUser?.id ?? '';
       _activeTripId = ref.read(activeTripIdProvider);
       _loadAll();
-      _subscribeRealtime(_activeTripId);
+      if (_activeTripId.isNotEmpty) _subscribeRealtime(_activeTripId);
     });
   }
 
@@ -846,7 +846,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
       if (next != _activeTripId) {
         _activeTripId = next;
         _loadAll();
-        _subscribeRealtime(next);
+        if (next.isNotEmpty) _subscribeRealtime(next);
       }
     });
     final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;

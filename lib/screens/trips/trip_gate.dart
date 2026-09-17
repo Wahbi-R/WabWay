@@ -8,7 +8,6 @@ import '../../core/providers/trip_provider.dart';
 import '../../core/supabase/auth_service.dart';
 import '../../core/supabase/client.dart';
 import '../../core/supabase/invite_service.dart';
-import '../../core/trip/app_trip.dart';
 import '../../shell/app_shell.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';

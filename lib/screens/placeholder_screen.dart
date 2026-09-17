@@ -8,7 +8,6 @@ import 'account_sheets.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
-import '../widgets/widgets.dart';
 import 'emergency_screen.dart';
 import 'pins_screen.dart';
 import 'members/invite_sheet.dart';

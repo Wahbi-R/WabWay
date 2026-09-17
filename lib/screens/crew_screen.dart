@@ -110,7 +110,7 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
 
   Future<void> _onNewMessage() async {
     final tripId = _tripId;
-    if (tripId == null) return;
+    if (tripId.isEmpty) return;
     try {
       final messages = await CrewService.fetchMessages(tripId);
       if (!mounted || _tripId != tripId) return;
@@ -121,7 +121,7 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
 
   Future<void> _onLocationsChanged() async {
     final tripId = _tripId;
-    if (tripId == null) return;
+    if (tripId.isEmpty) return;
     try {
       final locations = await CrewService.fetchActiveLocations(tripId);
       if (!mounted || _tripId != tripId) return;
@@ -454,7 +454,7 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
     if (file == null || !mounted) return;
     final tripId = _tripId;
     final userId = _userId;
-    if (tripId == null || userId == null) return;
+    if (tripId.isEmpty || userId == null) return;
     setState(() => _sendingImage = true);
     try {
       final bytes = await file.readAsBytes();

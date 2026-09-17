@@ -11,6 +11,17 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 395,
+    label: 'Bug fixes',
+    changes: [
+      'Crew chat no longer runs queries with an empty trip ID when no trip is active',
+      'Travel, packing, and plan screens no longer subscribe to real-time events with an empty trip ID',
+      'Pins screen no longer starts a real-time subscription with an empty trip ID',
+      'Several internal code quality improvements to prevent future regressions',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 394,
     label: 'Bug fixes',
     changes: [

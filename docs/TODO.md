@@ -2,6 +2,7 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **400. Fix code review: TextEditingController memory leak in packing_screen.dart** — `ctrl` created in `_addItem()` and `_rename()` was never disposed on early return or exception; wrapped both methods with `try/finally` to guarantee `ctrl.dispose()` on all exit paths (2026-09-17, build 400).
 - [x] **399. Fix code review: TextEditingController memory leak in pins_screen.dart** — `ctrl` created in `_addPin()` was never disposed on early return or exception; wrapped with `try/finally` to guarantee `ctrl.dispose()` on all exit paths (2026-09-17, build 399).
 - [x] **398. Fix code review: TextEditingController memory leak in doc_detail.dart** — two `TextEditingController` instances created inside async methods (`_showRenameDialog` and an inline rename `onTap`) were never disposed on early return or exception; wrapped both with `try/finally` to guarantee `ctrl.dispose()` on all exit paths (2026-09-17, build 398).
 - [x] **397. Fix code review: 3 correctness bugs in parsed_itinerary_screen and use_build_context_synchronously** — parsed_itinerary_screen Future.wait concurrent saves replaced with sequential saves to prevent duplicate bookings on partial-failure retry; accommodations_screen, links_screen, plan_screen, connections_section used passed BuildContext parameter after async gaps, replaced with this.context guarded by mounted check (2026-09-17, build 397).

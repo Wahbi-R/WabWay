@@ -92,84 +92,88 @@ class _PackingScreenState extends ConsumerState<PackingScreen> with AsyncScreenM
 
   void _addItem() async {
     final ctrl = TextEditingController();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: kColorPaper,
-        shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
-        title: Text('Add items', style: kStyleBodySemibold),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: ctrl,
-              autofocus: true,
-              style: kStyleBody,
-              decoration: InputDecoration(
-                hintText: 'Passport, charger, adapter…',
-                hintStyle: TextStyle(color: kColorInkSoft.withAlpha(120)),
-                border: OutlineInputBorder(
-                    borderRadius: kRadiusMd,
-                    borderSide: BorderSide(color: kColorBorder)),
-                focusedBorder: OutlineInputBorder(
-                    borderRadius: kRadiusMd,
-                    borderSide:
-                        BorderSide(color: kColorPrimary, width: 1.5)),
-                contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 10),
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: kColorPaper,
+          shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
+          title: Text('Add items', style: kStyleBodySemibold),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: ctrl,
+                autofocus: true,
+                style: kStyleBody,
+                decoration: InputDecoration(
+                  hintText: 'Passport, charger, adapter…',
+                  hintStyle: TextStyle(color: kColorInkSoft.withAlpha(120)),
+                  border: OutlineInputBorder(
+                      borderRadius: kRadiusMd,
+                      borderSide: BorderSide(color: kColorBorder)),
+                  focusedBorder: OutlineInputBorder(
+                      borderRadius: kRadiusMd,
+                      borderSide:
+                          BorderSide(color: kColorPrimary, width: 1.5)),
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 10),
+                ),
+                onSubmitted: (_) => Navigator.pop(ctx, true),
               ),
-              onSubmitted: (_) => Navigator.pop(ctx, true),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Separate multiple items with commas',
-              style: kStyleCaption.copyWith(
-                  color: kColorInkSoft, fontSize: 11),
-            ),
+              const SizedBox(height: 6),
+              Text(
+                'Separate multiple items with commas',
+                style: kStyleCaption.copyWith(
+                    color: kColorInkSoft, fontSize: 11),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel')),
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text('Add',
+                    style: TextStyle(color: kColorPrimary))),
           ],
         ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text('Add',
-                  style: TextStyle(color: kColorPrimary))),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted || ctrl.text.trim().isEmpty) return;
-    final tripId = _tripId;
-    final userId = _myId;
-    final titles = ctrl.text
-        .split(',')
-        .map((s) => s.trim())
-        .where((s) => s.isNotEmpty)
-        .toList();
-    try {
-      for (final t in titles) {
-        await PackingService.addItem(tripId, t, userId);
-      }
-      if (!mounted) return;
-      if (titles.length > 1) {
+      );
+      if (confirmed != true || !mounted || ctrl.text.trim().isEmpty) return;
+      final tripId = _tripId;
+      final userId = _myId;
+      final titles = ctrl.text
+          .split(',')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+      try {
+        for (final t in titles) {
+          await PackingService.addItem(tripId, t, userId);
+        }
+        if (!mounted) return;
+        if (titles.length > 1) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Added ${titles.length} items',
+                style: kStyleBody.copyWith(color: Colors.white)),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+          ));
+        }
+        _load(silent: true);
+      } catch (_) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Added ${titles.length} items',
+          content: Text('Could not add items. Try again.',
               style: kStyleBody.copyWith(color: Colors.white)),
           behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
         ));
+        _load(silent: true);
       }
-      _load(silent: true);
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Could not add items. Try again.',
-            style: kStyleBody.copyWith(color: Colors.white)),
-        behavior: SnackBarBehavior.floating,
-      ));
-      _load(silent: true);
+    } finally {
+      ctrl.dispose();
     }
   }
 
@@ -191,50 +195,54 @@ class _PackingScreenState extends ConsumerState<PackingScreen> with AsyncScreenM
 
   Future<void> _rename(PackingItem item) async {
     final ctrl = TextEditingController(text: item.title);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: kColorPaper,
-        shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
-        title: Text('Rename item', style: kStyleBodySemibold),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          style: kStyleBody,
-          decoration: InputDecoration(
-            hintText: 'Item name',
-            hintStyle: TextStyle(color: kColorInkSoft.withAlpha(120)),
-            border: OutlineInputBorder(
-                borderRadius: kRadiusMd,
-                borderSide: BorderSide(color: kColorBorder)),
-            focusedBorder: OutlineInputBorder(
-                borderRadius: kRadiusMd,
-                borderSide: BorderSide(color: kColorPrimary, width: 1.5)),
-            contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12, vertical: 10),
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: kColorPaper,
+          shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
+          title: Text('Rename item', style: kStyleBodySemibold),
+          content: TextField(
+            controller: ctrl,
+            autofocus: true,
+            style: kStyleBody,
+            decoration: InputDecoration(
+              hintText: 'Item name',
+              hintStyle: TextStyle(color: kColorInkSoft.withAlpha(120)),
+              border: OutlineInputBorder(
+                  borderRadius: kRadiusMd,
+                  borderSide: BorderSide(color: kColorBorder)),
+              focusedBorder: OutlineInputBorder(
+                  borderRadius: kRadiusMd,
+                  borderSide: BorderSide(color: kColorPrimary, width: 1.5)),
+              contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12, vertical: 10),
+            ),
+            onSubmitted: (_) => Navigator.pop(ctx, true),
           ),
-          onSubmitted: (_) => Navigator.pop(ctx, true),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel')),
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text('Save',
+                    style: TextStyle(color: kColorPrimary))),
+          ],
         ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text('Save',
-                  style: TextStyle(color: kColorPrimary))),
-        ],
-      ),
-    );
-    if (confirmed != true ||
-        !mounted ||
-        ctrl.text.trim().isEmpty ||
-        ctrl.text.trim() == item.title) return;
-    setState(() {
-      final idx = _items.indexWhere((i) => i.id == item.id);
-      if (idx >= 0) _items[idx] = item.copyWith(title: ctrl.text.trim());
-    });
-    await PackingService.renameItem(item.id, ctrl.text.trim());
+      );
+      if (confirmed != true ||
+          !mounted ||
+          ctrl.text.trim().isEmpty ||
+          ctrl.text.trim() == item.title) return;
+      setState(() {
+        final idx = _items.indexWhere((i) => i.id == item.id);
+        if (idx >= 0) _items[idx] = item.copyWith(title: ctrl.text.trim());
+      });
+      await PackingService.renameItem(item.id, ctrl.text.trim());
+    } finally {
+      ctrl.dispose();
+    }
   }
 
   Future<void> _delete(PackingItem item) async {

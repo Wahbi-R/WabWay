@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 398,
+    label: 'Bug fixes',
+    changes: [
+      'Fixed a memory leak when renaming a document — the text field controller is now always cleaned up',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 397,
     label: 'Bug fixes',
     changes: [

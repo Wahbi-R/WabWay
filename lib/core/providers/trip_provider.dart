@@ -74,9 +74,10 @@ class TripNotifier extends StateNotifier<TripData> {
           members.map((m) => m.toMap()).toList(),
         );
       } catch (_) {}
-      // If switchTrip() completed while we were fetching members, don't revert it.
+      // If switchTrip() completed while we were fetching members, don't revert the user's choice.
+      // Keep the selectedIndex and members from switchTrip; just update the trips list.
       if (state.selectedIndex != idx) {
-        state = state.copyWith(trips: trips, selectedIndex: idx, loading: false, offline: false);
+        state = state.copyWith(trips: trips, loading: false, offline: false);
         return;
       }
       state = state.copyWith(

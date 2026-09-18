@@ -2,6 +2,7 @@
 
 Checked items are done. Log the date and a one-liner when completing something.
 
+- [x] **401. Fix code review: race condition in TripNotifier.load() reverts trip switch** — when `switchTrip()` completed while `load()` was awaiting members, `load()` incorrectly reset `selectedIndex` back to the old value; fixed to preserve the user's trip selection when a concurrent switch is detected (2026-09-17, build 401).
 - [x] **400. Fix code review: TextEditingController memory leak in packing_screen.dart** — `ctrl` created in `_addItem()` and `_rename()` was never disposed on early return or exception; wrapped both methods with `try/finally` to guarantee `ctrl.dispose()` on all exit paths (2026-09-17, build 400).
 - [x] **399. Fix code review: TextEditingController memory leak in pins_screen.dart** — `ctrl` created in `_addPin()` was never disposed on early return or exception; wrapped with `try/finally` to guarantee `ctrl.dispose()` on all exit paths (2026-09-17, build 399).
 - [x] **398. Fix code review: TextEditingController memory leak in doc_detail.dart** — two `TextEditingController` instances created inside async methods (`_showRenameDialog` and an inline rename `onTap`) were never disposed on early return or exception; wrapped both with `try/finally` to guarantee `ctrl.dispose()` on all exit paths (2026-09-17, build 398).

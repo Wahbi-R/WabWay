@@ -240,13 +240,11 @@ abstract final class MoneyService {
       'notes':               (notes != null && notes.isNotEmpty) ? notes : null,
     }).eq('id', receiptId);
 
-    for (final split in splits) {
-      await supabase
-          .from('receipt_splits')
-          .update({'amount': split.amount})
-          .eq('receipt_id', receiptId)
-          .eq('user_id', split.memberId);
-    }
+    await Future.wait(splits.map((split) => supabase
+        .from('receipt_splits')
+        .update({'amount': split.amount})
+        .eq('receipt_id', receiptId)
+        .eq('user_id', split.memberId)));
 
     final full = await supabase
         .from('receipts')

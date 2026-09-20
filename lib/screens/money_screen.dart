@@ -348,19 +348,32 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
     });
 
     if (!silent) {
-      final cachedReceipts    = await MoneyService.loadReceiptsFromCache(tripId);
-      final cachedWithdrawals = await MoneyService.loadWithdrawalsFromCache(tripId);
-      final pending           = await SyncQueue.pendingCountFor(tripId);
-      if (isStale(gen)) return;
-      if (cachedReceipts != null) {
-        setState(() {
-          _receipts    = cachedReceipts;
-          _withdrawals = cachedWithdrawals ?? [];
-          if (_lastTripId != tripId) _persistedSettlements = [];
-          _lastTripId  = tripId;
-          loading          = false;
-          _pendingSyncCount = pending;
-        });
+      try {
+        final cached = await Future.wait([
+          MoneyService.loadReceiptsFromCache(tripId),
+          MoneyService.loadWithdrawalsFromCache(tripId),
+          SyncQueue.pendingCountFor(tripId),
+        ]);
+        final cachedReceipts    = cached[0] as List<Receipt>?;
+        final cachedWithdrawals = cached[1] as List<CashWithdrawal>?;
+        final pending           = cached[2] as int;
+        if (isStale(gen)) return;
+        if (cachedReceipts != null) {
+          // Commit cached data so the UI is immediately visible, then kick off a
+          // silent network refresh. Using commitLoad (rather than mutating
+          // loading directly) preserves the mixin's silent-load preemption guard.
+          commitLoad(gen, () {
+            _receipts         = cachedReceipts;
+            _withdrawals      = cachedWithdrawals ?? [];
+            if (_lastTripId != tripId) _persistedSettlements = [];
+            _lastTripId       = tripId;
+            _pendingSyncCount = pending;
+          });
+          unawaited(_loadAll(silent: true));
+          return;
+        }
+      } catch (_) {
+        // Cache read error — fall through to network fetch.
       }
     }
 
@@ -380,7 +393,9 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
         _pendingSyncCount     = pending;
       });
     } catch (_) {
-      failLoad(gen, silent: silent);
+      // If cached data is already visible, degrade gracefully to offline banner
+      // rather than replacing it with a full-screen error.
+      failLoad(gen, silent: silent || _receipts.isNotEmpty);
     }
   }
 

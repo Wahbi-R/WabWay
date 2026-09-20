@@ -139,30 +139,36 @@ class _TravelScreenState extends ConsumerState<TravelScreen> with AsyncScreenMix
     if (!silent) setState(() { _items.clear(); _docs.clear(); _days.clear(); });
 
     if (!silent) {
-      final cachedItemsFuture = TravelService.loadFromCache(_activeTripId);
-      final cachedDocsFuture  = DocService.loadDocumentsFromCache(_activeTripId);
-      final cachedDaysFuture  = PlanService.loadFromCache(_activeTripId);
-      final cachedItems = await cachedItemsFuture;
-      final cachedDocs  = await cachedDocsFuture;
-      final cachedDays  = await cachedDaysFuture;
+      final cached = await Future.wait([
+        TravelService.loadFromCache(_activeTripId),
+        DocService.loadDocumentsFromCache(_activeTripId),
+        PlanService.loadFromCache(_activeTripId),
+      ]);
+      final cachedItems = cached[0] as List<TravelItem>?;
+      final cachedDocs  = cached[1] as List<TripDocument>?;
+      final cachedDays  = cached[2] as List<TripDay>?;
       if (isStale(gen)) return;
       if (cachedItems != null) {
-        setState(() {
+        commitLoad(gen, () {
           _items..clear()..addAll(cachedItems);
           _docs..clear()..addAll(cachedDocs ?? []);
           _days..clear()..addAll(cachedDays ?? []);
-          loading = false;
         });
+        if (isStale(gen)) return;
+        unawaited(_loadAll(silent: true));
+        return;
       }
     }
 
     try {
-      final itemsFuture = TravelService.loadItems(_activeTripId);
-      final docsFuture  = DocService.loadDocuments(_activeTripId);
-      final daysFuture  = PlanService.loadAll(_activeTripId);
-      final items = await itemsFuture;
-      final docs  = await docsFuture;
-      final days  = await daysFuture;
+      final results = await Future.wait([
+        TravelService.loadItems(_activeTripId),
+        DocService.loadDocuments(_activeTripId),
+        PlanService.loadAll(_activeTripId),
+      ]);
+      final items = results[0] as List<TravelItem>;
+      final docs  = results[1] as List<TripDocument>;
+      final days  = results[2] as List<TripDay>;
       commitLoad(gen, () {
         _items..clear()..addAll(items);
         _docs..clear()..addAll(docs);

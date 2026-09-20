@@ -66,18 +66,23 @@ class _PackingScreenState extends ConsumerState<PackingScreen> with AsyncScreenM
     if (!silent) {
       final cached = await PackingService.loadFromCache(_tripId);
       if (isStale(gen)) return;
-      if (cached != null) setState(() { _items = cached; loading = false; });
+      if (cached != null) {
+        commitLoad(gen, () => _items = cached);
+        if (!isStale(gen)) unawaited(_load(silent: true));
+        return;
+      }
     }
 
     try {
       final items = await PackingService.fetchAll(_tripId);
       commitLoad(gen, () => _items = items);
     } catch (_) {
-      failLoad(gen, silent: silent);
+      failLoad(gen, silent: silent || _items.isNotEmpty);
     }
   }
 
   void _subscribe() {
+    _channel?.unsubscribe();
     _channel = PackingService.subscribe(_tripId, () {
       _debounce?.cancel();
       _debounce = Timer(
@@ -143,19 +148,27 @@ class _PackingScreenState extends ConsumerState<PackingScreen> with AsyncScreenM
         .map((s) => s.trim())
         .where((s) => s.isNotEmpty)
         .toList();
-    for (final title in titles) {
-      await PackingService.addItem(tripId, title, userId);
-    }
-    if (!mounted) return;
-    if (titles.length > 1) {
+    try {
+      await Future.wait(titles.map((t) => PackingService.addItem(tripId, t, userId)));
+      if (!mounted) return;
+      if (titles.length > 1) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Added ${titles.length} items',
+              style: kStyleBody.copyWith(color: Colors.white)),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ));
+      }
+      _load(silent: true);
+    } catch (_) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Added ${titles.length} items',
+        content: Text('Could not add items. Try again.',
             style: kStyleBody.copyWith(color: Colors.white)),
         behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
       ));
+      _load(silent: true);
     }
-    _load(silent: true);
   }
 
   Future<void> _toggle(PackingItem item) async {
@@ -296,8 +309,14 @@ class _PackingScreenState extends ConsumerState<PackingScreen> with AsyncScreenM
         .toList();
     if (toAdd.isEmpty) return;
 
-    for (final title in toAdd) {
-      await PackingService.addItem(tripId, title, userId);
+    try {
+      await Future.wait(toAdd.map((t) => PackingService.addItem(tripId, t, userId)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Some items could not be added. Try again.'),
+        behavior: SnackBarBehavior.floating,
+      ));
     }
     _load(silent: true);
   }

@@ -95,7 +95,7 @@ class _DocsScreenState extends ConsumerState<DocsScreen> with AsyncScreenMixin {
     if (!silent) {
       final cached = await DocService.loadDocumentsFromCache(tripId);
       if (isStale(gen)) return;
-      if (cached != null) setState(() { _docs = cached; loading = false; });
+      if (cached != null) commitLoad(gen, () => _docs = cached);
     }
 
     try {
@@ -110,7 +110,7 @@ class _DocsScreenState extends ConsumerState<DocsScreen> with AsyncScreenMixin {
     try {
       final tripId = _activeTripId!;
       final spots = await SpotService.loadSpots(tripId);
-      if (mounted) setState(() => _availableSpots = spots);
+      if (mounted && _activeTripId == tripId) setState(() => _availableSpots = spots);
     } catch (_) {}
   }
 

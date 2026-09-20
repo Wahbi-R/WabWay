@@ -95,7 +95,7 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen>
     if (!silent) {
       final cached = await AccommodationService.loadFromCache(tripId);
       if (isStale(gen)) return;
-      if (cached != null) setState(() { _items = cached; loading = false; });
+      if (cached != null) commitLoad(gen, () => _items = cached);
     }
 
     try {

@@ -162,26 +162,27 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> with AsyncScreenMixin
             }
           }
         }
-        setState(() {
+        commitLoad(gen, () {
           _spots   = cachedSpots;
           _docs    = cachedDocs ?? [];
           _stays   = cachedStays ?? [];
           _myVotes = cachedVotes;
-          loading  = false;
         });
       }
     }
 
     try {
-      final spotsFuture = SpotService.loadSpots(tripId);
-      final docsFuture  = DocService.loadDocuments(tripId);
-      // Accommodations fetched concurrently but caught separately so a transient
-      // failure doesn't prevent spots from loading.
-      final staysFuture = AccommodationService.loadAll(tripId)
-          .then<List<Accommodation>?>((v) => v, onError: (_) => null);
-      final spots = await spotsFuture;
-      final docs  = await docsFuture;
-      final stays = await staysFuture; // null means fetch failed; keep cached _stays
+      final results = await Future.wait([
+        SpotService.loadSpots(tripId),
+        DocService.loadDocuments(tripId),
+        // Accommodations caught separately so a transient failure doesn't
+        // prevent spots/docs from loading.
+        AccommodationService.loadAll(tripId)
+            .then<List<Accommodation>?>((v) => v, onError: (_) => null),
+      ]);
+      final spots = results[0] as List<Spot>;
+      final docs  = results[1] as List<TripDocument>;
+      final stays = results[2] as List<Accommodation>?; // null means fetch failed; keep cached _stays
       if (isStale(gen)) return;
 
       final myId = supabase.auth.currentUser?.id;
@@ -204,7 +205,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> with AsyncScreenMixin
         _myVotes = myVotes;
       });
     } catch (_) {
-      failLoad(gen, silent: silent);
+      failLoad(gen, silent: silent || _spots.isNotEmpty);
     }
   }
 
@@ -427,19 +428,17 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> with AsyncScreenMixin
     if (confirmed != true || !mounted) return;
 
     int failed = 0;
-    for (final id in deletable) {
+    await Future.wait(deletable.map((id) async {
       try {
         await SpotService.deleteSpot(id);
-        if (mounted) {
-          setState(() {
-            _spots.removeWhere((s) => s.id == id);
-            if (_selectedId == id) _selectedId = null;
-          });
-        }
+        if (mounted) setState(() {
+          _spots.removeWhere((s) => s.id == id);
+          if (_selectedId == id) _selectedId = null;
+        });
       } catch (_) {
         failed++;
       }
-    }
+    }));
     if (!mounted) return;
     _exitSelectionMode();
     if (failed > 0) {

@@ -11,6 +11,416 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 392,
+    label: 'Bug fixes',
+    changes: [
+      'Generating a new invite code while the list is still loading no longer causes the list to be hidden if the load subsequently fails',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 391,
+    label: 'Bug fixes',
+    changes: [
+      'Spot and stay links are now reliably preserved when adding or duplicating a plan item — the links were only stored in connections but not on the item itself',
+      'Adding a plan item from a spot no longer disappears from the list if the connection write fails',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 390,
+    label: 'Bug fixes',
+    changes: [
+      'Submitting a comment now shows the list correctly even when a previous load had failed',
+      'Adding a plan item from a spot now correctly saves the spot link — it was only in connections but not in the item record',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 389,
+    label: 'Bug fixes',
+    changes: [
+      'Editing a plan item\'s linked spot or stay now saves correctly — the change no longer reverts on next reload',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 388,
+    label: 'Bug fixes',
+    changes: [
+      'Minor internal cleanup in plan item creation',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 387,
+    label: 'Bug fixes',
+    changes: [
+      'Generating an invite code now correctly shows the codes list even when the initial load had failed',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 386,
+    label: 'Bug fixes',
+    changes: [
+      'Internal loading state fix in booking import screen',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 385,
+    label: 'Bug fixes',
+    changes: [
+      'Internal loading state fixes in booking import and link picker screens',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 384,
+    label: 'Performance',
+    changes: [
+      'Home screen now loads all data sources in parallel instead of fetching stays data in a separate sequential request',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 383,
+    label: 'Bug fixes',
+    changes: [
+      'Creating a plan item with a linked spot or stay now saves those links correctly — they were previously lost on next reload',
+      'Re-linking a spot or stay on a plan item is now more reliable when navigating away quickly',
+      'Home screen stays loading independently so a network issue on stays data no longer prevents the rest of the home screen from loading',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 382,
+    label: 'Bug fixes',
+    changes: [
+      'Duplicating a plan item now correctly preserves the linked stay — it was silently dropped before',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 381,
+    label: 'Bug fixes',
+    changes: [
+      'Link picker in docs now shows an error state with retry when loading fails instead of silently showing an empty list',
+      'Generate-code errors in invite sheet are now shown inline alongside the codes list, not blocking it',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 380,
+    label: 'Bug fixes',
+    changes: [
+      'Connecting a spot or stay when adding or duplicating a plan item is now more reliable and consistent with editing',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 379,
+    label: 'Bug fixes',
+    changes: [
+      'Invite codes sheet, link picker, and image previews in docs now show a loading indicator and handle errors correctly',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 378,
+    label: 'Bug fixes',
+    changes: [
+      'Spot and stay connection sync after editing or adding a plan item no longer triggers unnecessary data reloads when navigating away quickly',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 377,
+    label: 'Bug fixes',
+    changes: [
+      'Changing a plan item\'s linked spot or stay is now more reliable — if removing the old connection fails, the new one is not added prematurely',
+      'Adding a plan item no longer disappears if the spot or stay connection fails to write — the item appears immediately and the connection syncs in the background',
+      'Duplicating a plan item is safer when navigating away quickly — a background error no longer causes a crash',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 376,
+    label: 'Bug fixes',
+    changes: [
+      'Tapping the upcoming plan item card or an activity notification now shows all trip accommodations in the stay picker',
+      'Comments section on a plan item detail now shows an error message with a retry button if comments fail to load, instead of looking empty',
+      'Changing a plan item\'s linked spot or stay no longer risks a sync conflict — the old connection is removed before the new one is written',
+      'Adding a plan item with both a spot and a stay linked now correctly saves both connections',
+      'Duplicating a plan item now preserves its spot and stay connection records',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 375,
+    label: 'Bug fixes',
+    changes: [
+      'Editing a plan item from any screen now always shows your trip\'s accommodations in the stay picker',
+      'Changing a plan item\'s linked spot or stay is now more reliable — a sync failure triggers a silent refresh instead of leaving connections out of date',
+      'Comment loading on a plan item detail now shows an error state if the request fails instead of showing a spinner forever',
+      'Day loading on the booking import screen now shows an error state if the request fails',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 374,
+    label: 'Bug fixes',
+    changes: [
+      'Importing bookings from a document: if some bookings failed to save, retrying no longer re-saves the ones that already went through',
+      'Attaching documents to a receipt now tells you if any document links could not be synced instead of silently losing them',
+      'Editing a plan item from its detail screen now shows your trip\'s accommodations in the stay picker',
+      'Changing a plan item\'s linked stay now correctly updates the connection record',
+      'Adding packing items: if some failed, the successfully added ones now appear immediately',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 373,
+    label: 'Bug fixes',
+    changes: [
+      'Signing out now correctly returns you to the sign-in screen (a guard was preventing the profile from clearing)',
+      'Editing document links on a plan item no longer loses the item\'s linked stay',
+      'Attaching docs when creating a plan item now shows an error if the link fails instead of silently losing them',
+      'Applying a packing template now shows an error message if any items could not be added',
+      'Dragging to reorder plan items is safer: a partial failure now leaves items in a recoverable order instead of arbitrary corruption',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 372,
+    label: 'Bug fixes',
+    changes: [
+      'Packing list now shows an error message if adding items fails instead of silently doing nothing',
+      'Pinboard now shows error feedback when posting, unpinning, or deleting a pin fails',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 371,
+    label: 'Bug fixes',
+    changes: [
+      'Saving a receipt with linked documents is now faster — all doc-link changes are applied in parallel',
+      '"Add all trip days" in the Plan tab now creates all missing days at once instead of one by one',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 370,
+    label: 'Bug fixes',
+    changes: [
+      'Adding multiple packing items at once (bulk import or template) is now much faster',
+      'Deleting multiple spots at once now runs in parallel instead of one by one',
+      'Importing multiple bookings from a document now saves them all in parallel',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 369,
+    label: 'Bug fixes',
+    changes: [
+      'Editing a receipt with many members now updates all splits in parallel, reducing save time and preventing partial failures',
+      'Plan screen loads days and items in parallel instead of sequentially, cutting load time roughly in half',
+      'Duplicating a plan item no longer makes an extra network call to look up the trip',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 368,
+    label: 'Bug fixes',
+    changes: [
+      'Signing back in while offline no longer gets stuck at the loading screen',
+      'Dragging itinerary items to reorder no longer corrupts the order when the connection drops mid-way',
+      'Creating a plan item with linked documents no longer creates a duplicate item if the link step fails',
+      'Joining a trip and then quickly navigating away no longer causes a crash',
+      'Loading connections is now faster and more reliable on slow connections',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 367,
+    label: 'Bug fixes',
+    changes: [
+      'Money screen no longer gets stuck on a loading spinner when a cache read fails on startup',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 366,
+    label: 'Bug fixes',
+    changes: [
+      'Spots screen no longer logs unhandled network errors when the document fetch fails alongside a spot fetch failure',
+      'Plan and travel cache reads now run in a single parallel batch so a cache read failure no longer orphans sibling reads',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 365,
+    label: 'Bug fixes',
+    changes: [
+      'Switching trips no longer leaves a ghost packing-list subscription active in the background',
+      'Global search now shows an offline error state instead of a blank list when data fails to load',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 364,
+    label: 'Bug fixes',
+    changes: [
+      'Travel screen loads all data sources in parallel and handles failures cleanly without unhandled error logs',
+      'Home screen pull-to-refresh no longer blanks the screen when a load is already in progress',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 363,
+    label: 'Bug fixes',
+    changes: [
+      'Spots screen no longer flashes an error banner over cached spots during a fresh load after a prior failure',
+      'Links screen no longer mixes manual links from one trip with auto-links from another after switching trips mid-load',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 362,
+    label: 'Bug fixes',
+    changes: [
+      'Accommodations and docs screens no longer show an error banner over cached data after a prior failed load',
+      'Pins board no longer flashes an offline banner over existing pins during a background refresh failure',
+      'Photos screen no longer shows an offline banner over loaded albums during a brief network blip',
+      'Map no longer shows an offline overlay over existing spots when a background refresh fails',
+      'Linking a spot to a document now uses the correct trip\'s spots after a trip switch mid-request',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 361,
+    label: 'Bug fixes',
+    changes: [
+      'Packing and shopping lists refresh correctly when a real-time change arrives while loading',
+      'Packing and shopping screens now show an offline indicator when a background refresh fails',
+      'Photos screen no longer crashes on trip switch or slow startup',
+      'Map view stays correctly centred on the active trip after switching trips quickly',
+      'Home screen no longer shows mixed data when pull-to-refresh races with the initial load',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 360,
+    label: 'Bug fixes',
+    changes: [
+      'Switching trips while travel screen loads no longer flashes stale data',
+      'Crew messages and live locations now update correctly after switching trips',
+      'After a brief crew connection error, real-time updates clear the error banner automatically',
+      'Foreign-currency receipt balances are now calculated correctly in the money screen',
+      'Spots and links no longer vanish when a background refresh fails — existing data stays visible',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 359,
+    label: 'Bug fixes',
+    changes: [
+      'Connected section now shows a retry prompt when connections fail to load',
+      'Logging out now works correctly when you are offline',
+      'Moving a plan item to another day no longer briefly loses its completion status or stay link',
+      'Plan items already linked to a spot or stay no longer show as unlinked after switching trips while offline',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 358,
+    label: 'Bug fixes',
+    changes: [
+      'Connection picker now shows a retry banner when some data sources fail to load',
+      'Connection picker total network failure now shows a retry banner instead of silent empty tabs',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 357,
+    label: 'Bug fixes',
+    changes: [
+      'Adding a spot to the plan now correctly pre-fills the address/location field',
+      'Connection picker retry button no longer risks showing a partial failure state after a slow network',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 356,
+    label: 'Bug fixes',
+    changes: [
+      'Switching accounts quickly no longer shows the previous account\'s profile',
+      'Tapping "Add all days" while the plan is still loading no longer creates hidden days',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 355,
+    label: 'Bug fixes',
+    changes: [
+      'Signing back in after an automatic sign-out now reliably refreshes your profile',
+      'Adding all trip days while the plan is first loading now shows the new days immediately',
+      'Profile refresh on reconnect can no longer race with an in-progress sign-in',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 354,
+    label: 'Bug fixes',
+    changes: [
+      'Signing in is now fully protected against overlapping auth events during the profile load',
+      'Plan screen now shows the offline banner correctly if the network fails while cached data is visible',
+      'Switching trips mid-"add all days" no longer interferes with the new trip\'s plan display',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 353,
+    label: 'Bug fixes',
+    changes: [
+      'App can no longer get permanently stuck on the splash screen if your cached profile data is unreadable',
+      'Signing in and out quickly no longer leaves the app in a mixed auth state',
+      'Adding all trip days no longer creates days in the wrong trip if you switch trips mid-operation',
+      'Cached receipts are now shown correctly while the money screen fetches fresh data in the background',
+      'If adding all trip days fails partway through, the days that were created now appear immediately',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 352,
+    label: 'Bug fixes',
+    changes: [
+      'Adding all trip days no longer shows a loading spinner over your existing plan',
+      'Money screen now shows an offline banner instead of an error page when network drops with receipts already visible',
+      'Sending a crew photo no longer crashes if your profile hasn\'t loaded yet',
+      'A slow connection to one plan section no longer prevents the rest of the plan from loading',
+      'Links screen now shows results from all sections even if one section fails to load',
+      'App no longer gets stuck on the splash screen if cached profile data is corrupted',
+      'Connection chips no longer show wrong names when quickly switching between items',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 351,
+    label: 'Bug fixes',
+    changes: [
+      'Connections no longer show phantom duplicates after a realtime update races with a remove tap',
+      'App no longer shows the password-recovery screen when returning from offline with a valid session',
+      'Offline receipts from multiple trips now sync correctly when you reconnect',
+      'Plan screen no longer silently drops connection links when a Supabase request partially fails',
+      'Typing a follow-up message in crew chat while a send is in progress is no longer wiped on success',
+      'Connection picker now shows a retry banner instead of empty tabs when offline',
+      'Tapping Retry on the plan screen offline banner no longer flashes blank content',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 350,
     label: 'Test suite improvements',
     changes: [

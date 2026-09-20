@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/providers/profile_provider.dart';
 import '../../core/providers/trip_provider.dart';
 import '../../core/supabase/client.dart';
+import '../../core/async_screen_mixin.dart';
 import '../../core/supabase/doc_service.dart';
 import '../../core/supabase/money_service.dart';
 import '../../core/supabase/plan_service.dart';
@@ -596,12 +597,12 @@ class _LinkPickerSheet extends StatefulWidget {
   State<_LinkPickerSheet> createState() => _LinkPickerSheetState();
 }
 
-class _LinkPickerSheetState extends State<_LinkPickerSheet> {
+class _LinkPickerSheetState extends State<_LinkPickerSheet>
+    with AsyncScreenMixin {
   List<Receipt>? _receipts;
   List<CashWithdrawal>? _withdrawals;
   List<TravelItem>? _travelItems;
   List<TripDay>? _days;
-  bool _loading = true;
 
   @override
   void initState() {
@@ -610,6 +611,7 @@ class _LinkPickerSheetState extends State<_LinkPickerSheet> {
   }
 
   Future<void> _load() async {
+    final gen = beginLoad();
     try {
       final results = await Future.wait([
         MoneyService.loadReceipts(widget.tripId),
@@ -617,16 +619,14 @@ class _LinkPickerSheetState extends State<_LinkPickerSheet> {
         TravelService.loadItems(widget.tripId),
         PlanService.loadAll(widget.tripId),
       ]);
-      if (!mounted) return;
-      setState(() {
-        _receipts     = results[0] as List<Receipt>;
-        _withdrawals  = results[1] as List<CashWithdrawal>;
-        _travelItems  = results[2] as List<TravelItem>;
-        _days         = results[3] as List<TripDay>;
-        _loading      = false;
+      commitLoad(gen, () {
+        _receipts    = results[0] as List<Receipt>;
+        _withdrawals = results[1] as List<CashWithdrawal>;
+        _travelItems = results[2] as List<TravelItem>;
+        _days        = results[3] as List<TripDay>;
       });
     } catch (_) {
-      if (mounted) setState(() => _loading = false);
+      failLoad(gen);
     }
   }
 
@@ -653,8 +653,18 @@ class _LinkPickerSheetState extends State<_LinkPickerSheet> {
           ),
           const Divider(height: 1, color: kColorBorder),
           Expanded(
-            child: _loading
+            child: loading
                 ? const Center(child: CircularProgressIndicator())
+                : error
+                    ? Center(
+                        child: WabwayErrorState(
+                          title: 'Could not load links',
+                          action: TextButton(
+                            onPressed: _load,
+                            child: const Text('Retry'),
+                          ),
+                        ),
+                      )
                 : ListView(
                     controller: ctrl,
                     padding: const EdgeInsets.only(bottom: kSpace8),
@@ -794,9 +804,8 @@ class _ImagePreview extends StatefulWidget {
   State<_ImagePreview> createState() => _ImagePreviewState();
 }
 
-class _ImagePreviewState extends State<_ImagePreview> {
+class _ImagePreviewState extends State<_ImagePreview> with AsyncScreenMixin {
   String? _url;
-  bool _loading = true;
 
   @override
   void initState() {
@@ -805,11 +814,12 @@ class _ImagePreviewState extends State<_ImagePreview> {
   }
 
   Future<void> _load() async {
+    final gen = beginLoad();
     try {
       final url = await DocService.getSignedUrl(widget.storagePath);
-      if (mounted) setState(() { _url = url; _loading = false; });
+      commitLoad(gen, () => _url = url);
     } catch (_) {
-      if (mounted) setState(() => _loading = false);
+      failLoad(gen, silent: true);
     }
   }
 
@@ -821,7 +831,7 @@ class _ImagePreviewState extends State<_ImagePreview> {
         width: double.infinity,
         constraints: const BoxConstraints(maxHeight: 320),
         color: kColorSurfaceSunken,
-        child: _loading
+        child: loading
             ? const SizedBox(
                 height: 160,
                 child: Center(

@@ -79,14 +79,18 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> with AsyncScree
     if (!silent) {
       final cached = await ShoppingService.loadFromCache(_tripId);
       if (isStale(gen)) return;
-      if (cached != null) setState(() { _items = cached; loading = false; });
+      if (cached != null) {
+        commitLoad(gen, () => _items = cached);
+        if (!isStale(gen)) unawaited(_load(silent: true));
+        return;
+      }
     }
 
     try {
       final items = await ShoppingService.loadAll(_tripId);
       commitLoad(gen, () => _items = items);
     } catch (_) {
-      failLoad(gen, silent: silent);
+      failLoad(gen, silent: silent || _items.isNotEmpty);
     }
   }
 

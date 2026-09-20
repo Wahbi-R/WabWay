@@ -13,6 +13,7 @@ import '../core/supabase/doc_service.dart';
 import '../core/supabase/links_service.dart';
 import '../core/supabase/money_service.dart';
 import '../core/supabase/plan_service.dart';
+import '../core/supabase/accommodation_service.dart';
 import '../core/supabase/spot_service.dart';
 import '../core/supabase/travel_service.dart';
 import '../core/trip/app_trip.dart';
@@ -24,6 +25,7 @@ import '../data/docs_data.dart';
 import '../data/links_data.dart';
 import '../data/money_data.dart';
 import '../data/plan_data.dart';
+import '../data/accommodation_data.dart' show Accommodation;
 import '../data/spot_data.dart';
 import '../data/travel_data.dart';
 import '../theme/app_colors.dart';
@@ -59,6 +61,7 @@ class _HomeData {
     required this.homeCurrency,
     required this.memberMap,
     required this.members,
+    required this.stays,
     required this.activityEvents,
   });
 
@@ -68,6 +71,7 @@ class _HomeData {
   final List<TravelItem> travelItems;
   final List<Receipt> receipts;
   final List<TripLink> links;
+  final List<Accommodation> stays;
   // balancesByCurrency[currency] = per-member net balances in that currency.
   // Multi-currency trips will have multiple entries here.
   final Map<String, List<MemberBalance>> balancesByCurrency;
@@ -148,6 +152,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   _HomeData? _data;
   Object? _error;
   bool _loaded = false;
+  bool _loadInFlight = false;
 
   @override
   void initState() {
@@ -163,13 +168,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _load() async {
+    if (_loadInFlight) return;
+    _loadInFlight = true;
     final trip = ref.read(activeTripProvider);
     final members = ref.read(tripMembersProvider);
     final myId = ref.read(profileProvider)?.id ?? '';
 
     try {
-      // All eight sources in one round-trip so the home screen loads in parallel.
-      // results[0..7] must stay in sync with the list order below.
+      // All nine sources in parallel; stays failure is isolated via catchError.
+      // results[0..8] must stay in sync with the list order below.
       final tripId = trip?.id ?? '';
       final results = await Future.wait([
         SpotService.loadSpots(tripId),
@@ -180,16 +187,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         MoneyService.loadWithdrawals(tripId),
         ActivityService.loadEvents(tripId),
         LinksService.loadLinks(tripId),
+        AccommodationService.loadAll(tripId)
+            .catchError((_) => <Accommodation>[]),
       ]);
 
-      final spots        = results[0] as List<Spot>;
-      final docs         = results[1] as List<TripDocument>;
-      final days         = results[2] as List<TripDay>;
-      final travelItems  = results[3] as List<TravelItem>;
-      final receipts     = results[4] as List<Receipt>;
-      final withdrawals  = results[5] as List;
-      final activities   = results[6] as List<ActivityEvent>;
-      final links        = results[7] as List<TripLink>;
+      final spots         = results[0] as List<Spot>;
+      final docs          = results[1] as List<TripDocument>;
+      final days          = results[2] as List<TripDay>;
+      final travelItems   = results[3] as List<TravelItem>;
+      final receipts      = results[4] as List<Receipt>;
+      final withdrawals   = results[5] as List;
+      final activities    = results[6] as List<ActivityEvent>;
+      final links         = results[7] as List<TripLink>;
+      final stays         = results[8] as List<Accommodation>;
 
       final memberMap = {for (final m in members) m.userId: m.profile.displayName};
       final tripMembers = members
@@ -217,16 +227,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           homeCurrency: trip?.homeCurrency ?? '',
           memberMap: memberMap,
           members: members,
+          stays: stays,
           activityEvents: activities,
         );
       });
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = e);
+    } finally {
+      _loadInFlight = false;
     }
   }
 
   Future<void> _refresh() async {
+    if (_loadInFlight) return;
     setState(() {
       _data = null;
       _error = null;
@@ -659,6 +673,7 @@ class _TripHero extends StatelessWidget {
                                     day: nextDay!,
                                     docs: data!.docs,
                                     spots: data!.spots,
+                                    stays: data!.stays,
                                     days: data!.days,
                                   ),
                                 ),
@@ -1469,6 +1484,7 @@ class _ActivityFeed extends StatelessWidget {
               day:   entry.day,
               docs:  d.docs,
               spots: d.spots,
+              stays: d.stays,
               days:  d.days,
             ),
           ));

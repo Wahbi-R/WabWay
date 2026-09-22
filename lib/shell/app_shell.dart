@@ -268,11 +268,13 @@ class _AppShellState extends ConsumerState<AppShell> {
     ShareHandler.instance.consume();
     final tripId = ref.read(activeTripIdProvider);
     final userId = ref.read(profileProvider)?.id ?? '';
+    final homeCurrency = ref.read(activeTripProvider)?.homeCurrency ?? 'JPY';
     Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => IncomingShareScreen(
         share: share,
         tripId: tripId,
         userId: userId,
+        homeCurrency: homeCurrency,
         onDone: () => Navigator.of(context).pop(),
       ),
     ));

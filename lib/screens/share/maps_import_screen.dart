@@ -237,6 +237,7 @@ class _MapsImportScreenState extends State<MapsImportScreen> {
         }));
       }
       if (!mounted) return;
+      setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(
           'Added $_savingTotal spot${_savingTotal == 1 ? '' : 's'}',
@@ -530,7 +531,7 @@ class _MapsImportScreenState extends State<MapsImportScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(kSpace4),
                 child: FilledButton(
-                  onPressed: selectedCount == 0 || _saving ? null : _save,
+                  onPressed: selectedCount == 0 || _saving || _geocoding ? null : _save,
                   style: FilledButton.styleFrom(
                     backgroundColor: kColorPrimary,
                     minimumSize: const Size.fromHeight(48),

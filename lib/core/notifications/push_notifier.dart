@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../screens/notification_settings_screen.dart';
 
 /// Fire-and-forget push via the send-notification Edge Function.
 /// Checks the local notification pref key before sending — if the user

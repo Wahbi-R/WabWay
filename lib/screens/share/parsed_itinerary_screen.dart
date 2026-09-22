@@ -167,17 +167,17 @@ class _ParsedItineraryScreenState extends State<ParsedItineraryScreen>
         docId = doc.id;
       }
 
-      // 2. Save each selected booking in parallel (bookings are independent).
-      // Track successes so a partial failure leaves already-saved items deselected,
-      // preventing duplicates on retry.
+      // 2. Save each selected booking sequentially, tracking successes so a
+      // partial failure leaves already-saved items deselected, preventing
+      // duplicates on retry.
       final selectedIndices = [
         for (int i = 0; i < widget.bookings.length; i++)
           if (_selected[i]) i,
       ];
-      await Future.wait(selectedIndices.map((i) async {
+      for (final i in selectedIndices) {
         await _saveBooking(i, docId);
         succeeded.add(i);
-      }));
+      }
       final count = selectedIndices.length;
 
       if (!mounted) return;

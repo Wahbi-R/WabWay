@@ -213,7 +213,7 @@ class _ItemDetailContentState extends ConsumerState<ItemDetailContent>
 
               // ── Connections ───────────────────────────────────────────────────
               Builder(builder: (context) {
-                final tripId = ref.read(activeTripProvider)?.id;
+                final tripId = ref.watch(activeTripProvider)?.id;
                 if (tripId == null) return const SizedBox.shrink();
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

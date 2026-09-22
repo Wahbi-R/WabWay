@@ -11,6 +11,101 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 401,
+    label: 'Bug fixes',
+    changes: [
+      'Fixed a rare bug where switching trips during app load could snap you back to the previous trip',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 400,
+    label: 'Bug fixes',
+    changes: [
+      'Fixed memory leaks in the packing list — text field controllers for adding and renaming items are now always cleaned up',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 399,
+    label: 'Bug fixes',
+    changes: [
+      'Fixed a memory leak when posting a pinboard note — the text field controller is now always cleaned up',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 398,
+    label: 'Bug fixes',
+    changes: [
+      'Fixed a memory leak when renaming a document — the text field controller is now always cleaned up',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 397,
+    label: 'Bug fixes',
+    changes: [
+      'Importing bookings from a document no longer risks creating duplicates if a partial save fails and you retry',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 396,
+    label: 'Bug fixes',
+    changes: [
+      'Money, docs, links, map, photos, and accommodations screens no longer subscribe to real-time events with an empty trip ID',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 395,
+    label: 'Bug fixes',
+    changes: [
+      'Crew chat no longer runs queries with an empty trip ID when no trip is active',
+      'Travel, packing, and plan screens no longer subscribe to real-time events with an empty trip ID',
+      'Pins screen no longer starts a real-time subscription with an empty trip ID',
+      'Several internal code quality improvements to prevent future regressions',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 394,
+    label: 'Bug fixes',
+    changes: [
+      'Switching trips now correctly refreshes connection links in item and spot detail screens',
+      'Spots, money, docs, links, map, photos, and accommodations screens no longer fire database queries when no trip is active',
+      'Adding a plan item now shows an error if it fails, instead of silently doing nothing',
+      'Duplicating a plan item now shows an error if it fails',
+      'Changing a spot\'s status now shows an error if the update fails',
+      'Renaming a document now shows an error if the rename fails',
+      'Plan item reordering is now an atomic operation — a network failure can no longer leave days in a scrambled order',
+      'Adding a linked document to a new plan item no longer leaves an orphaned plan item if the link fails',
+      'Creating a trip no longer shows a failure if only the secondary currency update fails — the trip is still created',
+      'Document thumbnails no longer break after 1 hour — signed URL cache now refreshes before expiry',
+      'Saving a share as a plan item now shows an error if it fails, instead of silently doing nothing',
+      'Profile changes on another device (e.g. name rename) are now picked up on next app open, even if a fetch was in progress',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 393,
+    label: 'Bug fixes',
+    changes: [
+      'Editing a receipt now correctly adds or removes members from the split — previously only existing members\' amounts were updated',
+      'Importing spots and places no longer leaves the save button permanently disabled after a successful save',
+      'Saving during geocoding (finding locations) is now blocked until all locations are resolved, preventing spots from being saved without coordinates',
+      'Calendar export now correctly escapes special characters in event titles and descriptions',
+      'Adding a nightlife spot to the itinerary now correctly creates an Activity item, matching the quick-add from the Spots screen',
+      'App no longer crashes when a trip member\'s profile is missing from the database',
+      'App no longer crashes when switching trips causes the active trip index to fall out of range',
+      'Location sharing now sends a crew notification only after it has successfully started, not before',
+      'Trip name changes and currency changes now update the trip header immediately without requiring navigation',
+      'Parsing a booking confirmation no longer consumes your daily AI quota when Gemini returns an unexpected response',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 392,
     label: 'Bug fixes',
     changes: [

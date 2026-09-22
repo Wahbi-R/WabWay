@@ -23,8 +23,8 @@ class LocationShare {
         id: m['id'] as String,
         tripId: m['trip_id'] as String,
         userId: m['user_id'] as String,
-        lat: (m['lat'] as num).toDouble(),
-        lng: (m['lng'] as num).toDouble(),
+        lat: (m['lat'] as num?)?.toDouble() ?? 0.0,
+        lng: (m['lng'] as num?)?.toDouble() ?? 0.0,
         isActive: (m['is_active'] as bool?) ?? false,
         lastUpdatedAt: DateTime.parse(m['last_updated_at'] as String),
       );
@@ -60,8 +60,9 @@ class TripMessage {
     final reactionRows = m['message_reactions'] as List? ?? [];
     final reactions = <String, List<String>>{};
     for (final r in reactionRows) {
-      final emoji  = r['emoji'] as String;
-      final userId = r['user_id'] as String;
+      final emoji  = r['emoji'] as String?;
+      final userId = r['user_id'] as String?;
+      if (emoji == null || userId == null) continue;
       reactions.putIfAbsent(emoji, () => []).add(userId);
     }
     return TripMessage(

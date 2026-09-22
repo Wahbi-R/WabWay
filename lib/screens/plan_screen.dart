@@ -157,7 +157,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
       _userId = supabase.auth.currentUser?.id ?? '';
       _activeTripId = ref.read(activeTripIdProvider);
       _loadAll();
-      _subscribeRealtime(_activeTripId);
+      if (_activeTripId.isNotEmpty) _subscribeRealtime(_activeTripId);
     });
   }
 
@@ -389,13 +389,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
     final day = _days.where((d) => d.id == dayId).firstOrNull;
     if (day == null) return;
 
-    if (_activeTripId.isEmpty || _userId.isEmpty) {
-      setState(() {
-        day.items.add(draft);
-        _selectedItemId = draft.id;
-      });
-      return;
-    }
+    if (_activeTripId.isEmpty || _userId.isEmpty) return;
 
     try {
       final item = await PlanService.createItem(
@@ -475,7 +469,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
       _syncItemConnection(item.id, null, spot.id, EntityType.spot);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(
         content: Text('Failed to add item: $e', style: kStyleBody.copyWith(color: Colors.white)),
         backgroundColor: kColorDanger,
         behavior: SnackBarBehavior.floating,
@@ -606,7 +600,13 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
       setState(() => day.items.add(copy));
       _syncItemConnection(copy.id, null, copy.linkedSpotId, EntityType.spot);
       _syncItemConnection(copy.id, null, copy.linkedStayId, EntityType.stay);
-    } catch (_) {}
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to duplicate item — please try again')),
+        );
+      }
+    }
   }
 
   Future<void> _addDay(BuildContext context) async {
@@ -785,6 +785,9 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
     String icsDate(DateTime d) =>
         '${d.year.toString().padLeft(4, '0')}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}';
 
+    String icsEscape(String s) =>
+        s.replaceAll(r'\', r'\\').replaceAll(';', r'\;').replaceAll(',', r'\,');
+
     String icsDateTime(DateTime d, String? timeStr) {
       if (timeStr == null) return icsDate(d);
       final parts = timeStr.split(':');
@@ -796,7 +799,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
       for (final item in day.sortedItems) {
         buf.writeln('BEGIN:VEVENT');
         buf.writeln('UID:wabway-${item.id}@wabway.app');
-        buf.writeln('SUMMARY:${item.title.replaceAll(',', '\\,')}');
+        buf.writeln('SUMMARY:${icsEscape(item.title)}');
         if (item.time != null) {
           buf.writeln('DTSTART:${icsDateTime(day.date, item.time)}');
           buf.writeln('DTEND:${icsDateTime(day.date, item.time)}');
@@ -805,10 +808,10 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
           buf.writeln('DTEND;VALUE=DATE:${icsDate(day.date)}');
         }
         if (item.location != null && item.location!.isNotEmpty) {
-          buf.writeln('LOCATION:${item.location!.replaceAll(',', '\\,')}');
+          buf.writeln('LOCATION:${icsEscape(item.location!)}');
         }
         if (item.notes != null && item.notes!.isNotEmpty) {
-          buf.writeln('DESCRIPTION:${item.notes!.replaceAll('\n', '\\n').replaceAll(',', '\\,')}');
+          buf.writeln('DESCRIPTION:${icsEscape(item.notes!).replaceAll('\n', '\\n')}');
         }
         buf.writeln('END:VEVENT');
       }
@@ -843,7 +846,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
       if (next != _activeTripId) {
         _activeTripId = next;
         _loadAll();
-        _subscribeRealtime(next);
+        if (next.isNotEmpty) _subscribeRealtime(next);
       }
     });
     final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
@@ -1212,7 +1215,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
                                                   day: day,
                                                   spots: spots,
                                                   docs: docs,
-                                                  stays: _stayItems,
+                                                  stays: List.from(_stayItems),
                                                   days: days,
                                                   onDelete: () => _deleteItem(id),
                                                   onUpdated: _updateItem,
@@ -1251,7 +1254,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
             final result = await showDayPickerSheet(context, days: _days);
             if (result == null || !mounted) return;
             final (dayId, _) = result;
-            _addItem(context, dayId);
+            _addItem(this.context, dayId);
           }
         },
         icon: const Icon(Icons.event_note_rounded),

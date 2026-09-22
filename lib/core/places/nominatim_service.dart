@@ -132,7 +132,6 @@ abstract final class NominatimService {
   static SpotCategory _category(Map<String, dynamic> j) {
     final cls  = j['class']  as String? ?? '';
     final type = j['type']   as String? ?? '';
-    final addr = (j['address'] as Map<String, dynamic>?) ?? {};
 
     // Food
     if (cls == 'amenity' &&

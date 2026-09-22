@@ -1,4 +1,3 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/emergency_data.dart';
 import 'client.dart';
 

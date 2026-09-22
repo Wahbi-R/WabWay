@@ -49,7 +49,7 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
   final _scrollController = ScrollController();
   final _textController = TextEditingController();
 
-  String? _tripId;
+  String _tripId = '';
   String? _userId;
 
   @override
@@ -61,7 +61,7 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
       if (!mounted) return;
       _tripId = ref.read(activeTripIdProvider);
       _userId = ref.read(profileProvider)?.id;
-      _load(_tripId!);
+      if (_tripId.isNotEmpty) _load(_tripId);
     });
   }
 
@@ -110,7 +110,7 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
 
   Future<void> _onNewMessage() async {
     final tripId = _tripId;
-    if (tripId == null) return;
+    if (tripId.isEmpty) return;
     try {
       final messages = await CrewService.fetchMessages(tripId);
       if (!mounted || _tripId != tripId) return;
@@ -121,7 +121,7 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
 
   Future<void> _onLocationsChanged() async {
     final tripId = _tripId;
-    if (tripId == null) return;
+    if (tripId.isEmpty) return;
     try {
       final locations = await CrewService.fetchActiveLocations(tripId);
       if (!mounted || _tripId != tripId) return;
@@ -179,16 +179,8 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
     final granted = await _ensureLocationPermission();
     if (!granted || !mounted) return;
 
-    pushNotify(
-      tripId: _tripId!,
-      title: '\u{1F4CD} $_myDisplayName started sharing location',
-      body: 'Check the Live Map in crew',
-      excludeUserId: _userId,
-      data: {'screen': 'crew', 'trip_id': _tripId!},
-    );
-
     await mgr.start(
-      tripId: _tripId!,
+      tripId: _tripId,
       userId: _userId!,
       settings: _buildLocationSettings(),
       onError: (e) {
@@ -200,6 +192,15 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
           _showError('Location sharing stopped unexpectedly');
         }
       },
+    );
+
+    if (!mounted) return;
+    pushNotify(
+      tripId: _tripId,
+      title: '\u{1F4CD} $_myDisplayName started sharing location',
+      body: 'Check the Live Map in crew',
+      excludeUserId: _userId,
+      data: {'screen': 'crew', 'trip_id': _tripId},
     );
   }
 
@@ -294,7 +295,7 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
     _textController.clear();
     try {
       await CrewService.sendMessage(
-        tripId: _tripId!,
+        tripId: _tripId,
         authorId: _userId!,
         body: text,
       );
@@ -303,11 +304,11 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
       // Supabase realtime publication).
       await _onNewMessage();
       pushNotify(
-        tripId: _tripId!,
+        tripId: _tripId,
         title: 'New crew message',
         body: text.length > 80 ? '${text.substring(0, 80)}…' : text,
         excludeUserId: _userId,
-        data: {'screen': 'crew', 'trip_id': _tripId!},
+        data: {'screen': 'crew', 'trip_id': _tripId},
         prefKey: kPrefNotifCrew,
       );
     } catch (_) {
@@ -326,7 +327,7 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
     try {
       final pos = await _getCurrentPosition();
       await CrewService.sendLocationPing(
-        tripId: _tripId!,
+        tripId: _tripId,
         authorId: _userId!,
         lat: pos.latitude,
         lng: pos.longitude,
@@ -373,25 +374,25 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
     try {
       final pos = await _getCurrentPosition();
       await CrewService.sendFindMe(
-        tripId: _tripId!,
+        tripId: _tripId,
         authorId: _userId!,
         lat: pos.latitude,
         lng: pos.longitude,
       );
       await _onNewMessage();
       pushNotify(
-        tripId: _tripId!,
+        tripId: _tripId,
         title: '\u{1F6A8} $_myDisplayName needs the crew!',
         body: 'Tap to navigate to them',
         excludeUserId: _userId,
-        data: {'screen': 'crew', 'trip_id': _tripId!},
+        data: {'screen': 'crew', 'trip_id': _tripId},
         highPriority: true,
       );
       // Auto-start live location sharing so the crew's map pin stays current.
       final mgr = LocationSharingManager.instance;
       if (!mgr.isSharing.value && mounted) {
         await mgr.start(
-          tripId: _tripId!,
+          tripId: _tripId,
           userId: _userId!,
           settings: _buildLocationSettings(),
           onError: (_) {},
@@ -453,7 +454,7 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
     if (file == null || !mounted) return;
     final tripId = _tripId;
     final userId = _userId;
-    if (tripId == null || userId == null) return;
+    if (tripId.isEmpty || userId == null) return;
     setState(() => _sendingImage = true);
     try {
       final bytes = await file.readAsBytes();
@@ -506,18 +507,18 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
 
     try {
       await CrewService.sendMeetupPoint(
-        tripId: _tripId!,
+        tripId: _tripId,
         authorId: _userId!,
         lat: point.latitude,
         lng: point.longitude,
       );
       await _onNewMessage();
       pushNotify(
-        tripId: _tripId!,
+        tripId: _tripId,
         title: '\u{1F4CD} $_myDisplayName set a meetup point',
         body: 'Open crew chat to navigate there',
         excludeUserId: _userId,
-        data: {'screen': 'crew', 'trip_id': _tripId!},
+        data: {'screen': 'crew', 'trip_id': _tripId},
       );
     } catch (_) {
       _showError('Could not set meetup point');
@@ -601,7 +602,7 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
             onLinkUp: _sendLocationPing,
             onFindMe: _sendFindMe,
             onSendImage: _showImageSourceSheet,
-            onRetry: () => _load(_tripId ?? ''),
+            onRetry: () => _load(_tripId),
             onReact: _onReact,
           ),
           _MapTab(

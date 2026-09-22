@@ -32,9 +32,13 @@ abstract final class TripService {
       if (endDate != null)   'p_end_date':   isoDate(endDate),
       'p_default_currency': defaultCurrency.toUpperCase(),
     }) as String;
-    await supabase.from('trips').update({
-      'home_currency': homeCurrency.toUpperCase(),
-    }).eq('id', tripId);
+    try {
+      await supabase.from('trips').update({
+        'home_currency': homeCurrency.toUpperCase(),
+      }).eq('id', tripId);
+    } catch (_) {
+      // Trip was created; currency can be corrected in settings.
+    }
     return tripId;
   }
 
@@ -49,7 +53,8 @@ abstract final class TripService {
   }
 
   static Future<void> leaveTrip(String tripId) async {
-    final userId = supabase.auth.currentUser!.id;
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) return;
     await supabase
         .from('trip_members')
         .delete()

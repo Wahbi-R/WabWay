@@ -50,7 +50,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> with AsyncScreenMixin
   List<Accommodation> _stays = [];
   Map<String, VoteType> _myVotes = {};
 
-  String? _activeTripId;
+  String _activeTripId = '';
   RealtimeChannel? _realtimeChannel;
   Timer? _debounce;
 
@@ -78,7 +78,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> with AsyncScreenMixin
       if (!mounted) return;
       _activeTripId = ref.read(activeTripIdProvider);
       _loadSpots();
-      _subscribeRealtime(_activeTripId!);
+      if (_activeTripId.isNotEmpty) _subscribeRealtime(_activeTripId);
     });
   }
 
@@ -140,7 +140,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> with AsyncScreenMixin
 
   Future<void> _loadSpots({bool silent = false}) async {
     final tripId = _activeTripId;
-    if (tripId == null) return;
+    if (tripId.isEmpty) return;
     final gen = beginLoad(silent: silent);
     if (!silent) setState(() { _spots = []; _docs = []; _stays = []; _myVotes = {}; });
 
@@ -283,7 +283,8 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> with AsyncScreenMixin
   // ─── Mutations ───────────────────────────────────────────────────────────────
 
   Future<void> _addSpot(BuildContext context) async {
-    final tripId = _activeTripId!;
+    final tripId = _activeTripId;
+    if (tripId.isEmpty) return;
     final userId = ref.read(profileProvider)?.id ?? '';
     final spot = await showAddSpotSheet(context, tripId: tripId, userId: userId);
     if (spot != null && mounted) {
@@ -527,7 +528,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> with AsyncScreenMixin
       builder: (_) => _StayMiniSheet(
         stay: stay,
         linkedSpot: linkedSpot,
-        tripId: _activeTripId ?? '',
+        tripId: _activeTripId,
       ),
     );
   }
@@ -573,72 +574,6 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> with AsyncScreenMixin
     );
   }
 
-  // ─── Quick status from long-press ─────────────────────────────────────────────
-
-  void _quickStatusSheet(BuildContext context, Spot spot) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: kColorPaper,
-      shape: const RoundedRectangleBorder(borderRadius: kRadiusSheet),
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const WabwayDragHandle(),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: kSpace4),
-              child: Text(
-                spot.name,
-                style: kStyleBodyBold,
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const SizedBox(height: kSpace2),
-            if (spot.status != SpotStatus.visited)
-              WabwayActionTile(
-                icon: Icons.check_circle_rounded,
-                label: 'Mark as visited',
-                color: kColorSuccess,
-                onTap: () { Navigator.pop(ctx); _setSpotStatus(spot, SpotStatus.visited); },
-              ),
-            if (spot.status != SpotStatus.skipped)
-              WabwayActionTile(
-                icon: Icons.cancel_rounded,
-                label: 'Skip this spot',
-                onTap: () { Navigator.pop(ctx); _setSpotStatus(spot, SpotStatus.skipped); },
-              ),
-            if (spot.status == SpotStatus.visited || spot.status == SpotStatus.skipped)
-              WabwayActionTile(
-                icon: Icons.restart_alt_rounded,
-                label: 'Reset to saved',
-                onTap: () { Navigator.pop(ctx); _setSpotStatus(spot, SpotStatus.idea); },
-              ),
-            const SizedBox(height: kSpace4),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _setSpotStatus(Spot spot, SpotStatus status) async {
-    try {
-      final updated = await SpotService.updateSpot(
-        spotId: spot.id,
-        name: spot.name,
-        city: spot.city,
-        area: spot.area,
-        category: spot.category,
-        status: status,
-        notes: spot.notes,
-        mapsUrl: spot.mapsUrl,
-        sourceUrl: spot.sourceUrl,
-        address: spot.address,
-      );
-      if (mounted) _onEditSpot(updated);
-    } catch (_) {}
-  }
 
   @override
   Widget build(BuildContext context) {

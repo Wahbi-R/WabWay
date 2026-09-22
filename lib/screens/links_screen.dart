@@ -32,7 +32,7 @@ class LinksScreen extends ConsumerStatefulWidget {
 class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin {
   List<TripLink> _links = [];
   Map<AutoLinkSource, List<AutoLink>> _autoLinks = {};
-  String? _activeTripId;
+  String _activeTripId = '';
   RealtimeChannel? _channel;
   Timer? _debounce;
   LinkCategory? _filterCategory;
@@ -88,7 +88,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin
       if (!mounted) return;
       _activeTripId = ref.read(activeTripIdProvider);
       _load();
-      _subscribe(_activeTripId!);
+      if (_activeTripId.isNotEmpty) _subscribe(_activeTripId);
     });
   }
 
@@ -123,7 +123,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin
 
   Future<void> _load({bool silent = false}) async {
     final tripId = _activeTripId;
-    if (tripId == null) return;
+    if (tripId.isEmpty) return;
     final gen = beginLoad(silent: silent);
     try {
       final links = await LinksService.loadLinks(tripId);
@@ -147,7 +147,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin
     final userId = ref.read(profileProvider)!.id;
     final link = await showAddLinkSheet(
       context,
-      tripId: _activeTripId!,
+      tripId: _activeTripId,
       userId: userId,
     );
     if (link != null && mounted) {
@@ -159,7 +159,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin
     final userId = ref.read(profileProvider)!.id;
     final updated = await showAddLinkSheet(
       context,
-      tripId: _activeTripId!,
+      tripId: _activeTripId,
       userId: userId,
       existing: link,
     );
@@ -177,8 +177,8 @@ class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin
       await LinksService.deleteLink(link.id);
     } catch (_) {
       if (!mounted) return;
-      if (mounted) _load();
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      _load();
+      ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(
         content: Text('Could not delete "${link.title}". Try again.',
             style: kStyleBody.copyWith(color: Colors.white)),
         behavior: SnackBarBehavior.floating,
@@ -186,7 +186,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin
       return;
     }
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+    ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(
       content: Text('"${link.title}" removed.',
           style: kStyleBody.copyWith(color: Colors.white)),
       behavior: SnackBarBehavior.floating,
@@ -233,7 +233,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin
   void _shareLinks() {
     final list = _filteredLinks;
     if (list.isEmpty || kIsWeb) return;
-    final tripName = ref.read(activeTripProvider)!.name;
+    final tripName = ref.read(activeTripProvider)?.name ?? 'Trip';
     final buf = StringBuffer();
     buf.writeln('$tripName — Links');
     buf.writeln();
@@ -261,7 +261,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin
       if (next != _activeTripId) {
         _activeTripId = next;
         _load();
-        _subscribe(next);
+        if (next.isNotEmpty) _subscribe(next);
       }
     });
     final scaffold = Scaffold(

@@ -30,6 +30,8 @@ class _AuthGateState extends ConsumerState<AuthGate> {
   bool _showPasswordRecovery = false;
   bool _authChangeBusy = false;
   bool _fetchingProfile = false;
+  bool _pendingProfileFetch = false;
+  String? _pendingUserId;
 
   AppProfile? get _profile => ref.read(profileProvider);
 
@@ -107,7 +109,11 @@ class _AuthGateState extends ConsumerState<AuthGate> {
   }
 
   Future<void> _fetchProfile(String userId) async {
-    if (_fetchingProfile) return;
+    if (_fetchingProfile) {
+      _pendingProfileFetch = true;
+      _pendingUserId = userId;
+      return;
+    }
     _fetchingProfile = true;
     try {
       final data = await supabase
@@ -149,6 +155,12 @@ class _AuthGateState extends ConsumerState<AuthGate> {
       setState(() => _loading = false);
     } finally {
       _fetchingProfile = false;
+      if (_pendingProfileFetch) {
+        _pendingProfileFetch = false;
+        final uid = _pendingUserId;
+        _pendingUserId = null;
+        if (uid != null) unawaited(_fetchProfile(uid));
+      }
     }
   }
 

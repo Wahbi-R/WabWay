@@ -266,6 +266,7 @@ abstract final class PlanService {
               .toList(),
         );
       } catch (_) {
+        await supabase.from('itinerary_items').delete().eq('id', itemId);
         rethrow;
       }
     }
@@ -360,14 +361,12 @@ abstract final class PlanService {
   }
 
   static Future<void> reorderItemsInDay(List<ItineraryItem> items) async {
-    for (var i = 0; i < items.length; i++) {
-      if (items[i].sortOrder != i) {
-        await supabase
-            .from('itinerary_items')
-            .update({'sort_order': i})
-            .eq('id', items[i].id);
-      }
-    }
+    final updates = [
+      for (var i = 0; i < items.length; i++)
+        if (items[i].sortOrder != i) {'id': items[i].id, 'sort_order': i},
+    ];
+    if (updates.isEmpty) return;
+    await supabase.from('itinerary_items').upsert(updates, onConflict: 'id');
   }
 
   // ── Item comments ─────────────────────────────────────────────────────────────

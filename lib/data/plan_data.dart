@@ -106,7 +106,9 @@ class ItineraryItem {
   bool get hasTime => time != null;
   bool get hasLinks => linkedSpotId != null || linkedStayId != null || linkedDocIds.isNotEmpty;
 
-  ItineraryItem copyWith({bool? isDone, double? plannedCost, String? currency, String? linkedSpotId, String? linkedStayId}) =>
+  static const _unset = Object();
+
+  ItineraryItem copyWith({bool? isDone, double? plannedCost, String? currency, Object? linkedSpotId = _unset, Object? linkedStayId = _unset}) =>
       ItineraryItem(
         id:              id,
         dayId:           dayId,
@@ -119,8 +121,8 @@ class ItineraryItem {
         mapsUrl:         mapsUrl,
         confirmationUrl: confirmationUrl,
         notes:           notes,
-        linkedSpotId:    linkedSpotId ?? this.linkedSpotId,
-        linkedStayId:    linkedStayId ?? this.linkedStayId,
+        linkedSpotId:    identical(linkedSpotId, _unset) ? this.linkedSpotId : linkedSpotId as String?,
+        linkedStayId:    identical(linkedStayId, _unset) ? this.linkedStayId : linkedStayId as String?,
         linkedDocIds:    linkedDocIds,
         sortOrder:       sortOrder,
         isDone:          isDone ?? this.isDone,

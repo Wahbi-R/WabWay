@@ -133,7 +133,7 @@ abstract final class SpotService {
         .select('*, spot_votes(*), spot_comments(*)')
         .eq('trip_id', tripId)
         .order('created_at', ascending: false);
-    OfflineCache.write(OfflineCache.spotsKey(tripId), data);
+    await OfflineCache.write(OfflineCache.spotsKey(tripId), data);
     return data.map((r) => _spotFromRow(r)).toList();
   }
 

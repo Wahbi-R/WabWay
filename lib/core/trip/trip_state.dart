@@ -54,6 +54,10 @@ class TripState extends InheritedWidget {
   @override
   bool updateShouldNotify(TripState old) =>
       trip.id != old.trip.id ||
+      trip.name != old.trip.name ||
+      trip.homeCurrency != old.trip.homeCurrency ||
+      trip.defaultCurrency != old.trip.defaultCurrency ||
       members != old.members ||
-      allTrips.length != old.allTrips.length;
+      allTrips.length != old.allTrips.length ||
+      allTrips != old.allTrips;
 }

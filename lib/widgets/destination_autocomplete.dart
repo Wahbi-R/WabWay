@@ -51,7 +51,7 @@ List<String> _suggestionsFor(String query) {
 
 // ─── Widget ───────────────────────────────────────────────────────────────────
 
-class DestinationAutocomplete extends StatelessWidget {
+class DestinationAutocomplete extends StatefulWidget {
   const DestinationAutocomplete({
     super.key,
     required this.controller,
@@ -70,31 +70,44 @@ class DestinationAutocomplete extends StatelessWidget {
   final ValueChanged<String>? onSelected;
 
   @override
+  State<DestinationAutocomplete> createState() => _DestinationAutocompleteState();
+}
+
+class _DestinationAutocompleteState extends State<DestinationAutocomplete> {
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return RawAutocomplete<String>(
-      textEditingController: controller,
-      focusNode: FocusNode(),
+      textEditingController: widget.controller,
+      focusNode: _focusNode,
       optionsBuilder: (TextEditingValue value) =>
           _suggestionsFor(value.text),
       onSelected: (String selection) {
-        controller.text = selection;
-        controller.selection = TextSelection.fromPosition(
+        widget.controller.text = selection;
+        widget.controller.selection = TextSelection.fromPosition(
           TextPosition(offset: selection.length),
         );
-        onSelected?.call(selection);
+        widget.onSelected?.call(selection);
       },
       fieldViewBuilder: (context, ctrl, focusNode, onSubmitted) {
         return TextField(
           controller: ctrl,
           focusNode: focusNode,
-          textInputAction: textInputAction,
+          textInputAction: widget.textInputAction,
           style: kStyleBody,
           decoration: InputDecoration(
-            labelText: label,
-            hintText: hint,
+            labelText: widget.label,
+            hintText: widget.hint,
             hintStyle: kStyleBody.copyWith(color: kColorInkSoft),
             labelStyle: kStyleCaption,
-            prefixIcon: Icon(prefixIcon, size: 18, color: kColorInkSoft),
+            prefixIcon: Icon(widget.prefixIcon, size: 18, color: kColorInkSoft),
             filled: true,
             fillColor: kColorPaper,
             contentPadding: const EdgeInsets.symmetric(

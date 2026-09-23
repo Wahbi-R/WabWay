@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 403,
+    label: 'Security',
+    changes: [
+      'Shopping lists are now private to your trip crew',
+      'Tightened backend security so trip data can only be reached by signed-in trip members',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 402,
     label: 'Reliability',
     changes: [

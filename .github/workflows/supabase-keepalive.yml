@@ -21,7 +21,9 @@ jobs:
           - name: wabway
             url_ref: SUPABASE_URL
             key_ref: SUPABASE_ANON_KEY
-            table: trips
+            # profiles' SELECT policy doesn't call is_trip_member(), which anon
+            # can't execute (migration 043) — so anon gets [] instead of 401.
+            table: profiles
           - name: project-2
             url_ref: KEEPALIVE_2_URL
             key_ref: KEEPALIVE_2_KEY

@@ -10,16 +10,22 @@ class NominatimPlace {
     required this.lat,
     required this.lon,
     required this.category,
+    this.area = '',
     this.displayName = '',
+    this.placeId = '',
   });
 
   final String       name;
   final String       city;
+  /// Sub-city area (neighbourhood, district, suburb). Empty when unavailable.
+  final String       area;
   final String       country;
   final double       lat;
   final double       lon;
   final SpotCategory category;
   final String       displayName;
+  /// Google Places place_id — non-empty when geocoded via the wabway-server.
+  final String       placeId;
 }
 
 abstract final class NominatimService {
@@ -89,11 +95,16 @@ abstract final class NominatimService {
                    addr['town']         as String? ??
                    addr['village']      as String? ??
                    addr['municipality'] as String? ?? '';
+      final area = addr['suburb']        as String? ??
+                   addr['neighbourhood'] as String? ??
+                   addr['quarter']       as String? ??
+                   addr['city_district'] as String? ?? '';
       final country = addr['country'] as String? ?? '';
 
       return NominatimPlace(
         name:        name,
         city:        city,
+        area:        area,
         country:     country,
         lat:         lat,
         lon:         lon,
@@ -121,7 +132,6 @@ abstract final class NominatimService {
   static SpotCategory _category(Map<String, dynamic> j) {
     final cls  = j['class']  as String? ?? '';
     final type = j['type']   as String? ?? '';
-    final addr = (j['address'] as Map<String, dynamic>?) ?? {};
 
     // Food
     if (cls == 'amenity' &&

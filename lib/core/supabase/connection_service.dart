@@ -15,15 +15,11 @@ abstract final class ConnectionService {
 
   /// All connections that involve [entityId] (on either side).
   static Future<List<TripConnection>> fetchForEntity(String entityId) async {
-    final a = await supabase
-        .from('trip_connections')
-        .select()
-        .eq('entity_a_id', entityId);
-    final b = await supabase
-        .from('trip_connections')
-        .select()
-        .eq('entity_b_id', entityId);
-    final all = {...a.map(_fromRow), ...b.map(_fromRow)};
+    final results = await Future.wait([
+      supabase.from('trip_connections').select().eq('entity_a_id', entityId),
+      supabase.from('trip_connections').select().eq('entity_b_id', entityId),
+    ]);
+    final all = {...results[0].map(_fromRow), ...results[1].map(_fromRow)};
     return all.toList()..sort((x, y) => x.createdAt.compareTo(y.createdAt));
   }
 
@@ -85,28 +81,38 @@ abstract final class ConnectionService {
     return null;
   }
 
-  /// Batch-load spot connections for a list of plan item ids.
-  /// Returns a map of itemId → spotId.
-  static Future<Map<String, String>> fetchSpotMapForItems(
-      List<String> itemIds) async {
-    if (itemIds.isEmpty) return {};
-    final rows = await supabase
-        .from('trip_connections')
-        .select('entity_a_id, entity_a_type, entity_b_id, entity_b_type')
-        .or('entity_a_type.eq.plan_item,entity_b_type.eq.plan_item');
-    final map = <String, String>{};
-    for (final r in rows) {
+  /// Batch-load spot and stay connections for a list of plan item ids.
+  /// Returns ({itemId → spotId}, {itemId → stayId}) in a single query.
+  static Future<(Map<String, String>, Map<String, String>)>
+      fetchSpotAndStayMapsForItems(List<String> itemIds) async {
+    if (itemIds.isEmpty) return (<String, String>{}, <String, String>{});
+    const chunkSize = 50;
+    final idSet = itemIds.toSet();
+    final futures = <Future<List<Map<String, dynamic>>>>[];
+    for (var i = 0; i < itemIds.length; i += chunkSize) {
+      final chunk = itemIds.sublist(i, i + chunkSize > itemIds.length ? itemIds.length : i + chunkSize);
+      futures.add(supabase
+          .from('trip_connections')
+          .select('entity_a_id, entity_a_type, entity_b_id, entity_b_type')
+          .or('entity_a_id.in.(${chunk.join(',')}),entity_b_id.in.(${chunk.join(',')})'));
+    }
+    final allRows = (await Future.wait(futures)).expand((r) => r).toList();
+    final spotMap = <String, String>{};
+    final stayMap = <String, String>{};
+    for (final r in allRows) {
       final aType = r['entity_a_type'] as String;
       final bType = r['entity_b_type'] as String;
       final aId   = r['entity_a_id'] as String;
       final bId   = r['entity_b_id'] as String;
-      if (aType == 'plan_item' && bType == 'spot' && itemIds.contains(aId)) {
-        map[aId] = bId;
-      } else if (bType == 'plan_item' && aType == 'spot' && itemIds.contains(bId)) {
-        map[bId] = aId;
+      if (aType == 'plan_item' && idSet.contains(aId)) {
+        if (bType == 'spot') spotMap[aId] = bId;
+        if (bType == 'stay') stayMap[aId] = bId;
+      } else if (bType == 'plan_item' && idSet.contains(bId)) {
+        if (aType == 'spot') spotMap[bId] = aId;
+        if (aType == 'stay') stayMap[bId] = aId;
       }
     }
-    return map;
+    return (spotMap, stayMap);
   }
 
   static RealtimeChannel subscribe(

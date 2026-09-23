@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/providers/trip_provider.dart';
+import '../core/async_screen_mixin.dart';
 import '../core/supabase/client.dart';
 import '../core/supabase/money_service.dart';
 import '../core/supabase/settlement_service.dart';
@@ -62,13 +63,10 @@ class MoneyScreen extends ConsumerStatefulWidget {
   ConsumerState<MoneyScreen> createState() => _MoneyScreenState();
 }
 
-class _MoneyScreenState extends ConsumerState<MoneyScreen> {
+class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin {
   List<Receipt> _receipts = [];
   List<CashWithdrawal> _withdrawals = [];
   _CashSort _cashSort = _CashSort.newest;
-  bool _loading = true;
-  bool _error = false;
-  bool _offline = false;
   int _pendingSyncCount = 0;
 
   _MoneyTab _tab = _MoneyTab.receipts;
@@ -83,7 +81,8 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
   String? _selectedReceiptId;
   String? _selectedWithdrawalId;
 
-  String? _activeTripId;
+  String _activeTripId = '';
+  String? _lastTripId;
   RealtimeChannel? _realtimeChannel;
   Timer? _debounce;
 
@@ -116,7 +115,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
       _rebuildMembers();
       _activeTripId = ref.read(activeTripIdProvider);
       _loadAll();
-      _subscribeRealtime(_activeTripId!);
+      if (_activeTripId.isNotEmpty) _subscribeRealtime(_activeTripId);
     });
   }
 
@@ -341,45 +340,62 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
 
   Future<void> _loadAll({bool silent = false}) async {
     final tripId = _activeTripId;
-    if (tripId == null) return;
-    if (!silent) setState(() { _loading = true; _error = false; });
+    if (tripId.isEmpty) return;
+    final gen = beginLoad(silent: silent);
+    if (!silent) setState(() {
+      _receipts = []; _withdrawals = [];
+      if (_lastTripId != tripId) { _persistedSettlements = []; _pendingSyncCount = 0; }
+    });
+
+    if (!silent) {
+      try {
+        final cached = await Future.wait([
+          MoneyService.loadReceiptsFromCache(tripId),
+          MoneyService.loadWithdrawalsFromCache(tripId),
+          SyncQueue.pendingCountFor(tripId),
+        ]);
+        final cachedReceipts    = cached[0] as List<Receipt>?;
+        final cachedWithdrawals = cached[1] as List<CashWithdrawal>?;
+        final pending           = cached[2] as int;
+        if (isStale(gen)) return;
+        if (cachedReceipts != null) {
+          // Commit cached data so the UI is immediately visible, then kick off a
+          // silent network refresh. Using commitLoad (rather than mutating
+          // loading directly) preserves the mixin's silent-load preemption guard.
+          commitLoad(gen, () {
+            _receipts         = cachedReceipts;
+            _withdrawals      = cachedWithdrawals ?? [];
+            if (_lastTripId != tripId) _persistedSettlements = [];
+            _lastTripId       = tripId;
+            _pendingSyncCount = pending;
+          });
+          unawaited(_loadAll(silent: true));
+          return;
+        }
+      } catch (_) {
+        // Cache read error — fall through to network fetch.
+      }
+    }
+
     try {
       final futures = await Future.wait([
         MoneyService.loadReceipts(tripId),
         MoneyService.loadWithdrawals(tripId),
         SettlementService.loadSettlements(tripId),
       ]);
-      if (!mounted) return;
+      if (isStale(gen)) return;
       final pending = await SyncQueue.pendingCountFor(tripId);
-      if (!mounted) return;
-      setState(() {
-        _receipts              = List<Receipt>.from(futures[0] as List);
-        _withdrawals           = List<CashWithdrawal>.from(futures[1] as List);
-        _persistedSettlements  = List<Settlement>.from(futures[2] as List);
-        _loading = false;
-        _offline = false;
-        _pendingSyncCount = pending;
+      commitLoad(gen, () {
+        _receipts             = List<Receipt>.from(futures[0] as List);
+        _withdrawals          = List<CashWithdrawal>.from(futures[1] as List);
+        _persistedSettlements = List<Settlement>.from(futures[2] as List);
+        _lastTripId           = tripId;
+        _pendingSyncCount     = pending;
       });
     } catch (_) {
-      if (!mounted) return;
-      if (silent) { setState(() => _offline = true); return; }
-      // Try cached data on cold-start failure.
-      final cachedReceipts     = await MoneyService.loadReceiptsFromCache(tripId);
-      final cachedWithdrawals  = await MoneyService.loadWithdrawalsFromCache(tripId);
-      final pending            = await SyncQueue.pendingCountFor(tripId);
-      if (!mounted) return;
-      if (cachedReceipts != null) {
-        setState(() {
-          _receipts             = cachedReceipts;
-          _withdrawals          = cachedWithdrawals ?? [];
-          _persistedSettlements = [];
-          _loading = false;
-          _offline = true;
-          _pendingSyncCount = pending;
-        });
-      } else {
-        setState(() { _loading = false; _error = true; });
-      }
+      // If cached data is already visible, degrade gracefully to offline banner
+      // rather than replacing it with a full-screen error.
+      failLoad(gen, silent: silent || _receipts.isNotEmpty);
     }
   }
 
@@ -572,10 +588,10 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
   static String _csvCell(String v) => '"${v.replaceAll('"', '""')}"';
 
   Future<void> _addReceipt(BuildContext context) async {
-    if (_activeTripId == null) return;
+    if (_activeTripId.isEmpty) return;
     final receipt = await showAddReceiptSheet(
       context,
-      tripId:       _activeTripId!,
+      tripId:       _activeTripId,
       userId:       _userId,
       members:      _members,
       homeCurrency: _homeCurrency,
@@ -590,10 +606,10 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
   }
 
   Future<void> _addWithdrawal(BuildContext context) async {
-    if (_activeTripId == null) return;
+    if (_activeTripId.isEmpty) return;
     final w = await showAddCashSheet(
       context,
-      tripId:  _activeTripId!,
+      tripId:  _activeTripId,
       userId:  _userId,
       members: _members,
     );
@@ -631,12 +647,12 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
         _activeTripId = next;
         _rebuildMembers();
         _loadAll();
-        _subscribeRealtime(next);
+        if (next.isNotEmpty) _subscribeRealtime(next);
       }
     });
-    if (_loading) return const WabwayLoadingScaffold();
+    if (loading) return const WabwayLoadingScaffold();
 
-    if (_error) {
+    if (error) {
       return Scaffold(
         backgroundColor: kColorCream,
         body: Center(
@@ -656,7 +672,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
 
     final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
     final base = isDesktop ? _buildDesktop(context) : _buildMobile(context);
-    if (!_offline) return base;
+    if (!offline) return base;
     return Stack(
       children: [
         base,
@@ -690,7 +706,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
                     balancesByCurrency:    _balancesByCurrency,
                     suggestionsByCurrency: _suggestionsByCurrency,
                     members:               _members,
-                    tripId:                _activeTripId ?? '',
+                    tripId:                _activeTripId,
                     myId:                  _userId,
                     existingSettlements:   _persistedSettlements,
                     onSettled:             () => _loadAll(silent: true),
@@ -893,7 +909,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
       balancesByCurrency:    _balancesByCurrency,
       suggestionsByCurrency: _suggestionsByCurrency,
       members:               _members,
-      tripId:                _activeTripId ?? '',
+      tripId:                _activeTripId,
       myId:                  _userId,
       existingSettlements:   _persistedSettlements,
       onSettled:             () => _loadAll(silent: true),
@@ -922,7 +938,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
           receipt:   receipt,
           myId:      _userId,
           members:   _members,
-          tripId:    _activeTripId!,
+          tripId:    _activeTripId,
           onDelete:  () => _deleteReceipt(receipt.id),
           onUpdated: (r) => setState(() {
             final idx = _receipts.indexWhere((x) => x.id == r.id);
@@ -948,7 +964,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
         withdrawal: withdrawal,
         myId:       _userId,
         members:    _members,
-        tripId:     _activeTripId ?? '',
+        tripId:     _activeTripId,
         onDelete:   () => _deleteWithdrawal(withdrawal.id),
       ),
     );
@@ -1182,7 +1198,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
                                             receipt:   r,
                                             myId:      _userId,
                                             members:   _members,
-                                            tripId:    _activeTripId!,
+                                            tripId:    _activeTripId,
                                             onDelete:  () => _deleteReceipt(r.id),
                                             onUpdated: (updated) {
                                               if (mounted) {
@@ -1251,7 +1267,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
                                       withdrawal: w,
                                       myId:       _userId,
                                       members:    _members,
-                                      tripId:     _activeTripId ?? '',
+                                      tripId:     _activeTripId,
                                       onDelete:   () => _deleteWithdrawal(w.id),
                                     ),
                                   ),
@@ -1269,7 +1285,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
               balancesByCurrency:    _balancesByCurrency,
               suggestionsByCurrency: _suggestionsByCurrency,
               members:               _members,
-              tripId:                _activeTripId ?? '',
+              tripId:                _activeTripId,
               myId:                  _userId,
               existingSettlements:   _persistedSettlements,
               onSettled:             () => _loadAll(silent: true),

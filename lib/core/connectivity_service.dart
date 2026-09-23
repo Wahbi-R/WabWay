@@ -10,11 +10,15 @@ class ConnectivityNotifier extends StateNotifier<bool> {
   StreamSubscription<List<ConnectivityResult>>? _sub;
 
   Future<void> _init() async {
-    final result = await Connectivity().checkConnectivity();
-    state = _online(result);
-    _sub = Connectivity().onConnectivityChanged.listen((results) {
-      state = _online(results);
-    });
+    try {
+      final result = await Connectivity().checkConnectivity();
+      if (mounted) state = _online(result);
+      _sub = Connectivity().onConnectivityChanged.listen((results) {
+        if (mounted) state = _online(results);
+      });
+    } catch (_) {
+      if (mounted) state = false;
+    }
   }
 
   static bool _online(List<ConnectivityResult> results) =>

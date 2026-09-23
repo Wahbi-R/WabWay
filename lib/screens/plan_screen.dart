@@ -9,11 +9,14 @@ import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/providers/trip_provider.dart';
+import '../core/trip/trip_state.dart';
 import '../core/supabase/client.dart';
+import '../core/supabase/accommodation_service.dart';
 import '../core/supabase/connection_service.dart';
 import '../core/supabase/plan_service.dart';
 import '../core/supabase/spot_service.dart';
 import '../core/supabase/doc_service.dart';
+import '../data/accommodation_data.dart';
 import '../data/connection_data.dart';
 import '../data/money_data.dart' show fmtAmount;
 import '../data/plan_data.dart';
@@ -22,6 +25,7 @@ import '../data/docs_data.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
+import '../core/async_screen_mixin.dart';
 import '../widgets/widgets.dart';
 import 'plan/day_card.dart';
 import 'plan/item_detail.dart';
@@ -35,14 +39,12 @@ class PlanScreen extends ConsumerStatefulWidget {
   ConsumerState<PlanScreen> createState() => _PlanScreenState();
 }
 
-class _PlanScreenState extends ConsumerState<PlanScreen> {
+class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
   final List<TripDay> _days = [];
   final List<Spot> _spots = [];
   final List<TripDocument> _docs = [];
+  final List<Accommodation> _stayItems = [];
 
-  bool _loading = false;
-  bool _offline = false;
-  String? _error;
   String _activeTripId = '';
   String _userId = '';
 
@@ -155,7 +157,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
       _userId = supabase.auth.currentUser?.id ?? '';
       _activeTripId = ref.read(activeTripIdProvider);
       _loadAll();
-      _subscribeRealtime(_activeTripId);
+      if (_activeTripId.isNotEmpty) _subscribeRealtime(_activeTripId);
     });
   }
 
@@ -193,32 +195,65 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
   // real-time CDC events — the loading spinner stays hidden to avoid a flash.
   Future<void> _loadAll({bool silent = false}) async {
     if (_activeTripId.isEmpty) return;
-    if (!silent) setState(() { _loading = true; _error = null; });
+    final gen = beginLoad(silent: silent);
+    if (!silent) setState(() { _days.clear(); _spots.clear(); _docs.clear(); _stayItems.clear(); });
+
+    if (!silent) {
+      final cached = await Future.wait([
+        PlanService.loadFromCache(_activeTripId),
+        SpotService.loadSpotsFromCache(_activeTripId),
+        DocService.loadDocumentsFromCache(_activeTripId),
+        AccommodationService.loadFromCache(_activeTripId),
+      ]);
+      final cachedDays  = cached[0] as List<TripDay>?;
+      final cachedSpots = cached[1] as List<Spot>?;
+      final cachedDocs  = cached[2] as List<TripDocument>?;
+      final cachedStays = cached[3] as List<Accommodation>?;
+      if (isStale(gen)) return;
+      if (cachedDays != null) {
+        commitLoad(gen, () {
+          _days..clear()..addAll(cachedDays)..sort((a, b) {
+            final cmp = a.date.compareTo(b.date);
+            return cmp != 0 ? cmp : a.dayNumber.compareTo(b.dayNumber);
+          });
+          _spots..clear()..addAll(cachedSpots ?? []);
+          _docs..clear()..addAll(cachedDocs ?? []);
+          _stayItems..clear()..addAll(cachedStays ?? []);
+        });
+        unawaited(_loadAll(silent: true));
+        return;
+      }
+    }
+
     try {
-      final daysFuture  = PlanService.loadAll(_activeTripId);
-      final spotsFuture = SpotService.loadSpots(_activeTripId);
-      final docsFuture  = DocService.loadDocuments(_activeTripId);
-      final days  = await daysFuture;
-      final spots = await spotsFuture;
-      final docs  = await docsFuture;
-      if (!mounted) return;
-      setState(() {
-        _days
-          ..clear()
-          ..addAll(days);
-        _spots
-          ..clear()
-          ..addAll(spots);
-        _docs
-          ..clear()
-          ..addAll(docs);
-        if (!silent) _loading = false;
-        _offline = false;
+      final results = await Future.wait([
+        PlanService.loadAll(_activeTripId),
+        SpotService.loadSpots(_activeTripId),
+        DocService.loadDocuments(_activeTripId),
+        // Silenced: accommodation failure should not fail the whole plan load,
+        // and null preserves cached stays from the cache-first phase.
+        AccommodationService.loadAll(_activeTripId)
+            .then<List<Accommodation>?>((v) => v, onError: (_) => null),
+      ]);
+      final days  = results[0] as List<TripDay>;
+      final spots = results[1] as List<Spot>;
+      final docs  = results[2] as List<TripDocument>;
+      final stays = results[3] as List<Accommodation>?;
+      commitLoad(gen, () {
+        _days..clear()..addAll(days)..sort((a, b) {
+          final cmp = a.date.compareTo(b.date);
+          return cmp != 0 ? cmp : a.dayNumber.compareTo(b.dayNumber);
+        });
+        _spots..clear()..addAll(spots);
+        _docs..clear()..addAll(docs);
+        if (stays != null) { _stayItems..clear()..addAll(stays); }
       });
     } catch (e) {
-      if (!mounted) return;
-      if (!silent) { setState(() { _loading = false; _error = e.toString(); }); }
-      else { setState(() => _offline = true); }
+      if (silent || _days.isNotEmpty) {
+        failLoad(gen, silent: true);
+      } else {
+        failLoad(gen, message: e.toString());
+      }
     }
   }
 
@@ -277,11 +312,12 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
   }
 
   void _updateItem(ItineraryItem updated) {
-    // Detect spot connection changes before updating local state.
+    // Detect spot/stay connection changes before updating local state.
     String? oldSpotId;
+    String? oldStayId;
     for (final day in _days) {
       final old = day.items.where((i) => i.id == updated.id).firstOrNull;
-      if (old != null) { oldSpotId = old.linkedSpotId; break; }
+      if (old != null) { oldSpotId = old.linkedSpotId; oldStayId = old.linkedStayId; break; }
     }
 
     setState(() {
@@ -296,22 +332,31 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
     });
     PlanService.updateItem(updated).catchError((_) => _loadAll(silent: true));
 
-    // Sync spot connection in trip_connections.
-    final newSpotId = updated.linkedSpotId;
-    if (oldSpotId != newSpotId) {
-      if (oldSpotId != null) {
-        ConnectionService.removeForEntityPair(updated.id, oldSpotId);
-      }
-      if (newSpotId != null) {
-        ConnectionService.add(
-          tripId: _activeTripId,
-          userId: _userId,
-          typeA:  EntityType.planItem,
-          idA:    updated.id,
-          typeB:  EntityType.spot,
-          idB:    newSpotId,
-        );
-      }
+    _syncItemConnection(updated.id, oldSpotId, updated.linkedSpotId, EntityType.spot);
+    _syncItemConnection(updated.id, oldStayId, updated.linkedStayId, EntityType.stay);
+  }
+
+  void _syncItemConnection(
+      String itemId, String? oldId, String? newId, EntityType linkedType) {
+    if (oldId == newId) return;
+    void addNew() {
+      if (newId == null) return;
+      ConnectionService.add(
+        tripId: _activeTripId,
+        userId: _userId,
+        typeA:  EntityType.planItem,
+        idA:    itemId,
+        typeB:  linkedType,
+        idB:    newId,
+      ).then<void>((_) {}, onError: (_) { if (mounted) _loadAll(silent: true); });
+    }
+    if (oldId != null) {
+      ConnectionService.removeForEntityPair(itemId, oldId).then<void>(
+        (_) { addNew(); },
+        onError: (_) { if (mounted) _loadAll(silent: true); },
+      );
+    } else {
+      addNew();
     }
   }
 
@@ -337,19 +382,14 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
       defaultCurrency: ref.read(activeTripProvider)?.homeCurrency ?? '',
       spots: _spots,
       docs: _docs,
+      stays: _stayItems,
     );
     if (draft == null || !mounted) return;
 
     final day = _days.where((d) => d.id == dayId).firstOrNull;
     if (day == null) return;
 
-    if (_activeTripId.isEmpty || _userId.isEmpty) {
-      setState(() {
-        day.items.add(draft);
-        _selectedItemId = draft.id;
-      });
-      return;
-    }
+    if (_activeTripId.isEmpty || _userId.isEmpty) return;
 
     try {
       final item = await PlanService.createItem(
@@ -365,26 +405,18 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
         mapsUrl:         draft.mapsUrl,
         confirmationUrl: draft.confirmationUrl,
         notes:           draft.notes,
+        linkedSpotId:    draft.linkedSpotId,
+        linkedStayId:    draft.linkedStayId,
         linkedDocIds:    draft.linkedDocIds,
         sortOrder:       day.items.length,
       );
       if (!mounted) return;
-      // Write spot connection to trip_connections if one was picked.
-      if (draft.linkedSpotId != null) {
-        await ConnectionService.add(
-          tripId: _activeTripId,
-          userId: _userId,
-          typeA:  EntityType.planItem,
-          idA:    item.id,
-          typeB:  EntityType.spot,
-          idB:    draft.linkedSpotId!,
-        );
-      }
-      if (!mounted) return;
       setState(() {
-        day.items.add(item.copyWith(linkedSpotId: draft.linkedSpotId));
+        day.items.add(item);
         _selectedItemId = item.id;
       });
+      _syncItemConnection(item.id, null, draft.linkedSpotId, EntityType.spot);
+      _syncItemConnection(item.id, null, draft.linkedStayId, EntityType.stay);
     } catch (e) {
       if (!mounted) return;
       messenger.showSnackBar(SnackBar(
@@ -426,25 +458,18 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
         city:         spot.city.isNotEmpty ? spot.city : spot.area,
         location:     (spot.address?.isNotEmpty == true) ? spot.address : spot.name,
         mapsUrl:      spot.mapsUrl,
+        linkedSpotId: spot.id,
         sortOrder:    day.items.length,
       );
       if (!mounted) return;
-      await ConnectionService.add(
-        tripId: _activeTripId,
-        userId: _userId,
-        typeA:  EntityType.planItem,
-        idA:    item.id,
-        typeB:  EntityType.spot,
-        idB:    spot.id,
-      );
-      if (!mounted) return;
       setState(() {
-        day.items.add(item.copyWith(linkedSpotId: spot.id));
+        day.items.add(item);
         _selectedItemId = item.id;
       });
+      _syncItemConnection(item.id, null, spot.id, EntityType.spot);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(
         content: Text('Failed to add item: $e', style: kStyleBody.copyWith(color: Colors.white)),
         backgroundColor: kColorDanger,
         behavior: SnackBarBehavior.floating,
@@ -458,8 +483,13 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
     _                      => ItineraryItemType.spot,
   };
 
+  int _dayDisplayNumber(TripDay day) {
+    final idx = _days.indexWhere((d) => d.id == day.id);
+    return idx >= 0 ? idx + 1 : day.dayNumber;
+  }
+
   void _onEditDay(TripDay day) {
-    _showEditDaySheet(context, day: day, onSaved: (city, date, notes, clearNotes) {
+    _showEditDaySheet(context, day: day, displayNumber: _dayDisplayNumber(day), onSaved: (city, date, notes, clearNotes) {
       setState(() {
         final idx = _days.indexWhere((d) => d.id == day.id);
         if (idx != -1) {
@@ -480,8 +510,9 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
   }
 
   Future<void> _copyDay(TripDay day) async {
+    final n = _dayDisplayNumber(day);
     final buf = StringBuffer();
-    buf.writeln('Day ${day.dayNumber} – ${day.city}');
+    buf.writeln('Day $n – ${day.city}');
     final sorted = day.sortedItems;
     for (final item in sorted) {
       final prefix = item.hasTime ? '${item.time} ' : '';
@@ -491,7 +522,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Day ${day.dayNumber} copied to clipboard'),
+          content: Text('Day $n copied to clipboard'),
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 2),
         ),
@@ -505,7 +536,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Delete day?'),
         content: Text(
-          'Day ${day.dayNumber} (${day.city}) and all its itinerary items will be permanently deleted.',
+          'Day ${_dayDisplayNumber(day)} (${day.city}) and all its itinerary items will be permanently deleted.',
         ),
         actions: [
           TextButton(
@@ -522,6 +553,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
     );
     if (confirmed != true || !mounted) return;
     setState(() => _days.removeWhere((d) => d.id == day.id));
+    PlanService.writeDaysToCache(_activeTripId, _days);
     PlanService.deleteDay(day.id).catchError((_) => _loadAll(silent: true));
   }
 
@@ -531,10 +563,13 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
     if (fromDay == null || toDay == null) return;
     final moved = ItineraryItem(
       id: item.id, dayId: newDayId, title: item.title, type: item.type,
-      time: item.time, city: item.city, location: item.location,
-      mapsUrl: item.mapsUrl, confirmationUrl: item.confirmationUrl,
-      notes: item.notes, linkedSpotId: item.linkedSpotId,
-      linkedDocIds: item.linkedDocIds,
+      time: item.time, city: item.city, country: item.country,
+      location: item.location, mapsUrl: item.mapsUrl,
+      confirmationUrl: item.confirmationUrl, notes: item.notes,
+      linkedSpotId: item.linkedSpotId, linkedStayId: item.linkedStayId,
+      linkedDocIds: item.linkedDocIds, sortOrder: item.sortOrder,
+      isDone: item.isDone, plannedCost: item.plannedCost,
+      currency: item.currency,
     );
     setState(() {
       fromDay.items.removeWhere((i) => i.id == item.id);
@@ -558,31 +593,53 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
   Future<void> _onDuplicateItem(ItineraryItem item) async {
     if (_userId.isEmpty) return;
     try {
-      final copy = await PlanService.duplicateItem(item, createdBy: _userId);
+      final copy = await PlanService.duplicateItem(item, tripId: _activeTripId, createdBy: _userId);
       if (!mounted) return;
       final day = _days.where((d) => d.id == copy.dayId).firstOrNull;
       if (day == null) return;
       setState(() => day.items.add(copy));
-    } catch (_) {}
+      _syncItemConnection(copy.id, null, copy.linkedSpotId, EntityType.spot);
+      _syncItemConnection(copy.id, null, copy.linkedStayId, EntityType.stay);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to duplicate item — please try again')),
+        );
+      }
+    }
   }
 
   Future<void> _addDay(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
-    final draft = await _showAddDayDialog(context);
+    // Default to day after the latest existing day, or the trip start date, or today.
+    DateTime defaultDate;
+    if (_days.isNotEmpty) {
+      final latest = _days.map((d) => d.date).reduce((a, b) => a.isAfter(b) ? a : b);
+      defaultDate = latest.add(const Duration(days: 1));
+    } else {
+      defaultDate = TripState.maybeOf(context)?.trip.startDate ?? DateTime.now();
+    }
+    final draft = await _showAddDayDialog(context, defaultDate: defaultDate);
     if (draft == null || !mounted) return;
     if (_activeTripId.isEmpty || _userId.isEmpty) return;
 
     try {
       final day = await PlanService.createDay(
         tripId:    _activeTripId,
-        dayNumber: _days.length + 1,
+        dayNumber: _days.isEmpty ? 1 : _days.map((d) => d.dayNumber).reduce((a, b) => a > b ? a : b) + 1,
         date:      draft.date,
         city:      draft.city,
         createdBy: _userId,
         notes:     draft.notes,
       );
       if (!mounted) return;
-      setState(() => _days.add(day));
+      setState(() {
+        _days.add(day);
+        _days.sort((a, b) {
+          final cmp = a.date.compareTo(b.date);
+          return cmp != 0 ? cmp : a.dayNumber.compareTo(b.dayNumber);
+        });
+      });
     } catch (e) {
       if (!mounted) return;
       messenger.showSnackBar(SnackBar(
@@ -596,14 +653,84 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
     }
   }
 
+  Future<void> _addAllTripDays(BuildContext context) async {
+    if (loading) return; // plan not yet loaded; days would be invisible (gen pre-empted)
+    final trip = TripState.maybeOf(context)?.trip;
+    if (trip == null || trip.startDate == null || trip.endDate == null) return;
+    final messenger = ScaffoldMessenger.of(context);
+
+    // Collect dates already covered by existing days (date-only comparison).
+    final existingDates = _days
+        .map((d) => DateTime(d.date.year, d.date.month, d.date.day))
+        .toSet();
+
+    // Enumerate every date in the trip range that is not yet covered.
+    final missingDates = <DateTime>[];
+    var current = DateTime(trip.startDate!.year, trip.startDate!.month, trip.startDate!.day);
+    final tripEnd  = DateTime(trip.endDate!.year,  trip.endDate!.month,  trip.endDate!.day);
+    while (!current.isAfter(tripEnd)) {
+      if (!existingDates.contains(current)) missingDates.add(current);
+      current = current.add(const Duration(days: 1));
+    }
+
+    if (missingDates.isEmpty) {
+      messenger.showSnackBar(const SnackBar(content: Text('All trip days are already added.')));
+      return;
+    }
+    final tripId = _activeTripId;
+    final userId = _userId;
+    if (tripId.isEmpty || userId.isEmpty) return;
+
+    // Use a silent load so the existing plan stays visible while days are created.
+    final gen = beginLoad(silent: true);
+    final baseNumber = _days.isEmpty ? 0 : _days.map((d) => d.dayNumber).reduce((a, b) => a > b ? a : b);
+    final List<TripDay> newDays;
+    try {
+      // Pre-assign day numbers and create all missing days in parallel.
+      newDays = await Future.wait(
+        List.generate(missingDates.length, (i) => PlanService.createDay(
+          tripId:    tripId,
+          dayNumber: baseNumber + i + 1,
+          date:      missingDates[i],
+          city:      '',
+          createdBy: userId,
+          notes:     null,
+        )),
+      );
+      commitLoad(gen, () {
+        _days.addAll(newDays);
+        _days.sort((a, b) {
+          final cmp = a.date.compareTo(b.date);
+          return cmp != 0 ? cmp : a.dayNumber.compareTo(b.dayNumber);
+        });
+      });
+      if (!isStale(gen)) unawaited(PlanService.writeDaysToCache(tripId, _days));
+      // If gen was pre-empted (e.g. a non-silent load was in progress when we
+      // called beginLoad), commitLoad was a no-op and the new days are in the DB
+      // but not in _days. Reload silently so they become visible.
+      else if (_activeTripId == tripId) unawaited(_loadAll(silent: true));
+    } catch (e) {
+      failLoad(gen, silent: true);
+      // Only reload for the trip the days were being created for — if the user
+      // switched trips mid-loop, don't overwrite the new trip's plan data.
+      if (_activeTripId == tripId) unawaited(_loadAll(silent: true));
+      messenger.showSnackBar(SnackBar(
+        content: Text('Failed to add days: $e', style: kStyleBody.copyWith(color: Colors.white)),
+        backgroundColor: kColorDanger,
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
+  }
+
   void _exportPlan() {
     if (_days.isEmpty) return;
     final buf = StringBuffer();
     final tripName = ref.read(activeTripProvider)?.name ?? 'Trip';
     buf.writeln('$tripName — Itinerary');
     buf.writeln('=' * 40);
-    for (final day in _days) {
-      buf.writeln('\nDay ${day.dayNumber} · ${day.city} · ${fmtDate(day.date)}');
+    for (var di = 0; di < _days.length; di++) {
+      final day = _days[di];
+      buf.writeln('\nDay ${di + 1} · ${day.city} · ${fmtDate(day.date)}');
       if (day.notes != null && day.notes!.isNotEmpty) {
         buf.writeln('  Note: ${day.notes}');
       }
@@ -658,6 +785,9 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
     String icsDate(DateTime d) =>
         '${d.year.toString().padLeft(4, '0')}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}';
 
+    String icsEscape(String s) =>
+        s.replaceAll(r'\', r'\\').replaceAll(';', r'\;').replaceAll(',', r'\,');
+
     String icsDateTime(DateTime d, String? timeStr) {
       if (timeStr == null) return icsDate(d);
       final parts = timeStr.split(':');
@@ -669,7 +799,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
       for (final item in day.sortedItems) {
         buf.writeln('BEGIN:VEVENT');
         buf.writeln('UID:wabway-${item.id}@wabway.app');
-        buf.writeln('SUMMARY:${item.title.replaceAll(',', '\\,')}');
+        buf.writeln('SUMMARY:${icsEscape(item.title)}');
         if (item.time != null) {
           buf.writeln('DTSTART:${icsDateTime(day.date, item.time)}');
           buf.writeln('DTEND:${icsDateTime(day.date, item.time)}');
@@ -678,10 +808,10 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
           buf.writeln('DTEND;VALUE=DATE:${icsDate(day.date)}');
         }
         if (item.location != null && item.location!.isNotEmpty) {
-          buf.writeln('LOCATION:${item.location!.replaceAll(',', '\\,')}');
+          buf.writeln('LOCATION:${icsEscape(item.location!)}');
         }
         if (item.notes != null && item.notes!.isNotEmpty) {
-          buf.writeln('DESCRIPTION:${item.notes!.replaceAll('\n', '\\n').replaceAll(',', '\\,')}');
+          buf.writeln('DESCRIPTION:${icsEscape(item.notes!).replaceAll('\n', '\\n')}');
         }
         buf.writeln('END:VEVENT');
       }
@@ -716,12 +846,12 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
       if (next != _activeTripId) {
         _activeTripId = next;
         _loadAll();
-        _subscribeRealtime(next);
+        if (next.isNotEmpty) _subscribeRealtime(next);
       }
     });
     final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
     final base = isDesktop ? _buildDesktop(context) : _buildMobile(context);
-    if (!_offline) return base;
+    if (!offline) return base;
     return Stack(
       children: [
         base,
@@ -743,6 +873,8 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
           _DesktopPlanBar(
             dayCount: _days.length,
             onAddDay: () => _addDay(context),
+            onAddAllDays: () => _addAllTripDays(context),
+            showAddAllDays: () { final t = TripState.maybeOf(context)?.trip; return t?.startDate != null && t?.endDate != null; }(),
             onExport: _days.isNotEmpty ? _exportPlan : null,
             onExportCalendar: (_days.isNotEmpty && !kIsWeb) ? _exportToCalendar : null,
             hideCompleted: _hideCompleted,
@@ -751,14 +883,14 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
                 : null,
           ),
           Expanded(
-            child: _loading
+            child: loading
                 ? const Center(child: CircularProgressIndicator())
-                : _error != null
+                : error
                     ? Center(
                         child: WabwayEmptyState(
                           icon: Icons.error_outline_rounded,
                           title: 'Could not load plan',
-                          description: _error!,
+                          description: errorMessage,
                         ),
                       )
                     : Row(
@@ -809,6 +941,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
                                                         bottom: di < _days.length - 1 ? kSpace3 : 0),
                                                     child: TripDayCard(
                                                       day: _days[di],
+                                                      displayNumber: di + 1,
                                                       selectedItemId: _selectedItemId,
                                                       onItemTap: _selectItem,
                                                       onAddItem: () =>
@@ -854,6 +987,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
           day: day,
           spots: _spots,
           docs: _docs,
+          stays: _stayItems,
           days: _days,
           onDelete: () => _deleteItem(item.id),
           onUpdated: _updateItem,
@@ -871,6 +1005,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
           child: _DayDetailPanel(
             key: ValueKey(selectedDay.id),
             day: selectedDay,
+            displayNumber: _dayDisplayNumber(selectedDay),
             onAddItem: () => _addItem(context, selectedDay.id),
           ),
         );
@@ -974,6 +1109,13 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
                 ),
             ],
           ],
+          if (() { final t = TripState.maybeOf(context)?.trip; return t?.startDate != null && t?.endDate != null; }())
+            IconButton(
+              icon: const Icon(Icons.date_range_rounded, size: 20),
+              tooltip: 'Add all trip days',
+              color: kColorInkSoft,
+              onPressed: () => _addAllTripDays(context),
+            ),
           TextButton.icon(
             onPressed: () => _addDay(context),
             icon: const Icon(Icons.add_rounded, size: 18),
@@ -983,14 +1125,14 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
           const SizedBox(width: kSpace2),
         ],
       ),
-      body: _loading
+      body: loading
           ? const WabwayLoadingIndicator()
-          : _error != null
+          : error
               ? Center(
                   child: WabwayEmptyState(
                     icon: Icons.error_outline_rounded,
                     title: 'Could not load plan',
-                    description: _error!,
+                    description: errorMessage,
                   ),
                 )
               : _showCalendar
@@ -1057,6 +1199,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
                                           bottom: di < _days.length - 1 ? kSpace3 : 0),
                                       child: TripDayCard(
                                         day: _days[di],
+                                        displayNumber: di + 1,
                                         onItemTap: (id) {
                                           final item = itemById(_days, id);
                                           final day  = dayForItem(_days, id);
@@ -1072,6 +1215,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
                                                   day: day,
                                                   spots: spots,
                                                   docs: docs,
+                                                  stays: List.from(_stayItems),
                                                   days: days,
                                                   onDelete: () => _deleteItem(id),
                                                   onUpdated: _updateItem,
@@ -1110,7 +1254,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
             final result = await showDayPickerSheet(context, days: _days);
             if (result == null || !mounted) return;
             final (dayId, _) = result;
-            _addItem(context, dayId);
+            _addItem(this.context, dayId);
           }
         },
         icon: const Icon(Icons.event_note_rounded),
@@ -1235,7 +1379,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
           Row(
             children: [
               Text(
-                'Day ${day.dayNumber} · ${day.city}',
+                'Day ${_dayDisplayNumber(day)} · ${day.city}',
                 style: kStyleBodyBold,
               ),
               const SizedBox(width: kSpace2),
@@ -1294,6 +1438,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
                           day: day,
                           spots: spots,
                           docs: docs,
+                          stays: _stayItems,
                           days: days,
                           onDelete: () => _deleteItem(item.id),
                           onUpdated: _updateItem,
@@ -1352,6 +1497,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
         return _PlanSearchResultTile(
           item: r.item,
           day:  r.day,
+          displayNumber: _dayDisplayNumber(r.day),
           onTap: () => _selectItem(r.item.id),
         );
       },
@@ -1381,6 +1527,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
         return _PlanSearchResultTile(
           item: r.item,
           day:  r.day,
+          displayNumber: _dayDisplayNumber(r.day),
           onTap: () => Navigator.push(
             ctx,
             MaterialPageRoute(
@@ -1389,6 +1536,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
                 day:       r.day,
                 spots:     spots,
                 docs:      docs,
+                stays:     _stayItems,
                 days:      days,
                 onDelete:  () => _deleteItem(r.item.id),
                 onUpdated: _updateItem,
@@ -1494,10 +1642,12 @@ class _PlanSearchResultTile extends StatelessWidget {
   const _PlanSearchResultTile({
     required this.item,
     required this.day,
+    required this.displayNumber,
     required this.onTap,
   });
   final ItineraryItem item;
   final TripDay day;
+  final int displayNumber;
   final VoidCallback onTap;
 
   @override
@@ -1525,7 +1675,7 @@ class _PlanSearchResultTile extends StatelessWidget {
                 Text(item.title, style: kStyleBodyMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 2),
                 Text(
-                  'Day ${day.dayNumber} · ${day.city}',
+                  'Day $displayNumber · ${day.city}',
                   style: kStyleCaption.copyWith(color: kColorInkSoft),
                 ),
               ],
@@ -1544,10 +1694,12 @@ class _DayDetailPanel extends StatelessWidget {
   const _DayDetailPanel({
     super.key,
     required this.day,
+    this.displayNumber,
     required this.onAddItem,
   });
 
   final TripDay day;
+  final int? displayNumber;
   final VoidCallback onAddItem;
 
   @override
@@ -1578,7 +1730,7 @@ class _DayDetailPanel extends StatelessWidget {
                     ),
                     child: Center(
                       child: Text(
-                        '${day.dayNumber}',
+                        '${displayNumber ?? day.dayNumber}',
                         style: kStyleBodySemibold.copyWith(
                           color: kColorTextOnPrimary,
                           fontSize: 18,
@@ -1590,7 +1742,7 @@ class _DayDetailPanel extends StatelessWidget {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Day ${day.dayNumber}',
+                      Text('Day ${displayNumber ?? day.dayNumber}',
                           style: kStyleTitle.copyWith(fontSize: 20)),
                       Text(
                         fmtDate(day.date),
@@ -1704,19 +1856,21 @@ typedef _EditDaySaved = void Function(
 void _showEditDaySheet(
   BuildContext context, {
   required TripDay day,
+  int? displayNumber,
   required _EditDaySaved onSaved,
 }) {
   showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => _EditDaySheet(day: day, onSaved: onSaved),
+    builder: (_) => _EditDaySheet(day: day, displayNumber: displayNumber, onSaved: onSaved),
   );
 }
 
 class _EditDaySheet extends StatefulWidget {
-  const _EditDaySheet({required this.day, required this.onSaved});
+  const _EditDaySheet({required this.day, this.displayNumber, required this.onSaved});
   final TripDay day;
+  final int? displayNumber;
   final _EditDaySaved onSaved;
 
   @override
@@ -1787,7 +1941,7 @@ class _EditDaySheetState extends State<_EditDaySheet> {
           children: [
             const WabwayDragHandle(),
             const SizedBox(height: kSpace3),
-            Text('Edit Day ${widget.day.dayNumber}', style: kStyleTitle),
+            Text('Edit Day ${widget.displayNumber ?? widget.day.dayNumber}', style: kStyleTitle),
             const SizedBox(height: kSpace5),
 
             Text('Date', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
@@ -1849,6 +2003,8 @@ class _DesktopPlanBar extends StatelessWidget {
   const _DesktopPlanBar({
     required this.dayCount,
     required this.onAddDay,
+    required this.onAddAllDays,
+    this.showAddAllDays = false,
     this.onExport,
     this.onExportCalendar,
     this.hideCompleted = false,
@@ -1857,6 +2013,8 @@ class _DesktopPlanBar extends StatelessWidget {
 
   final int dayCount;
   final VoidCallback onAddDay;
+  final VoidCallback onAddAllDays;
+  final bool showAddAllDays;
   final VoidCallback? onExport;
   final VoidCallback? onExportCalendar;
   final bool hideCompleted;
@@ -1924,6 +2082,16 @@ class _DesktopPlanBar extends StatelessWidget {
                   ? WabwayButtonVariant.primary
                   : WabwayButtonVariant.ghost,
               onPressed: onToggleHideCompleted,
+            ),
+            const SizedBox(width: kSpace2),
+          ],
+          if (showAddAllDays) ...[
+            WabwayButton(
+              label: 'Add all days',
+              icon: Icons.date_range_rounded,
+              size: WabwayButtonSize.sm,
+              variant: WabwayButtonVariant.ghost,
+              onPressed: onAddAllDays,
             ),
             const SizedBox(width: kSpace2),
           ],
@@ -2310,15 +2478,17 @@ class _CalendarItemTile extends StatelessWidget {
 
 // ─── Add day dialog ───────────────────────────────────────────────────────────
 
-Future<TripDay?> _showAddDayDialog(BuildContext context) {
+Future<TripDay?> _showAddDayDialog(BuildContext context, {required DateTime defaultDate}) {
   return showDialog<TripDay>(
     context: context,
-    builder: (ctx) => const _AddDayDialog(),
+    builder: (ctx) => _AddDayDialog(defaultDate: defaultDate),
   );
 }
 
 class _AddDayDialog extends StatefulWidget {
-  const _AddDayDialog();
+  const _AddDayDialog({required this.defaultDate});
+
+  final DateTime defaultDate;
 
   @override
   State<_AddDayDialog> createState() => _AddDayDialogState();
@@ -2328,7 +2498,13 @@ class _AddDayDialogState extends State<_AddDayDialog> {
   final _formKey = GlobalKey<FormState>();
   final _cityCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
-  DateTime _date = DateTime.now();
+  late DateTime _date;
+
+  @override
+  void initState() {
+    super.initState();
+    _date = widget.defaultDate;
+  }
 
   @override
   void dispose() {

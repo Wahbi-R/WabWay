@@ -38,7 +38,7 @@ abstract final class PhotoAlbumService {
       'service':  service.dbValue,
       if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
     }).select().single();
-    return _fromRow(row as Map<String, dynamic>);
+    return _fromRow(row);
   }
 
   static Future<void> deleteAlbum(String albumId) async {

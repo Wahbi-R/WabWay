@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../core/image_cache_manager.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/async_screen_mixin.dart';
 import '../../core/providers/trip_provider.dart';
 import '../../core/supabase/client.dart';
 import '../../core/supabase/shopping_service.dart';
@@ -47,11 +49,11 @@ class ShoppingScreen extends ConsumerStatefulWidget {
   ConsumerState<ShoppingScreen> createState() => _ShoppingScreenState();
 }
 
-class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
+class _ShoppingScreenState extends ConsumerState<ShoppingScreen> with AsyncScreenMixin {
   String _tripId = '';
   List<ShoppingItem> _items   = [];
-  bool               _loading = true;
   RealtimeChannel?   _channel;
+  Timer?             _debounce;
 
   String? get _userId => supabase.auth.currentUser?.id;
 
@@ -65,19 +67,30 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
       if (!mounted) return;
       _tripId = ref.read(activeTripIdProvider);
       _load();
+      if (_tripId.isNotEmpty) _subscribeRealtime();
     });
   }
 
   Future<void> _load({bool silent = false}) async {
     if (_tripId.isEmpty || !mounted) return;
-    if (!silent) setState(() => _loading = true);
+    final gen = beginLoad(silent: silent);
+    if (!silent) setState(() { _items = []; });
+
+    if (!silent) {
+      final cached = await ShoppingService.loadFromCache(_tripId);
+      if (isStale(gen)) return;
+      if (cached != null) {
+        commitLoad(gen, () => _items = cached);
+        if (!isStale(gen)) unawaited(_load(silent: true));
+        return;
+      }
+    }
+
     try {
       final items = await ShoppingService.loadAll(_tripId);
-      if (!mounted) return;
-      setState(() { _items = items; _loading = false; });
-      _subscribeRealtime();
+      commitLoad(gen, () => _items = items);
     } catch (_) {
-      if (mounted) setState(() => _loading = false);
+      failLoad(gen, silent: silent || _items.isNotEmpty);
     }
   }
 
@@ -94,13 +107,20 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
             column: 'trip_id',
             value: _tripId,
           ),
-          callback: (_) => _load(silent: true),
+          callback: (_) {
+            _debounce?.cancel();
+            _debounce = Timer(
+              const Duration(milliseconds: 400),
+              () { if (mounted) _load(silent: true); },
+            );
+          },
         )
         .subscribe();
   }
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _channel?.unsubscribe();
     super.dispose();
   }
@@ -240,8 +260,10 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
   Widget build(BuildContext context) {
     ref.listen<String>(activeTripIdProvider, (prev, next) {
       if (next != _tripId) {
+        _debounce?.cancel();
         _tripId = next;
         _load();
+        if (next.isNotEmpty) _subscribeRealtime();
       }
     });
     return Scaffold(
@@ -260,7 +282,7 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
             ),
         ],
       ),
-      body: _loading
+      body: loading
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
@@ -680,8 +702,12 @@ class _ItemSheetState extends State<_ItemSheet> {
       linkUrl:  link,
       imageUrl: _imageUrl,
     );
-    await widget.onSave(updated);
-    if (mounted) Navigator.pop(context);
+    try {
+      await widget.onSave(updated);
+      if (mounted) Navigator.pop(context);
+    } catch (_) {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   Future<void> _delete() async {

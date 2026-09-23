@@ -18,7 +18,8 @@ class MembersScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final members = ref.watch(tripMembersProvider);
-    final trip = ref.watch(activeTripProvider)!;
+    final trip = ref.watch(activeTripProvider);
+    if (trip == null) return const SizedBox.shrink();
     final currentUserId = ref.watch(profileProvider)?.id;
     final isOwner = members.any((m) => m.userId == currentUserId && m.isOwner);
 

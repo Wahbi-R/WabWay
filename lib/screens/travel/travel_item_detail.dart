@@ -137,7 +137,7 @@ class TravelItemDetailContent extends StatelessWidget {
                 builder: (context, ref, _) => ConnectionsSection(
                   entityType: EntityType.travel,
                   entityId:   item.id,
-                  tripId:     ref.read(activeTripIdProvider),
+                  tripId:     ref.watch(activeTripIdProvider),
                   days:       days,
                 ),
               ),

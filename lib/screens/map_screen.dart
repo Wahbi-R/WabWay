@@ -1,12 +1,15 @@
 import 'dart:async';
 import 'dart:math' show min, max;
 import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/async_screen_mixin.dart';
 import '../core/providers/trip_provider.dart';
 import '../core/supabase/accommodation_service.dart';
 import '../core/supabase/client.dart';
@@ -21,25 +24,26 @@ import 'spots/spot_detail.dart';
 import 'spots/add_spot_sheet.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
-  const MapScreen({super.key});
+  const MapScreen({super.key, this.initialFocus});
+
+  final LatLng? initialFocus;
 
   @override
   ConsumerState<MapScreen> createState() => _MapScreenState();
 }
 
-class _MapScreenState extends ConsumerState<MapScreen> {
+class _MapScreenState extends ConsumerState<MapScreen> with AsyncScreenMixin {
   List<Spot> _spots = [];
   List<Accommodation> _accommodations = [];
-  bool _loading = true;
-  bool _error = false;
   bool _showMap = true;
   final Set<SpotCategory> _hiddenCategories = {};
-  String? _activeTripId;
+  String _activeTripId = '';
   RealtimeChannel? _realtimeChannel;
   Timer? _debounce;
 
   final _mapController = MapController();
   bool _needsFit = true;   // fit-to-bounds on first successful load only
+  bool _locating = false;
 
   @override
   void initState() {
@@ -47,8 +51,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _activeTripId = ref.read(activeTripIdProvider);
-      _load(_activeTripId!);
-      _subscribeRealtime(_activeTripId!);
+      if (_activeTripId.isNotEmpty) {
+        _load(_activeTripId);
+        _subscribeRealtime(_activeTripId);
+      }
     });
   }
 
@@ -108,23 +114,19 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   }
 
   Future<void> _load(String tripId, {bool silent = false}) async {
-    if (!silent) setState(() { _loading = true; _error = false; });
+    final gen = beginLoad(silent: silent);
     try {
       final results = await Future.wait([
         SpotService.loadSpots(tripId),
-        AccommodationService.loadAll(tripId),
+        AccommodationService.loadAll(tripId).catchError((_) => <Accommodation>[]),
       ]);
-      if (!mounted) return;
-      setState(() {
+      commitLoad(gen, () {
         _spots = results[0] as List<Spot>;
         _accommodations = results[1] as List<Accommodation>;
-        _loading = false;
-        _error = false;
       });
-      _fitIfNeeded();
+      if (!isStale(gen)) _fitIfNeeded();
     } catch (_) {
-      if (!mounted) return;
-      if (!silent) setState(() { _loading = false; _error = true; });
+      failLoad(gen, silent: silent || _spots.isNotEmpty);
     }
   }
 
@@ -153,8 +155,17 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   void _fitIfNeeded() {
     if (!_needsFit) return;
+    final focus = widget.initialFocus;
+    if (focus != null) {
+      _needsFit = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _mapController.move(focus, 16);
+      });
+      return;
+    }
     final pts = _allMappedPoints;
-    if (pts.isEmpty) return;
+    if (pts.isEmpty) return; // leave _needsFit=true so we retry when spots load
     _needsFit = false;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -197,6 +208,72 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     return null;
   }
 
+  Future<void> _goToMyLocation() async {
+    if (_locating) return;
+    setState(() => _locating = true);
+    try {
+      if (kIsWeb) {
+        // On web the browser handles the permission prompt directly.
+        final pos = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.medium,
+            timeLimit: Duration(seconds: 15),
+          ),
+        );
+        if (mounted) _mapController.move(LatLng(pos.latitude, pos.longitude), 15);
+        return;
+      }
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location services are off — enable them in Settings')),
+          );
+          await Geolocator.openLocationSettings();
+        }
+        return;
+      }
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location access is blocked — opening Settings')),
+          );
+          await Geolocator.openAppSettings();
+        }
+        return;
+      }
+      if (permission == LocationPermission.denied) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location permission denied')),
+          );
+        }
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 15),
+        ),
+      );
+      if (mounted) {
+        _mapController.move(LatLng(pos.latitude, pos.longitude), 15);
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not get location')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
+  }
+
   Future<void> _addSpotAtLatLng(LatLng point) async {
     final tripId = ref.read(activeTripIdProvider);
     final userId = supabase.auth.currentUser?.id ?? '';
@@ -231,7 +308,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => DraggableScrollableSheet(
+      builder: (ctx) => DraggableScrollableSheet(
         initialChildSize: 0.7,
         minChildSize: 0.4,
         maxChildSize: 0.95,
@@ -242,6 +319,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           ),
           child: SingleChildScrollView(
             controller: ctrl,
+            padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(ctx).bottom),
             child: SpotDetailContent(
               spot: spot,
               myVote: _myVoteFor(spot, userId),
@@ -250,6 +328,22 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 final idx = _spots.indexWhere((s) => s.id == updated.id);
                 if (idx != -1) _spots[idx] = updated;
               }),
+              onDelete: spot.addedById == userId
+                  ? () async {
+                      final nav = Navigator.of(ctx);
+                      try {
+                        await SpotService.deleteSpot(spot.id);
+                        if (!mounted) return;
+                        setState(() => _spots.removeWhere((s) => s.id == spot.id));
+                        nav.pop();
+                      } catch (_) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Could not delete spot. Try again.')),
+                        );
+                      }
+                    }
+                  : null,
             ),
           ),
         ),
@@ -262,8 +356,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     ref.listen<String>(activeTripIdProvider, (prev, next) {
       if (next != _activeTripId) {
         _activeTripId = next;
+        _debounce?.cancel();
         _load(next);
-        _subscribeRealtime(next);
+        if (next.isNotEmpty) _subscribeRealtime(next);
       }
     });
     return Scaffold(
@@ -274,7 +369,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
             tooltip: 'Refresh',
-            onPressed: _activeTripId == null ? null : () => _load(_activeTripId!), // explicit user refresh — show spinner
+            onPressed: _activeTripId.isEmpty ? null : () => _load(_activeTripId),
           ),
           // Map / List toggle
           Padding(
@@ -302,9 +397,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           ),
         ],
       ),
-      body: _loading
+      body: loading
           ? const Center(child: CircularProgressIndicator())
-          : _error
+          : error
               ? Center(
                   child: WabwayEmptyState(
                     icon: Icons.wifi_off_rounded,
@@ -312,7 +407,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     description: 'Could not load spots.',
                     action: WabwayButton(
                       label: 'Retry',
-                      onPressed: () => _load(_activeTripId!),
+                      onPressed: () => _load(_activeTripId),
                     ),
                   ),
                 )
@@ -421,13 +516,14 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           ),
           children: [
             TileLayer(
-              // Carto Voyager — English/Latin labels worldwide
-              urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-              subdomains: const ['a', 'b', 'c', 'd'],
+              // Esri World Street Map — English labels worldwide, no API key required
+              urlTemplate: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
               userAgentPackageName: 'ca.wabble.wabway',
               maxNativeZoom: 19,
               maxZoom: 22,
-              additionalOptions: const {'lang': 'en'},
+            ),
+            const SimpleAttributionWidget(
+              source: Text('Tiles © Esri'),
             ),
             MarkerLayer(
               markers: visible.map((spot) {
@@ -459,45 +555,67 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         ),
         _categoryFilterStrip(),
 
-        // Unmapped count banner
-        if (totalUnmapped > 0)
-          Positioned(
-            bottom: MediaQuery.paddingOf(context).bottom + kSpace3,
-            left: kSpace4,
-            right: kSpace4,
-            child: DecoratedBox(
-              decoration: kCardDecoration(),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: kSpace4, vertical: kSpace3),
-                child: Row(
-                  children: [
-                    const Icon(Icons.info_outline_rounded,
-                        size: 16, color: kColorInkSoft),
-                    const SizedBox(width: kSpace2),
-                    Expanded(
-                      child: Text(
-                        '$totalUnmapped item${totalUnmapped == 1 ? '' : 's'} without coordinates — switch to List to see all.',
-                        style: kStyleCaption.copyWith(color: kColorInkSoft),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () => setState(() => _showMap = false),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: kSpace2, vertical: 0),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      child: Text('See all',
-                          style: kStyleCaptionMedium.copyWith(
-                              color: kColorPrimary)),
-                    ),
-                  ],
-                ),
+        // FAB + unmapped banner stacked in a column at the bottom
+        Positioned(
+          bottom: MediaQuery.paddingOf(context).bottom + kSpace3,
+          left: kSpace4,
+          right: kSpace4,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              FloatingActionButton.small(
+                heroTag: 'map_location',
+                backgroundColor: Colors.white,
+                foregroundColor: kColorPrimary,
+                elevation: 2,
+                tooltip: 'Go to my location',
+                onPressed: _locating ? null : _goToMyLocation,
+                child: _locating
+                    ? const SizedBox(
+                        width: 18, height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.my_location),
               ),
-            ),
+              if (totalUnmapped > 0) ...[
+                const SizedBox(height: kSpace3),
+                DecoratedBox(
+                  decoration: kCardDecoration(),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: kSpace4, vertical: kSpace3),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.info_outline_rounded,
+                            size: 16, color: kColorInkSoft),
+                        const SizedBox(width: kSpace2),
+                        Expanded(
+                          child: Text(
+                            '$totalUnmapped item${totalUnmapped == 1 ? '' : 's'} without coordinates — switch to List to see all.',
+                            style: kStyleCaption.copyWith(color: kColorInkSoft),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () => setState(() => _showMap = false),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: kSpace2, vertical: 0),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: Text('See all',
+                              style: kStyleCaptionMedium.copyWith(
+                                  color: kColorPrimary)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
+        ),
       ],
     );
   }
@@ -524,7 +642,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final unmappedStays   = _accommodations.where((a) => a.latitude == null || a.longitude == null).toList();
 
     return RefreshIndicator(
-      onRefresh: () => _load(_activeTripId!),
+      onRefresh: () => _load(_activeTripId),
       child: ListView(
         padding: EdgeInsets.fromLTRB(
             kSpace4, kSpace3, kSpace4,

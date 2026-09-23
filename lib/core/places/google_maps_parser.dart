@@ -16,6 +16,7 @@ class MapsPlace {
     this.mapsUrl,
     required this.category,
     this.city = '',
+    this.area = '',
     this.notes,
   });
 
@@ -26,6 +27,7 @@ class MapsPlace {
   final String?      mapsUrl;
   final SpotCategory category;
   final String       city;
+  final String       area;
   final String?      notes;
 
   bool get hasCoords => lat != 0 || lon != 0;
@@ -38,6 +40,7 @@ class MapsPlace {
     String? mapsUrl,
     SpotCategory? category,
     String? city,
+    String? area,
     String? notes,
   }) =>
       MapsPlace(
@@ -48,6 +51,7 @@ class MapsPlace {
         mapsUrl:  mapsUrl  ?? this.mapsUrl,
         category: category ?? this.category,
         city:     city     ?? this.city,
+        area:     area     ?? this.area,
         notes:    notes    ?? this.notes,
       );
 }
@@ -302,6 +306,7 @@ abstract final class GoogleMapsParser {
           mapsUrl:  originalUrl,
           category: p.category,
           city:     p.city,
+          area:     p.area,
         ),
       ],
       isList:   false,

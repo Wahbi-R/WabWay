@@ -96,11 +96,6 @@ class ItineraryParser {
     r'[|│]\s*([A-Z]{1,3}\d{1,4})\b',
   );
 
-  // Standalone flight number line (e.g. "JL7815" alone)
-  static final _standaloneFlightRe = RegExp(
-    r'^\s*[^|]*([A-Z]{1,3}\d{1,4})\s*$',
-  );
-
   // ── Public entry ──────────────────────────────────────────────────────────
 
   static List<ParsedFlight> parse(String text) {
@@ -165,7 +160,7 @@ class ItineraryParser {
                   .replaceAll(RegExp(r'^[^A-Za-z]+'), '')
                   .replaceAll(RegExp(r'[^A-Za-z\s]'), ' ')
                   .trim();
-              if (airline!.isEmpty) airline = null;
+              if (airline.isEmpty) airline = null;
             }
             continue;
           }
@@ -332,8 +327,8 @@ class ItineraryParser {
 
   static String _to24h(String time, String ampm) {
     final parts = time.split(':');
-    var h = int.parse(parts[0]);
-    final m = int.parse(parts[1]);
+    var h = int.tryParse(parts[0]) ?? 0;
+    final m = int.tryParse(parts[1]) ?? 0;
     final isPm = ampm.toLowerCase().replaceAll('.', '').startsWith('p');
     if (isPm && h != 12) h += 12;
     if (!isPm && h == 12) h = 0;

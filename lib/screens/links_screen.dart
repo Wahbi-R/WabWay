@@ -8,8 +8,11 @@ import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
 import '../core/providers/profile_provider.dart';
 import '../core/providers/trip_provider.dart';
+import '../core/supabase/auto_links_service.dart';
 import '../core/supabase/client.dart';
+import '../core/async_screen_mixin.dart';
 import '../core/supabase/links_service.dart';
+import '../data/auto_link_data.dart';
 import '../data/links_data.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
@@ -26,17 +29,17 @@ class LinksScreen extends ConsumerStatefulWidget {
   ConsumerState<LinksScreen> createState() => _LinksScreenState();
 }
 
-class _LinksScreenState extends ConsumerState<LinksScreen> {
+class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin {
   List<TripLink> _links = [];
-  bool _loading = true;
-  bool _error   = false;
-  bool _offline = false;
-  String? _activeTripId;
+  Map<AutoLinkSource, List<AutoLink>> _autoLinks = {};
+  String _activeTripId = '';
   RealtimeChannel? _channel;
   Timer? _debounce;
   LinkCategory? _filterCategory;
   _LinkSort _sort = _LinkSort.newest;
   String _search = '';
+
+  bool get _hasAnyContent => _links.isNotEmpty || _autoLinks.isNotEmpty;
 
   final _searchCtrl = TextEditingController();
 
@@ -63,6 +66,21 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
     return list;
   }
 
+  Map<AutoLinkSource, List<AutoLink>> get _filteredAutoLinks {
+    if (_search.isEmpty) return _autoLinks;
+    final q = _search.toLowerCase().trim();
+    final filtered = <AutoLinkSource, List<AutoLink>>{};
+    for (final entry in _autoLinks.entries) {
+      final items = entry.value
+          .where((l) =>
+              l.itemName.toLowerCase().contains(q) ||
+              l.domain.toLowerCase().contains(q))
+          .toList();
+      if (items.isNotEmpty) filtered[entry.key] = items;
+    }
+    return filtered;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -70,7 +88,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
       if (!mounted) return;
       _activeTripId = ref.read(activeTripIdProvider);
       _load();
-      _subscribe(_activeTripId!);
+      if (_activeTripId.isNotEmpty) _subscribe(_activeTripId);
     });
   }
 
@@ -104,14 +122,24 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
   }
 
   Future<void> _load({bool silent = false}) async {
-    if (!silent) setState(() { _loading = true; _error = false; });
+    final tripId = _activeTripId;
+    if (tripId.isEmpty) return;
+    final gen = beginLoad(silent: silent);
     try {
-      final links = await LinksService.loadLinks(_activeTripId!);
-      if (mounted) setState(() { _links = links; _loading = false; _error = false; _offline = false; });
+      final links = await LinksService.loadLinks(tripId);
+      // Auto-links are best-effort — a failure here doesn't block manual links.
+      Map<AutoLinkSource, List<AutoLink>> autoLinks;
+      try {
+        autoLinks = await AutoLinksService.load(tripId);
+      } catch (_) {
+        autoLinks = {};
+      }
+      commitLoad(gen, () {
+        _links     = links;
+        _autoLinks = autoLinks;
+      });
     } catch (_) {
-      if (!mounted) return;
-      if (silent) { setState(() => _offline = true); return; }
-      setState(() { _loading = false; _error = true; });
+      failLoad(gen, silent: silent || _links.isNotEmpty);
     }
   }
 
@@ -119,7 +147,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
     final userId = ref.read(profileProvider)!.id;
     final link = await showAddLinkSheet(
       context,
-      tripId: _activeTripId!,
+      tripId: _activeTripId,
       userId: userId,
     );
     if (link != null && mounted) {
@@ -131,7 +159,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
     final userId = ref.read(profileProvider)!.id;
     final updated = await showAddLinkSheet(
       context,
-      tripId: _activeTripId!,
+      tripId: _activeTripId,
       userId: userId,
       existing: link,
     );
@@ -149,8 +177,8 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
       await LinksService.deleteLink(link.id);
     } catch (_) {
       if (!mounted) return;
-      if (mounted) _load();
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      _load();
+      ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(
         content: Text('Could not delete "${link.title}". Try again.',
             style: kStyleBody.copyWith(color: Colors.white)),
         behavior: SnackBarBehavior.floating,
@@ -158,7 +186,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
       return;
     }
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+    ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(
       content: Text('"${link.title}" removed.',
           style: kStyleBody.copyWith(color: Colors.white)),
       behavior: SnackBarBehavior.floating,
@@ -189,18 +217,23 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
       ),
     );
     if (confirmed != true) return;
+    if (!mounted) return;
     setState(() => _links = _links.where((l) => l.id != link.id).toList());
     try {
       await LinksService.deleteLink(link.id);
     } catch (_) {
-      if (mounted) _load(); // revert on failure
+      if (!mounted) return;
+      _load();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not delete link. Please try again.')),
+      );
     }
   }
 
   void _shareLinks() {
     final list = _filteredLinks;
     if (list.isEmpty || kIsWeb) return;
-    final tripName = ref.read(activeTripProvider)!.name;
+    final tripName = ref.read(activeTripProvider)?.name ?? 'Trip';
     final buf = StringBuffer();
     buf.writeln('$tripName — Links');
     buf.writeln();
@@ -228,7 +261,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
       if (next != _activeTripId) {
         _activeTripId = next;
         _load();
-        _subscribe(next);
+        if (next.isNotEmpty) _subscribe(next);
       }
     });
     final scaffold = Scaffold(
@@ -267,9 +300,9 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
           const SizedBox(width: kSpace2),
         ],
       ),
-      body: _loading
+      body: loading
           ? const WabwayLoadingIndicator()
-          : _error
+          : error
               ? Center(
                   child: WabwayEmptyState(
                     icon: Icons.wifi_off_rounded,
@@ -281,7 +314,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
                     ),
                   ),
                 )
-              : _links.isEmpty
+              : !_hasAnyContent
                   ? Center(
                       child: WabwayEmptyState(
                         icon: Icons.bookmark_border_rounded,
@@ -299,7 +332,6 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
                       onRefresh: _load,
                       child: CustomScrollView(
                         slivers: [
-                          // Search bar — always visible when links are loaded
                           SliverToBoxAdapter(
                             child: WabwaySearchBar(
                               controller: _searchCtrl,
@@ -307,79 +339,117 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
                               onChanged: (v) => setState(() => _search = v),
                             ),
                           ),
-                          SliverToBoxAdapter(
-                            child: WabwayFilterStrip<LinkCategory>(
-                              selected: _filterCategory,
-                              options: LinkCategory.values
-                                  .where((c) => _links.any((l) => l.category == c))
-                                  .map((c) => (
-                                        value: c,
-                                        label: c.label,
-                                        count: _links.where((l) => l.category == c).length,
-                                      ))
-                                  .toList(),
-                              allCount: _links.length,
-                              onChanged: (cat) => setState(() => _filterCategory = cat),
+                          if (_links.isNotEmpty)
+                            SliverToBoxAdapter(
+                              child: WabwayFilterStrip<LinkCategory>(
+                                selected: _filterCategory,
+                                options: LinkCategory.values
+                                    .where((c) => _links.any((l) => l.category == c))
+                                    .map((c) => (
+                                          value: c,
+                                          label: c.label,
+                                          count: _links.where((l) => l.category == c).length,
+                                        ))
+                                    .toList(),
+                                allCount: _links.length,
+                                onChanged: (cat) => setState(() => _filterCategory = cat),
+                              ),
                             ),
-                          ),
-                          SliverPadding(
-                            padding: EdgeInsets.fromLTRB(
-                              kSpace4,
-                              kSpace3,
-                              kSpace4,
-                              kSpace8 + MediaQuery.paddingOf(context).bottom,
-                            ),
-                            sliver: _filteredLinks.isEmpty
-                                ? SliverToBoxAdapter(
-                                    child: Center(
-                                      child: WabwayEmptyState(
-                                        icon: _filterCategory != null
-                                            ? _filterCategory!.icon
-                                            : Icons.search_off_rounded,
-                                        title: _search.isNotEmpty
-                                            ? 'No links match "$_search"'
-                                            : 'No ${_filterCategory!.label} links',
-                                        description: _search.isNotEmpty
-                                            ? 'Try a different search term.'
-                                            : 'Add some to see them here.',
+                          // ── Saved (manual) links ──────────────────────────
+                          if (_links.isNotEmpty) ...[
+                            if (_autoLinks.isNotEmpty)
+                              const _SectionHeader(label: 'Saved'),
+                            SliverPadding(
+                              padding: EdgeInsets.fromLTRB(
+                                kSpace4, kSpace3, kSpace4,
+                                _autoLinks.isEmpty
+                                    ? kSpace8 + MediaQuery.paddingOf(context).bottom
+                                    : kSpace2,
+                              ),
+                              sliver: _filteredLinks.isEmpty
+                                  ? SliverToBoxAdapter(
+                                      child: Center(
+                                        child: WabwayEmptyState(
+                                          icon: _filterCategory != null
+                                              ? _filterCategory!.icon
+                                              : Icons.search_off_rounded,
+                                          title: _search.isNotEmpty
+                                              ? 'No links match "$_search"'
+                                              : 'No ${_filterCategory!.label} links',
+                                          description: _search.isNotEmpty
+                                              ? 'Try a different search term.'
+                                              : 'Add some to see them here.',
+                                        ),
                                       ),
-                                    ),
-                                  )
-                                : SliverList.separated(
-                                    itemCount: _filteredLinks.length,
-                                    separatorBuilder: (_, __) => const SizedBox(height: kSpace3),
-                                    itemBuilder: (ctx, i) {
-                                      final link = _filteredLinks[i];
-                                      return Dismissible(
-                                        key: ValueKey('link_${link.id}'),
-                                        direction: DismissDirection.endToStart,
-                                        confirmDismiss: (_) async {
-                                          await _deleteLinkDirect(ctx, link);
-                                          return false;
-                                        },
-                                        background: Container(
-                                          alignment: Alignment.centerRight,
-                                          padding: const EdgeInsets.only(right: kSpace5),
-                                          decoration: BoxDecoration(
-                                            color: Colors.red.shade50,
-                                            borderRadius: kRadiusMd,
+                                    )
+                                  : SliverList.separated(
+                                      itemCount: _filteredLinks.length,
+                                      separatorBuilder: (_, __) =>
+                                          const SizedBox(height: kSpace3),
+                                      itemBuilder: (ctx, i) {
+                                        final link = _filteredLinks[i];
+                                        return Dismissible(
+                                          key: ValueKey('link_${link.id}'),
+                                          direction: DismissDirection.endToStart,
+                                          confirmDismiss: (_) async {
+                                            await _deleteLinkDirect(ctx, link);
+                                            return false;
+                                          },
+                                          background: Container(
+                                            alignment: Alignment.centerRight,
+                                            padding: const EdgeInsets.only(right: kSpace5),
+                                            decoration: BoxDecoration(
+                                              color: Colors.red.shade50,
+                                              borderRadius: kRadiusMd,
+                                            ),
+                                            child: const Icon(Icons.delete_rounded,
+                                                color: Colors.red, size: 22),
                                           ),
-                                          child: const Icon(Icons.delete_rounded,
-                                              color: Colors.red, size: 22),
-                                        ),
-                                        child: _LinkCard(
-                                          link: link,
-                                          onEdit: () => _editLink(link),
-                                          onDelete: () => _deleteLink(link),
-                                        ),
-                                      );
-                                    },
+                                          child: _LinkCard(
+                                            link: link,
+                                            onEdit: () => _editLink(link),
+                                            onDelete: () => _deleteLink(link),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                            ),
+                          ],
+                          // ── Auto sections from other features ─────────────
+                          Builder(builder: (context) {
+                            final autoSections = _filteredAutoLinks;
+                            final lastKey = autoSections.isEmpty ? null : autoSections.keys.last;
+                            return SliverMainAxisGroup(
+                              slivers: [
+                                for (final entry in autoSections.entries) ...[
+                                  _SectionHeader(
+                                    label: entry.key.label,
+                                    icon: entry.key.icon,
+                                    color: entry.key.color,
                                   ),
-                          ),
+                                  SliverPadding(
+                                    padding: EdgeInsets.fromLTRB(
+                                      kSpace4, kSpace3, kSpace4,
+                                      entry.key == lastKey
+                                          ? kSpace8 + MediaQuery.paddingOf(context).bottom
+                                          : kSpace2,
+                                    ),
+                                    sliver: SliverList.separated(
+                                      itemCount: entry.value.length,
+                                      separatorBuilder: (_, __) =>
+                                          const SizedBox(height: kSpace3),
+                                      itemBuilder: (_, i) =>
+                                          _AutoLinkCard(link: entry.value[i]),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            );
+                          }),
                         ],
                       ),
                     ),
-      floatingActionButton: _links.isNotEmpty
+      floatingActionButton: _hasAnyContent
           ? FloatingActionButton(
               onPressed: _addLink,
               backgroundColor: kColorPrimary,
@@ -387,7 +457,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> {
             )
           : null,
     );
-    if (!_offline) return scaffold;
+    if (!offline) return scaffold;
     return Stack(
       children: [
         scaffold,
@@ -480,7 +550,7 @@ class _LinkCard extends StatelessWidget {
                 value: _LinkAction.edit,
                 child: Text('Edit'),
               ),
-              PopupMenuItem(
+              const PopupMenuItem(
                 value: _LinkAction.delete,
                 child: Text('Delete', style: TextStyle(color: kColorDanger)),
               ),
@@ -493,6 +563,95 @@ class _LinkCard extends StatelessWidget {
               }
             },
           ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Section header ───────────────────────────────────────────────────────────
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.label, this.icon, this.color});
+  final String label;
+  final IconData? icon;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(kSpace4, kSpace5, kSpace4, 0),
+        child: Row(
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 14, color: color ?? kColorInkSoft),
+              const SizedBox(width: kSpace2),
+            ],
+            Text(
+              label.toUpperCase(),
+              style: kStyleCaption.copyWith(
+                color: color ?? kColorInkSoft,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.8,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Auto link card ───────────────────────────────────────────────────────────
+
+class _AutoLinkCard extends StatelessWidget {
+  const _AutoLinkCard({required this.link});
+  final AutoLink link;
+
+  Future<void> _open(BuildContext context) async {
+    final uri = Uri.tryParse(link.url);
+    if (uri != null && await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return WabwayCard(
+      hoverable: true,
+      onTap: () => _open(context),
+      padding: const EdgeInsets.all(kSpace3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: link.source.softColor,
+              borderRadius: kRadiusMd,
+            ),
+            child: Icon(link.source.icon, size: 20, color: link.source.color),
+          ),
+          const SizedBox(width: kSpace3),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(link.itemName,
+                    style: kStyleBodyMedium,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 2),
+                Text(link.domain,
+                    style: kStyleCaption.copyWith(color: kColorInkSoft),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+              ],
+            ),
+          ),
+          const Icon(Icons.open_in_new_rounded, size: 16, color: kColorInkSoft),
         ],
       ),
     );

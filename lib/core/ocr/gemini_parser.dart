@@ -76,11 +76,11 @@ If nothing is found return an empty array [].
       throw GeminiApiException(response.statusCode, lastResponseSnippet);
     }
 
-    await ParseCounter.increment();
-
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;
     final text = decoded['candidates']?[0]?['content']?['parts']?[0]?['text'] as String? ?? '[]';
     final list = (jsonDecode(text) as List?)?.cast<Map<String, dynamic>>() ?? [];
+
+    await ParseCounter.increment();
 
     return list.map(_fromJson).whereType<ParsedBooking>().toList();
   }

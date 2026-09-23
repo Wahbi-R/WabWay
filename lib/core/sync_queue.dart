@@ -6,6 +6,7 @@ import '../data/money_data.dart';
 /// Queues failed receipt creates so they can be replayed when connectivity returns.
 abstract final class SyncQueue {
   static const _prefix = 'sync_queue_receipts_';
+  static final Set<String> _drainingTrips = {};
 
   static String _key(String tripId) => '$_prefix$tripId';
 
@@ -63,29 +64,40 @@ abstract final class SyncQueue {
 
   /// Drain queued receipts for [tripId]. Removes successfully replayed entries.
   static Future<void> drain(String tripId, String userId) async {
+    if (_drainingTrips.contains(tripId)) return;
+    _drainingTrips.add(tripId);
+    try {
     final list = await _pending(tripId);
-    if (list.isEmpty) return;
+    if (list.isEmpty) { _drainingTrips.remove(tripId); return; }
 
     final failed = <Map<String, dynamic>>[];
     for (final item in list) {
       try {
-        final rawSplits = (item['splits'] as List?)
+        final paidBy     = item['paidBy'] as String? ?? userId;
+        final homeAmount = (item['homeAmount'] as num?)?.toDouble()
+            ?? (item['amount'] as num).toDouble();
+        var rawSplits = (item['splits'] as List?)
             ?.map((s) => ReceiptSplit(
                   memberId: s['memberId'] as String,
                   amount: (s['amount'] as num).toDouble(),
                 ))
             .toList() ?? [];
+        // Guard against empty splits (older payloads or corrupted cache) by
+        // falling back to a single split covering the full amount for the payer.
+        if (rawSplits.isEmpty) {
+          rawSplits = [ReceiptSplit(memberId: paidBy, amount: (item['amount'] as num).toDouble())];
+        }
         final category = ReceiptCategory.values.firstWhere(
           (c) => c.name == item['category'],
           orElse: () => ReceiptCategory.other,
         );
         await MoneyService.createReceipt(
           tripId:            tripId,
-          paidBy:            item['paidBy'] as String? ?? userId,
+          paidBy:            paidBy,
           title:             item['title'] as String,
           amount:            (item['amount'] as num).toDouble(),
           currency:          item['currency'] as String? ?? 'USD',
-          homeAmount:        (item['homeAmount'] as num?)?.toDouble() ?? (item['amount'] as num).toDouble(),
+          homeAmount:        homeAmount,
           exchangeRate:      (item['exchangeRate'] as num?)?.toDouble() ?? 1.0,
           transactionFeePct: (item['transactionFeePct'] as num?)?.toDouble() ?? 0.0,
           category:          category,
@@ -98,6 +110,9 @@ abstract final class SyncQueue {
       }
     }
     await _save(tripId, failed);
+    } finally {
+      _drainingTrips.remove(tripId);
+    }
   }
 
   static Future<int> pendingCount() async {

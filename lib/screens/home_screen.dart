@@ -6,6 +6,7 @@ import '../core/image_cache_manager.dart';
 import '../widgets/android_download_banner.dart';
 import '../widgets/update_checker_banner.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../core/async_screen_mixin.dart';
 import '../core/providers/profile_provider.dart';
 import '../core/providers/trip_provider.dart';
 import '../core/supabase/activity_service.dart';
@@ -13,6 +14,7 @@ import '../core/supabase/doc_service.dart';
 import '../core/supabase/links_service.dart';
 import '../core/supabase/money_service.dart';
 import '../core/supabase/plan_service.dart';
+import '../core/supabase/accommodation_service.dart';
 import '../core/supabase/spot_service.dart';
 import '../core/supabase/travel_service.dart';
 import '../core/trip/app_trip.dart';
@@ -24,6 +26,7 @@ import '../data/docs_data.dart';
 import '../data/links_data.dart';
 import '../data/money_data.dart';
 import '../data/plan_data.dart';
+import '../data/accommodation_data.dart' show Accommodation;
 import '../data/spot_data.dart';
 import '../data/travel_data.dart';
 import '../theme/app_colors.dart';
@@ -59,6 +62,7 @@ class _HomeData {
     required this.homeCurrency,
     required this.memberMap,
     required this.members,
+    required this.stays,
     required this.activityEvents,
   });
 
@@ -68,6 +72,7 @@ class _HomeData {
   final List<TravelItem> travelItems;
   final List<Receipt> receipts;
   final List<TripLink> links;
+  final List<Accommodation> stays;
   // balancesByCurrency[currency] = per-member net balances in that currency.
   // Multi-currency trips will have multiple entries here.
   final Map<String, List<MemberBalance>> balancesByCurrency;
@@ -144,10 +149,8 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> with AsyncScreenMixin {
   _HomeData? _data;
-  Object? _error;
-  bool _loaded = false;
 
   @override
   void initState() {
@@ -155,22 +158,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       showOnboardingIfNeeded(context);
-      if (!_loaded) {
-        _loaded = true;
-        _load();
-      }
+      _load();
     });
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool silent = false}) async {
+    final gen = beginLoad(silent: silent);
     final trip = ref.read(activeTripProvider);
     final members = ref.read(tripMembersProvider);
     final myId = ref.read(profileProvider)?.id ?? '';
 
     try {
-      // All eight sources in one round-trip so the home screen loads in parallel.
-      // results[0..7] must stay in sync with the list order below.
+      // All nine sources in parallel; stays failure is isolated via catchError.
+      // results[0..8] must stay in sync with the list order below.
       final tripId = trip?.id ?? '';
+      if (tripId.isEmpty) {
+        commitLoad(gen, () => _data = null);
+        return;
+      }
       final results = await Future.wait([
         SpotService.loadSpots(tripId),
         DocService.loadDocuments(tripId),
@@ -180,16 +185,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         MoneyService.loadWithdrawals(tripId),
         ActivityService.loadEvents(tripId),
         LinksService.loadLinks(tripId),
+        AccommodationService.loadAll(tripId)
+            .catchError((_) => <Accommodation>[]),
       ]);
 
-      final spots        = results[0] as List<Spot>;
-      final docs         = results[1] as List<TripDocument>;
-      final days         = results[2] as List<TripDay>;
-      final travelItems  = results[3] as List<TravelItem>;
-      final receipts     = results[4] as List<Receipt>;
-      final withdrawals  = results[5] as List;
-      final activities   = results[6] as List<ActivityEvent>;
-      final links        = results[7] as List<TripLink>;
+      final spots         = results[0] as List<Spot>;
+      final docs          = results[1] as List<TripDocument>;
+      final days          = results[2] as List<TripDay>;
+      final travelItems   = results[3] as List<TravelItem>;
+      final receipts      = results[4] as List<Receipt>;
+      final withdrawals   = results[5] as List;
+      final activities    = results[6] as List<ActivityEvent>;
+      final links         = results[7] as List<TripLink>;
+      final stays         = results[8] as List<Accommodation>;
 
       final memberMap = {for (final m in members) m.userId: m.profile.displayName};
       final tripMembers = members
@@ -203,9 +211,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         members: tripMembers,
       );
 
-      if (!mounted) return;
-      setState(() {
-        _error = null;
+      commitLoad(gen, () {
         _data = _HomeData(
           spots: spots,
           docs: docs,
@@ -217,20 +223,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           homeCurrency: trip?.homeCurrency ?? '',
           memberMap: memberMap,
           members: members,
+          stays: stays,
           activityEvents: activities,
         );
       });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e);
+    } catch (_) {
+      failLoad(gen, silent: silent);
     }
   }
 
   Future<void> _refresh() async {
-    setState(() {
-      _data = null;
-      _error = null;
-    });
+    if (!mounted) return;
+    setState(() => _data = null);
     return _load();
   }
 
@@ -290,7 +294,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final trip    = ref.watch(activeTripProvider);
     final members = ref.watch(tripMembersProvider);
 
-    if (_error != null && _data == null) {
+    if (error && _data == null) {
       return Scaffold(
         backgroundColor: kColorCream,
         appBar: AppBar(
@@ -635,7 +639,7 @@ class _TripHero extends StatelessWidget {
                                 context,
                                 MaterialPageRoute(
                                   builder: (_) => TravelItemDetailScreen(
-                                    item: nextTravel!,
+                                    item: nextTravel,
                                     docs: data!.docs,
                                     days: data!.days,
                                   ),
@@ -655,10 +659,11 @@ class _TripHero extends StatelessWidget {
                                 context,
                                 MaterialPageRoute(
                                   builder: (_) => ItemDetailScreen(
-                                    item: nextDay!.sortedItems.first,
-                                    day: nextDay!,
+                                    item: nextDay.sortedItems.first,
+                                    day: nextDay,
                                     docs: data!.docs,
                                     spots: data!.spots,
+                                    stays: data!.stays,
                                     days: data!.days,
                                   ),
                                 ),
@@ -966,16 +971,15 @@ class _PinboardCard extends StatefulWidget {
   State<_PinboardCard> createState() => _PinboardCardState();
 }
 
-class _PinboardCardState extends State<_PinboardCard> {
+class _PinboardCardState extends State<_PinboardCard> with AsyncScreenMixin {
   List<TripPin> _pins = [];
-  bool _loaded = false;
   RealtimeChannel? _channel;
 
   @override
   void initState() {
     super.initState();
     _load();
-    _channel = PinsService.subscribe(widget.tripId, () => _load());
+    _channel = PinsService.subscribe(widget.tripId, () => _load(silent: true));
   }
 
   @override
@@ -984,14 +988,19 @@ class _PinboardCardState extends State<_PinboardCard> {
     super.dispose();
   }
 
-  Future<void> _load() async {
-    final pins = await PinsService.fetchPinned(widget.tripId);
-    if (mounted) setState(() { _pins = pins; _loaded = true; });
+  Future<void> _load({bool silent = false}) async {
+    final gen = beginLoad(silent: silent);
+    try {
+      final pins = await PinsService.fetchPinned(widget.tripId);
+      commitLoad(gen, () => _pins = pins);
+    } catch (_) {
+      failLoad(gen, silent: silent || _pins.isNotEmpty);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_loaded || _pins.isEmpty) return const SizedBox.shrink();
+    if (loading || _pins.isEmpty) return const SizedBox.shrink();
 
     return DecoratedBox(
       decoration: kCardDecoration(),
@@ -1122,28 +1131,31 @@ class _UpcomingCard extends StatelessWidget {
                 if (i > 0)
                   const Divider(
                       height: 1, indent: kSpace4 + 36 + kSpace3, endIndent: kSpace4),
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: kSpace4,
-                    vertical: kSpace2,
-                  ),
-                  leading: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: const BoxDecoration(
-                      color: kColorSurfaceSunken,
-                      shape: BoxShape.circle,
+                Material(
+                  color: Colors.transparent,
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: kSpace4,
+                      vertical: kSpace2,
                     ),
-                    child: Icon(items[i].icon, size: 18, color: kColorInkSoft),
+                    leading: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: const BoxDecoration(
+                        color: kColorSurfaceSunken,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(items[i].icon, size: 18, color: kColorInkSoft),
+                    ),
+                    title: Text(items[i].label, style: kStyleBodyMedium),
+                    subtitle: items[i].sub.isNotEmpty
+                        ? Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(items[i].sub, style: kStyleCaption),
+                          )
+                        : null,
+                    trailing: Text(fmtDate(items[i].date), style: kStyleOverline),
                   ),
-                  title: Text(items[i].label, style: kStyleBodyMedium),
-                  subtitle: items[i].sub.isNotEmpty
-                      ? Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Text(items[i].sub, style: kStyleCaption),
-                        )
-                      : null,
-                  trailing: Text(fmtDate(items[i].date), style: kStyleOverline),
                 ),
               ],
             ],
@@ -1244,43 +1256,46 @@ class _TodayAgendaCardState extends State<_TodayAgendaCard> {
                     children: [
                       if (i == 0)
                         const Divider(height: 1, color: kColorBorder),
-                      ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: kSpace4, vertical: kSpace1),
-                        onTap: () => _toggle(item),
-                        leading: Container(
-                          width: 28,
-                          height: 28,
-                          decoration: BoxDecoration(
-                            color: done
-                                ? kColorPrimary.withValues(alpha: 0.12)
-                                : item.type.color.withValues(alpha: 0.12),
-                            shape: BoxShape.circle,
+                      Material(
+                        color: Colors.transparent,
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: kSpace4, vertical: kSpace1),
+                          onTap: () => _toggle(item),
+                          leading: Container(
+                            width: 28,
+                            height: 28,
+                            decoration: BoxDecoration(
+                              color: done
+                                  ? kColorPrimary.withValues(alpha: 0.12)
+                                  : item.type.color.withValues(alpha: 0.12),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              done ? Icons.check_rounded : item.type.icon,
+                              size: 14,
+                              color: done ? kColorPrimary : item.type.color,
+                            ),
                           ),
-                          child: Icon(
-                            done ? Icons.check_rounded : item.type.icon,
-                            size: 14,
-                            color: done ? kColorPrimary : item.type.color,
+                          title: Text(
+                            item.title,
+                            style: kStyleBodyMedium.copyWith(
+                              decoration: done ? TextDecoration.lineThrough : null,
+                              color: done ? kColorInkSoft : kColorInk,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
+                          subtitle: item.time != null || item.city != null
+                              ? Padding(
+                                  padding: const EdgeInsets.only(top: 1),
+                                  child: Text(
+                                    [if (item.time != null) item.time!, if (item.city != null) item.city!].join('  ·  '),
+                                    style: kStyleCaption,
+                                  ),
+                                )
+                              : null,
                         ),
-                        title: Text(
-                          item.title,
-                          style: kStyleBodyMedium.copyWith(
-                            decoration: done ? TextDecoration.lineThrough : null,
-                            color: done ? kColorInkSoft : kColorInk,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        subtitle: item.time != null || item.city != null
-                            ? Padding(
-                                padding: const EdgeInsets.only(top: 1),
-                                child: Text(
-                                  [if (item.time != null) item.time!, if (item.city != null) item.city!].join('  ·  '),
-                                  style: kStyleCaption,
-                                ),
-                              )
-                            : null,
                       ),
                       if (!isLast)
                         const Divider(height: 1, indent: kSpace4 + 28 + kSpace3),
@@ -1295,38 +1310,41 @@ class _TodayAgendaCardState extends State<_TodayAgendaCard> {
                   child: Text('Bookings today',
                       style: kStyleCaption.copyWith(color: kColorInkSoft)),
                 ),
-                ...widget.travelItems.map((t) => ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                      horizontal: kSpace4, vertical: kSpace1),
-                  leading: Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      color: t.type.color.withValues(alpha: 0.12),
-                      shape: BoxShape.circle,
+                ...widget.travelItems.map((t) => Material(
+                  color: Colors.transparent,
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: kSpace4, vertical: kSpace1),
+                    leading: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: t.type.color.withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(t.type.icon, size: 14, color: t.type.color),
                     ),
-                    child: Icon(t.type.icon, size: 14, color: t.type.color),
+                    title: Text(t.title,
+                        style: kStyleBodyMedium,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
+                    subtitle: () {
+                      final parts = [
+                        if (t.time != null) t.time!,
+                        if (t.location != null) t.location!,
+                        if (t.destination != null && t.location != null) '→ ${t.destination!}',
+                        if (t.confirmationNumber != null) t.confirmationNumber!,
+                      ];
+                      if (parts.isEmpty) return null;
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 1),
+                        child: Text(parts.join('  ·  '),
+                            style: kStyleCaption,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis),
+                      );
+                    }(),
                   ),
-                  title: Text(t.title,
-                      style: kStyleBodyMedium,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
-                  subtitle: () {
-                    final parts = [
-                      if (t.time != null) t.time!,
-                      if (t.location != null) t.location!,
-                      if (t.destination != null && t.location != null) '→ ${t.destination!}',
-                      if (t.confirmationNumber != null) t.confirmationNumber!,
-                    ];
-                    if (parts.isEmpty) return null;
-                    return Padding(
-                      padding: const EdgeInsets.only(top: 1),
-                      child: Text(parts.join('  ·  '),
-                          style: kStyleCaption,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis),
-                    );
-                  }(),
                 )),
               ],
             ],
@@ -1458,6 +1476,7 @@ class _ActivityFeed extends StatelessWidget {
               day:   entry.day,
               docs:  d.docs,
               spots: d.spots,
+              stays: d.stays,
               days:  d.days,
             ),
           ));
@@ -1491,42 +1510,45 @@ class _ActivityFeed extends StatelessWidget {
           return RepaintBoundary(
             child: Column(
               children: [
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: kSpace4,
-                    vertical: kSpace2,
-                  ),
-                  leading: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: ev.type.softColor,
-                      shape: BoxShape.circle,
+                Material(
+                  color: Colors.transparent,
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: kSpace4,
+                      vertical: kSpace2,
                     ),
-                    child: Icon(ev.type.icon, size: 18, color: ev.type.color),
-                  ),
-                  title: Text('$actorLabel ${ev.type.verb}', style: kStyleBodyMedium),
-                  subtitle: ev.entityTitle != null && ev.entityTitle!.isNotEmpty
-                      ? Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Text(ev.entityTitle!, style: kStyleCaption),
-                        )
-                      : null,
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(_relativeTime(ev.createdAt), style: kStyleOverline),
-                      if (onTap != null) ...[
-                        const SizedBox(width: kSpace1),
-                        const Icon(
-                          Icons.chevron_right_rounded,
-                          size: 16,
-                          color: kColorInkSoft,
-                        ),
+                    leading: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: ev.type.softColor,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(ev.type.icon, size: 18, color: ev.type.color),
+                    ),
+                    title: Text('$actorLabel ${ev.type.verb}', style: kStyleBodyMedium),
+                    subtitle: ev.entityTitle != null && ev.entityTitle!.isNotEmpty
+                        ? Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(ev.entityTitle!, style: kStyleCaption),
+                          )
+                        : null,
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(_relativeTime(ev.createdAt), style: kStyleOverline),
+                        if (onTap != null) ...[
+                          const SizedBox(width: kSpace1),
+                          const Icon(
+                            Icons.chevron_right_rounded,
+                            size: 16,
+                            color: kColorInkSoft,
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
+                    onTap: onTap != null ? () => onTap(context) : null,
                   ),
-                  onTap: onTap != null ? () => onTap(context) : null,
                 ),
                 if (!isLast) const Divider(height: 1, indent: kSpace4 + 36 + kSpace3),
               ],

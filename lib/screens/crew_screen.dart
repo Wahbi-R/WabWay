@@ -1,13 +1,17 @@
 import 'dart:async';
+import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show RealtimeChannel;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/async_screen_mixin.dart';
+import '../core/image_cache_manager.dart';
 import '../core/providers/profile_provider.dart';
 import '../core/providers/trip_provider.dart';
 import '../core/location/location_sharing_manager.dart';
@@ -29,15 +33,15 @@ class CrewScreen extends ConsumerStatefulWidget {
 }
 
 class _CrewScreenState extends ConsumerState<CrewScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, AsyncScreenMixin {
   late final TabController _tabs;
 
   List<TripMessage> _messages = [];
   List<LocationShare> _locations = [];
-  bool _loadingMessages = true;
   bool _sendingPing = false;
   bool _sendingFindMe = false;
   bool _sending = false;
+  bool _sendingImage = false;
 
   RealtimeChannel? _messageChannel;
   RealtimeChannel? _locationChannel;
@@ -45,7 +49,7 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
   final _scrollController = ScrollController();
   final _textController = TextEditingController();
 
-  String? _tripId;
+  String _tripId = '';
   String? _userId;
 
   @override
@@ -57,7 +61,7 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
       if (!mounted) return;
       _tripId = ref.read(activeTripIdProvider);
       _userId = ref.read(profileProvider)?.id;
-      _load(_tripId!);
+      if (_tripId.isNotEmpty) _load(_tripId);
     });
   }
 
@@ -77,23 +81,23 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
   }
 
   Future<void> _load(String tripId) async {
-    setState(() => _loadingMessages = true);
+    final gen = beginLoad();
     try {
       final results = await Future.wait([
         CrewService.fetchMessages(tripId),
         CrewService.fetchActiveLocations(tripId),
       ]);
-      if (!mounted) return;
-      setState(() {
+      commitLoad(gen, () {
         _messages = results[0] as List<TripMessage>;
         _locations = results[1] as List<LocationShare>;
-        _loadingMessages = false;
       });
-      _scrollToBottom();
-      _subscribe(tripId);
+      if (!isStale(gen)) {
+        _scrollToBottom();
+        _subscribe(tripId);
+      }
     } catch (_) {
-      if (!mounted) return;
-      setState(() => _loadingMessages = false);
+      failLoad(gen);
+      if (!isStale(gen)) _subscribe(tripId);
     }
   }
 
@@ -105,18 +109,24 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
   }
 
   Future<void> _onNewMessage() async {
-    if (_tripId == null) return;
-    final messages = await CrewService.fetchMessages(_tripId!);
-    if (!mounted) return;
-    setState(() => _messages = messages);
-    _scrollToBottom();
+    final tripId = _tripId;
+    if (tripId.isEmpty) return;
+    try {
+      final messages = await CrewService.fetchMessages(tripId);
+      if (!mounted || _tripId != tripId) return;
+      setState(() { _messages = messages; error = false; });
+      _scrollToBottom();
+    } catch (_) {}
   }
 
   Future<void> _onLocationsChanged() async {
-    if (_tripId == null) return;
-    final locations = await CrewService.fetchActiveLocations(_tripId!);
-    if (!mounted) return;
-    setState(() => _locations = locations);
+    final tripId = _tripId;
+    if (tripId.isEmpty) return;
+    try {
+      final locations = await CrewService.fetchActiveLocations(tripId);
+      if (!mounted || _tripId != tripId) return;
+      setState(() => _locations = locations);
+    } catch (_) {}
   }
 
   Future<void> _onReact(String messageId, String emoji) async {
@@ -126,11 +136,13 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
     if (idx == -1) return;
     final msg = _messages[idx];
     final myReacted = (msg.reactions[emoji] ?? []).contains(userId);
-    if (myReacted) {
-      await CrewService.removeReaction(messageId: messageId, userId: userId, emoji: emoji);
-    } else {
-      await CrewService.addReaction(messageId: messageId, userId: userId, emoji: emoji);
-    }
+    try {
+      if (myReacted) {
+        await CrewService.removeReaction(messageId: messageId, userId: userId, emoji: emoji);
+      } else {
+        await CrewService.addReaction(messageId: messageId, userId: userId, emoji: emoji);
+      }
+    } catch (_) {}
     // Reactions refresh via the realtime subscription; no extra setState needed.
   }
 
@@ -160,23 +172,15 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
   Future<void> _toggleLocationSharing() async {
     final mgr = LocationSharingManager.instance;
     if (mgr.isSharing.value) {
-      await mgr.stop();
+      try { await mgr.stop(); } catch (_) {}
       return;
     }
 
     final granted = await _ensureLocationPermission();
     if (!granted || !mounted) return;
 
-    pushNotify(
-      tripId: _tripId!,
-      title: '\u{1F4CD} $_myDisplayName started sharing location',
-      body: 'Check the Live Map in crew',
-      excludeUserId: _userId,
-      data: {'screen': 'crew', 'trip_id': _tripId!},
-    );
-
     await mgr.start(
-      tripId: _tripId!,
+      tripId: _tripId,
       userId: _userId!,
       settings: _buildLocationSettings(),
       onError: (e) {
@@ -188,6 +192,15 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
           _showError('Location sharing stopped unexpectedly');
         }
       },
+    );
+
+    if (!mounted) return;
+    pushNotify(
+      tripId: _tripId,
+      title: '\u{1F4CD} $_myDisplayName started sharing location',
+      body: 'Check the Live Map in crew',
+      excludeUserId: _userId,
+      data: {'screen': 'crew', 'trip_id': _tripId},
     );
   }
 
@@ -277,11 +290,12 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
   Future<void> _sendMessage() async {
     final text = _textController.text.trim();
     if (text.isEmpty || _sending) return;
-    _textController.clear();
     setState(() => _sending = true);
+    // Clear immediately so text typed while the send is in-flight isn't wiped.
+    _textController.clear();
     try {
       await CrewService.sendMessage(
-        tripId: _tripId!,
+        tripId: _tripId,
         authorId: _userId!,
         body: text,
       );
@@ -290,11 +304,11 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
       // Supabase realtime publication).
       await _onNewMessage();
       pushNotify(
-        tripId: _tripId!,
+        tripId: _tripId,
         title: 'New crew message',
         body: text.length > 80 ? '${text.substring(0, 80)}…' : text,
         excludeUserId: _userId,
-        data: {'screen': 'crew', 'trip_id': _tripId!},
+        data: {'screen': 'crew', 'trip_id': _tripId},
         prefKey: kPrefNotifCrew,
       );
     } catch (_) {
@@ -313,7 +327,7 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
     try {
       final pos = await _getCurrentPosition();
       await CrewService.sendLocationPing(
-        tripId: _tripId!,
+        tripId: _tripId,
         authorId: _userId!,
         lat: pos.latitude,
         lng: pos.longitude,
@@ -360,25 +374,25 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
     try {
       final pos = await _getCurrentPosition();
       await CrewService.sendFindMe(
-        tripId: _tripId!,
+        tripId: _tripId,
         authorId: _userId!,
         lat: pos.latitude,
         lng: pos.longitude,
       );
       await _onNewMessage();
       pushNotify(
-        tripId: _tripId!,
+        tripId: _tripId,
         title: '\u{1F6A8} $_myDisplayName needs the crew!',
         body: 'Tap to navigate to them',
         excludeUserId: _userId,
-        data: {'screen': 'crew', 'trip_id': _tripId!},
+        data: {'screen': 'crew', 'trip_id': _tripId},
         highPriority: true,
       );
       // Auto-start live location sharing so the crew's map pin stays current.
       final mgr = LocationSharingManager.instance;
       if (!mgr.isSharing.value && mounted) {
         await mgr.start(
-          tripId: _tripId!,
+          tripId: _tripId,
           userId: _userId!,
           settings: _buildLocationSettings(),
           onError: (_) {},
@@ -388,6 +402,82 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
       _showError('Could not send SOS — check your connection');
     } finally {
       if (mounted) setState(() => _sendingFindMe = false);
+    }
+  }
+
+  void _showImageSourceSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: kColorPaper,
+      shape: const RoundedRectangleBorder(borderRadius: kRadiusSheet),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_rounded),
+              title: Text('Camera', style: kStyleBodyMedium),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickAndSendImage(ImageSource.camera);
+              },
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded),
+              title: Text('Photo library', style: kStyleBodyMedium),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickAndSendImage(ImageSource.gallery);
+              },
+            ),
+            const SizedBox(height: kSpace2),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickAndSendImage(ImageSource source) async {
+    XFile? file;
+    try {
+      file = await ImagePicker().pickImage(
+        source: source,
+        imageQuality: 80,
+        maxWidth: 1280,
+        maxHeight: 1280,
+      );
+    } catch (_) {
+      if (mounted) _showError('Could not access camera or photo library');
+      return;
+    }
+    if (file == null || !mounted) return;
+    final tripId = _tripId;
+    final userId = _userId;
+    if (tripId.isEmpty || userId == null) return;
+    setState(() => _sendingImage = true);
+    try {
+      final bytes = await file.readAsBytes();
+      final ext = file.name.contains('.') ? file.name.split('.').last.toLowerCase() : 'jpg';
+      final (:path, :url) = await CrewService.uploadChatImage(tripId, userId, bytes, ext);
+      try {
+        await CrewService.sendImageMessage(
+          tripId: tripId,
+          authorId: userId,
+          imageUrl: url,
+        );
+      } catch (e) {
+        // Best-effort cleanup — ignore delete errors so the original error is preserved.
+        try {
+          await CrewService.deleteChatImage(path);
+        } catch (_) {}
+        rethrow;
+      }
+      await _onNewMessage();
+    } catch (_) {
+      _showError('Failed to send image');
+    } finally {
+      if (mounted) setState(() => _sendingImage = false);
     }
   }
 
@@ -417,18 +507,18 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
 
     try {
       await CrewService.sendMeetupPoint(
-        tripId: _tripId!,
+        tripId: _tripId,
         authorId: _userId!,
         lat: point.latitude,
         lng: point.longitude,
       );
       await _onNewMessage();
       pushNotify(
-        tripId: _tripId!,
+        tripId: _tripId,
         title: '\u{1F4CD} $_myDisplayName set a meetup point',
         body: 'Open crew chat to navigate there',
         excludeUserId: _userId,
-        data: {'screen': 'crew', 'trip_id': _tripId!},
+        data: {'screen': 'crew', 'trip_id': _tripId},
       );
     } catch (_) {
       _showError('Could not set meetup point');
@@ -451,6 +541,13 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
       if (next != _tripId) {
         _tripId = next;
         _userId = ref.read(profileProvider)?.id;
+        _messageChannel?.unsubscribe();
+        _locationChannel?.unsubscribe();
+        _messageChannel = null;
+        _locationChannel = null;
+        // Clear stale data immediately so a load failure never shows the
+        // previous trip's messages under the new trip's context.
+        setState(() { _messages = []; _locations = []; });
         _load(next);
       }
     });
@@ -491,7 +588,8 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
         children: [
           _ChatTab(
             messages: _messages,
-            loading: _loadingMessages,
+            loading: loading,
+            error: error,
             members: members,
             currentUserId: _userId ?? '',
             scrollController: _scrollController,
@@ -499,9 +597,12 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
             sending: _sending,
             sendingPing: _sendingPing,
             sendingFindMe: _sendingFindMe,
+            sendingImage: _sendingImage,
             onSend: _sendMessage,
             onLinkUp: _sendLocationPing,
             onFindMe: _sendFindMe,
+            onSendImage: _showImageSourceSheet,
+            onRetry: () => _load(_tripId),
             onReact: _onReact,
           ),
           _MapTab(
@@ -568,6 +669,7 @@ class _ChatTab extends StatelessWidget {
   const _ChatTab({
     required this.messages,
     required this.loading,
+    required this.error,
     required this.members,
     required this.currentUserId,
     required this.scrollController,
@@ -575,14 +677,18 @@ class _ChatTab extends StatelessWidget {
     required this.sending,
     required this.sendingPing,
     required this.sendingFindMe,
+    required this.sendingImage,
     required this.onSend,
     required this.onLinkUp,
     required this.onFindMe,
+    required this.onSendImage,
+    required this.onRetry,
     required this.onReact,
   });
 
   final List<TripMessage> messages;
   final bool loading;
+  final bool error;
   final List<AppTripMember> members;
   final String currentUserId;
   final ScrollController scrollController;
@@ -590,9 +696,12 @@ class _ChatTab extends StatelessWidget {
   final bool sending;
   final bool sendingPing;
   final bool sendingFindMe;
+  final bool sendingImage;
   final VoidCallback onSend;
   final VoidCallback onLinkUp;
   final VoidCallback onFindMe;
+  final VoidCallback onSendImage;
+  final VoidCallback onRetry;
   final Future<void> Function(String messageId, String emoji) onReact;
 
   AppTripMember? _memberById(String userId) {
@@ -610,6 +719,36 @@ class _ChatTab extends StatelessWidget {
       body = const Center(
           child: CircularProgressIndicator(
               color: kColorPrimary, strokeWidth: 2));
+    } else if (error && messages.isEmpty) {
+      body = Center(
+        child: Padding(
+          padding: const EdgeInsets.all(kSpace8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.cloud_off_rounded,
+                  size: 48,
+                  color: kColorInkSoft.withValues(alpha: 0.35)),
+              const SizedBox(height: kSpace3),
+              Text('Could not load messages',
+                  style: kStyleBodyMedium.copyWith(color: kColorInkSoft)),
+              const SizedBox(height: kSpace1),
+              Text(
+                'Check your connection and try again',
+                style: kStyleCaption,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: kSpace4),
+              FilledButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh_rounded, size: 16),
+                label: const Text('Retry'),
+                style: FilledButton.styleFrom(backgroundColor: kColorPrimary),
+              ),
+            ],
+          ),
+        ),
+      );
     } else if (messages.isEmpty) {
       body = Center(
         child: Padding(
@@ -673,14 +812,36 @@ class _ChatTab extends StatelessWidget {
     return Column(
       children: [
         Expanded(child: body),
+        // Show a compact error banner when messages exist but a reload failed,
+        // so stale chat is visibly flagged without hiding the message history.
+        if (error && messages.isNotEmpty)
+          Material(
+            color: kColorSurfaceSunken,
+            child: InkWell(
+              onTap: onRetry,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: kSpace4, vertical: kSpace2),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.cloud_off_rounded, size: 14, color: kColorInkSoft),
+                    const SizedBox(width: kSpace1),
+                    Text('Could not refresh · Tap to retry', style: kStyleCaption),
+                  ],
+                ),
+              ),
+            ),
+          ),
         _InputBar(
           textController: textController,
           sending: sending,
           sendingPing: sendingPing,
           sendingFindMe: sendingFindMe,
+          sendingImage: sendingImage,
           onSend: onSend,
           onLinkUp: onLinkUp,
           onFindMe: onFindMe,
+          onSendImage: onSendImage,
         ),
       ],
     );
@@ -761,25 +922,63 @@ class _MessageBubble extends StatelessWidget {
                   ),
                 GestureDetector(
                   onLongPress: () => _showEmojiPicker(context),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: kSpace3, vertical: kSpace2 + 2),
-                    decoration: BoxDecoration(
-                      color: bubbleColor,
-                      borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(16),
-                        topRight: const Radius.circular(16),
-                        bottomLeft: Radius.circular(isMe ? 16 : 4),
-                        bottomRight: Radius.circular(isMe ? 4 : 16),
-                      ),
-                      border: isMe ? null : Border.all(color: kColorBorder),
-                      boxShadow: kShadowXs,
-                    ),
-                    child: Text(
-                      message.body,
-                      style: kStyleBody.copyWith(color: textColor),
-                    ),
-                  ),
+                  child: message.type == MessageType.image
+                      ? Semantics(
+                          label: 'Photo message',
+                          image: true,
+                          child: ClipRRect(
+                          borderRadius: BorderRadius.only(
+                            topLeft: const Radius.circular(16),
+                            topRight: const Radius.circular(16),
+                            bottomLeft: Radius.circular(isMe ? 16 : 4),
+                            bottomRight: Radius.circular(isMe ? 4 : 16),
+                          ),
+                          child: CachedNetworkImage(
+                            imageUrl: message.imageUrl ?? '',
+                            cacheManager: WabwayImageCache.instance,
+                            width: 220,
+                            height: 220,
+                            memCacheWidth: (220 * MediaQuery.devicePixelRatioOf(context)).round(),
+                            memCacheHeight: (220 * MediaQuery.devicePixelRatioOf(context)).round(),
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) => Container(
+                              width: 220,
+                              height: 220,
+                              color: kColorSurfaceSunken,
+                              child: const Center(
+                                child: CircularProgressIndicator(
+                                    color: kColorPrimary, strokeWidth: 2),
+                              ),
+                            ),
+                            errorBuilder: (_, __, ___) => Container(
+                              width: 220,
+                              height: 220,
+                              color: kColorSurfaceSunken,
+                              child: const Icon(Icons.broken_image_rounded,
+                                  color: kColorInkSoft),
+                            ),
+                          ),
+                        ),
+                        )
+                      : Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: kSpace3, vertical: kSpace2 + 2),
+                          decoration: BoxDecoration(
+                            color: bubbleColor,
+                            borderRadius: BorderRadius.only(
+                              topLeft: const Radius.circular(16),
+                              topRight: const Radius.circular(16),
+                              bottomLeft: Radius.circular(isMe ? 16 : 4),
+                              bottomRight: Radius.circular(isMe ? 4 : 16),
+                            ),
+                            border: isMe ? null : Border.all(color: kColorBorder),
+                            boxShadow: kShadowXs,
+                          ),
+                          child: Text(
+                            message.body,
+                            style: kStyleBody.copyWith(color: textColor),
+                          ),
+                        ),
                 ),
                 if (hasReactions) ...[
                   const SizedBox(height: 4),
@@ -1189,18 +1388,22 @@ class _InputBar extends StatelessWidget {
     required this.sending,
     required this.sendingPing,
     required this.sendingFindMe,
+    required this.sendingImage,
     required this.onSend,
     required this.onLinkUp,
     required this.onFindMe,
+    required this.onSendImage,
   });
 
   final TextEditingController textController;
   final bool sending;
   final bool sendingPing;
   final bool sendingFindMe;
+  final bool sendingImage;
   final VoidCallback onSend;
   final VoidCallback onLinkUp;
   final VoidCallback onFindMe;
+  final VoidCallback onSendImage;
 
   @override
   Widget build(BuildContext context) {
@@ -1256,6 +1459,16 @@ class _InputBar extends StatelessWidget {
                     onTap: onLinkUp,
                   ),
                   const SizedBox(width: kSpace2),
+                  if (!kIsWeb)
+                    _CircleIconButton(
+                      tooltip: 'Send a photo',
+                      icon: Icons.image_rounded,
+                      color: kColorSurfaceSunken,
+                      iconColor: kColorInkSoft,
+                      loading: sendingImage,
+                      onTap: onSendImage,
+                    ),
+                  if (!kIsWeb) const SizedBox(width: kSpace2),
                   Expanded(
                     child: TextField(
                       controller: textController,
@@ -1528,8 +1741,11 @@ class _MapTab extends StatelessWidget {
           ),
           children: [
             TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              urlTemplate: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
               userAgentPackageName: 'ca.wabble.wabway',
+            ),
+            const SimpleAttributionWidget(
+              source: Text('Tiles © Esri'),
             ),
             MarkerLayer(
               markers: locations.map((loc) {

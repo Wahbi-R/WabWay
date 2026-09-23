@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/providers/profile_provider.dart';
 import '../../core/providers/trip_provider.dart';
 import '../../core/supabase/client.dart';
+import '../../core/async_screen_mixin.dart';
 import '../../core/supabase/doc_service.dart';
 import '../../core/supabase/money_service.dart';
 import '../../core/supabase/plan_service.dart';
@@ -596,12 +597,12 @@ class _LinkPickerSheet extends StatefulWidget {
   State<_LinkPickerSheet> createState() => _LinkPickerSheetState();
 }
 
-class _LinkPickerSheetState extends State<_LinkPickerSheet> {
+class _LinkPickerSheetState extends State<_LinkPickerSheet>
+    with AsyncScreenMixin {
   List<Receipt>? _receipts;
   List<CashWithdrawal>? _withdrawals;
   List<TravelItem>? _travelItems;
   List<TripDay>? _days;
-  bool _loading = true;
 
   @override
   void initState() {
@@ -610,6 +611,7 @@ class _LinkPickerSheetState extends State<_LinkPickerSheet> {
   }
 
   Future<void> _load() async {
+    final gen = beginLoad();
     try {
       final results = await Future.wait([
         MoneyService.loadReceipts(widget.tripId),
@@ -617,16 +619,14 @@ class _LinkPickerSheetState extends State<_LinkPickerSheet> {
         TravelService.loadItems(widget.tripId),
         PlanService.loadAll(widget.tripId),
       ]);
-      if (!mounted) return;
-      setState(() {
-        _receipts     = results[0] as List<Receipt>;
-        _withdrawals  = results[1] as List<CashWithdrawal>;
-        _travelItems  = results[2] as List<TravelItem>;
-        _days         = results[3] as List<TripDay>;
-        _loading      = false;
+      commitLoad(gen, () {
+        _receipts    = results[0] as List<Receipt>;
+        _withdrawals = results[1] as List<CashWithdrawal>;
+        _travelItems = results[2] as List<TravelItem>;
+        _days        = results[3] as List<TripDay>;
       });
     } catch (_) {
-      if (mounted) setState(() => _loading = false);
+      failLoad(gen);
     }
   }
 
@@ -653,8 +653,18 @@ class _LinkPickerSheetState extends State<_LinkPickerSheet> {
           ),
           const Divider(height: 1, color: kColorBorder),
           Expanded(
-            child: _loading
+            child: loading
                 ? const Center(child: CircularProgressIndicator())
+                : error
+                    ? Center(
+                        child: WabwayErrorState(
+                          title: 'Could not load links',
+                          action: TextButton(
+                            onPressed: _load,
+                            child: const Text('Retry'),
+                          ),
+                        ),
+                      )
                 : ListView(
                     controller: ctrl,
                     padding: const EdgeInsets.only(bottom: kSpace8),
@@ -794,9 +804,8 @@ class _ImagePreview extends StatefulWidget {
   State<_ImagePreview> createState() => _ImagePreviewState();
 }
 
-class _ImagePreviewState extends State<_ImagePreview> {
+class _ImagePreviewState extends State<_ImagePreview> with AsyncScreenMixin {
   String? _url;
-  bool _loading = true;
 
   @override
   void initState() {
@@ -805,11 +814,12 @@ class _ImagePreviewState extends State<_ImagePreview> {
   }
 
   Future<void> _load() async {
+    final gen = beginLoad();
     try {
       final url = await DocService.getSignedUrl(widget.storagePath);
-      if (mounted) setState(() { _url = url; _loading = false; });
+      commitLoad(gen, () => _url = url);
     } catch (_) {
-      if (mounted) setState(() => _loading = false);
+      failLoad(gen, silent: true);
     }
   }
 
@@ -821,7 +831,7 @@ class _ImagePreviewState extends State<_ImagePreview> {
         width: double.infinity,
         constraints: const BoxConstraints(maxHeight: 320),
         color: kColorSurfaceSunken,
-        child: _loading
+        child: loading
             ? const SizedBox(
                 height: 160,
                 child: Center(
@@ -982,44 +992,48 @@ class _ActionsSectionState extends State<_ActionsSection> {
 
   Future<void> _showRenameDialog() async {
     final ctrl = TextEditingController(text: widget.doc.title);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: kColorPaper,
-        shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
-        title: Text('Rename document', style: kStyleBodySemibold),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          decoration: InputDecoration(
-            hintText: 'Document title',
-            hintStyle: kStyleBody.copyWith(color: kColorInkSoft),
-          ),
-          style: kStyleBody,
-          textInputAction: TextInputAction.done,
-          onSubmitted: (_) => Navigator.pop(ctx, true),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Cancel', style: kStyleBody.copyWith(color: kColorInkSoft)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('Rename', style: kStyleBodyMedium.copyWith(color: kColorPrimary)),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    final newTitle = ctrl.text.trim();
-    if (newTitle.isEmpty || newTitle == widget.doc.title) return;
     try {
-      await DocService.renameDocument(widget.doc.id, newTitle);
-      widget.onRenamed?.call(newTitle);
-      if (mounted) _snack('Renamed to "$newTitle".');
-    } catch (_) {
-      if (mounted) _snack('Could not rename. Please try again.');
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: kColorPaper,
+          shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
+          title: Text('Rename document', style: kStyleBodySemibold),
+          content: TextField(
+            controller: ctrl,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: 'Document title',
+              hintStyle: kStyleBody.copyWith(color: kColorInkSoft),
+            ),
+            style: kStyleBody,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => Navigator.pop(ctx, true),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text('Cancel', style: kStyleBody.copyWith(color: kColorInkSoft)),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text('Rename', style: kStyleBodyMedium.copyWith(color: kColorPrimary)),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+      final newTitle = ctrl.text.trim();
+      if (newTitle.isEmpty || newTitle == widget.doc.title) return;
+      try {
+        await DocService.renameDocument(widget.doc.id, newTitle);
+        widget.onRenamed?.call(newTitle);
+        if (mounted) _snack('Renamed to "$newTitle".');
+      } catch (_) {
+        if (mounted) _snack('Could not rename. Please try again.');
+      }
+    } finally {
+      ctrl.dispose();
     }
   }
 
@@ -1203,42 +1217,52 @@ class _ActionsSheetContentState extends State<_ActionsSheetContent> {
             onTap: () async {
               Navigator.pop(context);
               final ctrl = TextEditingController(text: widget.doc.title);
-              final confirmed = await showDialog<bool>(
-                context: widget.context,
-                builder: (ctx) => AlertDialog(
-                  backgroundColor: kColorPaper,
-                  shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
-                  title: Text('Rename document', style: kStyleBodySemibold),
-                  content: TextField(
-                    controller: ctrl,
-                    autofocus: true,
-                    style: kStyleBody,
-                    textInputAction: TextInputAction.done,
-                    onSubmitted: (_) => Navigator.pop(ctx, true),
-                    decoration: InputDecoration(
-                      hintText: 'Document title',
-                      hintStyle: kStyleBody.copyWith(color: kColorInkSoft),
-                    ),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx, false),
-                      child: Text('Cancel', style: kStyleBody.copyWith(color: kColorInkSoft)),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx, true),
-                      child: Text('Rename', style: kStyleBodyMedium.copyWith(color: kColorPrimary)),
-                    ),
-                  ],
-                ),
-              );
-              if (confirmed != true) return;
-              final newTitle = ctrl.text.trim();
-              if (newTitle.isEmpty || newTitle == widget.doc.title) return;
               try {
-                await DocService.renameDocument(widget.doc.id, newTitle);
-                widget.onRenamed?.call(newTitle);
-              } catch (_) {}
+                final confirmed = await showDialog<bool>(
+                  context: widget.context,
+                  builder: (ctx) => AlertDialog(
+                    backgroundColor: kColorPaper,
+                    shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
+                    title: Text('Rename document', style: kStyleBodySemibold),
+                    content: TextField(
+                      controller: ctrl,
+                      autofocus: true,
+                      style: kStyleBody,
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => Navigator.pop(ctx, true),
+                      decoration: InputDecoration(
+                        hintText: 'Document title',
+                        hintStyle: kStyleBody.copyWith(color: kColorInkSoft),
+                      ),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: Text('Cancel', style: kStyleBody.copyWith(color: kColorInkSoft)),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: Text('Rename', style: kStyleBodyMedium.copyWith(color: kColorPrimary)),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirmed != true) return;
+                final newTitle = ctrl.text.trim();
+                if (newTitle.isEmpty || newTitle == widget.doc.title) return;
+                try {
+                  await DocService.renameDocument(widget.doc.id, newTitle);
+                  widget.onRenamed?.call(newTitle);
+                } catch (_) {
+                  if (widget.context.mounted) {
+                    ScaffoldMessenger.of(widget.context).showSnackBar(
+                      const SnackBar(content: Text('Rename failed — please try again')),
+                    );
+                  }
+                }
+              } finally {
+                ctrl.dispose();
+              }
             },
           ),
           WabwayActionTile(

@@ -8,7 +8,6 @@ import 'account_sheets.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
-import '../widgets/widgets.dart';
 import 'emergency_screen.dart';
 import 'pins_screen.dart';
 import 'members/invite_sheet.dart';
@@ -156,7 +155,8 @@ class SettingsScreen extends ConsumerWidget {
           Text('TRIP', style: kStyleOverline),
           const SizedBox(height: kSpace3),
           Builder(builder: (ctx) {
-            final trip = ref.watch(activeTripProvider)!;
+            final trip = ref.watch(activeTripProvider);
+            if (trip == null) return const SizedBox.shrink();
             final members = ref.watch(tripMembersProvider);
             final currentUserId = ref.watch(profileProvider)?.id;
             final isOwner = members.any((m) => m.userId == currentUserId && m.isOwner);
@@ -177,7 +177,7 @@ class SettingsScreen extends ConsumerWidget {
                     _SettingsTile(
                       icon: Icons.person_add_rounded,
                       label: 'Invite members',
-                      onTap: () => showInviteSheet(ctx, tripId: trip.id),
+                      onTap: () => showInviteSheet(ctx, tripId: trip.id, canRevoke: isOwner),
                     ),
                     const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
                     _SettingsTile(

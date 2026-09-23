@@ -90,7 +90,7 @@ abstract final class DocService {
         .select('*, document_links(*)')
         .eq('trip_id', tripId)
         .order('created_at', ascending: false);
-    OfflineCache.write(OfflineCache.docsKey(tripId), data);
+    await OfflineCache.write(OfflineCache.docsKey(tripId), data);
     return data.map<TripDocument>((r) => _docFromRow(r)).toList();
   }
 
@@ -261,13 +261,16 @@ abstract final class DocService {
     return supabase.storage.from(_bucket).createSignedUrl(path, expiresIn);
   }
 
-  static final Map<String, Future<String?>> _thumbCache = {};
+  static final Map<String, (Future<String?>, DateTime)> _thumbCache = {};
+  static const _thumbTtl = Duration(minutes: 55);
 
   static const _imageExts = {'jpg', 'jpeg', 'png', 'webp'};
 
   static Future<String?> getThumbnailUrl(String storagePath, String ext) {
     if (!_imageExts.contains(ext.toLowerCase())) return Future.value(null);
-    return _thumbCache.putIfAbsent(storagePath, () async {
+    final cached = _thumbCache[storagePath];
+    if (cached != null && DateTime.now().isBefore(cached.$2)) return cached.$1;
+    final future = Future<String?>(() async {
       try {
         return await supabase.storage.from(_bucket).createSignedUrl(
           storagePath,
@@ -282,6 +285,8 @@ abstract final class DocService {
         return null;
       }
     });
+    _thumbCache[storagePath] = (future, DateTime.now().add(_thumbTtl));
+    return future;
   }
 
   static Future<void> deleteStorageFile(String path) async {

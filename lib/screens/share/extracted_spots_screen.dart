@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../../core/images/wikipedia_image_service.dart';
+import '../../core/place_search_service.dart';
 import '../../core/places/nominatim_service.dart';
 import '../../core/supabase/spot_service.dart';
 import '../../data/spot_data.dart';
@@ -50,14 +51,20 @@ class _ExtractedSpotsScreenState extends State<ExtractedSpotsScreen> {
       for (int i = 0; i < widget.places.length; i++) {
         if (!_selected[i]) continue;
         final p = widget.places[i];
-        final imageUrl = kIsWeb
-            ? null
-            : await WikipediaImageService.fetchThumbnailUrl(p.name);
+        // Prefer Google Places photo (needs place_id from server geocoding),
+        // fall back to Wikipedia thumbnail for Nominatim-geocoded results.
+        String? imageUrl;
+        if (p.placeId.isNotEmpty) {
+          imageUrl = await PlaceSearchService.fetchPhotoUrl(p.placeId);
+        }
+        if (imageUrl == null && !kIsWeb) {
+          imageUrl = await WikipediaImageService.fetchThumbnailUrl(p.name);
+        }
         await SpotService.createSpot(
           tripId:      widget.tripId,
           name:        p.name,
           city:        p.city.isNotEmpty ? p.city : p.country,
-          area:        '',
+          area:        p.area,
           category:    _categories[i],
           status:      SpotStatus.wantToGo,
           addedBy:     widget.userId,
@@ -69,6 +76,7 @@ class _ExtractedSpotsScreenState extends State<ExtractedSpotsScreen> {
         count++;
       }
       if (!mounted) return;
+      setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(
           'Added $count spot${count == 1 ? '' : 's'}',

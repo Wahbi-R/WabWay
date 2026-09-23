@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
+import '../core/async_screen_mixin.dart';
 import '../core/notifications/push_notifier.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/providers/trip_provider.dart';
@@ -31,13 +32,11 @@ class TravelScreen extends ConsumerStatefulWidget {
   ConsumerState<TravelScreen> createState() => _TravelScreenState();
 }
 
-class _TravelScreenState extends ConsumerState<TravelScreen> {
+class _TravelScreenState extends ConsumerState<TravelScreen> with AsyncScreenMixin {
   final List<TravelItem> _items = [];
   final List<TripDocument> _docs = [];
   final List<TripDay> _days = [];
 
-  bool _loading = true;
-  String? _error;
   String _activeTripId = '';
   String _userId = '';
 
@@ -89,7 +88,7 @@ class _TravelScreenState extends ConsumerState<TravelScreen> {
       _userId = supabase.auth.currentUser?.id ?? '';
       _activeTripId = ref.read(activeTripIdProvider);
       _loadAll();
-      _subscribeRealtime(_activeTripId);
+      if (_activeTripId.isNotEmpty) _subscribeRealtime(_activeTripId);
     });
   }
 
@@ -130,36 +129,56 @@ class _TravelScreenState extends ConsumerState<TravelScreen> {
     );
   }
 
-  bool _offline = false;
-
   // ─── Data loading ─────────────────────────────────────────────────────────────
 
   // silent=false shows a full loading spinner (first load / retry);
   // silent=true silently refreshes in the background after a realtime event.
   Future<void> _loadAll({bool silent = false}) async {
     if (_activeTripId.isEmpty) return;
-    if (!silent) setState(() { _loading = true; _error = null; });
+    final gen = beginLoad(silent: silent);
+    if (!silent) setState(() { _items.clear(); _docs.clear(); _days.clear(); });
+
+    if (!silent) {
+      final cached = await Future.wait([
+        TravelService.loadFromCache(_activeTripId),
+        DocService.loadDocumentsFromCache(_activeTripId),
+        PlanService.loadFromCache(_activeTripId),
+      ]);
+      final cachedItems = cached[0] as List<TravelItem>?;
+      final cachedDocs  = cached[1] as List<TripDocument>?;
+      final cachedDays  = cached[2] as List<TripDay>?;
+      if (isStale(gen)) return;
+      if (cachedItems != null) {
+        commitLoad(gen, () {
+          _items..clear()..addAll(cachedItems);
+          _docs..clear()..addAll(cachedDocs ?? []);
+          _days..clear()..addAll(cachedDays ?? []);
+        });
+        if (isStale(gen)) return;
+        unawaited(_loadAll(silent: true));
+        return;
+      }
+    }
+
     try {
-      final itemsFuture = TravelService.loadItems(_activeTripId);
-      final docsFuture  = DocService.loadDocuments(_activeTripId);
-      final daysFuture  = PlanService.loadAll(_activeTripId);
-      final items = await itemsFuture;
-      final docs  = await docsFuture;
-      final days  = await daysFuture;
-      if (!mounted) return;
-      setState(() {
+      final results = await Future.wait([
+        TravelService.loadItems(_activeTripId),
+        DocService.loadDocuments(_activeTripId),
+        PlanService.loadAll(_activeTripId),
+      ]);
+      final items = results[0] as List<TravelItem>;
+      final docs  = results[1] as List<TripDocument>;
+      final days  = results[2] as List<TripDay>;
+      commitLoad(gen, () {
         _items..clear()..addAll(items);
         _docs..clear()..addAll(docs);
         _days..clear()..addAll(days);
-        if (!silent) _loading = false;
-        _offline = false;
       });
     } catch (e) {
-      if (!mounted) return;
-      if (silent) {
-        setState(() => _offline = true);
+      if (silent || _items.isNotEmpty) {
+        failLoad(gen, silent: true);
       } else {
-        setState(() { _loading = false; _error = e.toString(); });
+        failLoad(gen, message: e.toString());
       }
     }
   }
@@ -314,19 +333,19 @@ class _TravelScreenState extends ConsumerState<TravelScreen> {
       if (next != _activeTripId) {
         _activeTripId = next;
         _loadAll();
-        _subscribeRealtime(next);
+        if (next.isNotEmpty) _subscribeRealtime(next);
       }
     });
-    if (_loading) return const WabwayLoadingScaffold();
+    if (loading) return const WabwayLoadingScaffold();
 
-    if (_error != null) {
+    if (error) {
       return Scaffold(
         backgroundColor: kColorCream,
         body: Center(
           child: WabwayEmptyState(
             icon: Icons.error_outline_rounded,
             title: 'Could not load travel',
-            description: _error!,
+            description: errorMessage,
           ),
         ),
       );
@@ -334,13 +353,13 @@ class _TravelScreenState extends ConsumerState<TravelScreen> {
 
     final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
     final base = isDesktop ? _buildDesktop(context) : _buildMobile(context);
-    if (!_offline) return base;
+    if (!offline) return base;
     return Stack(
       children: [
         base,
         Positioned(
           left: 0, right: 0, bottom: 0,
-          child: OfflineBanner(onRetry: () => _loadAll(silent: true)),
+          child: OfflineBanner(onRetry: _loadAll),
         ),
       ],
     );

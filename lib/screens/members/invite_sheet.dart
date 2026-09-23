@@ -8,33 +8,38 @@ import '../../data/invite_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
+import '../../core/async_screen_mixin.dart';
 import '../../widgets/widgets.dart';
 
-Future<void> showInviteSheet(BuildContext context, {required String tripId}) {
+Future<void> showInviteSheet(
+  BuildContext context, {
+  required String tripId,
+  bool canRevoke = false,
+}) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => _InviteSheet(tripId: tripId),
+    builder: (_) => _InviteSheet(tripId: tripId, canRevoke: canRevoke),
   );
 }
 
 // ─── Sheet ────────────────────────────────────────────────────────────────────
 
 class _InviteSheet extends StatefulWidget {
-  const _InviteSheet({required this.tripId});
+  const _InviteSheet({required this.tripId, required this.canRevoke});
   final String tripId;
+  final bool canRevoke;
 
   @override
   State<_InviteSheet> createState() => _InviteSheetState();
 }
 
-class _InviteSheetState extends State<_InviteSheet> {
+class _InviteSheetState extends State<_InviteSheet> with AsyncScreenMixin {
   List<InviteCode> _codes = [];
-  bool _loading = true;
   bool _generating = false;
-  String? _error;
+  String? _generateError;
   final Set<String> _copied = {};
 
   @override
@@ -44,28 +49,27 @@ class _InviteSheetState extends State<_InviteSheet> {
   }
 
   Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
+    final gen = beginLoad();
     try {
       final codes = await InviteService.loadInvites(widget.tripId);
-      if (!mounted) return;
-      setState(() { _codes = codes; _loading = false; });
+      commitLoad(gen, () { _codes = codes; _generateError = null; });
     } catch (_) {
-      if (!mounted) return;
-      setState(() { _loading = false; _error = 'Could not load invite codes.'; });
+      failLoad(gen, message: 'Could not load invite codes.');
     }
   }
 
   Future<void> _generate() async {
-    setState(() { _generating = true; _error = null; });
+    setState(() { _generating = true; _generateError = null; });
     try {
       final code = await InviteService.createInvite(widget.tripId);
       if (!mounted) return;
-      setState(() { _codes = [code, ..._codes]; _generating = false; });
+      cancelLoad();
+      setState(() { _codes = [code, ..._codes]; _generating = false; loading = false; error = false; offline = false; });
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _generating = false;
-        _error = 'Could not generate a code. Try again.';
+        _generateError = 'Could not generate a code. Try again.';
       });
     }
   }
@@ -163,15 +167,15 @@ class _InviteSheetState extends State<_InviteSheet> {
                   ),
                   const SizedBox(height: kSpace5),
 
-                  if (_loading)
+                  if (loading)
                     const Center(
                       child: Padding(
                         padding: EdgeInsets.all(kSpace6),
                         child: CircularProgressIndicator(),
                       ),
                     )
-                  else if (_error != null) ...[
-                    Text(_error!,
+                  else if (error) ...[
+                    Text(errorMessage,
                         style: kStyleCaption.copyWith(color: kColorDanger)),
                     const SizedBox(height: kSpace3),
                     WabwayButton(
@@ -179,14 +183,20 @@ class _InviteSheetState extends State<_InviteSheet> {
                       fullWidth: true,
                       onPressed: _load,
                     ),
-                  ] else
+                  ] else ...[
+                    if (_generateError != null) ...[
+                      Text(_generateError!,
+                          style: kStyleCaption.copyWith(color: kColorDanger)),
+                      const SizedBox(height: kSpace3),
+                    ],
                     _CodesSection(
                       codes: _codes,
                       copied: _copied,
                       onCopy: _copy,
                       onShareLink: _shareLink,
-                      onRevoke: _revoke,
+                      onRevoke: widget.canRevoke ? _revoke : null,
                     ),
+                  ],
 
                   WabwayButton(
                     label: 'Generate new code',
@@ -220,7 +230,7 @@ class _CodesSection extends StatelessWidget {
   final Set<String> copied;
   final Future<void> Function(InviteCode) onCopy;
   final Future<void> Function(InviteCode) onShareLink;
-  final Future<void> Function(InviteCode) onRevoke;
+  final Future<void> Function(InviteCode)? onRevoke;
 
   @override
   Widget build(BuildContext context) {
@@ -240,7 +250,7 @@ class _CodesSection extends StatelessWidget {
                   copied: copied.contains(c.id),
                   onCopy: () => onCopy(c),
                   onShareLink: () => onShareLink(c),
-                  onRevoke: () => onRevoke(c),
+                  onRevoke: onRevoke != null ? () => onRevoke!(c) : null,
                 ),
               )),
           const SizedBox(height: kSpace3),

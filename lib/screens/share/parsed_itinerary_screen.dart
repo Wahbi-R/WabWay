@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import '../../core/async_screen_mixin.dart';
 import '../../core/ocr/parse_counter.dart';
 import '../../core/ocr/parsed_booking.dart';
 import '../../core/supabase/doc_service.dart';
@@ -38,14 +39,14 @@ class ParsedItineraryScreen extends StatefulWidget {
   State<ParsedItineraryScreen> createState() => _ParsedItineraryScreenState();
 }
 
-class _ParsedItineraryScreenState extends State<ParsedItineraryScreen> {
+class _ParsedItineraryScreenState extends State<ParsedItineraryScreen>
+    with AsyncScreenMixin {
   late final List<bool> _selected;
   late final List<bool> _addToPlan;
   late final List<TextEditingController> _titleCtrls;
   bool   _saving      = false;
   int    _remaining   = ParseCounter.dailyLimit;
   List<TripDay> _days = [];
-  bool   _daysLoading = false;
 
   @override
   void initState() {
@@ -69,12 +70,12 @@ class _ParsedItineraryScreenState extends State<ParsedItineraryScreen> {
   }
 
   Future<void> _loadDays() async {
-    setState(() => _daysLoading = true);
+    final gen = beginLoad();
     try {
       final days = await PlanService.loadAll(widget.tripId);
-      if (mounted) setState(() => _days = days);
-    } finally {
-      if (mounted) setState(() => _daysLoading = false);
+      commitLoad(gen, () => _days = days);
+    } catch (_) {
+      failLoad(gen, silent: true);
     }
   }
 
@@ -93,8 +94,63 @@ class _ParsedItineraryScreenState extends State<ParsedItineraryScreen> {
     super.dispose();
   }
 
+  Future<void> _saveBooking(int i, String? docId) async {
+    final b     = widget.bookings[i];
+    final title = _titleCtrls[i].text.trim().isEmpty ? b.title : _titleCtrls[i].text.trim();
+
+    String? planItemId;
+    if (_addToPlan[i]) {
+      final day = _matchingDay(b.date);
+      if (day != null) {
+        final planItem = await PlanService.createItem(
+          tripId:       widget.tripId,
+          dayId:        day.id,
+          title:        title,
+          type:         _planType(b.itemType),
+          createdBy:    widget.userId,
+          time:         b.departureTime,
+          notes:        b.notes.isEmpty ? null : b.notes,
+          linkedDocIds: docId != null ? [docId] : [],
+        );
+        planItemId = planItem.id;
+      }
+    }
+
+    final travelItem = await TravelService.createItem(
+      tripId:                widget.tripId,
+      title:                 title,
+      type:                  b.itemType,
+      createdBy:             widget.userId,
+      date:                  b.date,
+      time:                  b.departureTime,
+      notes:                 b.notes.isEmpty ? null : b.notes,
+      linkedItineraryItemId: planItemId,
+      linkedDocIds:          docId != null ? [docId] : [],
+    );
+
+    if (docId != null) {
+      await DocService.addLink(
+        documentId: docId,
+        linkedType: DocLinkedType.travelItem,
+        linkedId:   travelItem.id,
+        createdBy:  widget.userId,
+      );
+    }
+
+    if (docId != null && planItemId != null) {
+      await DocService.addLink(
+        documentId: docId,
+        linkedType: DocLinkedType.itineraryItem,
+        linkedId:   planItemId,
+        createdBy:  widget.userId,
+      );
+    }
+  }
+
   Future<void> _save() async {
     setState(() => _saving = true);
+    // Declared outside try so catch can deselect already-saved bookings on partial failure.
+    final succeeded = <int>[];
     try {
       // 1. Upload source file once if provided
       String? docId;
@@ -111,67 +167,18 @@ class _ParsedItineraryScreenState extends State<ParsedItineraryScreen> {
         docId = doc.id;
       }
 
-      // 2. Save each selected booking
-      int count = 0;
-      for (int i = 0; i < widget.bookings.length; i++) {
-        if (!_selected[i]) continue;
-        final b     = widget.bookings[i];
-        final title = _titleCtrls[i].text.trim().isEmpty ? b.title : _titleCtrls[i].text.trim();
-
-        // 2a. Create plan item first (if requested) so we get its ID for linking
-        String? planItemId;
-        if (_addToPlan[i]) {
-          final day = _matchingDay(b.date);
-          if (day != null) {
-            final planItem = await PlanService.createItem(
-              tripId:      widget.tripId,
-              dayId:       day.id,
-              title:       title,
-              type:        _planType(b.itemType),
-              createdBy:   widget.userId,
-              time:        b.departureTime,
-              notes:       b.notes.isEmpty ? null : b.notes,
-              linkedDocIds: docId != null ? [docId] : [],
-            );
-            planItemId = planItem.id;
-          }
-        }
-
-        // 2b. Create travel item
-        final travelItem = await TravelService.createItem(
-          tripId:                widget.tripId,
-          title:                 title,
-          type:                  b.itemType,
-          createdBy:             widget.userId,
-          date:                  b.date,
-          time:                  b.departureTime,
-          notes:                 b.notes.isEmpty ? null : b.notes,
-          linkedItineraryItemId: planItemId,
-          linkedDocIds:          docId != null ? [docId] : [],
-        );
-
-        // 2c. Link doc → travel item
-        if (docId != null) {
-          await DocService.addLink(
-            documentId: docId,
-            linkedType: DocLinkedType.travelItem,
-            linkedId:   travelItem.id,
-            createdBy:  widget.userId,
-          );
-        }
-
-        // 2d. Link doc → plan item
-        if (docId != null && planItemId != null) {
-          await DocService.addLink(
-            documentId: docId,
-            linkedType: DocLinkedType.itineraryItem,
-            linkedId:   planItemId,
-            createdBy:  widget.userId,
-          );
-        }
-
-        count++;
+      // 2. Save each selected booking sequentially, tracking successes so a
+      // partial failure leaves already-saved items deselected, preventing
+      // duplicates on retry.
+      final selectedIndices = [
+        for (int i = 0; i < widget.bookings.length; i++)
+          if (_selected[i]) i,
+      ];
+      for (final i in selectedIndices) {
+        await _saveBooking(i, docId);
+        succeeded.add(i);
       }
+      final count = selectedIndices.length;
 
       if (!mounted) return;
       final planCount = _selected
@@ -193,6 +200,12 @@ class _ParsedItineraryScreenState extends State<ParsedItineraryScreen> {
       widget.onDone?.call();
     } catch (e) {
       if (!mounted) return;
+      // Deselect already-saved bookings so retry doesn't duplicate them.
+      if (succeeded.isNotEmpty) {
+        setState(() {
+          for (final i in succeeded) _selected[i] = false;
+        });
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
       );
@@ -259,7 +272,7 @@ class _ParsedItineraryScreenState extends State<ParsedItineraryScreen> {
                 addToPlan:  _addToPlan[i],
                 titleCtrl:  _titleCtrls[i],
                 matchingDay: _matchingDay(widget.bookings[i].date),
-                daysLoading: _daysLoading,
+                daysLoading: loading,
                 onToggle:    (v) => setState(() => _selected[i] = v),
                 onPlanToggle: (v) => setState(() => _addToPlan[i] = v),
               ),

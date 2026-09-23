@@ -268,6 +268,9 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
     if (info.city != null && _cityCtrl.text.trim().isEmpty) {
       _cityCtrl.text = info.city!;
     }
+    if (info.area != null && info.area!.isNotEmpty && _areaCtrl.text.trim().isEmpty) {
+      _areaCtrl.text = info.area!;
+    }
     if (info.country != null && _countryCtrl.text.trim().isEmpty) {
       _countryCtrl.text = info.country!;
     }
@@ -285,10 +288,10 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
 
   void _applySuggestion(PlaceSuggestion place) {
     _nameCtrl.text    = place.name;
-    _cityCtrl.text    = place.city;
-    _areaCtrl.text    = place.area;
-    _addressCtrl.text = place.address;
-    _countryCtrl.text = place.country;
+    if (place.city.isNotEmpty)    _cityCtrl.text    = place.city;
+    if (place.area.isNotEmpty)    _areaCtrl.text    = place.area;
+    if (place.address.isNotEmpty) _addressCtrl.text = place.address;
+    if (place.country.isNotEmpty) _countryCtrl.text = place.country;
     _mapsCtrl.text    = place.mapsUrl;
 
     // If the search returned no specific category (defaulted to landmark),
@@ -402,6 +405,11 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
       final Spot spot;
       if (widget.isEditing) {
         final addrInput = _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim();
+        // Fetch a photo if we have a placeId and the spot currently has no image.
+        String? imageUrl;
+        if (_placeId != null && (widget.initialSpot!.imageUrl == null || widget.initialSpot!.imageUrl!.trim().isEmpty)) {
+          imageUrl = await PlaceSearchService.fetchPhotoUrl(_placeId!);
+        }
         spot = await SpotService.updateSpot(
           spotId:      widget.initialSpot!.id,
           name:        _nameCtrl.text.trim(),
@@ -417,6 +425,7 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
           latitude:    _latitude,
           longitude:   _longitude,
           placeSource: _placeSource,
+          imageUrl:    imageUrl,
         );
       } else {
         final addrInput = _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim();
@@ -445,6 +454,7 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
           imageUrl:    imageUrl,
         );
       }
+      if (!mounted) return;
       widget.onSubmit(spot);
       if (!widget.isEditing && _notifyOnAdd) {
         pushNotify(

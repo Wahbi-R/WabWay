@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/async_screen_mixin.dart';
 import '../core/providers/profile_provider.dart';
 import '../core/providers/trip_provider.dart';
 import '../core/supabase/client.dart';
@@ -22,12 +23,9 @@ class PhotosScreen extends ConsumerStatefulWidget {
   ConsumerState<PhotosScreen> createState() => _PhotosScreenState();
 }
 
-class _PhotosScreenState extends ConsumerState<PhotosScreen> {
+class _PhotosScreenState extends ConsumerState<PhotosScreen> with AsyncScreenMixin {
   List<TripPhotoAlbum> _albums = [];
-  bool _loading = true;
-  bool _error   = false;
-  bool _offline  = false;
-  String? _activeTripId;
+  String _activeTripId = '';
   RealtimeChannel? _channel;
   Timer? _debounce;
 
@@ -38,7 +36,7 @@ class _PhotosScreenState extends ConsumerState<PhotosScreen> {
       if (!mounted) return;
       _activeTripId = ref.read(activeTripIdProvider);
       _load();
-      _subscribe(_activeTripId!);
+      if (_activeTripId.isNotEmpty) _subscribe(_activeTripId);
     });
   }
 
@@ -72,21 +70,13 @@ class _PhotosScreenState extends ConsumerState<PhotosScreen> {
   }
 
   Future<void> _load({bool silent = false}) async {
-    if (!silent) setState(() { _loading = true; _error = false; });
+    if (_activeTripId.isEmpty) return;
+    final gen = beginLoad(silent: silent);
     try {
-      final albums = await PhotoAlbumService.loadAlbums(_activeTripId!);
-      if (mounted) {
-        setState(() {
-          _albums  = albums;
-          _loading = false;
-          _error   = false;
-          _offline  = false;
-        });
-      }
+      final albums = await PhotoAlbumService.loadAlbums(_activeTripId);
+      commitLoad(gen, () => _albums = albums);
     } catch (_) {
-      if (!mounted) return;
-      if (silent) { setState(() => _offline = true); return; }
-      setState(() { _loading = false; _error = true; });
+      failLoad(gen, silent: silent || _albums.isNotEmpty);
     }
   }
 
@@ -94,7 +84,7 @@ class _PhotosScreenState extends ConsumerState<PhotosScreen> {
     final userId = ref.read(profileProvider)?.id ?? '';
     final album  = await showAddAlbumSheet(
       context,
-      tripId: _activeTripId!,
+      tripId: _activeTripId,
       userId: userId,
     );
     if (album != null && mounted) {
@@ -142,7 +132,7 @@ class _PhotosScreenState extends ConsumerState<PhotosScreen> {
       if (next != _activeTripId) {
         _activeTripId = next;
         _load();
-        _subscribe(next);
+        if (next.isNotEmpty) _subscribe(next);
       }
     });
     final currentUserId = ref.watch(profileProvider)?.id;
@@ -162,9 +152,9 @@ class _PhotosScreenState extends ConsumerState<PhotosScreen> {
           const SizedBox(width: kSpace2),
         ],
       ),
-      body: _loading
+      body: loading
           ? const WabwayLoadingIndicator()
-          : _error
+          : error
               ? Center(
                   child: WabwayEmptyState(
                     icon: Icons.wifi_off_rounded,
@@ -229,7 +219,7 @@ class _PhotosScreenState extends ConsumerState<PhotosScreen> {
           : null,
     );
 
-    if (!_offline) return scaffold;
+    if (!offline) return scaffold;
     return Stack(
       children: [
         scaffold,

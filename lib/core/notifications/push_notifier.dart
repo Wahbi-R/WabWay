@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../screens/notification_settings_screen.dart';
 
 /// Fire-and-forget push via the send-notification Edge Function.
 /// Checks the local notification pref key before sending — if the user
@@ -16,8 +15,10 @@ Future<void> pushNotify({
   String? prefKey, // one of kPrefNotif* constants — null means always send
   bool highPriority = false,
 }) async {
-  if (kIsWeb) return;
-  if (prefKey != null) {
+  // On native, respect the per-category pref. On web, SharedPreferences is
+  // unavailable but we still need to fire the Edge Function so other members
+  // on native receive their notifications.
+  if (!kIsWeb && prefKey != null) {
     final prefs = await SharedPreferences.getInstance();
     if (!(prefs.getBool(prefKey) ?? true)) return;
   }

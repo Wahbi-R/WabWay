@@ -37,6 +37,9 @@ abstract final class OfflineCache {
   static String docsKey(String tripId)              => 'cache_docs_$tripId';
   static String planKey(String tripId)              => 'cache_plan_$tripId';
   static String travelKey(String tripId)            => 'cache_travel_$tripId';
+  static String accommodationsKey(String tripId)    => 'cache_accommodations_$tripId';
+  static String shoppingKey(String tripId)          => 'cache_shopping_$tripId';
+  static String packingKey(String tripId)           => 'cache_packing_$tripId';
   static String linksKey(String tripId)             => 'cache_links_$tripId';
   static String moneyReceiptsKey(String tripId)     => 'cache_money_receipts_$tripId';
   static String moneyWithdrawalsKey(String tripId)  => 'cache_money_withdrawals_$tripId';

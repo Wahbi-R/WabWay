@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/async_screen_mixin.dart';
 import '../core/providers/profile_provider.dart';
 import '../core/providers/trip_provider.dart';
 import '../core/supabase/client.dart';
@@ -31,15 +32,11 @@ class DocsScreen extends ConsumerStatefulWidget {
   ConsumerState<DocsScreen> createState() => _DocsScreenState();
 }
 
-class _DocsScreenState extends ConsumerState<DocsScreen> {
+class _DocsScreenState extends ConsumerState<DocsScreen> with AsyncScreenMixin {
   List<TripDocument> _docs = [];
   List<Spot> _availableSpots = [];
 
-  bool _loading = true;
-  bool _error = false;
-  bool _offline = false;
-
-  String? _activeTripId;
+  String _activeTripId = '';
   RealtimeChannel? _realtimeChannel;
   Timer? _debounce;
 
@@ -74,7 +71,7 @@ class _DocsScreenState extends ConsumerState<DocsScreen> {
       _rebuildMemberName();
       _loadDocs();
       _loadAvailableSpots();
-      _subscribeRealtime(_activeTripId!);
+      if (_activeTripId.isNotEmpty) _subscribeRealtime(_activeTripId);
     });
   }
 
@@ -90,34 +87,31 @@ class _DocsScreenState extends ConsumerState<DocsScreen> {
   // ── Data loading ─────────────────────────────────────────────────────────────
 
   Future<void> _loadDocs({bool silent = false}) async {
-    if (!silent) setState(() { _loading = true; _error = false; });
+    final tripId = _activeTripId;
+    if (tripId.isEmpty) return;
+    final gen = beginLoad(silent: silent);
+    if (!silent) setState(() => _docs = []);
+
+    if (!silent) {
+      final cached = await DocService.loadDocumentsFromCache(tripId);
+      if (isStale(gen)) return;
+      if (cached != null) commitLoad(gen, () => _docs = cached);
+    }
+
     try {
-      final tripId = _activeTripId!;
       final docs = await DocService.loadDocuments(tripId);
-      if (!mounted) return;
-      setState(() { _docs = docs; _loading = false; _offline = false; });
+      commitLoad(gen, () => _docs = docs);
     } catch (_) {
-      if (!mounted) return;
-      if (silent) { setState(() => _offline = true); return; }
-      // Try cached data on cold-start failure
-      final tripId = _activeTripId ?? '';
-      final cached = tripId.isNotEmpty
-          ? await DocService.loadDocumentsFromCache(tripId)
-          : null;
-      if (!mounted) return;
-      if (cached != null) {
-        setState(() { _docs = cached; _loading = false; _offline = true; });
-      } else {
-        setState(() { _loading = false; _error = true; });
-      }
+      failLoad(gen, silent: silent || _docs.isNotEmpty);
     }
   }
 
   Future<void> _loadAvailableSpots() async {
     try {
-      final tripId = _activeTripId!;
+      final tripId = _activeTripId;
+      if (tripId.isEmpty) return;
       final spots = await SpotService.loadSpots(tripId);
-      if (mounted) setState(() => _availableSpots = spots);
+      if (mounted && _activeTripId == tripId) setState(() => _availableSpots = spots);
     } catch (_) {}
   }
 
@@ -158,7 +152,7 @@ class _DocsScreenState extends ConsumerState<DocsScreen> {
 
   Future<void> _addDoc(BuildContext context) async {
     final trip = ref.read(activeTripProvider);
-    final tripId   = trip?.id ?? _activeTripId ?? '';
+    final tripId   = trip?.id ?? _activeTripId;
     final tripName = trip?.name ?? 'Trip';
     final userId   = ref.read(profileProvider)?.id ?? '';
 
@@ -309,12 +303,12 @@ class _DocsScreenState extends ConsumerState<DocsScreen> {
         _rebuildMemberName();
         _loadDocs();
         _loadAvailableSpots();
-        _subscribeRealtime(next);
+        if (next.isNotEmpty) _subscribeRealtime(next);
       }
     });
-    if (_loading) return const WabwayLoadingScaffold();
+    if (loading) return const WabwayLoadingScaffold();
 
-    if (_error) {
+    if (error) {
       return Scaffold(
         backgroundColor: kColorCream,
         body: Center(
@@ -334,7 +328,7 @@ class _DocsScreenState extends ConsumerState<DocsScreen> {
 
     final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
     final base = isDesktop ? _buildDesktop(context) : _buildMobile(context);
-    if (!_offline) return base;
+    if (!offline) return base;
     return Stack(
       children: [
         base,
@@ -431,7 +425,7 @@ class _DocsScreenState extends ConsumerState<DocsScreen> {
       child: DocDetailContent(
         key: ValueKey(doc.id),
         doc: doc,
-        tripId: trip?.id ?? _activeTripId ?? '',
+        tripId: trip?.id ?? _activeTripId,
         tripName: trip?.name ?? 'Trip',
         availableSpots: _availableSpots,
         onDelete: () => _deleteDoc(doc),
@@ -533,7 +527,7 @@ class _DocsScreenState extends ConsumerState<DocsScreen> {
                           MaterialPageRoute(
                             builder: (_) => DocDetailScreen(
                               doc: doc,
-                              tripId: trip?.id ?? _activeTripId ?? '',
+                              tripId: trip?.id ?? _activeTripId,
                               tripName: trip?.name ?? 'Trip',
                               availableSpots: _availableSpots,
                               onDelete: () => _deleteDoc(doc),

@@ -9,7 +9,10 @@ import 'package:supabase_flutter/supabase_flutter.dart'
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/providers/profile_provider.dart';
 import '../core/providers/trip_provider.dart';
+import '../core/async_screen_mixin.dart';
 import '../core/supabase/accommodation_service.dart';
+import '../data/connection_data.dart' show EntityType;
+import 'shared/connections_section.dart';
 import '../core/supabase/client.dart';
 import '../core/supabase/doc_service.dart';
 import '../core/supabase/spot_service.dart';
@@ -20,9 +23,11 @@ import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
 import '../widgets/widgets.dart';
+import 'package:latlong2/latlong.dart';
 import 'spots/spot_list_tile.dart';
 import 'spots/spot_detail.dart';
 import 'spots/add_spot_sheet.dart';
+import 'map_screen.dart';
 
 // Sort modes available on the spots list. Applied after filters and search.
 enum _SpotSort {
@@ -39,29 +44,29 @@ class SpotsScreen extends ConsumerStatefulWidget {
   ConsumerState<SpotsScreen> createState() => _SpotsScreenState();
 }
 
-class _SpotsScreenState extends ConsumerState<SpotsScreen> {
+class _SpotsScreenState extends ConsumerState<SpotsScreen> with AsyncScreenMixin {
   List<Spot> _spots = [];
   List<TripDocument> _docs = [];
   List<Accommodation> _stays = [];
   Map<String, VoteType> _myVotes = {};
-  bool _loading = true;
-  bool _error = false;
-  bool _offline = false;
 
-  String? _activeTripId;
+  String _activeTripId = '';
   RealtimeChannel? _realtimeChannel;
   Timer? _debounce;
-  // Tracks spots for which we've already kicked off a thumbnail fetch this session.
-  // Without this, every silent reload would re-request images that already failed.
 
   String? _selectedId;
   SpotCategory? _filterCategory;
+  bool _filterStays = false;
   Set<SpotStatus> _filterStatuses = {};
   String? _filterCity;
   String _searchQuery = '';
   bool _showSearch = false;
   _SpotSort _sortBy = _SpotSort.newest;
   final _searchCtrl = TextEditingController();
+
+  // Multi-select / bulk-delete
+  bool _selectionMode = false;
+  Set<String> _selectedIds = {};
 
   int get _advancedFilterCount =>
       _filterStatuses.length + (_filterCity != null ? 1 : 0);
@@ -73,7 +78,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
       if (!mounted) return;
       _activeTripId = ref.read(activeTripIdProvider);
       _loadSpots();
-      _subscribeRealtime(_activeTripId!);
+      if (_activeTripId.isNotEmpty) _subscribeRealtime(_activeTripId);
     });
   }
 
@@ -134,18 +139,51 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
   }
 
   Future<void> _loadSpots({bool silent = false}) async {
-    if (!silent) setState(() { _loading = true; _error = false; });
+    final tripId = _activeTripId;
+    if (tripId.isEmpty) return;
+    final gen = beginLoad(silent: silent);
+    if (!silent) setState(() { _spots = []; _docs = []; _stays = []; _myVotes = {}; });
+
+    if (!silent) {
+      final cachedSpots = await SpotService.loadSpotsFromCache(tripId);
+      final cachedDocs  = await DocService.loadDocumentsFromCache(tripId);
+      final cachedStays = await AccommodationService.loadFromCache(tripId);
+      if (isStale(gen)) return;
+      if (cachedSpots != null) {
+        final myId = supabase.auth.currentUser?.id;
+        final cachedVotes = <String, VoteType>{};
+        if (myId != null) {
+          for (final spot in cachedSpots) {
+            for (final type in VoteType.values) {
+              if (spot.votes.voters(type).contains(myId)) {
+                cachedVotes[spot.id] = type;
+                break;
+              }
+            }
+          }
+        }
+        commitLoad(gen, () {
+          _spots   = cachedSpots;
+          _docs    = cachedDocs ?? [];
+          _stays   = cachedStays ?? [];
+          _myVotes = cachedVotes;
+        });
+      }
+    }
+
     try {
-      final tripId = _activeTripId!;
       final results = await Future.wait([
         SpotService.loadSpots(tripId),
         DocService.loadDocuments(tripId),
-        AccommodationService.loadAll(tripId),
+        // Accommodations caught separately so a transient failure doesn't
+        // prevent spots/docs from loading.
+        AccommodationService.loadAll(tripId)
+            .then<List<Accommodation>?>((v) => v, onError: (_) => null),
       ]);
       final spots = results[0] as List<Spot>;
       final docs  = results[1] as List<TripDocument>;
-      final stays = results[2] as List<Accommodation>;
-      if (!mounted) return;
+      final stays = results[2] as List<Accommodation>?; // null means fetch failed; keep cached _stays
+      if (isStale(gen)) return;
 
       final myId = supabase.auth.currentUser?.id;
       final myVotes = <String, VoteType>{};
@@ -160,42 +198,30 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
         }
       }
 
-      setState(() {
+      commitLoad(gen, () {
         _spots = spots;
         _docs = docs;
-        _stays = stays;
+        if (stays != null) _stays = stays;
         _myVotes = myVotes;
-        _loading = false;
-        _offline = false;
       });
     } catch (_) {
-      if (!mounted) return;
-      if (silent) { setState(() => _offline = true); return; }
-      // Try to show cached data on cold-start failure
-      final tripId = _activeTripId ?? '';
-      final cachedSpots = tripId.isNotEmpty
-          ? await SpotService.loadSpotsFromCache(tripId)
-          : null;
-      final cachedDocs = tripId.isNotEmpty
-          ? await DocService.loadDocumentsFromCache(tripId)
-          : null;
-      if (!mounted) return;
-      if (cachedSpots != null) {
-        setState(() {
-          _spots = cachedSpots;
-          _docs = cachedDocs ?? _docs;
-          _loading = false;
-          _offline = true;
-        });
-      } else {
-        setState(() { _loading = false; _error = true; });
-      }
+      failLoad(gen, silent: silent || _spots.isNotEmpty);
     }
   }
 
   // Fired after every successful load. Kicks off background Wikipedia lookups
   // for spots that have no image yet. Each lookup is fire-and-forget — results
   // stream in over ~1-2 seconds and update the list row by row.
+  List<Accommodation> get _filteredStays {
+    final q = _searchQuery.toLowerCase();
+    if (q.isEmpty) return _stays;
+    return _stays.where((s) =>
+      s.name.toLowerCase().contains(q) ||
+      s.city.toLowerCase().contains(q) ||
+      (s.address?.toLowerCase().contains(q) ?? false)
+    ).toList();
+  }
+
   List<Spot> get _filtered {
     final list = _spots.where((s) {
       final q = _searchQuery.toLowerCase();
@@ -257,7 +283,8 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
   // ─── Mutations ───────────────────────────────────────────────────────────────
 
   Future<void> _addSpot(BuildContext context) async {
-    final tripId = _activeTripId!;
+    final tripId = _activeTripId;
+    if (tripId.isEmpty) return;
     final userId = ref.read(profileProvider)?.id ?? '';
     final spot = await showAddSpotSheet(context, tripId: tripId, userId: userId);
     if (spot != null && mounted) {
@@ -294,8 +321,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
         await SpotService.upsertVote(spotId: spotId, userId: myId, vote: type);
       }
     } catch (_) {
-      // Revert on failure
-      await _loadSpots();
+      await _loadSpots(silent: true);
     }
   }
 
@@ -324,6 +350,105 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
           ),
         );
       }
+    }
+  }
+
+  // ─── Multi-select ────────────────────────────────────────────────────────────
+
+  void _enterSelectionMode(String spotId) {
+    setState(() {
+      _selectionMode = true;
+      _selectedIds = {spotId};
+    });
+  }
+
+  void _exitSelectionMode() {
+    setState(() {
+      _selectionMode = false;
+      _selectedIds = {};
+    });
+  }
+
+  void _toggleSelection(String spotId) {
+    setState(() {
+      if (_selectedIds.contains(spotId)) {
+        _selectedIds = {..._selectedIds}..remove(spotId);
+      } else {
+        _selectedIds = {..._selectedIds, spotId};
+      }
+      if (_selectedIds.isEmpty) {
+        _selectionMode = false;
+      }
+    });
+  }
+
+  Future<void> _deleteSelected() async {
+    final ids = List<String>.from(_selectedIds);
+    final deletable = ids.where((id) {
+      final spot = _spots.where((s) => s.id == id).firstOrNull;
+      return spot != null && _canDelete(spot);
+    }).toList();
+
+    final count = deletable.length;
+    final skipped = ids.length - count;
+    if (count == 0) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text("You don't have permission to delete the selected spots.",
+              style: kStyleBody.copyWith(color: Colors.white)),
+          backgroundColor: kColorDanger,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Delete $count ${count == 1 ? 'spot' : 'spots'}?',
+            style: kStyleBodyBold),
+        content: Text(
+          skipped > 0
+              ? 'This will permanently delete $count ${count == 1 ? 'spot' : 'spots'}. ($skipped skipped — you don\'t have permission to delete those.)'
+              : 'This will permanently delete $count ${count == 1 ? 'spot' : 'spots'}. This can\'t be undone.',
+          style: kStyleBody,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Delete', style: TextStyle(color: kColorDanger)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    int failed = 0;
+    await Future.wait(deletable.map((id) async {
+      try {
+        await SpotService.deleteSpot(id);
+        if (mounted) setState(() {
+          _spots.removeWhere((s) => s.id == id);
+          if (_selectedId == id) _selectedId = null;
+        });
+      } catch (_) {
+        failed++;
+      }
+    }));
+    if (!mounted) return;
+    _exitSelectionMode();
+    if (failed > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('$failed ${failed == 1 ? 'spot' : 'spots'} could not be deleted.',
+            style: kStyleBody.copyWith(color: Colors.white)),
+        backgroundColor: kColorDanger,
+        behavior: SnackBarBehavior.floating,
+      ));
     }
   }
 
@@ -400,7 +525,11 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
       context: context,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _StayMiniSheet(stay: stay, linkedSpot: linkedSpot),
+      builder: (_) => _StayMiniSheet(
+        stay: stay,
+        linkedSpot: linkedSpot,
+        tripId: _activeTripId,
+      ),
     );
   }
 
@@ -427,90 +556,38 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
           onOpenStay: linkedStay != null
               ? () => _openStayDetailMobile(context, linkedStay)
               : null,
+          onShowOnMap: spot.isMapReady
+              ? () {
+                  Navigator.pop(context);
+                  Navigator.push<void>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => MapScreen(
+                        initialFocus: LatLng(spot.latitude!, spot.longitude!),
+                      ),
+                    ),
+                  );
+                }
+              : null,
         ),
       ),
     );
   }
 
-  // ─── Quick status from long-press ─────────────────────────────────────────────
-
-  void _quickStatusSheet(BuildContext context, Spot spot) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: kColorPaper,
-      shape: const RoundedRectangleBorder(borderRadius: kRadiusSheet),
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const WabwayDragHandle(),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: kSpace4),
-              child: Text(
-                spot.name,
-                style: kStyleBodyBold,
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const SizedBox(height: kSpace2),
-            if (spot.status != SpotStatus.visited)
-              WabwayActionTile(
-                icon: Icons.check_circle_rounded,
-                label: 'Mark as visited',
-                color: kColorSuccess,
-                onTap: () { Navigator.pop(ctx); _setSpotStatus(spot, SpotStatus.visited); },
-              ),
-            if (spot.status != SpotStatus.skipped)
-              WabwayActionTile(
-                icon: Icons.cancel_rounded,
-                label: 'Skip this spot',
-                onTap: () { Navigator.pop(ctx); _setSpotStatus(spot, SpotStatus.skipped); },
-              ),
-            if (spot.status == SpotStatus.visited || spot.status == SpotStatus.skipped)
-              WabwayActionTile(
-                icon: Icons.restart_alt_rounded,
-                label: 'Reset to saved',
-                onTap: () { Navigator.pop(ctx); _setSpotStatus(spot, SpotStatus.idea); },
-              ),
-            const SizedBox(height: kSpace4),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _setSpotStatus(Spot spot, SpotStatus status) async {
-    try {
-      final updated = await SpotService.updateSpot(
-        spotId: spot.id,
-        name: spot.name,
-        city: spot.city,
-        area: spot.area,
-        category: spot.category,
-        status: status,
-        notes: spot.notes,
-        mapsUrl: spot.mapsUrl,
-        sourceUrl: spot.sourceUrl,
-        address: spot.address,
-      );
-      if (mounted) _onEditSpot(updated);
-    } catch (_) {}
-  }
 
   @override
   Widget build(BuildContext context) {
     ref.listen<String>(activeTripIdProvider, (prev, next) {
       if (next != _activeTripId) {
         _activeTripId = next;
+        _exitSelectionMode();
         _loadSpots();
         _subscribeRealtime(next);
       }
     });
-    if (_loading) return const WabwayLoadingScaffold();
+    if (loading) return const WabwayLoadingScaffold();
 
-    if (_error) {
+    if (error) {
       return Scaffold(
         backgroundColor: kColorCream,
         body: Center(
@@ -532,21 +609,26 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
 
     Widget body = isDesktop
         ? _DesktopLayout(
-            spots: _filtered,
+            spots: _filterStays ? const [] : _filtered,
             allSpots: _spots,
-            stays: _stays,
+            stays: _filteredStays,
+            totalStayCount: _stays.length,
             docs: _docs,
             selected: _selected,
             myVotes: _myVotes,
             filterCategory: _filterCategory,
+            filterStays: _filterStays,
             filterStatuses: _filterStatuses,
             searchQuery: _searchQuery,
             searchCtrl: _searchCtrl,
             showSearch: _showSearch,
             sortBy: _sortBy,
             canDelete: _canDelete,
+            selectionMode: _selectionMode,
+            selectedIds: _selectedIds,
             onSelectSpot: (s) => setState(() => _selectedId = s?.id),
-            onFilterCategory: (c) => setState(() => _filterCategory = c),
+            onFilterCategory: (c) => setState(() { _filterCategory = c; _filterStays = false; }),
+            onFilterStays: () => setState(() { _filterStays = !_filterStays; _filterCategory = null; }),
             onToggleStatus: (s) => setState(() {
               if (_filterStatuses.contains(s)) {
                 _filterStatuses = {..._filterStatuses}..remove(s);
@@ -569,23 +651,35 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
             onEdit: _onEditSpot,
             onAdd: () => _addSpot(context),
             onOpenStay: (a) => _openStayDetailMobile(context, a),
+            onLongPressSpot: _enterSelectionMode,
+            onToggleSelection: _toggleSelection,
+            onExitSelectionMode: _exitSelectionMode,
+            onDeleteSelected: _deleteSelected,
           )
         : _MobileLayout(
-            spots: _filtered,
+            spots: _filterStays ? const [] : _filtered,
             allSpots: _spots,
-            stays: _stays,
+            stays: _filteredStays,
+            totalStayCount: _stays.length,
             myVotes: _myVotes,
             filterCategory: _filterCategory,
+            filterStays: _filterStays,
             filterStatuses: _filterStatuses,
             advancedFilterCount: _advancedFilterCount,
             searchQuery: _searchQuery,
             searchCtrl: _searchCtrl,
             showSearch: _showSearch,
             sortBy: _sortBy,
+            selectionMode: _selectionMode,
+            selectedIds: _selectedIds,
             onOpenSpot: (s) => _openDetailMobile(context, s),
             onOpenStay: (a) => _openStayDetailMobile(context, a),
-            onLongPress: (s) => _quickStatusSheet(context, s),
-            onFilterCategory: (c) => setState(() => _filterCategory = c),
+            onLongPress: _enterSelectionMode,
+            onToggleSelection: _toggleSelection,
+            onExitSelectionMode: _exitSelectionMode,
+            onDeleteSelected: _deleteSelected,
+            onFilterCategory: (c) => setState(() { _filterCategory = c; _filterStays = false; }),
+            onFilterStays: () => setState(() { _filterStays = !_filterStays; _filterCategory = null; }),
             onToggleStatus: (s) => setState(() {
               if (_filterStatuses.contains(s)) {
                 _filterStatuses = {..._filterStatuses}..remove(s);
@@ -606,7 +700,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> {
             onExport: _exportSpots,
             onAdd: () => _addSpot(context),
           );
-    if (!_offline) return body;
+    if (!offline) return body;
     return Stack(
       children: [
         body,
@@ -646,18 +740,26 @@ class _MobileLayout extends StatelessWidget {
     required this.spots,
     required this.allSpots,
     required this.stays,
+    required this.totalStayCount,
     required this.myVotes,
     required this.filterCategory,
+    required this.filterStays,
     required this.filterStatuses,
     required this.advancedFilterCount,
     required this.searchQuery,
     required this.searchCtrl,
     required this.showSearch,
     required this.sortBy,
+    required this.selectionMode,
+    required this.selectedIds,
     required this.onOpenSpot,
     required this.onOpenStay,
     required this.onLongPress,
+    required this.onToggleSelection,
+    required this.onExitSelectionMode,
+    required this.onDeleteSelected,
     required this.onFilterCategory,
+    required this.onFilterStays,
     required this.onToggleStatus,
     required this.onSearch,
     required this.onToggleSearch,
@@ -670,18 +772,26 @@ class _MobileLayout extends StatelessWidget {
   final List<Spot> spots;
   final List<Spot> allSpots;
   final List<Accommodation> stays;
+  final int totalStayCount;
   final Map<String, VoteType> myVotes;
   final SpotCategory? filterCategory;
+  final bool filterStays;
   final Set<SpotStatus> filterStatuses;
   final int advancedFilterCount;
   final String searchQuery;
   final TextEditingController searchCtrl;
   final bool showSearch;
   final _SpotSort sortBy;
+  final bool selectionMode;
+  final Set<String> selectedIds;
   final ValueChanged<Spot> onOpenSpot;
   final ValueChanged<Accommodation> onOpenStay;
-  final ValueChanged<Spot> onLongPress;
+  final ValueChanged<String> onLongPress;
+  final ValueChanged<String> onToggleSelection;
+  final VoidCallback onExitSelectionMode;
+  final Future<void> Function() onDeleteSelected;
   final ValueChanged<SpotCategory?> onFilterCategory;
+  final VoidCallback onFilterStays;
   final ValueChanged<SpotStatus> onToggleStatus;
   final ValueChanged<String> onSearch;
   final VoidCallback onToggleSearch;
@@ -697,81 +807,106 @@ class _MobileLayout extends StatelessWidget {
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
-            title: showSearch
-                ? _SearchField(controller: searchCtrl, onChanged: onSearch)
-                : Text('Spots', style: kStyleTitle),
+            leading: selectionMode
+                ? IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    color: kColorInkSoft,
+                    onPressed: onExitSelectionMode,
+                  )
+                : null,
+            title: selectionMode
+                ? Text(
+                    '${selectedIds.length} selected',
+                    style: kStyleTitle,
+                  )
+                : showSearch
+                    ? _SearchField(controller: searchCtrl, onChanged: onSearch)
+                    : Text('Spots', style: kStyleTitle),
             pinned: true,
-            actions: [
-              IconButton(
-                icon: Icon(
-                  showSearch ? Icons.close_rounded : Icons.search_rounded,
-                ),
-                color: kColorInkSoft,
-                onPressed: onToggleSearch,
-              ),
-              // Share the filtered list as a CSV
-              if (!showSearch && spots.isNotEmpty)
-                IconButton(
-                  icon: const Icon(Icons.ios_share_rounded),
-                  color: kColorInkSoft,
-                  tooltip: 'Export spots as CSV',
-                  onPressed: onExport,
-                ),
-              // Sort popup — icon is highlighted when a non-default sort is active
-              PopupMenuButton<_SpotSort>(
-                icon: Icon(
-                  Icons.sort_rounded,
-                  color: sortBy != _SpotSort.newest ? kColorPrimary : kColorInkSoft,
-                ),
-                tooltip: 'Sort',
-                onSelected: onSortChange,
-                itemBuilder: (_) => [
-                  _sortMenuItem(_SpotSort.newest,       'Newest first', sortBy),
-                  _sortMenuItem(_SpotSort.alphabetical, 'A – Z',        sortBy),
-                  _sortMenuItem(_SpotSort.mostVoted,    'Most voted',   sortBy),
-                  _sortMenuItem(_SpotSort.byCity,       'By city',      sortBy),
-                ],
-              ),
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.tune_rounded),
-                    color: advancedFilterCount > 0 ? kColorPrimary : kColorInkSoft,
-                    onPressed: onFilter,
-                  ),
-                  if (advancedFilterCount > 0)
-                    Positioned(
-                      right: 6,
-                      top: 6,
-                      child: Container(
-                        width: 14,
-                        height: 14,
-                        decoration: const BoxDecoration(
-                          color: kColorPrimary,
-                          shape: BoxShape.circle,
+            actions: selectionMode
+                ? [
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline_rounded),
+                      color: kColorDanger,
+                      tooltip: 'Delete selected',
+                      onPressed: selectedIds.isEmpty ? null : onDeleteSelected,
+                    ),
+                    const SizedBox(width: kSpace2),
+                  ]
+                : [
+                    IconButton(
+                      icon: Icon(
+                        showSearch ? Icons.close_rounded : Icons.search_rounded,
+                      ),
+                      color: kColorInkSoft,
+                      onPressed: onToggleSearch,
+                    ),
+                    // Share the filtered list as a CSV
+                    if (!showSearch && spots.isNotEmpty)
+                      IconButton(
+                        icon: const Icon(Icons.ios_share_rounded),
+                        color: kColorInkSoft,
+                        tooltip: 'Export spots as CSV',
+                        onPressed: onExport,
+                      ),
+                    // Sort popup — icon is highlighted when a non-default sort is active
+                    PopupMenuButton<_SpotSort>(
+                      icon: Icon(
+                        Icons.sort_rounded,
+                        color: sortBy != _SpotSort.newest ? kColorPrimary : kColorInkSoft,
+                      ),
+                      tooltip: 'Sort',
+                      onSelected: onSortChange,
+                      itemBuilder: (_) => [
+                        _sortMenuItem(_SpotSort.newest,       'Newest first', sortBy),
+                        _sortMenuItem(_SpotSort.alphabetical, 'A – Z',        sortBy),
+                        _sortMenuItem(_SpotSort.mostVoted,    'Most voted',   sortBy),
+                        _sortMenuItem(_SpotSort.byCity,       'By city',      sortBy),
+                      ],
+                    ),
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.tune_rounded),
+                          color: advancedFilterCount > 0 ? kColorPrimary : kColorInkSoft,
+                          onPressed: onFilter,
                         ),
-                        child: Center(
-                          child: Text(
-                            '$advancedFilterCount',
-                            style: kStyleCaption.copyWith(
-                              color: Colors.white,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
+                        if (advancedFilterCount > 0)
+                          Positioned(
+                            right: 6,
+                            top: 6,
+                            child: Container(
+                              width: 14,
+                              height: 14,
+                              decoration: const BoxDecoration(
+                                color: kColorPrimary,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  '$advancedFilterCount',
+                                  style: kStyleCaption.copyWith(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
+                      ],
                     ),
-                ],
-              ),
-              const SizedBox(width: kSpace2),
-            ],
+                    const SizedBox(width: kSpace2),
+                  ],
           ),
           SliverToBoxAdapter(
             child: _CategoryFilterStrip(
               selected: filterCategory,
+              staysSelected: filterStays,
+              stayCount: totalStayCount,
               onChanged: onFilterCategory,
+              onStaysSelected: onFilterStays,
               spots: allSpots,
             ),
           ),
@@ -831,12 +966,21 @@ class _MobileLayout extends StatelessWidget {
                 itemCount: spots.length,
                 separatorBuilder: (_, __) =>
                     const SizedBox(height: kSpace3),
-                itemBuilder: (_, i) => SpotListTile(
-                  spot: spots[i],
-                  myVote: myVotes[spots[i].id],
-                  onTap: () => onOpenSpot(spots[i]),
-                  onLongPress: () => onLongPress(spots[i]),
-                ),
+                itemBuilder: (_, i) {
+                  final s = spots[i];
+                  return SpotListTile(
+                    spot: s,
+                    myVote: myVotes[s.id],
+                    inSelectionMode: selectionMode,
+                    checkedForDelete: selectedIds.contains(s.id),
+                    onTap: selectionMode
+                        ? () => onToggleSelection(s.id)
+                        : () => onOpenSpot(s),
+                    onLongPress: selectionMode
+                        ? () => onToggleSelection(s.id)
+                        : () => onLongPress(s.id),
+                  );
+                },
               ),
             ),
           if (stays.isNotEmpty)
@@ -846,15 +990,17 @@ class _MobileLayout extends StatelessWidget {
           const SliverToBoxAdapter(child: SizedBox(height: kSpace16)),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'spots_fab',
-        onPressed: onAdd,
-        icon: const Icon(Icons.add_rounded),
-        label: Text(
-          'Add a spot',
-          style: kStyleButtonMd.copyWith(color: kColorTextOnPrimary),
-        ),
-      ),
+      floatingActionButton: selectionMode
+          ? null
+          : FloatingActionButton.extended(
+              heroTag: 'spots_fab',
+              onPressed: onAdd,
+              icon: const Icon(Icons.add_rounded),
+              label: Text(
+                'Add a spot',
+                style: kStyleButtonMd.copyWith(color: kColorTextOnPrimary),
+              ),
+            ),
     );
   }
 }
@@ -866,18 +1012,23 @@ class _DesktopLayout extends StatelessWidget {
     required this.spots,
     required this.allSpots,
     required this.stays,
+    required this.totalStayCount,
     required this.docs,
     required this.selected,
     required this.myVotes,
     required this.filterCategory,
+    required this.filterStays,
     required this.filterStatuses,
     required this.searchQuery,
     required this.searchCtrl,
     required this.showSearch,
     required this.sortBy,
     required this.canDelete,
+    required this.selectionMode,
+    required this.selectedIds,
     required this.onSelectSpot,
     required this.onFilterCategory,
+    required this.onFilterStays,
     required this.onToggleStatus,
     required this.onSearch,
     required this.onToggleSearch,
@@ -888,23 +1039,32 @@ class _DesktopLayout extends StatelessWidget {
     required this.onEdit,
     required this.onAdd,
     required this.onOpenStay,
+    required this.onLongPressSpot,
+    required this.onToggleSelection,
+    required this.onExitSelectionMode,
+    required this.onDeleteSelected,
   });
 
   final List<Spot> spots;
   final List<Spot> allSpots;
   final List<Accommodation> stays;
+  final int totalStayCount;
   final List<TripDocument> docs;
   final Spot? selected;
   final Map<String, VoteType> myVotes;
   final SpotCategory? filterCategory;
+  final bool filterStays;
   final Set<SpotStatus> filterStatuses;
   final String searchQuery;
   final TextEditingController searchCtrl;
   final bool showSearch;
   final _SpotSort sortBy;
   final bool Function(Spot) canDelete;
+  final bool selectionMode;
+  final Set<String> selectedIds;
   final ValueChanged<Spot?> onSelectSpot;
   final ValueChanged<SpotCategory?> onFilterCategory;
+  final VoidCallback onFilterStays;
   final ValueChanged<SpotStatus> onToggleStatus;
   final ValueChanged<String> onSearch;
   final VoidCallback onToggleSearch;
@@ -915,6 +1075,10 @@ class _DesktopLayout extends StatelessWidget {
   final ValueChanged<Spot> onEdit;
   final VoidCallback onAdd;
   final ValueChanged<Accommodation> onOpenStay;
+  final ValueChanged<String> onLongPressSpot;
+  final ValueChanged<String> onToggleSelection;
+  final VoidCallback onExitSelectionMode;
+  final Future<void> Function() onDeleteSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -927,11 +1091,15 @@ class _DesktopLayout extends StatelessWidget {
             searchCtrl: searchCtrl,
             sortBy: sortBy,
             hasSpots: spots.isNotEmpty,
+            selectionMode: selectionMode,
+            selectedCount: selectedIds.length,
             onSearch: onSearch,
             onToggleSearch: onToggleSearch,
             onSortChange: onSortChange,
             onExport: onExport,
             onAdd: onAdd,
+            onExitSelectionMode: onExitSelectionMode,
+            onDeleteSelected: onDeleteSelected,
           ),
 
           Expanded(
@@ -944,7 +1112,10 @@ class _DesktopLayout extends StatelessWidget {
                     children: [
                       _CategoryFilterStrip(
                         selected: filterCategory,
+                        staysSelected: filterStays,
+                        stayCount: totalStayCount,
                         onChanged: onFilterCategory,
+                        onStaysSelected: onFilterStays,
                         spots: allSpots,
                       ),
                       _StatusFilterStrip(
@@ -995,11 +1166,18 @@ class _DesktopLayout extends StatelessWidget {
                                                 : 0),
                                         child: SpotListTile(
                                           spot: s,
-                                          selected: selected?.id == s.id,
+                                          selected: !selectionMode && selected?.id == s.id,
                                           myVote: myVotes[s.id],
-                                          onTap: () => onSelectSpot(
-                                            selected?.id == s.id ? null : s,
-                                          ),
+                                          inSelectionMode: selectionMode,
+                                          checkedForDelete: selectedIds.contains(s.id),
+                                          onTap: selectionMode
+                                              ? () => onToggleSelection(s.id)
+                                              : () => onSelectSpot(
+                                                  selected?.id == s.id ? null : s,
+                                                ),
+                                          onLongPress: selectionMode
+                                              ? () => onToggleSelection(s.id)
+                                              : () => onLongPressSpot(s.id),
                                         ),
                                       );
                                     }),
@@ -1055,22 +1233,30 @@ class _DesktopTopBar extends StatelessWidget {
     required this.searchCtrl,
     required this.sortBy,
     required this.hasSpots,
+    required this.selectionMode,
+    required this.selectedCount,
     required this.onSearch,
     required this.onToggleSearch,
     required this.onSortChange,
     required this.onExport,
     required this.onAdd,
+    required this.onExitSelectionMode,
+    required this.onDeleteSelected,
   });
 
   final bool showSearch;
   final TextEditingController searchCtrl;
   final _SpotSort sortBy;
   final bool hasSpots;
+  final bool selectionMode;
+  final int selectedCount;
   final ValueChanged<String> onSearch;
   final VoidCallback onToggleSearch;
   final ValueChanged<_SpotSort> onSortChange;
   final VoidCallback onExport;
   final VoidCallback onAdd;
+  final VoidCallback onExitSelectionMode;
+  final Future<void> Function() onDeleteSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -1081,54 +1267,74 @@ class _DesktopTopBar extends StatelessWidget {
         color: kColorPaper,
         border: Border(bottom: BorderSide(color: kColorBorder)),
       ),
-      child: Row(
-        children: [
-          Text('Spots', style: kStyleTitle),
-          const SizedBox(width: kSpace4),
-          if (showSearch)
-            Expanded(
-              child: _SearchField(controller: searchCtrl, onChanged: onSearch),
+      child: selectionMode
+          ? Row(
+              children: [
+                WabwayIconButton(
+                  icon: Icons.close_rounded,
+                  label: 'Cancel',
+                  onPressed: onExitSelectionMode,
+                ),
+                const SizedBox(width: kSpace3),
+                Text('$selectedCount selected', style: kStyleTitle),
+                const Spacer(),
+                WabwayButton(
+                  label: 'Delete',
+                  icon: Icons.delete_outline_rounded,
+                  size: WabwayButtonSize.sm,
+                  variant: WabwayButtonVariant.danger,
+                  onPressed: selectedCount == 0 ? null : onDeleteSelected,
+                ),
+              ],
             )
-          else
-            const Spacer(),
-          WabwayIconButton(
-            icon: showSearch ? Icons.close_rounded : Icons.search_rounded,
-            label: showSearch ? 'Close search' : 'Search',
-            onPressed: onToggleSearch,
-          ),
-          const SizedBox(width: kSpace2),
-          if (hasSpots)
-            WabwayIconButton(
-              icon: Icons.ios_share_rounded,
-              label: 'Export CSV',
-              onPressed: onExport,
+          : Row(
+              children: [
+                Text('Spots', style: kStyleTitle),
+                const SizedBox(width: kSpace4),
+                if (showSearch)
+                  Expanded(
+                    child: _SearchField(controller: searchCtrl, onChanged: onSearch),
+                  )
+                else
+                  const Spacer(),
+                WabwayIconButton(
+                  icon: showSearch ? Icons.close_rounded : Icons.search_rounded,
+                  label: showSearch ? 'Close search' : 'Search',
+                  onPressed: onToggleSearch,
+                ),
+                const SizedBox(width: kSpace2),
+                if (hasSpots)
+                  WabwayIconButton(
+                    icon: Icons.ios_share_rounded,
+                    label: 'Export CSV',
+                    onPressed: onExport,
+                  ),
+                const SizedBox(width: kSpace2),
+                // Sort popup for desktop
+                PopupMenuButton<_SpotSort>(
+                  icon: Icon(
+                    Icons.sort_rounded,
+                    color: sortBy != _SpotSort.newest ? kColorPrimary : kColorInkSoft,
+                    size: 20,
+                  ),
+                  tooltip: 'Sort',
+                  onSelected: onSortChange,
+                  itemBuilder: (_) => [
+                    _sortMenuItem(_SpotSort.newest,       'Newest first', sortBy),
+                    _sortMenuItem(_SpotSort.alphabetical, 'A – Z',        sortBy),
+                    _sortMenuItem(_SpotSort.mostVoted,    'Most voted',   sortBy),
+                    _sortMenuItem(_SpotSort.byCity,       'By city',      sortBy),
+                  ],
+                ),
+                const SizedBox(width: kSpace2),
+                WabwayButton(
+                  label: 'Add a spot',
+                  icon: Icons.add_rounded,
+                  size: WabwayButtonSize.sm,
+                  onPressed: onAdd,
+                ),
+              ],
             ),
-          const SizedBox(width: kSpace2),
-          // Sort popup for desktop
-          PopupMenuButton<_SpotSort>(
-            icon: Icon(
-              Icons.sort_rounded,
-              color: sortBy != _SpotSort.newest ? kColorPrimary : kColorInkSoft,
-              size: 20,
-            ),
-            tooltip: 'Sort',
-            onSelected: onSortChange,
-            itemBuilder: (_) => [
-              _sortMenuItem(_SpotSort.newest,       'Newest first', sortBy),
-              _sortMenuItem(_SpotSort.alphabetical, 'A – Z',        sortBy),
-              _sortMenuItem(_SpotSort.mostVoted,    'Most voted',   sortBy),
-              _sortMenuItem(_SpotSort.byCity,       'By city',      sortBy),
-            ],
-          ),
-          const SizedBox(width: kSpace2),
-          WabwayButton(
-            label: 'Add a spot',
-            icon: Icons.add_rounded,
-            size: WabwayButtonSize.sm,
-            onPressed: onAdd,
-          ),
-        ],
-      ),
     );
   }
 }
@@ -1164,12 +1370,18 @@ class _CategoryFilterStrip extends StatefulWidget {
     required this.selected,
     required this.onChanged,
     required this.spots,
+    this.staysSelected = false,
+    this.stayCount = 0,
+    this.onStaysSelected,
   });
 
   final SpotCategory? selected;
   final ValueChanged<SpotCategory?> onChanged;
   // Full (unfiltered) spot list — used to show counts per category.
   final List<Spot> spots;
+  final bool staysSelected;
+  final int stayCount;
+  final VoidCallback? onStaysSelected;
 
   @override
   State<_CategoryFilterStrip> createState() => _CategoryFilterStripState();
@@ -1243,6 +1455,15 @@ class _CategoryFilterStripState extends State<_CategoryFilterStrip> {
                     ),
                   );
                 }),
+                if (widget.stayCount > 0 && widget.onStaysSelected != null)
+                  Padding(
+                    padding: const EdgeInsets.only(left: kSpace2),
+                    child: WabwayTag(
+                      label: 'Stays (${widget.stayCount})',
+                      selected: widget.staysSelected,
+                      onTap: widget.onStaysSelected!,
+                    ),
+                  ),
               ],
             ),
           ),
@@ -1698,9 +1919,10 @@ class _StayRow extends StatelessWidget {
 // ── Stay mini sheet ───────────────────────────────────────────────────────────
 
 class _StayMiniSheet extends StatelessWidget {
-  const _StayMiniSheet({required this.stay, this.linkedSpot});
+  const _StayMiniSheet({required this.stay, required this.tripId, this.linkedSpot});
 
   final Accommodation stay;
+  final String tripId;
   final Spot? linkedSpot;
 
   String _fmt(DateTime dt) =>
@@ -1709,13 +1931,20 @@ class _StayMiniSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final nights = stay.nights;
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(kSpace5, kSpace4, kSpace5, kSpace5),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: kColorPaper,
+        borderRadius: kRadiusSheet,
+      ),
+      child: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(kSpace5, kSpace4, kSpace5, kSpace5),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const WabwayDragHandle(),
+              const SizedBox(height: kSpace3),
             Row(
               children: [
                 Expanded(
@@ -1808,7 +2037,17 @@ class _StayMiniSheet extends StatelessWidget {
               ),
             ],
             const SizedBox(height: kSpace4),
+            if (tripId.isNotEmpty) ...[
+              const Divider(height: 1),
+              const SizedBox(height: kSpace4),
+              ConnectionsSection(
+                entityType: EntityType.stay,
+                entityId: stay.id,
+                tripId: tripId,
+              ),
+            ],
           ],
+          ),
         ),
       ),
     );

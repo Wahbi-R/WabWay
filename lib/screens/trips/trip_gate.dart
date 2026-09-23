@@ -5,9 +5,9 @@ import '../../core/connectivity_service.dart';
 import '../../core/invite/invite_link_handler.dart';
 import '../../core/providers/profile_provider.dart';
 import '../../core/providers/trip_provider.dart';
+import '../../core/supabase/auth_service.dart';
 import '../../core/supabase/client.dart';
 import '../../core/supabase/invite_service.dart';
-import '../../core/trip/app_trip.dart';
 import '../../shell/app_shell.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
@@ -88,7 +88,7 @@ class _TripGateState extends ConsumerState<TripGate> {
       backgroundColor: Colors.transparent,
       builder: (_) => JoinWithCodeSheet(initialCode: initialCode),
     );
-    if (tripId != null) await _reload();
+    if (tripId != null && mounted) await _reload();
   }
 
   @override
@@ -98,8 +98,10 @@ class _TripGateState extends ConsumerState<TripGate> {
     // Auto-reload and drain queued writes when connectivity is restored.
     ref.listen<bool>(connectivityProvider, (prev, isOnline) {
       if (isOnline && prev == false) {
-        final userId = ref.read(profileProvider)?.id ?? '';
-        ref.read(tripNotifierProvider.notifier).onReconnect(userId);
+        final userId = ref.read(profileProvider)?.id;
+        if (userId != null && userId.isNotEmpty) {
+          ref.read(tripNotifierProvider.notifier).onReconnect(userId);
+        }
       }
     });
 
@@ -203,7 +205,7 @@ class _NoTripsScreen extends StatelessWidget {
                   WabwayButton(
                     label: 'Log out',
                     variant: WabwayButtonVariant.ghost,
-                    onPressed: () => Supabase.instance.client.auth.signOut(),
+                    onPressed: () => AuthService.signOut(),
                     fullWidth: true,
                     icon: Icons.logout_rounded,
                   ),

@@ -240,12 +240,12 @@ abstract final class MoneyService {
       'notes':               (notes != null && notes.isNotEmpty) ? notes : null,
     }).eq('id', receiptId);
 
-    for (final split in splits) {
-      await supabase
-          .from('receipt_splits')
-          .update({'amount': split.amount})
-          .eq('receipt_id', receiptId)
-          .eq('user_id', split.memberId);
+    await supabase.from('receipt_splits').delete().eq('receipt_id', receiptId);
+    final nonZero = splits.where((s) => s.amount > 0).toList();
+    if (nonZero.isNotEmpty) {
+      await supabase.from('receipt_splits').insert(
+        nonZero.map((s) => {'receipt_id': receiptId, 'user_id': s.memberId, 'amount': s.amount}).toList(),
+      );
     }
 
     final full = await supabase

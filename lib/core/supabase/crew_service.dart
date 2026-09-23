@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/crew_data.dart';
 import 'client.dart';
@@ -95,6 +96,44 @@ abstract final class CrewService {
       'message_type': 'meetup_point',
       'lat': lat,
       'lng': lng,
+    });
+  }
+
+  static Future<({String path, String url})> uploadChatImage(
+      String tripId, String userId, Uint8List bytes, String ext) async {
+    final mime = switch (ext) {
+      'jpg' || 'jpeg' => 'image/jpeg',
+      'png'           => 'image/png',
+      'gif'           => 'image/gif',
+      'webp'          => 'image/webp',
+      'heic'          => 'image/heic',
+      _               => 'image/jpeg',
+    };
+    final path = '$tripId/${userId}_${DateTime.now().microsecondsSinceEpoch}.$ext';
+    await supabase.storage.from('trip-chat').uploadBinary(
+      path,
+      bytes,
+      fileOptions: FileOptions(contentType: mime, upsert: false),
+    );
+    final url = supabase.storage.from('trip-chat').getPublicUrl(path);
+    return (path: path, url: url);
+  }
+
+  static Future<void> deleteChatImage(String path) async {
+    await supabase.storage.from('trip-chat').remove([path]);
+  }
+
+  static Future<void> sendImageMessage({
+    required String tripId,
+    required String authorId,
+    required String imageUrl,
+  }) async {
+    await supabase.from('trip_messages').insert({
+      'trip_id': tripId,
+      'author_id': authorId,
+      'body': '',
+      'message_type': 'image',
+      'image_url': imageUrl,
     });
   }
 

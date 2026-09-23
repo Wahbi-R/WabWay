@@ -1,6 +1,8 @@
 // Shared utilities for WabWay integration tests.
 // ignore_for_file: avoid_print
 import 'dart:async';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -27,12 +29,23 @@ Widget testApp() => const ProviderScope(
 
 // ── Supabase ─────────────────────────────────────────────────────────────────
 
-Future<void> initSupabase() async {
+/// Full app initialization matching main.dart: Firebase + Supabase.
+/// Safe to call multiple times — both are idempotent.
+Future<void> initApp() async {
   assert(kSupabaseUrl.isNotEmpty && kSupabaseKey.isNotEmpty,
       'SUPABASE_URL / SUPABASE_ANON_KEY missing — run with --dart-define-from-file=.env');
-  // initialize is idempotent; safe to call in every setUpAll
+  if (!kIsWeb) {
+    try {
+      await Firebase.initializeApp();
+    } on FirebaseException catch (e) {
+      if (e.code != 'duplicate-app') rethrow;
+    }
+  }
   await Supabase.initialize(url: kSupabaseUrl, publishableKey: kSupabaseKey);
 }
+
+/// Alias kept for back-compat with older test files.
+Future<void> initSupabase() => initApp();
 
 SupabaseClient get sb => Supabase.instance.client;
 
@@ -52,9 +65,21 @@ Future<void> signOut() async {
 // ── Widget helpers ───────────────────────────────────────────────────────────
 
 /// Pumps the app and waits for initial load (auth + providers).
+/// Also dismisses the onboarding dialog if it appears (first install on a fresh emulator).
 Future<void> pumpApp(WidgetTester t, {Duration settle = const Duration(seconds: 6)}) async {
   await t.pumpWidget(testApp());
   await t.pumpAndSettle(settle);
+  await dismissOnboarding(t);
+}
+
+/// Taps the Skip button on the onboarding wizard if it is visible.
+Future<void> dismissOnboarding(WidgetTester t) async {
+  final skip = find.text('Skip');
+  if (skip.evaluate().isNotEmpty) {
+    print('[test] onboarding visible — tapping Skip');
+    await t.tap(skip.first, warnIfMissed: false);
+    await t.pumpAndSettle(const Duration(seconds: 2));
+  }
 }
 
 /// Taps the bottom nav tab with [label] and waits to settle.
@@ -64,7 +89,7 @@ Future<void> tapTab(WidgetTester t, String label, {Duration settle = const Durat
     print('[test] tab "$label" not found — skipping');
     return;
   }
-  await t.tap(f.first);
+  await t.tap(f.first, warnIfMissed: false);
   await t.pumpAndSettle(settle);
 }
 

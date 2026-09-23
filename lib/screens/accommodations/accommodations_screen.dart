@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import '../../core/async_screen_mixin.dart';
 import '../../core/image_cache_manager.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
@@ -29,13 +30,11 @@ class AccommodationsScreen extends ConsumerStatefulWidget {
   ConsumerState<AccommodationsScreen> createState() => _AccommodationsScreenState();
 }
 
-class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen> {
+class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen>
+    with AsyncScreenMixin {
   List<Accommodation> _items = [];
-  bool _loading = true;
-  bool _error   = false;
-  bool _offline  = false;
 
-  String? _activeTripId;
+  String _activeTripId = '';
   AccommodationStatus? _filterStatus;
   _StaySort _sort = _StaySort.checkIn;
   String _search = '';
@@ -51,7 +50,7 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen> {
       if (!mounted) return;
       _activeTripId = ref.read(activeTripIdProvider);
       _load();
-      _subscribe(_activeTripId!);
+      if (_activeTripId.isNotEmpty) _subscribe(_activeTripId);
     });
   }
 
@@ -88,15 +87,22 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen> {
   }
 
   Future<void> _load({bool silent = false}) async {
-    if (!silent) setState(() { _loading = true; _error = false; });
+    final tripId = _activeTripId;
+    if (tripId.isEmpty) return;
+    final gen = beginLoad(silent: silent);
+    if (!silent) setState(() => _items = []);
+
+    if (!silent) {
+      final cached = await AccommodationService.loadFromCache(tripId);
+      if (isStale(gen)) return;
+      if (cached != null) commitLoad(gen, () => _items = cached);
+    }
+
     try {
-      final items  = await AccommodationService.loadAll(_activeTripId!);
-      if (!mounted) return;
-      setState(() { _items = items; _loading = false; _offline = false; });
+      final items = await AccommodationService.loadAll(tripId);
+      commitLoad(gen, () => _items = items);
     } catch (_) {
-      if (!mounted) return;
-      if (silent) { setState(() => _offline = true); return; }
-      setState(() { _loading = false; _error = true; });
+      failLoad(gen, silent: silent || _items.isNotEmpty);
     }
   }
 
@@ -166,7 +172,7 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _items.insert(0, item));
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(
         content: Text('Could not delete "${item.name}". Try again.',
             style: kStyleBody.copyWith(color: Colors.white)),
         behavior: SnackBarBehavior.floating,
@@ -174,7 +180,7 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen> {
       return;
     }
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
+    ScaffoldMessenger.of(this.context).showSnackBar(
       SnackBar(
         content: Text('"${item.name}" deleted.',
             style: kStyleBody.copyWith(color: Colors.white)),
@@ -184,7 +190,8 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen> {
   }
 
   Future<void> _openAdd(BuildContext context, {Accommodation? editing}) async {
-    final tripId = _activeTripId!;
+    final tripId = _activeTripId;
+    if (tripId.isEmpty) return;
     final userId = supabase.auth.currentUser?.id ?? '';
     final result = await showModalBottomSheet<AccommodationSheetResult>(
       context: context,
@@ -218,12 +225,12 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen> {
       if (next != _activeTripId) {
         _activeTripId = next;
         _load();
-        _subscribe(next);
+        if (next.isNotEmpty) _subscribe(next);
       }
     });
-    if (_loading) return const WabwayLoadingScaffold();
+    if (loading) return const WabwayLoadingScaffold();
 
-    if (_error) {
+    if (error) {
       return Scaffold(
         backgroundColor: kColorCream,
         body: Center(
@@ -367,7 +374,7 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen> {
         ),
       ),
     );
-    if (!_offline) return scaffold;
+    if (!offline) return scaffold;
     return Stack(
       children: [
         scaffold,

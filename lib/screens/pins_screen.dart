@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show RealtimeChannel;
+import '../core/async_screen_mixin.dart';
 import '../core/providers/profile_provider.dart';
 import '../core/providers/trip_provider.dart';
 import '../core/supabase/pins_service.dart';
@@ -18,9 +19,8 @@ class PinsScreen extends ConsumerStatefulWidget {
   ConsumerState<PinsScreen> createState() => _PinsScreenState();
 }
 
-class _PinsScreenState extends ConsumerState<PinsScreen> {
+class _PinsScreenState extends ConsumerState<PinsScreen> with AsyncScreenMixin {
   List<TripPin> _pins = [];
-  bool _loading = true;
   String _tripId = '';
   String _myId = '';
   RealtimeChannel? _channel;
@@ -34,11 +34,13 @@ class _PinsScreenState extends ConsumerState<PinsScreen> {
       _tripId = ref.read(activeTripIdProvider);
       _myId   = ref.read(profileProvider)?.id ?? '';
       _load();
-      _channel ??= PinsService.subscribe(_tripId, () {
-        _debounce?.cancel();
-        _debounce = Timer(
-            const Duration(milliseconds: 400), () => _load(silent: true));
-      });
+      if (_tripId.isNotEmpty) {
+        _channel ??= PinsService.subscribe(_tripId, () {
+          _debounce?.cancel();
+          _debounce = Timer(
+              const Duration(milliseconds: 400), () => _load(silent: true));
+        });
+      }
     });
   }
 
@@ -50,65 +52,97 @@ class _PinsScreenState extends ConsumerState<PinsScreen> {
   }
 
   Future<void> _load({bool silent = false}) async {
-    if (!silent) setState(() => _loading = true);
-    final pins = await PinsService.fetchAll(_tripId);
-    if (mounted) setState(() { _pins = pins; _loading = false; });
+    final gen = beginLoad(silent: silent);
+    try {
+      final pins = await PinsService.fetchAll(_tripId);
+      commitLoad(gen, () => _pins = pins);
+    } catch (_) {
+      failLoad(gen, silent: silent || _pins.isNotEmpty);
+    }
   }
 
   void _addPin() async {
     final ctrl = TextEditingController();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: kColorPaper,
-        shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
-        title: Text('Post to pinboard', style: kStyleBodySemibold),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Share a note with the whole group (check-in codes, meet times, reminders).',
-              style: kStyleCaption,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: ctrl,
-              autofocus: true,
-              maxLines: 3,
-              maxLength: 500,
-              style: kStyleBody,
-              decoration: InputDecoration(
-                hintText: 'e.g. Airbnb code is 4821, check-in after 3 pm…',
-                hintStyle: TextStyle(color: kColorInkSoft.withAlpha(120)),
-                border: OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorBorder)),
-                focusedBorder: OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorPrimary, width: 1.5)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: kColorPaper,
+          shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
+          title: Text('Post to pinboard', style: kStyleBodySemibold),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Share a note with the whole group (check-in codes, meet times, reminders).',
+                style: kStyleCaption,
               ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: ctrl,
+                autofocus: true,
+                maxLines: 3,
+                maxLength: 500,
+                style: kStyleBody,
+                decoration: InputDecoration(
+                  hintText: 'e.g. Airbnb code is 4821, check-in after 3 pm…',
+                  hintStyle: TextStyle(color: kColorInkSoft.withAlpha(120)),
+                  border: OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorBorder)),
+                  focusedBorder: OutlineInputBorder(borderRadius: kRadiusMd, borderSide: BorderSide(color: kColorPrimary, width: 1.5)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text('Post', style: TextStyle(color: kColorPrimary)),
             ),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('Post', style: TextStyle(color: kColorPrimary)),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted || ctrl.text.trim().isEmpty) return;
-    await PinsService.post(tripId: _tripId, authorId: _myId, body: ctrl.text.trim());
-    _load(silent: true);
+      );
+      if (confirmed != true || !mounted || ctrl.text.trim().isEmpty) return;
+      try {
+        await PinsService.post(tripId: _tripId, authorId: _myId, body: ctrl.text.trim());
+        _load(silent: true);
+      } catch (_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Could not post. Try again.'),
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    } finally {
+      ctrl.dispose();
+    }
   }
 
   Future<void> _unpin(TripPin pin) async {
-    await PinsService.unpin(pin.id);
-    _load(silent: true);
+    try {
+      await PinsService.unpin(pin.id);
+      _load(silent: true);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Could not unpin. Try again.'),
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
   }
 
   Future<void> _delete(TripPin pin) async {
-    await PinsService.delete(pin.id);
-    _load(silent: true);
+    try {
+      await PinsService.delete(pin.id);
+      _load(silent: true);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Could not delete. Try again.'),
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
   }
 
   @override
@@ -117,11 +151,20 @@ class _PinsScreenState extends ConsumerState<PinsScreen> {
       if (next != _tripId) {
         _tripId = next;
         _myId = ref.read(profileProvider)?.id ?? '';
+        _channel?.unsubscribe();
+        _channel = null;
+        if (next.isNotEmpty) {
+          _channel = PinsService.subscribe(_tripId, () {
+            _debounce?.cancel();
+            _debounce = Timer(
+                const Duration(milliseconds: 400), () => _load(silent: true));
+          });
+        }
         _load();
       }
     });
 
-    if (_loading) return const WabwayLoadingScaffold();
+    if (loading) return const WabwayLoadingScaffold();
 
     return Scaffold(
       backgroundColor: kColorCream,

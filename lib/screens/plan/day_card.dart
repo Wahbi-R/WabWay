@@ -17,6 +17,7 @@ class TripDayCard extends StatefulWidget {
   const TripDayCard({
     super.key,
     required this.day,
+    this.displayNumber,
     this.selectedItemId,
     required this.onItemTap,
     required this.onAddItem,
@@ -33,6 +34,7 @@ class TripDayCard extends StatefulWidget {
   });
 
   final TripDay day;
+  final int? displayNumber;
   final String? selectedItemId;
   final ValueChanged<String> onItemTap;
   final VoidCallback onAddItem;
@@ -87,6 +89,7 @@ class _TripDayCardState extends State<TripDayCard> {
         children: [
           _DayHeader(
             day: widget.day,
+            displayNumber: widget.displayNumber,
             expanded: _notesExpanded,
             hasNotes: hasNotes,
             isDesktop: widget.isDesktop,
@@ -152,6 +155,7 @@ enum _DayMenuAction { edit, copy, delete }
 class _DayHeader extends StatelessWidget {
   const _DayHeader({
     required this.day,
+    this.displayNumber,
     required this.expanded,
     required this.hasNotes,
     required this.isDesktop,
@@ -165,6 +169,7 @@ class _DayHeader extends StatelessWidget {
   });
 
   final TripDay day;
+  final int? displayNumber;
   final bool expanded;
   final bool hasNotes;
   final bool isDesktop;
@@ -196,7 +201,7 @@ class _DayHeader extends StatelessWidget {
                 ),
                 child: Center(
                   child: Text(
-                    '${day.dayNumber}',
+                    '${displayNumber ?? day.dayNumber}',
                     style: kStyleCaptionMedium.copyWith(
                       color: selected ? kColorTextOnPrimary : kColorPrimaryDark,
                       fontWeight: FontWeight.w800,
@@ -213,7 +218,7 @@ class _DayHeader extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Text('Day ${day.dayNumber}',
+                        Text('Day ${displayNumber ?? day.dayNumber}',
                             style: kStyleBodySemibold.copyWith(
                               color: selected ? kColorPrimary : kColorInk,
                             )),

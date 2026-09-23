@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/async_screen_mixin.dart';
 import '../../core/providers/profile_provider.dart';
-import '../../core/providers/trip_provider.dart';
 import '../../core/supabase/accommodation_service.dart';
 import '../../core/supabase/connection_service.dart';
 import '../../core/supabase/doc_service.dart';
@@ -50,12 +50,15 @@ class ConnectionsSection extends ConsumerStatefulWidget {
       _ConnectionsSectionState();
 }
 
-class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
+class _ConnectionsSectionState extends ConsumerState<ConnectionsSection>
+    with AsyncScreenMixin {
   List<TripConnection> _connections = [];
-  bool _loading = true;
 
   // Cache of entity names keyed by id — populated lazily as we resolve.
   final Map<String, String> _nameCache = {};
+
+  // Cached stays list to avoid re-fetching on every chip tap.
+  List<Accommodation>? _staysCache;
 
   @override
   void initState() {
@@ -63,21 +66,32 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
     _load();
   }
 
+  @override
+  void didUpdateWidget(ConnectionsSection old) {
+    super.didUpdateWidget(old);
+    if (old.entityId != widget.entityId || old.tripId != widget.tripId) {
+      _nameCache.clear();
+      _staysCache = null;
+      _load();
+    }
+  }
+
   Future<void> _load() async {
-    setState(() => _loading = true);
-    final conns =
-        await ConnectionService.fetchForEntity(widget.entityId);
-    if (!mounted) return;
-    await _resolveNames(conns);
-    if (!mounted) return;
-    setState(() {
-      _connections = conns;
-      _loading     = false;
-    });
+    final gen = beginLoad();
+    try {
+      final conns = await ConnectionService.fetchForEntity(widget.entityId);
+      if (isStale(gen)) return;
+      await _resolveNames(conns, gen);
+      if (isStale(gen)) return;
+      commitLoad(gen, () => _connections = conns);
+    } catch (_) {
+      failLoad(gen, silent: true);
+    }
   }
 
   // Resolve display names for all peer entities not yet in cache.
-  Future<void> _resolveNames(List<TripConnection> conns) async {
+  // [gen] is used to abort writes if the widget was updated mid-flight.
+  Future<void> _resolveNames(List<TripConnection> conns, int gen) async {
     final toResolve = <MapEntry<EntityType, String>>[];
     for (final c in conns) {
       final type = c.peerType(widget.entityId);
@@ -101,48 +115,114 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
       final ids  = entry.value.toSet();
       switch (type) {
         case EntityType.spot:
-          final spots = await SpotService.loadSpots(tripId);
+          final spots = await SpotService.loadSpots(tripId)
+              .catchError((_) => <Spot>[]);
+          if (isStale(gen)) return;
           for (final s in spots) {
             if (ids.contains(s.id)) _nameCache[s.id] = s.name;
           }
+          break;
         case EntityType.travel:
-          final items = await TravelService.loadItems(tripId);
+          final items = await TravelService.loadItems(tripId)
+              .catchError((_) => <TravelItem>[]);
+          if (isStale(gen)) return;
           for (final i in items) {
             if (ids.contains(i.id)) _nameCache[i.id] = i.title;
           }
+          break;
         case EntityType.stay:
-          final stays = await AccommodationService.loadAll(tripId);
-          for (final s in stays) {
+          // Re-fetch if cache is absent or if any needed ID is missing from it.
+          final cachedStays = _staysCache;
+          if (cachedStays == null ||
+              ids.any((id) => !cachedStays.any((s) => s.id == id))) {
+            final result = await AccommodationService.loadAll(tripId)
+                .then<List<Accommodation>?>((v) => v, onError: (_) => null);
+            if (isStale(gen)) return;
+            if (result != null) _staysCache = result;
+          }
+          for (final s in _staysCache ?? []) {
             if (ids.contains(s.id)) _nameCache[s.id] = s.name;
           }
+          break;
         case EntityType.doc:
-          final docs = await DocService.loadDocuments(tripId);
+          final docs = await DocService.loadDocuments(tripId)
+              .catchError((_) => <TripDocument>[]);
+          if (isStale(gen)) return;
           for (final d in docs) {
             if (ids.contains(d.id)) _nameCache[d.id] = d.title;
           }
+          break;
         case EntityType.link:
-          final links = await LinksService.loadLinks(tripId);
+          final links = await LinksService.loadLinks(tripId)
+              .catchError((_) => <TripLink>[]);
+          if (isStale(gen)) return;
           for (final l in links) {
             if (ids.contains(l.id)) _nameCache[l.id] = l.title;
           }
+          break;
         case EntityType.planItem:
           for (final day in widget.days) {
             for (final item in day.items) {
-              if (ids.contains(item.id)) _nameCache[item.id] = item.title;
+              if (ids.contains(item.id)) {
+                _nameCache[item.id] = '${item.title} (Day ${day.dayNumber})';
+              }
             }
           }
+          break;
       }
     }));
   }
 
+  bool _canNavigate(EntityType type) => type == EntityType.stay;
+
+  Future<void> _navigate(BuildContext context, ResolvedConnection r) async {
+    final tripId = widget.tripId;
+    if (r.peerType == EntityType.stay) {
+      if (_staysCache == null) {
+        final result = await AccommodationService.loadAll(tripId)
+            .then<List<Accommodation>?>((v) => v, onError: (_) => null);
+        if (!mounted) return;
+        if (result != null) _staysCache = result;
+      }
+      final allStays = _staysCache ?? [];
+      final stay = allStays.where((s) => s.id == r.peerId).firstOrNull;
+      if (!mounted || stay == null) return;
+      _showStayDetailSheet(this.context, stay);
+    }
+  }
+
+  void _showStayDetailSheet(BuildContext context, Accommodation stay) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _StayDetailSheet(stay: stay),
+    );
+  }
+
   Future<void> _remove(TripConnection c) async {
+    final idx = _connections.indexOf(c);
+    // Guard: if realtime already removed c from the list, indexOf returns -1.
+    // Remove by identity to be safe; skip revert insert if c was already gone.
     setState(() => _connections.remove(c));
-    await ConnectionService.remove(c.id);
+    try {
+      await ConnectionService.remove(c.id);
+    } catch (_) {
+      if (!mounted) return;
+      if (idx >= 0) {
+        setState(() => _connections.insert(idx.clamp(0, _connections.length), c));
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not remove connection. Please try again.')),
+      );
+    }
   }
 
   Future<void> _addConnection() async {
-    final tripId = widget.tripId;
-    final userId = ref.read(profileProvider)?.id ?? '';
+    final tripId  = widget.tripId;
+    final entityId = widget.entityId;
+    final userId  = ref.read(profileProvider)?.id ?? '';
 
     // Load all entities for the picker (excluding the current entity type
     // only if it makes no sense to link to itself — allow same-type links).
@@ -153,28 +233,29 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
       builder: (_) => _ConnectionPickerSheet(
         tripId:         tripId,
         myEntityType:   widget.entityType,
-        myEntityId:     widget.entityId,
+        myEntityId:     entityId,
         days:           widget.days,
-        alreadyLinked:  _connections.map((c) => c.peerId(widget.entityId)).toSet(),
+        alreadyLinked:  _connections.map((c) => c.peerId(entityId)).toSet(),
       ),
     );
-    if (result == null || !mounted) return;
+    if (result == null || !mounted || widget.entityId != entityId) return;
 
     final conn = await ConnectionService.add(
       tripId: tripId,
       userId: userId,
       typeA:  widget.entityType,
-      idA:    widget.entityId,
+      idA:    entityId,
       typeB:  result.type,
       idB:    result.id,
     );
+    if (!mounted || widget.entityId != entityId) return;
     _nameCache[result.id] = result.name;
     setState(() => _connections.add(conn));
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
+    if (loading) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: kSpace4),
         child: Center(
@@ -182,6 +263,23 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
                 width: 20,
                 height: 20,
                 child: CircularProgressIndicator(strokeWidth: 2))),
+      );
+    }
+
+    if (offline) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Connected', style: kStyleOverline),
+          const SizedBox(height: kSpace2),
+          GestureDetector(
+            onTap: _load,
+            child: Text(
+              'Could not load connections · Tap to retry',
+              style: kStyleCaption.copyWith(color: kColorPrimary),
+            ),
+          ),
+        ],
       );
     }
 
@@ -233,6 +331,9 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
                 .map((r) => _ConnectionChip(
                       resolved: r,
                       onRemove: () => _remove(r.connection),
+                      onTap: _canNavigate(r.peerType)
+                          ? () => _navigate(context, r)
+                          : null,
                     ))
                 .toList(),
           ),
@@ -245,40 +346,55 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection> {
 
 class _ConnectionChip extends StatelessWidget {
   const _ConnectionChip(
-      {required this.resolved, required this.onRemove});
+      {required this.resolved, required this.onRemove, this.onTap});
   final ResolvedConnection resolved;
   final VoidCallback        onRemove;
+  final VoidCallback?       onTap;
 
   @override
   Widget build(BuildContext context) {
     final type = resolved.peerType;
+    final labelArea = GestureDetector(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.only(left: 8, top: 5, bottom: 5, right: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(type.icon, size: 12, color: onTap != null ? kColorPrimary : kColorInkSoft),
+            const SizedBox(width: 4),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 160),
+              child: Text(
+                resolved.peerName,
+                style: kStyleCaption.copyWith(
+                  fontWeight: FontWeight.w500,
+                  color: onTap != null ? kColorPrimary : null,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
     return Container(
-      padding:
-          const EdgeInsets.only(left: 8, top: 5, bottom: 5, right: 4),
       decoration: BoxDecoration(
         color: kColorSurfaceSunken,
         borderRadius: kRadiusPill,
-        border: Border.all(color: kColorBorder),
+        border: Border.all(color: onTap != null ? kColorPrimary.withValues(alpha: 0.35) : kColorBorder),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(type.icon, size: 12, color: kColorInkSoft),
-          const SizedBox(width: 4),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 160),
-            child: Text(
-              resolved.peerName,
-              style: kStyleCaption.copyWith(fontWeight: FontWeight.w500),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          const SizedBox(width: 4),
+          labelArea,
           GestureDetector(
             onTap: onRemove,
-            child: Icon(Icons.close_rounded,
-                size: 14, color: kColorInkSoft),
+            child: const Padding(
+              padding: EdgeInsets.only(right: 6, top: 5, bottom: 5),
+              child: Icon(Icons.close_rounded, size: 14, color: kColorInkSoft),
+            ),
           ),
         ],
       ),
@@ -318,9 +434,8 @@ class _ConnectionPickerSheet extends StatefulWidget {
 
 class _ConnectionPickerSheetState
     extends State<_ConnectionPickerSheet>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, AsyncScreenMixin {
   late TabController _tabs;
-  bool _loading = true;
 
   List<Spot>          _spots  = [];
   List<TravelItem>    _travel = [];
@@ -348,22 +463,27 @@ class _ConnectionPickerSheetState
 
   Future<void> _loadAll() async {
     final tid = widget.tripId;
-    final results = await Future.wait([
-      SpotService.loadSpots(tid),
-      TravelService.loadItems(tid),
-      AccommodationService.loadAll(tid),
-      DocService.loadDocuments(tid),
-      LinksService.loadLinks(tid),
-    ]);
-    if (!mounted) return;
-    setState(() {
-      _spots  = results[0] as List<Spot>;
-      _travel = results[1] as List<TravelItem>;
-      _stays  = results[2] as List<Accommodation>;
-      _docs   = results[3] as List<TripDocument>;
-      _links  = results[4] as List<TripLink>;
-      _loading = false;
-    });
+    final gen = beginLoad();
+    bool anyFailed = false;
+    try {
+      final results = await Future.wait([
+        SpotService.loadSpots(tid).catchError((e) { anyFailed = true; return <Spot>[]; }),
+        TravelService.loadItems(tid).catchError((e) { anyFailed = true; return <TravelItem>[]; }),
+        AccommodationService.loadAll(tid).catchError((e) { anyFailed = true; return <Accommodation>[]; }),
+        DocService.loadDocuments(tid).catchError((e) { anyFailed = true; return <TripDocument>[]; }),
+        LinksService.loadLinks(tid).catchError((e) { anyFailed = true; return <TripLink>[]; }),
+      ]);
+      commitLoad(gen, () {
+        offline = anyFailed;
+        _spots  = results[0] as List<Spot>;
+        _travel = results[1] as List<TravelItem>;
+        _stays  = results[2] as List<Accommodation>;
+        _docs   = results[3] as List<TripDocument>;
+        _links  = results[4] as List<TripLink>;
+      });
+    } catch (_) {
+      failLoad(gen, silent: true);
+    }
   }
 
   List<({String id, String name})> _itemsFor(EntityType t) {
@@ -446,8 +566,20 @@ class _ConnectionPickerSheetState
                 ],
               ),
             ),
+            if (offline)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(kSpace4, kSpace2, kSpace4, 0),
+                child: Row(
+                  children: [
+                    const Icon(Icons.wifi_off_rounded, size: 14, color: kColorInkSoft),
+                    const SizedBox(width: 6),
+                    Expanded(child: Text('Some items couldn\'t load.', style: kStyleCaption.copyWith(color: kColorInkSoft))),
+                    TextButton(onPressed: _loadAll, child: const Text('Retry')),
+                  ],
+                ),
+              ),
             Expanded(
-              child: _loading
+              child: loading
                   ? const Center(child: CircularProgressIndicator())
                   : TabBarView(
                       controller: _tabs,
@@ -510,4 +642,74 @@ class _ConnectionPickerSheetState
       ),
     );
   }
+}
+
+// ─── Stay detail sheet ────────────────────────────────────────────────────────
+
+class _StayDetailSheet extends StatelessWidget {
+  const _StayDetailSheet({required this.stay});
+  final Accommodation stay;
+
+  @override
+  Widget build(BuildContext context) {
+    String? dateRange;
+    if (stay.checkIn != null && stay.checkOut != null) {
+      dateRange = '${fmtDate(stay.checkIn!)} – ${fmtDate(stay.checkOut!)}';
+    }
+    return DraggableScrollableSheet(
+      initialChildSize: 0.5,
+      minChildSize: 0.35,
+      maxChildSize: 0.85,
+      builder: (_, ctrl) => DecoratedBox(
+        decoration: const BoxDecoration(
+          color: kColorPaper,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: ListView(
+          controller: ctrl,
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+          children: [
+            Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: kColorBorder, borderRadius: BorderRadius.circular(2)))),
+            const SizedBox(height: 16),
+            Row(children: [
+              Container(
+                width: 40, height: 40,
+                decoration: BoxDecoration(color: ItineraryItemType.stay.softColor, borderRadius: kRadiusMd),
+                child: Icon(stay.source?.icon ?? Icons.hotel_rounded, size: 20, color: ItineraryItemType.stay.color),
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(stay.name, style: kStyleTitle, maxLines: 2, overflow: TextOverflow.ellipsis),
+                  if (stay.source != null)
+                    Text(stay.source!.label, style: kStyleCaption.copyWith(color: kColorInkSoft)),
+                ],
+              )),
+            ]),
+            const SizedBox(height: 16),
+            const Divider(height: 1),
+            const SizedBox(height: 16),
+            if (stay.city.isNotEmpty) _row(Icons.location_city_rounded, stay.city),
+            if (stay.address != null) _row(Icons.place_rounded, stay.address!),
+            if (dateRange != null) _row(Icons.calendar_today_rounded, dateRange),
+            _row(Icons.info_outline_rounded, stay.status.label),
+            if (stay.notes != null && stay.notes!.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(stay.notes!, style: kStyleBody.copyWith(color: kColorInkSoft)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _row(IconData icon, String text) => Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Row(children: [
+      Icon(icon, size: 16, color: kColorInkSoft),
+      const SizedBox(width: 8),
+      Expanded(child: Text(text, style: kStyleBody)),
+    ]),
+  );
 }

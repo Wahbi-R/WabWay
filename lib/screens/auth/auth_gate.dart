@@ -28,6 +28,10 @@ class _AuthGateState extends ConsumerState<AuthGate> {
   late final StreamSubscription<AuthState> _sub;
   bool _loading = true;
   bool _showPasswordRecovery = false;
+  bool _authChangeBusy = false;
+  bool _fetchingProfile = false;
+  bool _pendingProfileFetch = false;
+  String? _pendingUserId;
 
   AppProfile? get _profile => ref.read(profileProvider);
 
@@ -54,37 +58,63 @@ class _AuthGateState extends ConsumerState<AuthGate> {
     AppLogger.instance.log(
         'authStateChange → ${state.event}  uid=${state.session?.user.id}',
         tag: 'AUTH');
+    // Handle signedIn outside the mutex so a token-refresh signedIn (which
+    // Supabase emits immediately after a signedOut) is never silently dropped
+    // while the signedOut handler holds _authChangeBusy.
+    if (state.event == AuthChangeEvent.signedIn) {
+      final uid = state.session?.user.id;
+      // Also re-fetch when the signed-in user differs from the cached profile
+      // (e.g. rapid user-switch while signedOut is still clearing the old profile).
+      if (uid != null && (_profile == null || _profile!.id != uid)) {
+        await _fetchProfile(uid);
+      }
+      return;
+    }
+    if (_authChangeBusy) return;
+    _authChangeBusy = true;
+    try {
     switch (state.event) {
       case AuthChangeEvent.passwordRecovery:
         if (mounted) setState(() { _showPasswordRecovery = true; _loading = false; });
-      case AuthChangeEvent.signedIn:
-        final uid = state.session?.user.id;
-        if (uid != null && _profile == null) _fetchProfile(uid);
       case AuthChangeEvent.signedOut:
-        // If we're offline the sign-out was likely a failed token refresh, not
-        // a real sign-out. Keep the cached profile so the user stays in the app.
+        // Suppress automatic sign-out (e.g. failed token refresh) when offline,
+        // but always honour an explicit user-initiated sign-out.
         final isOnline = ref.read(connectivityProvider);
-        if (!isOnline) {
-          final cached = await OfflineCache.read<AppProfile>(
-            OfflineCache.profileKey,
-            (json) => AppProfile.fromMap(json as Map<String, dynamic>),
-          );
+        if (!isOnline && !AuthService.consumeUserInitiatedSignOut()) {
+          AppProfile? cached;
+          try {
+            cached = await OfflineCache.read<AppProfile>(
+              OfflineCache.profileKey,
+              (json) => AppProfile.fromMap(json as Map<String, dynamic>),
+            );
+          } catch (_) {}
           if (cached != null && mounted) {
             ref.read(profileProvider.notifier).set(cached);
-            setState(() => _loading = false);
+            setState(() { _loading = false; _showPasswordRecovery = false; });
             return;
           }
+          // A concurrent signedIn may have fetched a real profile while we
+          // awaited the cache read — don't overwrite it with null.
+          if (_profile != null || !mounted) return;
         }
-        if (mounted) {
-          ref.read(profileProvider.notifier).set(null);
-          setState(() { _loading = false; _showPasswordRecovery = false; });
-        }
+        if (!mounted) return;
+        ref.read(profileProvider.notifier).set(null);
+        setState(() { _loading = false; _showPasswordRecovery = false; });
       default:
         break;
+    }
+    } finally {
+      _authChangeBusy = false;
     }
   }
 
   Future<void> _fetchProfile(String userId) async {
+    if (_fetchingProfile) {
+      _pendingProfileFetch = true;
+      _pendingUserId = userId;
+      return;
+    }
+    _fetchingProfile = true;
     try {
       final data = await supabase
           .from('profiles')
@@ -105,21 +135,32 @@ class _AuthGateState extends ConsumerState<AuthGate> {
                   supabase.auth.currentUser?.userMetadata?['display_name'] != null,
               email: supabase.auth.currentUser?.email ?? '',
             );
-      OfflineCache.write(OfflineCache.profileKey, profile.toMap());
+      await OfflineCache.write(OfflineCache.profileKey, profile.toMap());
       ref.read(profileProvider.notifier).set(profile);
       if (mounted) setState(() => _loading = false);
     } catch (_) {
       // Network unavailable — fall back to cached profile so the user can
       // browse their trips offline without being stuck on the splash screen.
-      final cached = await OfflineCache.read<AppProfile>(
-        OfflineCache.profileKey,
-        (json) => AppProfile.fromMap(json as Map<String, dynamic>),
-      );
+      AppProfile? cached;
+      try {
+        cached = await OfflineCache.read<AppProfile>(
+          OfflineCache.profileKey,
+          (json) => AppProfile.fromMap(json as Map<String, dynamic>),
+        );
+      } catch (_) {}
       if (!mounted) return;
       if (cached != null) {
         ref.read(profileProvider.notifier).set(cached);
       }
       setState(() => _loading = false);
+    } finally {
+      _fetchingProfile = false;
+      if (_pendingProfileFetch) {
+        _pendingProfileFetch = false;
+        final uid = _pendingUserId;
+        _pendingUserId = null;
+        if (uid != null) unawaited(_fetchProfile(uid));
+      }
     }
   }
 
@@ -245,6 +286,7 @@ class _NamePromptScreenState extends State<_NamePromptScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       await widget.onNameSet(name);
+      if (mounted) setState(() => _loading = false);
     } catch (e) {
       if (mounted) setState(() { _loading = false; _error = e.toString(); });
     }

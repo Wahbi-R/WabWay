@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 404,
+    label: 'Security',
+    changes: [
+      'More backend hardening behind the scenes — no changes to how the app works',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 403,
     label: 'Security',
     changes: [

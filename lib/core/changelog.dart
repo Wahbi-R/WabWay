@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 402,
+    label: 'Reliability',
+    changes: [
+      'The app backend no longer goes offline after a quiet week — it now stays awake automatically',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 401,
     label: 'Bug fixes',
     changes: [

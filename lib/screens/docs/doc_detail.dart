@@ -43,21 +43,7 @@ String _uploaderName(WidgetRef ref, String userId) {
 
 // ── Linked label helper ───────────────────────────────────────────────────────
 
-String _linkedLabel(DocumentLink link, List<Spot> spots, String tripName) {
-  switch (link.type) {
-    case DocLinkedType.spot:
-      return spots.where((s) => s.id == link.linkedId).firstOrNull?.name ??
-          'Spot';
-    case DocLinkedType.trip:
-      return tripName;
-    default:
-      return link.type.label;
-  }
-}
-
 // ── Link key helper ───────────────────────────────────────────────────────────
-
-String _linkKey(DocumentLink link) => '${link.type.name}_${link.linkedId}';
 
 // ── Mobile screen ─────────────────────────────────────────────────────────────
 
@@ -163,76 +149,6 @@ class _DocDetailContentState extends State<DocDetailContent> {
     }
   }
 
-  Future<void> _addLink(DocLinkedType type, String linkedId) async {
-    if (_links.any((l) => l.type == type && l.linkedId == linkedId)) return;
-    // Capture context-dependent values before the async gap.
-    final userId =
-        supabase.auth.currentUser?.id ?? '';
-    setState(() => _linkLoading = true);
-    try {
-      await DocService.addLink(
-        documentId: widget.doc.id,
-        linkedType: type,
-        linkedId: linkedId,
-        createdBy: userId,
-      );
-      if (!mounted) return;
-      setState(() {
-        _links = [..._links, DocumentLink(type: type, linkedId: linkedId)];
-        _linkLoading = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _linkLoading = false);
-      showWabwaySnack(context, 'Could not add link. Please try again.');
-    }
-  }
-
-  Future<void> _removeLink(DocumentLink link) async {
-    final key = _linkKey(link);
-    setState(() => _unlinkingKeys.add(key));
-    try {
-      await DocService.deleteLink(
-        documentId: widget.doc.id,
-        linkedType: link.type,
-        linkedId: link.linkedId,
-      );
-      if (!mounted) return;
-      setState(() {
-        _links = _links.where((l) => _linkKey(l) != key).toList();
-        _unlinkingKeys.remove(key);
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _unlinkingKeys.remove(key));
-      showWabwaySnack(context, 'Could not remove link. Please try again.');
-    }
-  }
-
-
-  void _showLinkPicker() {
-    final alreadyLinked = _links
-        .map((l) => '${l.type.name}_${l.linkedId}')
-        .toSet();
-
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: kColorPaper,
-      shape: const RoundedRectangleBorder(borderRadius: kRadiusSheet),
-      builder: (ctx) => _LinkPickerSheet(
-        tripId: widget.tripId,
-        tripName: widget.tripName,
-        availableSpots: widget.availableSpots,
-        alreadyLinked: alreadyLinked,
-        onPick: (type, linkedId) {
-          Navigator.pop(ctx);
-          _addLink(type, linkedId);
-        },
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -249,16 +165,8 @@ class _DocDetailContentState extends State<DocDetailContent> {
                 const SizedBox(height: kSpace4),
                 _ImagePreview(storagePath: widget.doc.storagePath!),
               ],
-              const SizedBox(height: kSpace4),
-              _LinkedSection(
-                links: _links,
-                availableSpots: widget.availableSpots,
-                tripName: widget.tripName,
-                linkLoading: _linkLoading,
-                unlinkingKeys: _unlinkingKeys,
-                onAddLink: _showLinkPicker,
-                onRemoveLink: _removeLink,
-              ),
+              // Links (spot, travel, receipt, cash, plan item) now show in the
+              // one "Connected" section below — it merges document_links too.
               if (widget.doc.notes != null &&
                   widget.doc.notes!.isNotEmpty) ...[
                 const SizedBox(height: kSpace4),
@@ -403,169 +311,6 @@ class _FileMetaCard extends ConsumerWidget {
 }
 
 // ── Linked section ────────────────────────────────────────────────────────────
-
-class _LinkedSection extends StatelessWidget {
-  const _LinkedSection({
-    required this.links,
-    required this.availableSpots,
-    required this.tripName,
-    required this.linkLoading,
-    required this.unlinkingKeys,
-    required this.onAddLink,
-    required this.onRemoveLink,
-  });
-
-  final List<DocumentLink> links;
-  final List<Spot> availableSpots;
-  final String tripName;
-  final bool linkLoading;
-  final Set<String> unlinkingKeys;
-  final VoidCallback onAddLink;
-  final ValueChanged<DocumentLink> onRemoveLink;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text('Linked to',
-                style: kStyleCaptionMedium.copyWith(color: kColorInk)),
-            const Spacer(),
-            if (linkLoading)
-              const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation(kColorPrimary),
-                ),
-              )
-            else
-              GestureDetector(
-                onTap: onAddLink,
-                behavior: HitTestBehavior.opaque,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: kSpace1, vertical: 2),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.add_rounded,
-                          size: 15, color: kColorPrimary),
-                      const SizedBox(width: 3),
-                      Text(
-                        'Add link',
-                        style: kStyleCaptionMedium.copyWith(
-                            color: kColorPrimary),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: kSpace2),
-        if (links.isEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: kSpace1, bottom: kSpace1),
-            child: Text(
-              'Not linked to anything yet.',
-              style: kStyleCaption.copyWith(color: kColorInkSoft),
-            ),
-          )
-        else
-          ...links.map((link) => _LinkedRow(
-                link: link,
-                availableSpots: availableSpots,
-                tripName: tripName,
-                isUnlinking: unlinkingKeys.contains(_linkKey(link)),
-                onRemove: () => onRemoveLink(link),
-              )),
-      ],
-    );
-  }
-}
-
-class _LinkedRow extends StatelessWidget {
-  const _LinkedRow({
-    required this.link,
-    required this.availableSpots,
-    required this.tripName,
-    required this.isUnlinking,
-    required this.onRemove,
-  });
-
-  final DocumentLink link;
-  final List<Spot> availableSpots;
-  final String tripName;
-  final bool isUnlinking;
-  final VoidCallback onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    final label = _linkedLabel(link, availableSpots, tripName);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: kSpace2),
-      child: WabwayCard(
-        padding: const EdgeInsets.symmetric(
-            horizontal: kSpace3, vertical: kSpace3),
-        child: Row(
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: const BoxDecoration(
-                color: kColorSurfaceSunken,
-                borderRadius: kRadiusMd,
-              ),
-              child: Icon(link.type.icon, size: 16, color: kColorInkSoft),
-            ),
-            const SizedBox(width: kSpace3),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: kStyleBodyMedium,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    link.type.label,
-                    style: kStyleCaption.copyWith(fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: kSpace2),
-            if (isUnlinking)
-              const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation(kColorInkSoft),
-                ),
-              )
-            else
-              IconButton(
-                icon: const Icon(Icons.link_off_rounded, size: 18),
-                color: kColorInkSoft,
-                tooltip: 'Remove link',
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                visualDensity: VisualDensity.compact,
-                onPressed: onRemove,
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 // ── Link picker sheet ─────────────────────────────────────────────────────────
 
@@ -1008,6 +753,17 @@ class _ActionsSectionState extends State<_ActionsSection> {
               loading: _openLoading,
               onPressed: hasFile ? _openFile : null,
             ),
+            if (widget.doc.url != null && widget.doc.url!.isNotEmpty)
+              WabwayButton(
+                label: 'Open link',
+                icon: Icons.link_rounded,
+                variant: WabwayButtonVariant.ghost,
+                size: WabwayButtonSize.sm,
+                onPressed: () {
+                  final uri = Uri.tryParse(widget.doc.url!);
+                  if (uri != null) launchUrl(uri, mode: LaunchMode.externalApplication);
+                },
+              ),
             WabwayButton(
               label: 'Download',
               icon: Icons.download_rounded,

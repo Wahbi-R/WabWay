@@ -6,7 +6,9 @@ enum EntityType {
   travel,
   stay,
   doc,
-  link;
+  link,
+  receipt,
+  cash;
 
   String get dbValue => switch (this) {
         EntityType.spot     => 'spot',
@@ -15,16 +17,22 @@ enum EntityType {
         EntityType.stay     => 'stay',
         EntityType.doc      => 'doc',
         EntityType.link     => 'link',
+        EntityType.receipt  => 'receipt',
+        EntityType.cash     => 'cash',
       };
 
-  static EntityType fromDb(String v) => switch (v) {
+  /// Null for a type this build doesn't know — callers skip the row instead
+  /// of guessing (older builds mapped unknowns to spot → phantom "…" rows).
+  static EntityType? tryFromDb(String v) => switch (v) {
         'spot'      => EntityType.spot,
         'plan_item' => EntityType.planItem,
         'travel'    => EntityType.travel,
         'stay'      => EntityType.stay,
         'doc'       => EntityType.doc,
         'link'      => EntityType.link,
-        _           => EntityType.spot,
+        'receipt'   => EntityType.receipt,
+        'cash'      => EntityType.cash,
+        _           => null,
       };
 
   String get label => switch (this) {
@@ -34,6 +42,8 @@ enum EntityType {
         EntityType.stay     => 'Stay',
         EntityType.doc      => 'Document',
         EntityType.link     => 'Link',
+        EntityType.receipt  => 'Receipt',
+        EntityType.cash     => 'Cash withdrawal',
       };
 
   String get pluralLabel => switch (this) {
@@ -43,6 +53,8 @@ enum EntityType {
         EntityType.stay     => 'Stays',
         EntityType.doc      => 'Docs',
         EntityType.link     => 'Links',
+        EntityType.receipt  => 'Receipts',
+        EntityType.cash     => 'Cash',
       };
 
   IconData get icon => switch (this) {
@@ -52,6 +64,8 @@ enum EntityType {
         EntityType.stay     => Icons.hotel_rounded,
         EntityType.doc      => Icons.insert_drive_file_rounded,
         EntityType.link     => Icons.link_rounded,
+        EntityType.receipt  => Icons.receipt_long_rounded,
+        EntityType.cash     => Icons.atm_rounded,
       };
 }
 

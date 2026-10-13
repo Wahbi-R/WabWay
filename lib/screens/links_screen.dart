@@ -120,6 +120,21 @@ class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin
             _debounce = Timer(const Duration(milliseconds: 400), () => _load(silent: true));
           },
         )
+        // New links are stored as documents (build 417) — listen there too.
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'documents',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'trip_id',
+            value: tripId,
+          ),
+          callback: (_) {
+            _debounce?.cancel();
+            _debounce = Timer(const Duration(milliseconds: 400), () => _load(silent: true));
+          },
+        )
         .subscribe();
   }
 
@@ -176,7 +191,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin
   Future<void> _deleteLinkDirect(BuildContext context, TripLink link) async {
     setState(() => _links = _links.where((l) => l.id != link.id).toList());
     try {
-      await LinksService.deleteLink(link.id);
+      await LinksService.deleteLink(link);
     } catch (_) {
       if (!mounted) return;
       _load();
@@ -184,7 +199,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin
       return;
     }
     if (!mounted) return;
-    showWabwaySnack(this.context, '"${link.title}" removed.');
+    showWabwaySnack(this.context, '"${link.title}" deleted.');
   }
 
   Future<void> _deleteLink(TripLink link) async {
@@ -194,7 +209,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin
     if (!mounted) return;
     setState(() => _links = _links.where((l) => l.id != link.id).toList());
     try {
-      await LinksService.deleteLink(link.id);
+      await LinksService.deleteLink(link);
     } catch (_) {
       if (!mounted) return;
       _load();

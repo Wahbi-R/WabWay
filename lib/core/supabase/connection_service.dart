@@ -3,24 +3,73 @@ import '../../data/connection_data.dart';
 import 'client.dart';
 
 abstract final class ConnectionService {
-  static TripConnection _fromRow(Map<String, dynamic> r) => TripConnection(
-        id:          r['id'] as String,
-        tripId:      r['trip_id'] as String,
-        entityAType: EntityType.fromDb(r['entity_a_type'] as String),
-        entityAId:   r['entity_a_id'] as String,
-        entityBType: EntityType.fromDb(r['entity_b_type'] as String),
-        entityBId:   r['entity_b_id'] as String,
-        createdAt:   DateTime.parse(r['created_at'] as String),
-      );
+  /// Null when the row uses an entity type this build doesn't know (skipped).
+  static TripConnection? _fromRow(Map<String, dynamic> r) {
+    final a = EntityType.tryFromDb(r['entity_a_type'] as String);
+    final b = EntityType.tryFromDb(r['entity_b_type'] as String);
+    if (a == null || b == null) return null;
+    return TripConnection(
+      id:          r['id'] as String,
+      tripId:      r['trip_id'] as String,
+      entityAType: a,
+      entityAId:   r['entity_a_id'] as String,
+      entityBType: b,
+      entityBId:   r['entity_b_id'] as String,
+      createdAt:   DateTime.parse(r['created_at'] as String),
+    );
+  }
 
-  /// All connections that involve [entityId] (on either side).
-  static Future<List<TripConnection>> fetchForEntity(String entityId) async {
+  /// Legacy document_links rows are surfaced as connections so ONE "Connected"
+  /// list shows every link (doc ↔ spot/travel/receipt/cash/plan item).
+  /// Their ids are prefixed so [remove] knows which table to delete from.
+  static const _legacyPrefix = 'dl:';
+
+  static EntityType? _fromDocLinkedType(String t) => switch (t) {
+        'spot'            => EntityType.spot,
+        'travel_item'     => EntityType.travel,
+        'receipt'         => EntityType.receipt,
+        'cash_withdrawal' => EntityType.cash,
+        'itinerary_item'  => EntityType.planItem,
+        _                 => null, // itinerary_day / trip: not shown as connections
+      };
+
+  static TripConnection? _fromDocLinkRow(Map<String, dynamic> r, String tripId) {
+    final peer = _fromDocLinkedType(r['linked_type'] as String);
+    if (peer == null) return null;
+    return TripConnection(
+      id:          '$_legacyPrefix${r['id']}',
+      tripId:      tripId,
+      entityAType: EntityType.doc,
+      entityAId:   r['document_id'] as String,
+      entityBType: peer,
+      entityBId:   r['linked_id'] as String,
+      createdAt:   DateTime.parse(r['created_at'] as String),
+    );
+  }
+
+  /// All connections that involve [entityId] (on either side), merged with
+  /// legacy document_links for the same entity and de-duplicated by peer.
+  static Future<List<TripConnection>> fetchForEntity(String entityId, {String tripId = ''}) async {
     final results = await Future.wait([
       supabase.from('trip_connections').select().eq('entity_a_id', entityId),
       supabase.from('trip_connections').select().eq('entity_b_id', entityId),
+      supabase.from('document_links').select().eq('document_id', entityId),
+      supabase.from('document_links').select().eq('linked_id', entityId),
     ]);
-    final all = {...results[0].map(_fromRow), ...results[1].map(_fromRow)};
-    return all.toList()..sort((x, y) => x.createdAt.compareTo(y.createdAt));
+    final out = <TripConnection>[];
+    final seenPeers = <String>{};
+    void add(TripConnection? c) {
+      if (c == null) return;
+      final peerKey = '${c.peerType(entityId).name}:${c.peerId(entityId)}';
+      if (seenPeers.add(peerKey)) out.add(c);
+    }
+    for (final r in [...results[0], ...results[1]]) {
+      add(_fromRow(r));
+    }
+    for (final r in [...results[2], ...results[3]]) {
+      add(_fromDocLinkRow(r, tripId));
+    }
+    return out..sort((x, y) => x.createdAt.compareTo(y.createdAt));
   }
 
   static Future<TripConnection> add({
@@ -43,10 +92,17 @@ abstract final class ConnectionService {
         })
         .select()
         .single();
-    return _fromRow(row);
+    return _fromRow(row)!;
   }
 
   static Future<void> remove(String connectionId) async {
+    if (connectionId.startsWith(_legacyPrefix)) {
+      await supabase
+          .from('document_links')
+          .delete()
+          .eq('id', connectionId.substring(_legacyPrefix.length));
+      return;
+    }
     await supabase.from('trip_connections').delete().eq('id', connectionId);
   }
 

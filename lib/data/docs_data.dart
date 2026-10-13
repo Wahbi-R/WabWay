@@ -125,6 +125,7 @@ class TripDocument {
     this.amount,
     this.currency,
     this.notes,
+    this.url,
     this.links = const [],
   });
 
@@ -139,6 +140,9 @@ class TripDocument {
   final double? amount;
   final String? currency;
   final String? notes;
+
+  /// Source / booking link for this document (e.g. the page it was imported from).
+  final String? url;
   final List<DocumentLink> links;
 
   String get formattedSize {

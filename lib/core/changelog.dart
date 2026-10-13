@@ -11,6 +11,17 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 417,
+    label: "Library",
+    changes: [
+      "Links and documents are now one kind of thing: a saved link lives in the Library just like a file",
+      "Documents can have a link — add the booking page, and open it from the document",
+      "Everything a document is attached to (spots, travel, receipts, cash, plan items) now shows in one Connected list",
+      "You can connect documents to receipts and cash withdrawals from the Connected section",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 416,
     label: "Bug fixes",
     changes: [

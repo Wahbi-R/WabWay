@@ -20,6 +20,8 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
+import '../../core/supabase/money_service.dart';
+import '../../data/money_data.dart';
 
 // ─── Public widget ─────────────────────────────────────────────────────────────
 //
@@ -79,7 +81,7 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection>
   Future<void> _load() async {
     final gen = beginLoad();
     try {
-      final conns = await ConnectionService.fetchForEntity(widget.entityId);
+      final conns = await ConnectionService.fetchForEntity(widget.entityId, tripId: widget.tripId);
       if (isStale(gen)) return;
       await _resolveNames(conns, gen);
       if (isStale(gen)) return;
@@ -158,6 +160,24 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection>
           if (isStale(gen)) return;
           for (final l in links) {
             if (ids.contains(l.id)) _nameCache[l.id] = l.title;
+          }
+          break;
+        case EntityType.receipt:
+          final receipts = await MoneyService.loadReceipts(tripId)
+              .catchError((_) => <Receipt>[]);
+          if (isStale(gen)) return;
+          for (final r in receipts) {
+            if (ids.contains(r.id)) _nameCache[r.id] = r.title;
+          }
+          break;
+        case EntityType.cash:
+          final cash = await MoneyService.loadWithdrawals(tripId)
+              .catchError((_) => <CashWithdrawal>[]);
+          if (isStale(gen)) return;
+          for (final w in cash) {
+            if (ids.contains(w.id)) {
+              _nameCache[w.id] = 'Cash · ${fmtAmount(w.amount, w.currency)}';
+            }
           }
           break;
         case EntityType.planItem:
@@ -440,6 +460,8 @@ class _ConnectionPickerSheetState
   List<Accommodation> _stays  = [];
   List<TripDocument>  _docs   = [];
   List<TripLink>      _links  = [];
+  List<Receipt>       _receipts = [];
+  List<CashWithdrawal> _cash    = [];
 
   // Tab order — exclude self-type to reduce noise.
   List<EntityType> get _tabTypes => EntityType.values
@@ -470,6 +492,8 @@ class _ConnectionPickerSheetState
         AccommodationService.loadAll(tid).catchError((e) { anyFailed = true; return <Accommodation>[]; }),
         DocService.loadDocuments(tid).catchError((e) { anyFailed = true; return <TripDocument>[]; }),
         LinksService.loadLinks(tid).catchError((e) { anyFailed = true; return <TripLink>[]; }),
+        MoneyService.loadReceipts(tid).catchError((e) { anyFailed = true; return <Receipt>[]; }),
+        MoneyService.loadWithdrawals(tid).catchError((e) { anyFailed = true; return <CashWithdrawal>[]; }),
       ]);
       commitLoad(gen, () {
         offline = anyFailed;
@@ -478,6 +502,8 @@ class _ConnectionPickerSheetState
         _stays  = results[2] as List<Accommodation>;
         _docs   = results[3] as List<TripDocument>;
         _links  = results[4] as List<TripLink>;
+        _receipts = results[5] as List<Receipt>;
+        _cash     = results[6] as List<CashWithdrawal>;
       });
     } catch (_) {
       failLoad(gen, silent: true);
@@ -510,6 +536,16 @@ class _ConnectionPickerSheetState
         return _links
             .where((l) => l.id != widget.myEntityId)
             .map((l) => (id: l.id, name: l.title))
+            .toList();
+      case EntityType.receipt:
+        return _receipts
+            .where((r) => r.id != widget.myEntityId)
+            .map((r) => (id: r.id, name: '${r.title} · ${fmtAmount(r.amount, r.currency)}'))
+            .toList();
+      case EntityType.cash:
+        return _cash
+            .where((w) => w.id != widget.myEntityId)
+            .map((w) => (id: w.id, name: 'Cash · ${fmtAmount(w.amount, w.currency)}'))
             .toList();
       case EntityType.planItem:
         return [

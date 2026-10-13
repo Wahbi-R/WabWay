@@ -140,7 +140,7 @@ class _AddLinkContentState extends State<_AddLinkContent> {
       final TripLink link;
       if (_isEditing) {
         link = await LinksService.updateLink(
-          widget.existing!.id,
+          widget.existing!,
           title:    _titleCtrl.text.trim(),
           url:      _urlCtrl.text.trim(),
           category: _category,

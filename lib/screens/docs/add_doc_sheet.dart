@@ -68,6 +68,7 @@ class _AddDocContentState extends State<_AddDocContent> {
   final _formKey = GlobalKey<FormState>();
   final _titleCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
+  final _urlCtrl = TextEditingController();
 
   DocType _type = DocType.other;
   DocLinkedType? _linkType;
@@ -87,10 +88,8 @@ class _AddDocContentState extends State<_AddDocContent> {
     final pre = widget.prefill;
     if (pre != null) {
       _titleCtrl.text = pre.title ?? '';
-      // Documents have no URL column yet — keep the source link in notes so
-      // it is never silently dropped.
-      final notes = [if (pre.notes != null) pre.notes!, if (pre.url != null) pre.url!];
-      _notesCtrl.text = notes.join('\n');
+      _notesCtrl.text = pre.notes ?? '';
+      _urlCtrl.text = pre.url ?? '';
       if (pre.fileBytes != null) {
         _fileBytes  = pre.fileBytes;
         _fileName   = pre.fileName;
@@ -104,6 +103,7 @@ class _AddDocContentState extends State<_AddDocContent> {
   void dispose() {
     _titleCtrl.dispose();
     _notesCtrl.dispose();
+    _urlCtrl.dispose();
     super.dispose();
   }
 
@@ -149,6 +149,7 @@ class _AddDocContentState extends State<_AddDocContent> {
           bytes:      _fileBytes!,
           fileSizeKb: _fileSizeKb,
           notes:      _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
+          url:        _urlCtrl.text.trim().isEmpty ? null : _urlCtrl.text.trim(),
         );
       } else {
         doc = await DocService.createDocument(
@@ -158,6 +159,7 @@ class _AddDocContentState extends State<_AddDocContent> {
           type:   _type,
           ext:    ext,
           notes:  _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
+          url:    _urlCtrl.text.trim().isEmpty ? null : _urlCtrl.text.trim(),
         );
       }
 
@@ -260,6 +262,13 @@ class _AddDocContentState extends State<_AddDocContent> {
                   ),
                   const SizedBox(height: kSpace4),
 
+                  WabwayTextField(
+                    label: 'Link (optional)',
+                    hint: 'Booking or confirmation page',
+                    controller: _urlCtrl,
+                    keyboardType: TextInputType.url,
+                  ),
+                  const SizedBox(height: kSpace4),
                   WabwayTextField(
                     label: 'Notes (optional)',
                     hint: 'Optional notes…',

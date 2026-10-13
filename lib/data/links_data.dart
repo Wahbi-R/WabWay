@@ -64,6 +64,7 @@ class TripLink {
     required this.category,
     required this.createdAt,
     this.notes,
+    this.isDocument = false,
   });
 
   final String id;
@@ -74,6 +75,10 @@ class TripLink {
   final LinkCategory category;
   final DateTime createdAt;
   final String? notes;
+
+  /// True when stored as a `documents` row (build 417+); false for legacy
+  /// `trip_links` rows. Decides which table edits/deletes go to.
+  final bool isDocument;
 
   String get domain {
     final uri = Uri.tryParse(url);

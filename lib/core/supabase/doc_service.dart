@@ -78,6 +78,7 @@ abstract final class DocService {
       amount:       (row['amount'] as num?)?.toDouble(),
       currency:     row['currency'] as String?,
       notes:        row['notes'] as String?,
+      url:          row['url'] as String?,
       links:        links,
     );
   }
@@ -89,6 +90,7 @@ abstract final class DocService {
         .from('documents')
         .select('*, document_links(*)')
         .eq('trip_id', tripId)
+        .isFilter('link_category', null)
         .order('created_at', ascending: false);
     await OfflineCache.write(OfflineCache.docsKey(tripId), data);
     return data.map<TripDocument>((r) => _docFromRow(r)).toList();
@@ -113,6 +115,7 @@ abstract final class DocService {
     double? amount,
     String? currency,
     String? notes,
+    String? url,
   }) async {
     final inserted = await supabase.from('documents').insert({
       'trip_id':     tripId,
@@ -125,6 +128,7 @@ abstract final class DocService {
       if (amount      != null) 'amount':         amount,
       if (currency    != null && currency.isNotEmpty) 'currency': currency.toUpperCase(),
       if (notes       != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+      if (url         != null && url.trim().isNotEmpty) 'url': url.trim(),
     }).select('*, document_links(*)').single();
     return _docFromRow(inserted);
   }
@@ -147,13 +151,28 @@ abstract final class DocService {
     required DocLinkedType linkedType,
     required String linkedId,
   }) async {
-    final links = await supabase
-        .from('document_links')
-        .select('document_id')
-        .eq('linked_type', _linkedTypeToDb(linkedType))
-        .eq('linked_id', linkedId);
-    if (links.isEmpty) return [];
-    final ids = links.map((l) => l['document_id'] as String).toList();
+    // Documents can be linked two ways: legacy document_links rows and the
+    // shared trip_connections ("Connected" picker). Read both.
+    final results = await Future.wait([
+      supabase
+          .from('document_links')
+          .select('document_id')
+          .eq('linked_type', _linkedTypeToDb(linkedType))
+          .eq('linked_id', linkedId),
+      supabase
+          .from('trip_connections')
+          .select('entity_a_id, entity_a_type, entity_b_id, entity_b_type')
+          .or('entity_a_id.eq.$linkedId,entity_b_id.eq.$linkedId'),
+    ]);
+    final ids = <String>{
+      for (final l in results[0]) l['document_id'] as String,
+      for (final c in results[1])
+        if (c['entity_a_id'] == linkedId && c['entity_b_type'] == 'doc')
+          c['entity_b_id'] as String
+        else if (c['entity_b_id'] == linkedId && c['entity_a_type'] == 'doc')
+          c['entity_a_id'] as String,
+    }.toList();
+    if (ids.isEmpty) return [];
     final docs = await supabase
         .from('documents')
         .select('*, document_links(*)')
@@ -172,6 +191,11 @@ abstract final class DocService {
         .eq('document_id', documentId)
         .eq('linked_type', _linkedTypeToDb(linkedType))
         .eq('linked_id', linkedId);
+    // …and the same pair in trip_connections (either direction).
+    await supabase.from('trip_connections').delete()
+        .eq('entity_a_id', documentId).eq('entity_b_id', linkedId);
+    await supabase.from('trip_connections').delete()
+        .eq('entity_a_id', linkedId).eq('entity_b_id', documentId);
   }
 
   static Future<void> renameDocument(String docId, String newTitle) async {
@@ -217,6 +241,7 @@ abstract final class DocService {
     double? amount,
     String? currency,
     String? notes,
+    String? url,
   }) async {
     // 1. Generate UUID — shared between storage path and the DB row's primary key.
     final docId = _generateUuid();
@@ -244,6 +269,7 @@ abstract final class DocService {
         if (amount     != null) 'amount':        amount,
         if (currency   != null && currency.isNotEmpty) 'currency': currency.toUpperCase(),
         if (notes      != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+        if (url        != null && url.trim().isNotEmpty) 'url': url.trim(),
       }).select('*, document_links(*)').single();
       return _docFromRow(inserted);
     } catch (e) {

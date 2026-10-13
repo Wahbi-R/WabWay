@@ -194,29 +194,13 @@ class _SpotDetailContentState extends ConsumerState<SpotDetailContent> {
 
   Future<void> _setStatus(SpotStatus status) async {
     try {
-      final updated = await SpotService.updateSpot(
-        spotId: widget.spot.id,
-        name: widget.spot.name,
-        city: widget.spot.city,
-        area: widget.spot.area,
-        category: widget.spot.category,
-        status: status,
-        notes: widget.spot.notes,
-        mapsUrl: widget.spot.mapsUrl,
-        sourceUrl: widget.spot.sourceUrl,
-        address: widget.spot.address,
-      );
+      final updated = await SpotService.updateStatus(widget.spot.id, status);
       if (mounted) widget.onEdit?.call(updated);
     } catch (e) {
-      if (mounted) {
-        showWabwaySnack(context, 'Could not update: $e', duration: const Duration(seconds: 3));
-      }
+      if (mounted) showWabwaySnack(context, 'Could not update the spot.', error: true);
     }
   }
 
-  Future<void> _markVisited() => _setStatus(SpotStatus.visited);
-  Future<void> _markSkipped() => _setStatus(SpotStatus.skipped);
-  Future<void> _markConfirmed() => _setStatus(SpotStatus.confirmed);
 
   Future<void> _submitComment() async {
     final text = _commentCtrl.text.trim();
@@ -467,66 +451,25 @@ class _SpotDetailContentState extends ConsumerState<SpotDetailContent> {
               const SizedBox(height: kSpace4),
               const Divider(height: 1),
               const SizedBox(height: kSpace4),
-              _AddToPlanButton(spot: widget.spot),
+              _AddToPlanButton(
+                spot: widget.spot,
+                // Planning a spot moves it to Planned (never backwards).
+                onPlanned: widget.onEdit == null ||
+                        widget.spot.status.stage == SpotStage.planned ||
+                        widget.spot.status.stage == SpotStage.visited
+                    ? null
+                    : () => _setStatus(SpotStatus.planned),
+              ),
 
-              // ── Status quick actions
+              // ── Lifecycle: Idea → Confirmed → Planned → Visited
               if (widget.onEdit != null) ...[
                 const SizedBox(height: kSpace4),
                 const Divider(height: 1),
                 const SizedBox(height: kSpace4),
-                if (widget.spot.status == SpotStatus.visited ||
-                    widget.spot.status == SpotStatus.skipped) ...[
-                  // Visited / skipped — offer revert
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: _markConfirmed,
-                      icon: const Icon(Icons.undo_rounded, size: 16),
-                      label: const Text('Mark as confirmed'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: kColorInkSoft,
-                        side: const BorderSide(color: kColorBorder),
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        shape: const RoundedRectangleBorder(borderRadius: kRadiusMd),
-                      ),
-                    ),
-                  ),
-                ] else ...[
-                  // Active spot — offer visited + skipped
-                  Row(
-                    children: [
-                      Expanded(
-                        flex: 3,
-                        child: FilledButton.icon(
-                          onPressed: _markVisited,
-                          icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
-                          label: const Text('Mark as visited'),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: kColorSuccess,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: const RoundedRectangleBorder(borderRadius: kRadiusMd),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: kSpace2),
-                      Expanded(
-                        flex: 2,
-                        child: OutlinedButton.icon(
-                          onPressed: _markSkipped,
-                          icon: const Icon(Icons.cancel_outlined, size: 16),
-                          label: const Text('Skip'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: kColorInkSoft,
-                            side: const BorderSide(color: kColorBorder),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: const RoundedRectangleBorder(borderRadius: kRadiusMd),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                _SpotLifecycle(
+                  status: widget.spot.status,
+                  onSetStatus: _setStatus,
+                ),
               ],
 
               const SizedBox(height: kSpace4),
@@ -592,8 +535,9 @@ class _SpotDetailContentState extends ConsumerState<SpotDetailContent> {
 // ─── Add to Plan button ────────────────────────────────────────────────────────
 
 class _AddToPlanButton extends ConsumerStatefulWidget {
-  const _AddToPlanButton({required this.spot});
+  const _AddToPlanButton({required this.spot, this.onPlanned});
   final Spot spot;
+  final VoidCallback? onPlanned;
 
   @override
   ConsumerState<_AddToPlanButton> createState() => _AddToPlanButtonState();
@@ -702,6 +646,7 @@ class _AddToPlanButtonState extends ConsumerState<_AddToPlanButton> {
       );
       if (!mounted) return;
       setState(() => _plannedDay = day);
+      widget.onPlanned?.call();
       showWabwaySnack(context,
           'Added to Day ${day.dayNumber}${day.city.isEmpty ? '' : ' · ${day.city}'}');
     } catch (e) {
@@ -724,6 +669,115 @@ class _AddToPlanButtonState extends ConsumerState<_AddToPlanButton> {
       fullWidth: true,
       loading: _loading,
       onPressed: _loading ? null : _tap,
+    );
+  }
+}
+
+// ─── Lifecycle (Idea → Confirmed → Planned → Visited) ─────────────────────────
+
+/// One spot lifecycle, shown as a stepper with the single next action.
+/// Votes stay the group-opinion layer; this is where the spot is in the trip.
+class _SpotLifecycle extends StatelessWidget {
+  const _SpotLifecycle({
+    required this.status,
+    required this.onSetStatus,
+  });
+
+  final SpotStatus status;
+  final ValueChanged<SpotStatus> onSetStatus;
+
+  static const _steps = [
+    SpotStage.idea,
+    SpotStage.confirmed,
+    SpotStage.planned,
+    SpotStage.visited,
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final stage = status.stage;
+    final reached = stage == SpotStage.skipped ? -1 : _steps.indexOf(stage);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            for (var i = 0; i < _steps.length; i++) ...[
+              if (i > 0)
+                Expanded(
+                  child: Container(
+                    height: 2,
+                    color: i <= reached ? kColorPrimary : kColorBorder,
+                  ),
+                ),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 14,
+                    height: 14,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: i <= reached ? kColorPrimary : kColorPaper,
+                      border: Border.all(color: i <= reached ? kColorPrimary : kColorBorder, width: 2),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _steps[i].label,
+                    style: kStyleCaption.copyWith(
+                      color: i == reached ? kColorInk : kColorInkSoft,
+                      fontWeight: i == reached ? FontWeight.w600 : FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: kSpace3),
+        if (stage == SpotStage.visited || stage == SpotStage.skipped)
+          WabwayButton(
+            label: stage == SpotStage.skipped ? 'Skipped — undo' : 'Visited — undo',
+            icon: Icons.undo_rounded,
+            variant: WabwayButtonVariant.ghost,
+            fullWidth: true,
+            onPressed: () => onSetStatus(SpotStatus.confirmed),
+          )
+        else
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: stage == SpotStage.idea
+                    ? WabwayButton(
+                        label: 'Confirm — we\'re doing this',
+                        icon: Icons.check_rounded,
+                        fullWidth: true,
+                        onPressed: () => onSetStatus(SpotStatus.confirmed),
+                      )
+                    : WabwayButton(
+                        label: 'Mark as visited',
+                        icon: Icons.check_circle_outline_rounded,
+                        fullWidth: true,
+                        onPressed: () => onSetStatus(SpotStatus.visited),
+                      ),
+              ),
+              const SizedBox(width: kSpace2),
+              Expanded(
+                flex: 2,
+                child: WabwayButton(
+                  label: 'Skip',
+                  icon: Icons.cancel_outlined,
+                  variant: WabwayButtonVariant.ghost,
+                  fullWidth: true,
+                  onPressed: () => onSetStatus(SpotStatus.skipped),
+                ),
+              ),
+            ],
+          ),
+      ],
     );
   }
 }

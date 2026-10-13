@@ -55,7 +55,7 @@ const _kPages = [
     icon: Icons.place_rounded,
     title: 'Discover & vote on Spots',
     body:
-        'Add places you want to visit, vote Must-do / Want / Maybe / Skip, and confirm the ones you\'re committing to. Confirmed spots flow straight into your plan.',
+        'Add places you want to visit and vote Must-do / Want / Maybe / Skip. Each spot moves Idea → Confirmed → Planned → Visited: tap Confirm when the group commits, then Add to Plan.',
     color: Color(0xFFC96F4A),
   ),
   _Page(

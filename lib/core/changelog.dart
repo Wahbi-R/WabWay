@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 415,
+    label: "Spots",
+    changes: [
+      "Every spot now shows where it is: Idea → Confirmed → Planned → Visited, with one clear next step",
+      "Adding a spot to your plan marks it as Planned",
+      "Fixed: marking a spot visited, skipped or confirmed no longer erases its map location and country",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 414,
     label: "Library",
     changes: [

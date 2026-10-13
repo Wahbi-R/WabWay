@@ -35,6 +35,34 @@ enum SpotStatus {
     SpotStatus.visited   => WabwayBadgeTone.success,
     SpotStatus.skipped   => WabwayBadgeTone.danger,
   };
+
+  /// Where the spot is in the one lifecycle. Legacy statuses are kept in the
+  /// DB and folded in here: Want to go / Must-do are still ideas (the votes
+  /// carry that opinion), Booked counts as Planned.
+  SpotStage get stage => switch (this) {
+    SpotStatus.idea || SpotStatus.wantToGo || SpotStatus.mustDo => SpotStage.idea,
+    SpotStatus.confirmed => SpotStage.confirmed,
+    SpotStatus.planned || SpotStatus.booked => SpotStage.planned,
+    SpotStatus.visited => SpotStage.visited,
+    SpotStatus.skipped => SpotStage.skipped,
+  };
+}
+
+/// Idea → Confirmed → Planned → Visited (or Skipped).
+enum SpotStage {
+  idea,
+  confirmed,
+  planned,
+  visited,
+  skipped;
+
+  String get label => switch (this) {
+    SpotStage.idea      => 'Idea',
+    SpotStage.confirmed => 'Confirmed',
+    SpotStage.planned   => 'Planned',
+    SpotStage.visited   => 'Visited',
+    SpotStage.skipped   => 'Skipped',
+  };
 }
 
 enum SpotCategory {

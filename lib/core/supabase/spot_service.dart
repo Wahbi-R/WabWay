@@ -225,6 +225,19 @@ abstract final class SpotService {
     return _spotFromRow(updated);
   }
 
+  /// Changes ONLY the status. Status quick-actions must use this — calling
+  /// [updateSpot] with partial fields nulls out country / coordinates /
+  /// place_source (it writes every column).
+  static Future<Spot> updateStatus(String spotId, SpotStatus status) async {
+    final updated = await supabase
+        .from('spots')
+        .update({'status': _statusToDb(status)})
+        .eq('id', spotId)
+        .select('*, spot_votes(*), spot_comments(*)')
+        .single();
+    return _spotFromRow(updated);
+  }
+
   static Future<void> deleteSpot(String spotId) async {
     await supabase.from('spots').delete().eq('id', spotId);
   }

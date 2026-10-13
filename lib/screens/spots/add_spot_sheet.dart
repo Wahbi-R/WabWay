@@ -551,13 +551,23 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
                   ],
                   const SizedBox(height: kSpace4),
 
-                  WabwaySelectField<SpotStatus>(
-                    label: 'Status',
-                    value: _status,
-                    onChanged: (v) => setState(() => _status = v ?? SpotStatus.idea),
-                    items: SpotStatus.values
-                        .map((s) => WabwaySelectItem(value: s, label: s.label))
-                        .toList(),
+                  // The one lifecycle. A legacy status (Want to go, Must-do,
+                  // Booked) stays selected until the user picks a stage.
+                  WabwayChoiceChips<SpotStatus>(
+                    label: 'Stage',
+                    choices: [
+                      for (final st in const [
+                        SpotStatus.idea, SpotStatus.confirmed, SpotStatus.planned,
+                        SpotStatus.visited, SpotStatus.skipped,
+                      ])
+                        WabwayChoice(st, st.label),
+                      if (!const [SpotStatus.idea, SpotStatus.confirmed, SpotStatus.planned,
+                              SpotStatus.visited, SpotStatus.skipped]
+                          .contains(_status))
+                        WabwayChoice(_status, _status.label),
+                    ],
+                    selected: _status,
+                    onChanged: (st) => setState(() => _status = st),
                   ),
                   const SizedBox(height: kSpace4),
 

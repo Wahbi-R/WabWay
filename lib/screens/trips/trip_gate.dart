@@ -202,13 +202,23 @@ class _NoTripsScreen extends StatelessWidget {
                     size: WabwayButtonSize.lg,
                     icon: Icons.group_add_rounded,
                   ),
-                  const SizedBox(height: kSpace5),
-                  WabwayButton(
-                    label: 'Log out',
-                    variant: WabwayButtonVariant.ghost,
-                    onPressed: () => AuthService.signOut(),
-                    fullWidth: true,
-                    icon: Icons.logout_rounded,
+                  const SizedBox(height: kSpace8),
+                  // Account action, not a primary choice — quiet footer link.
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          'Signed in as ${supabase.auth.currentUser?.email ?? ''}',
+                          style: kStyleCaption,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => AuthService.signOut(),
+                        child: Text('Log out', style: kStyleCaptionMedium.copyWith(color: kColorPrimaryDark)),
+                      ),
+                    ],
                   ),
                 ],
               ),

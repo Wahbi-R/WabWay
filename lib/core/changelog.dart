@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 410,
+    label: "Home",
+    changes: [
+      "Home lists your other trips so you can switch with one tap",
+      "Log out is no longer a big button on the start screen",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 409,
     label: "Crew",
     changes: [

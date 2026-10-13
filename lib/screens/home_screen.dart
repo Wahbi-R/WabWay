@@ -23,6 +23,7 @@ import '../core/trip/app_trip.dart';
 import '../core/trip/app_trip_member.dart';
 import 'onboarding_screen.dart';
 import 'trips/trip_settings_sheet.dart';
+import 'trips/trip_list_tile.dart';
 import '../data/activity_data.dart';
 import '../data/docs_data.dart';
 import '../data/links_data.dart';
@@ -409,6 +410,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with AsyncScreenMixin {
                 (data.nextDay != null || data.nextTravelItem != null)) ...[
               const SizedBox(height: kSpace4),
               _UpcomingCard(data: data),
+            ],
+            // Other trips — one tap to switch (same row as the trip switcher).
+            if (ref.watch(allTripsProvider).length > 1) ...[
+              const SizedBox(height: kSpace4),
+              Text('Your trips', style: kStyleOverline),
+              const SizedBox(height: kSpace3),
+              DecoratedBox(
+                decoration: kCardDecoration(),
+                child: Column(
+                  children: [
+                    for (final t in ref.watch(allTripsProvider).take(5))
+                      TripListTile(
+                        trip: t,
+                        isActive: t.id == trip?.id,
+                        onTap: t.id == trip?.id
+                            ? null
+                            : () => ref.read(tripNotifierProvider.notifier).switchTrip(t),
+                      ),
+                  ],
+                ),
+              ),
             ],
             const SizedBox(height: kSpace4),
             Text('Recent activity', style: kStyleOverline),

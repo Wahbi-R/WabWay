@@ -221,7 +221,7 @@ class ReceiptDetailContent extends StatelessWidget {
               _InfoRow(
                 icon: Icons.person_rounded,
                 label: 'Paid by',
-                value: payer.name,
+                value: payer.label,
               ),
 
               // Net for you

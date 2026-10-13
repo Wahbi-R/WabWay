@@ -186,12 +186,8 @@ class _PinCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isMe = pin.authorId == myId;
-    final members = ref.watch(tripMembersProvider);
-    final match = members.where((m) => m.userId == pin.authorId).firstOrNull;
-    final name = isMe
-        ? 'You'
-        : match?.profile.displayName ??
-          (pin.authorId.length >= 8 ? pin.authorId.substring(0, 8) : pin.authorId);
+    ref.watch(tripMembersProvider); // rebuild when members load
+    final name = ref.memberLabel(pin.authorId);
 
     final pinColor = pin.isPinned ? kColorPrimary : kColorInkSoft;
 
@@ -236,7 +232,7 @@ class _PinCard extends ConsumerWidget {
               const SizedBox(height: kSpace2),
               Row(
                 children: [
-                  WabwayAvatar(name: name, size: WabwayAvatarSize.xs),
+                  WabwayAvatar(name: ref.memberName(pin.authorId), size: WabwayAvatarSize.xs),
                   const SizedBox(width: kSpace2),
                   Text(name, style: kStyleCaption),
                 ],

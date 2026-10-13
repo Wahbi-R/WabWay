@@ -24,21 +24,11 @@ import '../shared/connections_section.dart';
 import 'add_spot_sheet.dart';
 import 'spot_vote_chip.dart';
 import '../../data/date_utils.dart';
-
-// ─── Member name helper ────────────────────────────────────────────────────────
-
-String _memberName(WidgetRef ref, String userId) {
-  final me = ref.read(profileProvider);
-  if (me?.id == userId) return 'You';
-  final members = ref.read(tripMembersProvider);
-  final match = members.where((m) => m.userId == userId).firstOrNull;
-  if (match != null) return match.profile.displayName;
-  return userId.length >= 8 ? userId.substring(0, 8) : userId;
-}
+import '../../core/text_utils.dart';
 
 // ─── Full-screen route for mobile ─────────────────────────────────────────────
 
-class SpotDetailScreen extends ConsumerWidget {
+class SpotDetailScreen extends ConsumerStatefulWidget {
   const SpotDetailScreen({
     super.key,
     required this.spot,
@@ -65,7 +55,24 @@ class SpotDetailScreen extends ConsumerWidget {
   final VoidCallback? onOpenStay;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SpotDetailScreen> createState() => _SpotDetailScreenState();
+}
+
+class _SpotDetailScreenState extends ConsumerState<SpotDetailScreen> {
+  // Local copy so status changes / edits redraw this pushed route (the
+  // parent list is updated through widget.onEdit as well).
+  late Spot spot = widget.spot;
+
+  void _updated(Spot s) {
+    setState(() => spot = s);
+    widget.onEdit?.call(s);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final onEdit = widget.onEdit == null ? null : _updated;
+    final canDelete = widget.canDelete;
+    final onDelete = widget.onDelete;
     return Scaffold(
       backgroundColor: kColorCream,
       appBar: AppBar(
@@ -94,14 +101,14 @@ class SpotDetailScreen extends ConsumerWidget {
                   userId: userId,
                   spot: spot,
                 );
-                if (updated != null) onEdit!(updated);
+                if (updated != null) onEdit(updated);
               },
             ),
           if (canDelete && onDelete != null)
             IconButton(
               icon: const Icon(Icons.delete_outline_rounded),
               color: kColorDanger,
-              onPressed: () => _confirmDelete(context, spot.name, onDelete!),
+              onPressed: () => _confirmDelete(context, spot.name, onDelete),
             ),
           const SizedBox(width: kSpace2),
         ],
@@ -110,12 +117,15 @@ class SpotDetailScreen extends ConsumerWidget {
         padding: EdgeInsets.only(bottom: kSpace12 + MediaQuery.paddingOf(context).bottom),
         child: SpotDetailContent(
           spot: spot,
-          myVote: myVote,
-          onVote: onVote,
-          docs: docs,
-          linkedStay: linkedStay,
-          onOpenStay: onOpenStay,
-          onShowOnMap: onShowOnMap,
+          myVote: widget.myVote,
+          onVote: widget.onVote,
+          // Lifecycle actions need onEdit; edit/delete icons stay in the
+          // app bar (canDelete not passed, so the content doesn't repeat them).
+          onEdit: onEdit,
+          docs: widget.docs,
+          linkedStay: widget.linkedStay,
+          onOpenStay: widget.onOpenStay,
+          onShowOnMap: widget.onShowOnMap,
         ),
       ),
     );
@@ -297,7 +307,7 @@ class _SpotDetailContentState extends ConsumerState<SpotDetailContent> {
                       size: 14, color: kColorInkSoft),
                   const SizedBox(width: 4),
                   Text(
-                    '${widget.spot.city}, ${widget.spot.area}',
+                    joinNonEmpty([widget.spot.city, widget.spot.area], ', '),
                     style: kStyleCaptionMedium,
                   ),
                   const SizedBox(width: kSpace2),
@@ -1037,7 +1047,7 @@ class _GroupVotesSummary extends ConsumerWidget {
                     (id) => Padding(
                       padding: const EdgeInsets.only(right: 6),
                       child: WabwayAvatar(
-                        name: _memberName(ref, id),
+                        name: ref.memberName(id),
                         size: WabwayAvatarSize.xs,
                       ),
                     ),
@@ -1070,13 +1080,13 @@ class _CommentRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final name = _memberName(ref, comment.authorId);
+    final name = ref.memberLabel(comment.authorId);
     return Padding(
       padding: const EdgeInsets.only(bottom: kSpace4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          WabwayAvatar(name: name, size: WabwayAvatarSize.sm),
+          WabwayAvatar(name: ref.memberName(comment.authorId), size: WabwayAvatarSize.sm),
           const SizedBox(width: kSpace3),
           Expanded(
             child: Column(

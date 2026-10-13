@@ -96,6 +96,26 @@ class _HomeData {
   // Sum of home-currency equivalents — consistent across multi-currency trips.
   double get totalSpent => receipts.fold(0.0, (s, r) => s + r.homeAmount);
 
+  // Foreign receipts saved without an exchange rate (older builds allowed a
+  // 0 home amount). Shown alongside the total instead of silently counting as 0.
+  Map<String, double> get unconvertedSpent {
+    final out = <String, double>{};
+    for (final r in receipts) {
+      if (r.homeAmount == 0 && r.amount > 0 && r.currency != homeCurrency) {
+        out[r.currency] = (out[r.currency] ?? 0) + r.amount;
+      }
+    }
+    return out;
+  }
+
+  String get spentLabel {
+    final extra = unconvertedSpent;
+    return joinNonEmpty([
+      if (totalSpent > 0 || extra.isEmpty) fmtAmount(totalSpent, homeCurrency),
+      for (final e in extra.entries) fmtAmount(e.value, e.key),
+    ], ' + ');
+  }
+
   // Today's plan day exactly, if one exists. Used for the "Today" agenda card.
   TripDay? get todayDay {
     final today = _today();
@@ -708,9 +728,7 @@ class _TripHero extends StatelessWidget {
                     Expanded(
                       child: _HeroStat(
                         label: 'Spent',
-                        value: data != null
-                            ? fmtAmount(data!.totalSpent, data!.homeCurrency)
-                            : '—',
+                        value: data != null ? data!.spentLabel : '—',
                       ),
                     ),
                   ],
@@ -1172,7 +1190,7 @@ class _UpcomingCard extends StatelessWidget {
         final d = day!;
         items.add((
           icon: Icons.calendar_month_rounded,
-          label: 'Day ${d.dayNumber} · ${d.city}',
+          label: joinNonEmpty(['Day ${d.dayNumber}', d.city]),
           sub: d.sortedItems.isNotEmpty ? d.sortedItems.first.title : '',
           date: d.date,
         ));
@@ -1305,7 +1323,7 @@ class _TodayAgendaCardState extends State<_TodayAgendaCard> {
                     const Icon(Icons.calendar_month_rounded, size: 14, color: kColorInkSoft),
                     const SizedBox(width: kSpace2),
                     Text(
-                      'Day ${widget.day.dayNumber}  ·  ${widget.day.city}  ·  ${fmtDate(widget.day.date)}',
+                      joinNonEmpty(['Day ${widget.day.dayNumber}', widget.day.city, fmtDate(widget.day.date)], '  ·  '),
                       style: kStyleCaption.copyWith(color: kColorInkSoft),
                     ),
                   ],
@@ -1521,10 +1539,10 @@ class _ActivityFeed extends StatelessWidget {
 
     // Convert members once for receipt detail.
     final moneyMembers = d.members.isEmpty
-        ? [TripMember(id: myId.isEmpty ? 'you' : myId, name: 'You')]
+        ? [TripMember(id: myId.isEmpty ? 'you' : myId, name: 'You', isMe: true)]
         : d.members.map((m) => TripMember(
               id:   m.userId,
-              name: m.userId == myId ? 'You' : m.profile.displayName,
+              name: m.profile.displayName, isMe: m.userId == myId,
             )).toList();
 
     void Function(BuildContext)? onTapFor(ActivityEvent ev) {

@@ -62,3 +62,15 @@ const Map<String, String> _kFold = {
   '‐': '-', '‑': '-', '–': '-', '—': '-',
   '’': "'", '‘': "'",
 };
+
+/// Older builds saved a literal "Unknown" when a place had no city. Treat it as
+/// empty everywhere it's read so the UI simply omits the city.
+String? cleanCity(String? city) {
+  final c = city?.trim();
+  if (c == null || c.isEmpty || c.toLowerCase() == 'unknown') return null;
+  return c;
+}
+
+/// Joins the non-empty parts: joinNonEmpty(['Day 1', '', 'Oct 13']) → "Day 1 · Oct 13".
+String joinNonEmpty(Iterable<String?> parts, [String separator = ' · ']) =>
+    parts.where((p) => p != null && p.trim().isNotEmpty).map((p) => p!.trim()).join(separator);

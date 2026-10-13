@@ -4,8 +4,38 @@
     {
       "name": "WabWay Web",
       "runtimeExecutable": "flutter",
-      "runtimeArgs": ["run", "-d", "web-server", "--web-port=8080", "--dart-define-from-file=.env"],
+      "runtimeArgs": [
+        "run",
+        "-d",
+        "web-server",
+        "--web-port=8080",
+        "--dart-define-from-file=.env"
+      ],
       "port": 8080
+    },
+    {
+      "name": "WabWay Web (release build)",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8090",
+        "--directory",
+        "build/web"
+      ],
+      "port": 8090
+    },
+    {
+      "name": "WabWay Web (release build, user 2)",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8091",
+        "--directory",
+        "build/web"
+      ],
+      "port": 8091
     }
   ]
 }

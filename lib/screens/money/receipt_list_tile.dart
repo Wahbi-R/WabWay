@@ -73,7 +73,7 @@ class ReceiptListTile extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     [
-                      '${payer.name} paid',
+                      '${payer.label} paid',
                       fmtDate(receipt.date),
                       if (receipt.splits.length > 1) 'split ${receipt.splits.length} ways'
                       else if (receipt.splits.isEmpty) 'not split',

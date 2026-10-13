@@ -11,6 +11,20 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 416,
+    label: "Bug fixes",
+    changes: [
+      "Exchange rates load again in the web app, so foreign receipts convert automatically",
+      "Home's Spent total shows foreign receipts that are missing a rate instead of \$0",
+      "Places no longer show \"Unknown\" when they have no city",
+      "Your avatar shows your initials everywhere, never just \"Y\"",
+      "\"Add all trip days\" and the add-day date/city pre-fill work again",
+      "The spot stage stepper now appears on phones too",
+      "The quick-add menu, invite codes and trip switcher look right on desktop",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 415,
     label: "Spots",
     changes: [

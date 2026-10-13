@@ -552,7 +552,6 @@ class _SidebarHeader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final trip    = ref.watch(activeTripProvider);
-    final hasMany = ref.watch(allTripsProvider).length > 1;
 
     return GestureDetector(
       onTap: () => showTripSwitcherSheet(context, ref),
@@ -600,8 +599,9 @@ class _SidebarHeader extends ConsumerWidget {
                 ],
               ),
             ),
-            if (hasMany)
-              const Icon(Icons.unfold_more_rounded, size: 16, color: kColorInkSoft),
+            // Always show the switch affordance — the switcher is also
+            // where you create or join another trip.
+            const Icon(Icons.unfold_more_rounded, size: 16, color: kColorInkSoft),
           ],
         ),
       ),

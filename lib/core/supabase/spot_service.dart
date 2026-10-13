@@ -1,6 +1,7 @@
 import '../../data/spot_data.dart';
 import '../offline_cache.dart';
 import 'client.dart';
+import '../text_utils.dart';
 
 abstract final class SpotService {
   // ─── Enum converters ────────────────────────────────────────────────────────
@@ -98,7 +99,7 @@ abstract final class SpotService {
     return Spot(
       id:          row['id'] as String,
       name:        row['name'] as String,
-      city:        row['city'] as String,
+      city:        cleanCity(row['city'] as String?) ?? '',
       area:        row['area'] as String? ?? '',
       category:    _catFrom(row['category'] as String),
       status:      _statusFrom(row['status'] as String),
@@ -166,7 +167,7 @@ abstract final class SpotService {
     final inserted = await supabase.from('spots').insert({
       'trip_id':  tripId,
       'name':     name.trim(),
-      'city':     city.trim().isEmpty ? 'Unknown' : city.trim(),
+      'city':     city.trim(),
       'area':     area.trim(),
       'category': _catToDb(category),
       'status':   _statusToDb(status),
@@ -205,7 +206,7 @@ abstract final class SpotService {
         .from('spots')
         .update({
           'name':     name.trim(),
-          'city':     city.trim().isEmpty ? 'Unknown' : city.trim(),
+          'city':     city.trim(),
           'area':     area.trim(),
           'category': _catToDb(category),
           'status':   _statusToDb(status),

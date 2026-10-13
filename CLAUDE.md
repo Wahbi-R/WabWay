@@ -28,9 +28,9 @@ Before every commit+push to `wabway-server/`, update `wabway-server/FEATURES.md`
 - Keep entries brief but endpoint-specific (what the endpoint does, what changed).
 - This file is served by the `/version` endpoint so the user can check what's live on the phone vs what's on GitHub.
 
-## TripState / ProfileState in routes
+## Reading the active trip / profile
 
-These InheritedWidgets are not available inside a pushed `MaterialPageRoute`. Pass required data as explicit constructor parameters instead.
+Use the Riverpod providers: `ref.read(activeTripProvider)`, `tripMembersProvider`, `profileProvider`, `isOrganiserProvider`. They work everywhere, including pushed `MaterialPageRoute`s. The old `TripState` / `ProfileState` InheritedWidgets were never provided in the tree (every `maybeOf` returned null and silently broke "Add all trip days" and day defaults) and were deleted in build 416 — don't reintroduce them.
 
 ## Before creating anything new — check for an existing equivalent
 

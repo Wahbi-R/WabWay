@@ -25,7 +25,9 @@ abstract final class ExchangeRateService {
             '${date.month.toString().padLeft(2, '0')}-'
             '${date.day.toString().padLeft(2, '0')}';
     try {
-      final uri = Uri.parse('https://api.frankfurter.app/$segment?from=$from&to=$to');
+      // api.frankfurter.app now 301-redirects here; the redirect has no CORS
+      // headers, so on web the old URL failed every time (rate stayed empty).
+      final uri = Uri.parse('https://api.frankfurter.dev/v1/$segment?from=$from&to=$to');
       final res = await http.get(uri).timeout(const Duration(seconds: 5));
       if (res.statusCode != 200) return null;
       final j = jsonDecode(res.body) as Map<String, dynamic>;

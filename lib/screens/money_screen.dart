@@ -99,11 +99,11 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
     final appMembers = ref.read(tripMembersProvider);
     _userId  = myId;
     _members = appMembers.isEmpty
-        ? [TripMember(id: myId.isEmpty ? 'you' : myId, name: 'You')]
+        ? [TripMember(id: myId.isEmpty ? 'you' : myId, name: 'You', isMe: true)]
         : appMembers
             .map((m) => TripMember(
                   id:   m.userId,
-                  name: m.userId == myId ? 'You' : m.profile.displayName,
+                  name: m.profile.displayName, isMe: m.userId == myId,
                 ))
             .toList();
   }

@@ -92,6 +92,11 @@ Future<T?> showWabwayAutoSheet<T>(
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: Colors.transparent,
-    builder: (sheetCtx) => builder(sheetCtx, true),
+    // Always give the sheet its paper panel — content shouldn't have to
+    // remember to draw one (the quick-add menu didn't, and rendered see-through).
+    builder: (sheetCtx) => DecoratedBox(
+      decoration: const BoxDecoration(color: kColorPaper, borderRadius: kRadiusSheet),
+      child: builder(sheetCtx, true),
+    ),
   );
 }

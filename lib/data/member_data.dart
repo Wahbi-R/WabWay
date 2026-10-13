@@ -1,10 +1,19 @@
 // ─── Member identity ──────────────────────────────────────────────────────────
 
 class TripMember {
-  const TripMember({required this.id, required this.name});
+  const TripMember({required this.id, required this.name, this.isMe = false});
   final String id;
+
+  /// The member's real display name — use it for avatars/initials.
   final String name;
-  bool get isYou => id == kYouId;
+
+  /// True for the signed-in user. Never fake this by naming someone "You":
+  /// the name feeds avatars, so it must stay the real one.
+  final bool isMe;
+  bool get isYou => isMe || id == kYouId;
+
+  /// What to show as text: "You" for the signed-in user, else the name.
+  String get label => isYou ? 'You' : name;
 }
 
 // Mock fallback — used only for demo/test paths where live data is not loaded.

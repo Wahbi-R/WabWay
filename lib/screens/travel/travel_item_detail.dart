@@ -20,6 +20,7 @@ import '../plan/day_picker_sheet.dart';
 import '../plan/doc_attach_sheet.dart';
 import '../../data/connection_data.dart';
 import '../shared/connections_section.dart';
+import '../../core/text_utils.dart';
 
 // ─── Mobile screen ────────────────────────────────────────────────────────────
 
@@ -721,7 +722,7 @@ class _ActionsSectionState extends ConsumerState<_ActionsSection> {
         linkedDayId: dayId,
       );
       widget.onUpdated?.call(updated);
-      showWabwaySnack(context, 'Added to Day ${day.dayNumber} · ${day.city}');
+      showWabwaySnack(context, 'Added to ${joinNonEmpty(['Day ${day.dayNumber}', day.city])}');
     } catch (e) {
       if (!mounted) return;
       showWabwaySnack(context, 'Could not add to plan: $e', error: true);

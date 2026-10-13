@@ -21,6 +21,7 @@ import '../shared/connections_section.dart';
 import '../../core/async_screen_mixin.dart';
 import 'add_item_sheet.dart';
 import 'doc_attach_sheet.dart';
+import '../../core/text_utils.dart';
 
 // ─── Mobile screen ────────────────────────────────────────────────────────────
 
@@ -890,7 +891,7 @@ class _MoveToDaySheet extends StatelessWidget {
                           ),
                         ),
                         title: Text(
-                          'Day ${day.dayNumber} · ${day.city}',
+                          joinNonEmpty(['Day ${day.dayNumber}', day.city]),
                           style: kStyleBodyMedium,
                         ),
                         subtitle: Text(fmtDate(day.date),
@@ -913,28 +914,19 @@ class _MoveToDaySheet extends StatelessWidget {
 
 // ─── Item comment widgets ─────────────────────────────────────────────────────
 
-String _commentAuthorName(WidgetRef ref, String authorId) {
-  final me = ref.read(profileProvider);
-  if (me?.id == authorId) return 'You';
-  final members = ref.read(tripMembersProvider);
-  final match = members.where((m) => m.userId == authorId).firstOrNull;
-  if (match != null) return match.profile.displayName;
-  return authorId.length >= 8 ? authorId.substring(0, 8) : authorId;
-}
-
 class _ItemCommentRow extends ConsumerWidget {
   const _ItemCommentRow({required this.comment});
   final ItineraryItemComment comment;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final name = _commentAuthorName(ref, comment.authorId);
+    final name = ref.memberLabel(comment.authorId);
     return Padding(
       padding: const EdgeInsets.only(bottom: kSpace4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          WabwayAvatar(name: name, size: WabwayAvatarSize.sm),
+          WabwayAvatar(name: ref.memberName(comment.authorId), size: WabwayAvatarSize.sm),
           const SizedBox(width: kSpace3),
           Expanded(
             child: Column(

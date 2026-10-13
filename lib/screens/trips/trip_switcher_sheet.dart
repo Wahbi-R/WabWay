@@ -14,12 +14,10 @@ Future<void> showTripSwitcherSheet(BuildContext context, WidgetRef ref) {
   final currentTripId = ref.read(activeTripIdProvider);
   final allTrips      = ref.read(allTripsProvider);
 
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    backgroundColor: Colors.transparent,
-    builder: (ctx) => _TripSwitcherSheet(
+  return showWabwayAutoSheet<void>(
+    context,
+    builder: (ctx, handle) => _TripSwitcherSheet(
+      showDragHandle: handle,
       currentTripId: currentTripId,
       allTrips:      allTrips,
       onSwitch: (trip) {
@@ -64,8 +62,10 @@ class _TripSwitcherSheet extends StatelessWidget {
     required this.onSwitch,
     required this.onCreateTrip,
     required this.onJoinTrip,
+    this.showDragHandle = true,
   });
 
+  final bool showDragHandle;
   final String currentTripId;
   final List<AppTrip> allTrips;
   final ValueChanged<AppTrip> onSwitch;
@@ -90,7 +90,7 @@ class _TripSwitcherSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const WabwayDragHandle(),
+            if (showDragHandle) const WabwayDragHandle(),
             const SizedBox(height: kSpace3),
 
             Row(

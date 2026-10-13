@@ -934,15 +934,15 @@ class _ActionsSectionState extends State<_ActionsSection> {
     try {
       final appMembers = await TripService.loadTripMembers(widget.tripId);
       members = appMembers.isEmpty
-          ? [TripMember(id: myId.isEmpty ? 'you' : myId, name: 'You')]
+          ? [TripMember(id: myId.isEmpty ? 'you' : myId, name: 'You', isMe: true)]
           : appMembers
               .map((m) => TripMember(
                     id: m.userId,
-                    name: m.userId == myId ? 'You' : m.profile.displayName,
+                    name: m.profile.displayName, isMe: m.userId == myId,
                   ))
               .toList();
     } catch (_) {
-      members = [TripMember(id: myId.isEmpty ? 'you' : myId, name: 'You')];
+      members = [TripMember(id: myId.isEmpty ? 'you' : myId, name: 'You', isMe: true)];
     }
     if (!mounted) return;
     final r = await showAddReceiptSheet(
@@ -1162,15 +1162,15 @@ class _ActionsSheetContentState extends State<_ActionsSheetContent> {
               try {
                 final appMembers = await TripService.loadTripMembers(widget.tripId);
                 members = appMembers.isEmpty
-                    ? [TripMember(id: myId.isEmpty ? 'you' : myId, name: 'You')]
+                    ? [TripMember(id: myId.isEmpty ? 'you' : myId, name: 'You', isMe: true)]
                     : appMembers
                         .map((m) => TripMember(
                               id: m.userId,
-                              name: m.userId == myId ? 'You' : m.profile.displayName,
+                              name: m.profile.displayName, isMe: m.userId == myId,
                             ))
                         .toList();
               } catch (_) {
-                members = [TripMember(id: myId.isEmpty ? 'you' : myId, name: 'You')];
+                members = [TripMember(id: myId.isEmpty ? 'you' : myId, name: 'You', isMe: true)];
               }
               if (!outerCtx.mounted) return;
               final r = await showAddReceiptSheet(outerCtx,

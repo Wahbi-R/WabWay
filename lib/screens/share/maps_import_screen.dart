@@ -206,7 +206,7 @@ class _MapsImportScreenState extends State<MapsImportScreen> {
           await SpotService.createSpot(
             tripId:      widget.tripId,
             name:        p.name,
-            city:        p.city.isNotEmpty ? p.city : 'Unknown',
+            city:        p.city,
             area:        p.area,
             category:    _categories[i],
             status:      SpotStatus.wantToGo,

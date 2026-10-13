@@ -3,6 +3,7 @@ import '../offline_cache.dart';
 import '../trip/app_trip.dart';
 import '../trip/app_trip_member.dart';
 import '../supabase/client.dart';
+import 'profile_provider.dart';
 import '../supabase/trip_service.dart';
 import '../sync_queue.dart';
 
@@ -239,4 +240,22 @@ bool canManageItem(String? createdById, {required bool isOrganiser}) {
   final myId = supabase.auth.currentUser?.id;
   if (myId == null) return false;
   return isOrganiser || createdById == myId;
+}
+
+// ─── Member names ─────────────────────────────────────────────────────────────
+
+/// The one way to name a trip member from an id.
+/// [memberName] is the real display name — use it for avatars/initials.
+/// [memberLabel] is for text: "You" for the signed-in user.
+extension MemberNames on WidgetRef {
+  String memberName(String userId) {
+    final me = read(profileProvider);
+    if (me != null && me.id == userId) return me.displayName;
+    final match = read(tripMembersProvider).where((m) => m.userId == userId).firstOrNull;
+    if (match != null) return match.profile.displayName;
+    return userId.length >= 8 ? userId.substring(0, 8) : userId;
+  }
+
+  String memberLabel(String userId) =>
+      read(profileProvider)?.id == userId ? 'You' : memberName(userId);
 }

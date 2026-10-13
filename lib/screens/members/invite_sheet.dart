@@ -23,21 +23,19 @@ Future<void> showInviteSheet(
   required String tripId,
   bool canRevoke = false,
 }) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    backgroundColor: Colors.transparent,
-    builder: (_) => _InviteSheet(tripId: tripId, canRevoke: canRevoke),
+  return showWabwayAutoSheet<void>(
+    context,
+    builder: (_, handle) => _InviteSheet(tripId: tripId, canRevoke: canRevoke, showDragHandle: handle),
   );
 }
 
 // ─── Sheet ────────────────────────────────────────────────────────────────────
 
 class _InviteSheet extends StatefulWidget {
-  const _InviteSheet({required this.tripId, required this.canRevoke});
+  const _InviteSheet({required this.tripId, required this.canRevoke, this.showDragHandle = true});
   final String tripId;
   final bool canRevoke;
+  final bool showDragHandle;
 
   @override
   State<_InviteSheet> createState() => _InviteSheetState();
@@ -119,7 +117,7 @@ class _InviteSheetState extends State<_InviteSheet> with AsyncScreenMixin {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const WabwayDragHandle(),
+            if (widget.showDragHandle) const WabwayDragHandle(),
             Padding(
               padding: const EdgeInsets.fromLTRB(kSpace5, kSpace3, kSpace5, 0),
               child: Row(
@@ -353,12 +351,14 @@ class _CodeCard extends StatelessWidget {
                       label: 'Share link',
                       icon: Icons.link_rounded,
                       size: WabwayButtonSize.sm,
-                      variant: WabwayButtonVariant.secondary,
+                      variant: WabwayButtonVariant.ghost,
                       onPressed: onShareLink,
                     ),
                   ),
                 ],
               ),
+              // Revoking is organiser-only (RLS) — don't show a dead button.
+              if (onRevoke != null) ...[
               const SizedBox(height: kSpace2),
               Row(
                 children: [
@@ -371,6 +371,7 @@ class _CodeCard extends StatelessWidget {
                   ),
                 ],
               ),
+              ],
             ],
           ],
         ),

@@ -41,7 +41,7 @@ Future<Receipt?> showAddReceiptSheet(
       ? members
       : kMockMembers.isNotEmpty
           ? kMockMembers
-          : [TripMember(id: effectiveUserId, name: 'You')];
+          : [TripMember(id: effectiveUserId, name: 'You', isMe: true)];
 
   return showWabwayFormSheet<Receipt>(
     context,

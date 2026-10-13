@@ -9,7 +9,6 @@ import 'package:supabase_flutter/supabase_flutter.dart'
     show PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType, RealtimeChannel;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/providers/trip_provider.dart';
-import '../core/trip/trip_state.dart';
 import '../core/supabase/client.dart';
 import '../core/supabase/accommodation_service.dart';
 import '../core/supabase/connection_service.dart';
@@ -572,7 +571,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
       final latest = _days.map((d) => d.date).reduce((a, b) => a.isAfter(b) ? a : b);
       defaultDate = latest.add(const Duration(days: 1));
     } else {
-      defaultDate = TripState.maybeOf(context)?.trip.startDate ?? DateTime.now();
+      defaultDate = ref.read(activeTripProvider)?.startDate ?? DateTime.now();
     }
     // Pre-fill the city: carry over the latest day's city, else the trip destination.
     final lastCity = _days.isEmpty
@@ -580,7 +579,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
         : (_days.reduce((a, b) => a.date.isAfter(b.date) ? a : b).city);
     final defaultCity = lastCity.isNotEmpty
         ? lastCity
-        : TripState.maybeOf(context)?.trip.destination;
+        : ref.read(activeTripProvider)?.destination;
     final draft = await _showAddDayDialog(context,
         defaultDate: defaultDate, defaultCity: defaultCity);
     if (draft == null || !mounted) return;
@@ -618,7 +617,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
 
   Future<void> _addAllTripDays(BuildContext context) async {
     if (loading) return; // plan not yet loaded; days would be invisible (gen pre-empted)
-    final trip = TripState.maybeOf(context)?.trip;
+    final trip = ref.read(activeTripProvider);
     if (trip == null || trip.startDate == null || trip.endDate == null) return;
     final messenger = ScaffoldMessenger.of(context);
 
@@ -809,7 +808,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
             dayCount: _days.length,
             onAddDay: () => _addDay(context),
             onAddAllDays: () => _addAllTripDays(context),
-            showAddAllDays: () { final t = TripState.maybeOf(context)?.trip; return t?.startDate != null && t?.endDate != null; }(),
+            showAddAllDays: () { final t = ref.read(activeTripProvider); return t?.startDate != null && t?.endDate != null; }(),
             onExport: _days.isNotEmpty ? _exportPlan : null,
             onExportCalendar: (_days.isNotEmpty && !kIsWeb) ? _exportToCalendar : null,
             hideCompleted: _hideCompleted,
@@ -1016,7 +1015,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
               }
             },
             itemBuilder: (_) {
-              final t = TripState.maybeOf(context)?.trip;
+              final t = ref.read(activeTripProvider);
               final hasDates = t?.startDate != null && t?.endDate != null;
               return [
                 const PopupMenuItem(value: 'day', child: Text('Add day')),

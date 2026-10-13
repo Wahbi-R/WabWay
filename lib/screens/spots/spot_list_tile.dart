@@ -98,7 +98,7 @@ class SpotListTile extends StatelessWidget {
                       Expanded(
                         child: Text(
                           [
-                            if (spot.city.isNotEmpty && spot.city != 'Unknown') spot.city,
+                            if (spot.city.isNotEmpty) spot.city,
                             if (spot.area.isNotEmpty) spot.area,
                             spot.category.label,
                           ].join(' · '),

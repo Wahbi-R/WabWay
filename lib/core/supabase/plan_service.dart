@@ -3,6 +3,7 @@ import '../../data/date_utils.dart';
 import '../../data/plan_data.dart';
 import 'client.dart';
 import 'connection_service.dart';
+import '../text_utils.dart';
 
 abstract final class PlanService {
   // ── Enum converters ──────────────────────────────────────────────────────────
@@ -46,7 +47,7 @@ abstract final class PlanService {
       title:           row['title'] as String,
       type:            _typeFrom(row['type'] as String),
       time:            time,
-      city:            row['city'] as String?,
+      city:            cleanCity(row['city'] as String?),
       country:         row['country'] as String?,
       location:        row['location'] as String?,
       mapsUrl:         row['maps_url'] as String?,
@@ -67,7 +68,7 @@ abstract final class PlanService {
       id:        row['id'] as String,
       dayNumber: (row['day_number'] as num).toInt(),
       date:      DateTime.parse(row['date'] as String),
-      city:      (row['city'] as String?) ?? '',
+      city:      cleanCity(row['city'] as String?) ?? '',
       notes:     row['notes'] as String?,
       items:     items,
     );
@@ -156,7 +157,7 @@ abstract final class PlanService {
     id: j['id'] as String, dayId: j['day_id'] as String,
     title: j['title'] as String,
     type: _typeFrom(j['type'] as String? ?? ''),
-    time: j['time'] as String?, city: j['city'] as String?,
+    time: j['time'] as String?, city: cleanCity(j['city'] as String?),
     country: j['country'] as String?, location: j['location'] as String?,
     mapsUrl: j['maps_url'] as String?, confirmationUrl: j['confirmation_url'] as String?,
     notes: j['notes'] as String?,
@@ -173,7 +174,7 @@ abstract final class PlanService {
     id: j['id'] as String,
     dayNumber: (j['day_number'] as num).toInt(),
     date: DateTime.parse(j['date'] as String),
-    city: j['city'] as String? ?? '',
+    city: cleanCity(j['city'] as String?) ?? '',
     notes: j['notes'] as String?,
     items: (j['items'] as List?)
         ?.map((i) => _itemFromJson(Map<String, dynamic>.from(i as Map)))

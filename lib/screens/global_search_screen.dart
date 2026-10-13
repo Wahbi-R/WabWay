@@ -158,11 +158,11 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> with AsyncScre
   // ─── Derived: convert AppTripMember to money TripMember for receipt screens
 
   List<TripMember> get _moneyMembers => widget.members.isEmpty
-      ? [TripMember(id: widget.userId.isEmpty ? 'you' : widget.userId, name: 'You')]
+      ? [TripMember(id: widget.userId.isEmpty ? 'you' : widget.userId, name: 'You', isMe: true)]
       : widget.members
           .map((m) => TripMember(
                 id:   m.userId,
-                name: m.userId == widget.userId ? 'You' : m.profile.displayName,
+                name: m.profile.displayName, isMe: m.userId == widget.userId,
               ))
           .toList();
 
@@ -184,7 +184,7 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> with AsyncScre
         out.add(_Result(
           kind:     _ResultKind.spot,
           title:    s.name,
-          subtitle: [s.city, s.category.label].whereType<String>().join(' · '),
+          subtitle: joinNonEmpty([s.city, s.category.label]),
           icon:     Icons.place_rounded,
           onTap: (ctx) => Navigator.push(
             ctx,

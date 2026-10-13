@@ -6,7 +6,6 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/ocr/gemini_parser.dart';
 import '../../core/ocr/itinerary_scanner.dart';
 import '../../core/places/google_maps_parser.dart';
-import '../../core/places/listing_parser.dart';
 import '../../core/places/social_place_extractor.dart';
 import '../../core/platform/platform_file.dart';
 import '../../core/share/file_type_registry.dart';
@@ -14,14 +13,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers/profile_provider.dart';
 import '../../core/providers/trip_provider.dart';
 import '../../core/supabase/doc_service.dart';
-import '../../core/supabase/plan_service.dart';
-import '../../core/supabase/spot_service.dart';
-import '../../core/supabase/travel_service.dart';
 import '../../data/docs_data.dart';
-import '../../data/money_data.dart';
 import '../../data/share_data.dart';
-import '../../data/spot_data.dart';
-import '../../screens/accommodations/add_accommodation_sheet.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
@@ -33,15 +26,7 @@ import 'maps_import_screen.dart';
 import 'parsed_itinerary_screen.dart';
 import 'dart:typed_data';
 import '../../core/places/url_metadata_service.dart';
-import '../../core/supabase/accommodation_service.dart';
-import '../../data/accommodation_data.dart' show Accommodation;
-import '../docs/add_doc_sheet.dart';
-import '../links/add_link_sheet.dart';
-import '../money/add_receipt_sheet.dart';
-import '../plan/add_item_sheet.dart';
-import '../plan/day_picker_sheet.dart';
-import '../spots/add_spot_sheet.dart';
-import '../travel/add_travel_sheet.dart';
+import 'open_add_sheet.dart';
 
 // ─── Entry point for import mode ─────────────────────────────────────────────
 
@@ -569,13 +554,6 @@ class _IncomingShareScreenState extends ConsumerState<IncomingShareScreen> {
     );
   }
 
-  Future<void> _discardDoc(TripDocument? doc) async {
-    if (doc == null) return;
-    try {
-      await DocService.deleteDocument(doc.id);
-    } catch (_) {}
-  }
-
   Future<void> _continue() async {
     final dest = _destination;
     if (dest == null || _saving) return;
@@ -595,105 +573,19 @@ class _IncomingShareScreenState extends ConsumerState<IncomingShareScreen> {
   }
 
   Future<bool> _openSheetFor(ShareDestination dest) async {
-    final tripId = widget.tripId;
-    final userId = widget.userId;
-    final trip = ref.read(activeTripProvider);
-
-    switch (dest) {
-      case ShareDestination.spot:
-        return await showAddSpotSheet(context,
-                tripId: tripId, userId: userId, prefill: _prefill()) !=
-            null;
-
-      case ShareDestination.link:
-        return await showAddLinkSheet(context,
-                tripId: tripId, userId: userId,
-                prefillUrl: _sourceUrl, prefillTitle: _prefill().title) !=
-            null;
-
-      case ShareDestination.stay:
-        final url = _sourceUrl;
-        final listing = url == null ? null : await ListingParser.parse(url);
-        if (!mounted) return false;
-        return await showAddStaySheet(context,
-                tripId: tripId, userId: userId,
-                prefilled: listing, initialUrl: url) !=
-            null;
-
-      case ShareDestination.document:
-        final f = await _fileForShare();
-        if (!mounted) return false;
-        return await showAddDocSheet(context,
-                tripId: tripId,
-                tripName: trip?.name ?? '',
-                userId: userId,
-                availableSpots: const [],
-                prefill: _prefill(bytes: f?.$1, fileName: f?.$2, fileExt: f?.$3)) !=
-            null;
-
-      case ShareDestination.receipt:
-        final f = await _fileForShare();
-        if (!mounted) return false;
-        final members = ref
-            .read(tripMembersProvider)
-            .map((m) => TripMember(id: m.userId, name: m.profile.displayName))
-            .toList();
-        return await showAddReceiptSheet(context,
-                tripId: tripId,
-                userId: userId,
-                members: members,
-                homeCurrency: trip?.homeCurrency ?? widget.homeCurrency,
-                defaultCurrency: trip?.defaultCurrency,
-                prefill: _prefill(bytes: f?.$1, fileName: f?.$2, fileExt: f?.$3)) !=
-            null;
-
-      case ShareDestination.travelItem:
-        final doc = await _uploadShareFile();
-        final docs = await DocService.loadDocuments(tripId)
-            .catchError((_) => <TripDocument>[]);
-        if (!mounted) return false;
-        final draft = await showAddTravelSheet(context,
-            docs: docs, prefill: _prefill(docIds: [if (doc != null) doc.id]));
-        if (draft == null) {
-          await _discardDoc(doc);
-          return false;
-        }
-        await TravelService.createFromDraft(draft, tripId: tripId, createdBy: userId);
-        return true;
-
-      case ShareDestination.planItem:
-        final days = await PlanService.loadAll(tripId);
-        if (!mounted) return false;
-        if (days.isEmpty) {
-          showWabwaySnack(context, 'Set your trip dates in Trip settings to start planning days.');
-          return false;
-        }
-        final picked = await showDayPickerSheet(context, days: days);
-        if (picked == null || !mounted) return false;
-        final day = days.firstWhere((d) => d.id == picked.$1);
-        final doc = await _uploadShareFile();
-        final lists = await Future.wait<List<Object>>([
-          SpotService.loadSpots(tripId).catchError((_) => <Spot>[]),
-          DocService.loadDocuments(tripId).catchError((_) => <TripDocument>[]),
-          AccommodationService.loadAll(tripId).catchError((_) => <Accommodation>[]),
-        ]);
-        if (!mounted) return false;
-        final draft = await showAddItemSheet(context,
-            dayId: day.id,
-            defaultCurrency: trip?.defaultCurrency ?? widget.homeCurrency,
-            spots: lists[0].cast<Spot>(),
-            docs: lists[1].cast<TripDocument>(),
-            stays: lists[2].cast<Accommodation>(),
-            prefill: _prefill(docIds: [if (doc != null) doc.id]));
-        if (draft == null) {
-          await _discardDoc(doc);
-          return false;
-        }
-        await PlanService.createItemFromDraft(draft,
-            tripId: tripId, dayId: day.id, createdBy: userId,
-            sortOrder: day.items.length);
-        return true;
-    }
+    // Documents and receipts take the file in their own form; travel and plan
+    // items attach it as an uploaded document instead.
+    final carriesFile = dest == ShareDestination.document || dest == ShareDestination.receipt;
+    final f = carriesFile ? await _fileForShare() : null;
+    if (!mounted) return false;
+    return openAddSheet(
+      context,
+      ref,
+      dest,
+      prefill: _prefill(bytes: f?.$1, fileName: f?.$2, fileExt: f?.$3),
+      sourceUrl: _sourceUrl,
+      uploadFile: _uploadShareFile,
+    );
   }
 
   void _handleDiscard() {

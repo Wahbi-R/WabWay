@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 411,
+    label: "Home",
+    changes: [
+      "The bell now opens your trip's activity, with a dot when something new happened — notification settings are behind the gear",
+      "The + on Home lets you add anything: a spot, plan item, receipt, travel, stay, link or document",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 410,
     label: "Home",
     changes: [

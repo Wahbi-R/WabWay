@@ -1,3 +1,5 @@
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
 import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -40,7 +42,6 @@ import 'share/incoming_share_screen.dart';
 import 'notification_settings_screen.dart';
 import 'global_search_screen.dart';
 import 'docs/doc_detail.dart';
-import 'money/add_receipt_sheet.dart';
 import 'money/receipt_detail.dart';
 import 'plan/item_detail.dart';
 import 'spots/spot_detail.dart';
@@ -50,6 +51,8 @@ import '../core/supabase/pins_service.dart';
 import '../data/pins_data.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show RealtimeChannel;
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'share/open_add_sheet.dart';
+import '../widgets/wabway_snack.dart';
 
 // ─── Loaded data ──────────────────────────────────────────────────────────────
 
@@ -161,6 +164,50 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with AsyncScreenMixin {
   // (a new plan day, a receipt) show up without pull-to-refresh.
   bool _visible = true;
 
+  // Activity inbox "unread" marker — last time this device opened the inbox
+  // for the active trip.
+  DateTime? _activitySeenAt;
+
+  static String _seenKey(String tripId) => 'activity_seen_$tripId';
+
+  Future<void> _loadActivitySeen(String tripId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final ms = prefs.getInt(_seenKey(tripId));
+      if (mounted) {
+        setState(() => _activitySeenAt =
+            ms == null ? null : DateTime.fromMillisecondsSinceEpoch(ms));
+      }
+    } catch (_) {}
+  }
+
+  bool get _hasUnreadActivity {
+    final d = _data;
+    if (d == null) return false;
+    final myId = ref.read(profileProvider)?.id ?? '';
+    final seen = _activitySeenAt;
+    return d.activityEvents.any((e) =>
+        e.actorId != myId && (seen == null || e.createdAt.isAfter(seen)));
+  }
+
+  Future<void> _openInbox(BuildContext context) async {
+    final trip = ref.read(activeTripProvider);
+    final myId = ref.read(profileProvider)?.id ?? '';
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _ActivityInboxScreen(data: _data, trip: trip, myId: myId),
+      ),
+    );
+    final now = DateTime.now();
+    if (mounted) setState(() => _activitySeenAt = now);
+    if (trip == null) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_seenKey(trip.id), now.millisecondsSinceEpoch);
+    } catch (_) {}
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -193,6 +240,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with AsyncScreenMixin {
         commitLoad(gen, () => _data = null);
         return;
       }
+      unawaited(_loadActivitySeen(tripId));
       final results = await Future.wait([
         SpotService.loadSpots(tripId),
         DocService.loadDocuments(tripId),
@@ -294,13 +342,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with AsyncScreenMixin {
       },
     ),
     IconButton(
-      icon: const Icon(LucideIcons.bell),
+      tooltip: 'Activity',
       color: kColorInkSoft,
-      onPressed: () => Navigator.push<void>(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const NotificationSettingsScreen(),
-        ),
+      onPressed: () => _openInbox(context),
+      icon: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          const Icon(LucideIcons.bell),
+          if (_hasUnreadActivity)
+            Positioned(
+              right: -1,
+              top: -1,
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: kColorPrimary,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+        ],
       ),
     ),
     const SizedBox(width: kSpace2),
@@ -353,23 +415,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with AsyncScreenMixin {
       ),
       bottomNavigationBar: const AndroidDownloadBanner(),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'home_quick_add',
+        tooltip: 'Add to trip',
         onPressed: () async {
-          final tripMembers = members
-              .map((m) => TripMember(id: m.userId, name: m.profile.displayName))
-              .toList();
-          await showAddReceiptSheet(
-            context,
-            tripId: trip?.id ?? '',
-            userId: ref.read(profileProvider)?.id ?? '',
-            members: tripMembers,
-            homeCurrency: data?.homeCurrency ?? 'CAD',
-            defaultCurrency: trip?.defaultCurrency,
-          );
-          _refresh();
+          final created = await showQuickAddMenu(context, ref);
+          if (created != null && mounted) {
+            showWabwaySnack(context, 'Added ${created.label.toLowerCase()}');
+            _load(silent: true);
+          }
         },
-        backgroundColor: kColorPrimary,
-        foregroundColor: Colors.white,
-        tooltip: 'Add expense',
         child: const Icon(Icons.add_rounded),
       ),
       body: RefreshIndicator(
@@ -1373,6 +1427,39 @@ class _TodayAgendaCardState extends State<_TodayAgendaCard> {
 }
 
 // ─── Activity feed ────────────────────────────────────────────────────────────
+
+/// The bell's destination: the trip's activity feed (same widget as Home's
+/// "Recent activity"), with notification settings behind the gear.
+class _ActivityInboxScreen extends StatelessWidget {
+  const _ActivityInboxScreen({required this.data, required this.trip, required this.myId});
+  final _HomeData? data;
+  final AppTrip? trip;
+  final String myId;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        backgroundColor: kColorCream,
+        appBar: AppBar(
+          title: Text('Activity', style: kStyleTitle),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.settings_outlined),
+              color: kColorInkSoft,
+              tooltip: 'Notification settings',
+              onPressed: () => Navigator.push<void>(
+                context,
+                MaterialPageRoute(builder: (_) => const NotificationSettingsScreen()),
+              ),
+            ),
+            const SizedBox(width: kSpace2),
+          ],
+        ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(kSpace4),
+          child: _ActivityFeed(data: data, trip: trip, myId: myId),
+        ),
+      );
+}
 
 class _ActivityFeed extends StatelessWidget {
   const _ActivityFeed({

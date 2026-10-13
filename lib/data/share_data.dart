@@ -366,4 +366,15 @@ class ImportPrefill {
 
   /// Documents already uploaded for this import, to pre-select in doc pickers.
   final List<String> linkedDocIds;
+
+  ImportPrefill withDocIds(List<String> ids) => ids.isEmpty
+      ? this
+      : ImportPrefill(
+          title: title, notes: notes, url: url, mapsUrl: mapsUrl,
+          location: location, destination: destination, date: date,
+          endDate: endDate, confirmationNumber: confirmationNumber,
+          amount: amount, currency: currency, fileBytes: fileBytes,
+          fileName: fileName, fileExt: fileExt,
+          linkedDocIds: [...linkedDocIds, ...ids],
+        );
 }

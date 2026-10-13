@@ -4,6 +4,7 @@ import 'client.dart';
 import '../../data/date_utils.dart';
 import '../trip/app_trip.dart';
 import '../trip/app_trip_member.dart';
+import 'plan_service.dart';
 
 abstract final class TripService {
   static Future<List<AppTrip>> loadUserTrips() async {
@@ -21,7 +22,7 @@ abstract final class TripService {
     String? destination,
     DateTime? startDate,
     DateTime? endDate,
-    String defaultCurrency = 'JPY',
+    String defaultCurrency = 'CAD',
     String homeCurrency = 'CAD',
   }) async {
     final tripId = await supabase.rpc('create_trip_with_owner', params: {
@@ -38,6 +39,17 @@ abstract final class TripService {
       }).eq('id', tripId);
     } catch (_) {
       // Trip was created; currency can be corrected in settings.
+    }
+    // Days are the core planning object — create one per date up front so
+    // nobody has to bootstrap the plan by hand. Non-fatal: Plan can add them.
+    final userId = supabase.auth.currentUser?.id;
+    if (userId != null) {
+      try {
+        await PlanService.ensureTripDays(
+          tripId: tripId, start: startDate, end: endDate,
+          createdBy: userId, city: destination,
+        );
+      } catch (_) {}
     }
     return tripId;
   }

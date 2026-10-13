@@ -14,6 +14,7 @@ import '../../widgets/widgets.dart';
 import 'accommodations_screen.dart';
 import '../shared/connections_section.dart';
 import '../../data/date_utils.dart';
+import '../../data/currencies.dart';
 
 /// Add / edit a stay. Pops with an [AccommodationSheetResult].
 Future<AccommodationSheetResult?> showAddStaySheet(
@@ -566,7 +567,6 @@ class _CurrencySelector extends StatelessWidget {
   final String value;
   final ValueChanged<String> onChanged;
 
-  static const _currencies = ['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD'];
 
   @override
   Widget build(BuildContext context) {
@@ -585,9 +585,10 @@ class _CurrencySelector extends StatelessWidget {
             style: kStyleBody.copyWith(color: kColorInk),
             dropdownColor: kColorPaper,
             borderRadius: kRadiusMd,
-            items: _currencies
-                .map((c) => DropdownMenuItem(value: c, child: Text(c, style: kStyleBody)))
-                .toList(),
+            items: [
+              for (final c in currencyOptions(include: value))
+                DropdownMenuItem(value: c.$1, child: Text(c.$1, style: kStyleBody)),
+            ],
             onChanged: (v) { if (v != null) onChanged(v); },
           ),
         ),

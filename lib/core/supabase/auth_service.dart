@@ -4,6 +4,18 @@ import '../debug/app_logger.dart';
 import 'client.dart';
 
 abstract final class AuthService {
+  static String get _redirect => kIsWeb
+      ? 'https://wabway.wabble.ca/'
+      : 'ca.wabble.wabway://login-callback';
+
+  /// Re-sends the sign-up confirmation email (for "didn't get it?").
+  static Future<void> resendSignupConfirmation(String email) =>
+      supabase.auth.resend(
+        type: OtpType.signup,
+        email: email.trim(),
+        emailRedirectTo: _redirect,
+      );
+
   static Future<void> sendMagicLink(String email) async {
     final trimmed = email.trim();
     AppLogger.instance.log('sendMagicLink → $trimmed', tag: 'AUTH');
@@ -11,9 +23,7 @@ abstract final class AuthService {
       await supabase.auth.signInWithOtp(
         email: trimmed,
         shouldCreateUser: true,
-        emailRedirectTo: kIsWeb
-            ? 'https://wabway.wabble.ca/'
-            : 'ca.wabble.wabway://login-callback',
+        emailRedirectTo: _redirect,
       );
       AppLogger.instance.log('sendMagicLink ✓ (OTP queued)', tag: 'AUTH');
     } catch (e) {

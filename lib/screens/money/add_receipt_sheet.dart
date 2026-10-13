@@ -17,6 +17,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
+import '../../data/currencies.dart';
 
 /// Opens the Add Receipt form, or Edit Receipt when [existingReceipt] is passed.
 ///
@@ -30,6 +31,7 @@ Future<Receipt?> showAddReceiptSheet(
   List<TripMember>? members,
   Receipt? existingReceipt,
   String homeCurrency = 'CAD',
+  String? defaultCurrency,
   bool isDuplicate = false,
 }) {
   final effectiveUserId = userId ?? supabase.auth.currentUser?.id ?? kYouId;
@@ -51,6 +53,7 @@ Future<Receipt?> showAddReceiptSheet(
       members:         effectiveMembers,
       existingReceipt: existingReceipt,
       homeCurrency:    homeCurrency,
+      defaultCurrency: defaultCurrency,
       isDuplicate:     isDuplicate,
       scrollController: scroll,
       showDragHandle: handle,
@@ -68,6 +71,7 @@ class _AddReceiptContent extends StatefulWidget {
     required this.userId,
     required this.members,
     required this.homeCurrency,
+    this.defaultCurrency,
     this.existingReceipt,
     this.isDuplicate = false,
     this.scrollController,
@@ -80,6 +84,10 @@ class _AddReceiptContent extends StatefulWidget {
   final String userId;
   final List<TripMember> members;
   final String homeCurrency;
+
+  /// Currency a NEW receipt starts in — the trip's spending currency.
+  /// Falls back to [homeCurrency].
+  final String? defaultCurrency;
   /// When set, the form pre-fills with this receipt and updates rather than creates.
   final Receipt? existingReceipt;
   /// When true, pre-fills from [existingReceipt] but creates a new receipt instead of editing.
@@ -105,7 +113,7 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
   late Map<String, TextEditingController> _customCtrls;
 
   ReceiptCategory _category  = ReceiptCategory.food;
-  String          _currency  = 'JPY';
+  late String     _currency  = widget.defaultCurrency ?? widget.homeCurrency;
   _SplitMode      _splitMode = _SplitMode.equal;
   bool            _loading      = false;
   bool            _fetchingRate = false;
@@ -284,6 +292,20 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+
+    // A foreign-currency receipt needs a rate (or a manual home amount) —
+    // otherwise it would save with a 0 home amount, totals show $0 and the
+    // equal split collapses to nothing.
+    if (_needsConversion && _effectiveHomeAmount <= 0) {
+      if (_fetchingRate) {
+        setState(() => _error = 'Still fetching the exchange rate — try again in a moment.');
+      } else {
+        setState(() => _error =
+            "Couldn't get a ${_currency}→${widget.homeCurrency} rate. Enter the rate or the ${widget.homeCurrency} amount.");
+        _fetchRate();
+      }
+      return;
+    }
 
     final total = double.tryParse(_amountCtrl.text.trim()) ?? 0;
     final title = _titleCtrl.text.trim();
@@ -543,21 +565,15 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
                           value: _currency,
                           onChanged: (v) {
                             setState(() {
-                              _currency     = v ?? 'JPY';
+                              _currency     = v ?? widget.homeCurrency;
                               _homeOverride = false;
                               _rateCtrl.clear();
                             });
                             _fetchRate();
                           },
-                          items: const [
-                            WabwaySelectItem(value: 'JPY', label: 'JPY ¥'),
-                            WabwaySelectItem(value: 'USD', label: 'USD \$'),
-                            WabwaySelectItem(value: 'EUR', label: 'EUR €'),
-                            WabwaySelectItem(value: 'GBP', label: 'GBP £'),
-                            WabwaySelectItem(value: 'CAD', label: 'CAD C\$'),
-                            WabwaySelectItem(value: 'AUD', label: 'AUD A\$'),
-                            WabwaySelectItem(value: 'KRW', label: 'KRW ₩'),
-                            WabwaySelectItem(value: 'THB', label: 'THB ฿'),
+                          items: [
+                            for (final c in currencyOptions(include: _currency))
+                              WabwaySelectItem(value: c.$1, label: c.$2),
                           ],
                         ),
                       ),

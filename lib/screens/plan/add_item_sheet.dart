@@ -11,6 +11,8 @@ import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/place_search_field.dart';
 import '../../widgets/widgets.dart';
+import '../../core/text_utils.dart';
+import '../../data/currencies.dart';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -426,7 +428,6 @@ class _AddItemContentState extends State<_AddItemContent> {
 
 // ─── Estimated cost field ─────────────────────────────────────────────────────
 
-const _kCurrencies = ['JPY', 'USD', 'EUR', 'CAD', 'GBP', 'AUD', 'KRW', 'THB', 'SGD', 'HKD', 'CNY'];
 
 class _CostField extends StatelessWidget {
   const _CostField({
@@ -456,7 +457,8 @@ class _CostField extends StatelessWidget {
                     backgroundColor: kColorPaper,
                     shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
                     title: Text('Currency', style: kStyleBodySemibold),
-                    children: _kCurrencies
+                    children: currencyOptions(include: currency)
+                        .map((o) => o.$1)
                         .map((c) => SimpleDialogOption(
                               onPressed: () => Navigator.pop(ctx, c),
                               child: Text(c,
@@ -566,17 +568,17 @@ class _FillFromPickerState extends State<_FillFromPicker> {
 
   List<Spot> get _filteredSpots {
     if (_query.isEmpty) return widget.spots;
-    final q = _query.toLowerCase();
+    final q = foldForSearch(_query);
     return widget.spots
-        .where((s) => s.name.toLowerCase().contains(q) || s.city.toLowerCase().contains(q))
+        .where((s) => searchMatches(s.name, q) || searchMatches(s.city, q))
         .toList();
   }
 
   List<Accommodation> get _filteredStays {
     if (_query.isEmpty) return widget.stays;
-    final q = _query.toLowerCase();
+    final q = foldForSearch(_query);
     return widget.stays
-        .where((s) => s.name.toLowerCase().contains(q) || s.city.toLowerCase().contains(q))
+        .where((s) => searchMatches(s.name, q) || searchMatches(s.city, q))
         .toList();
   }
 

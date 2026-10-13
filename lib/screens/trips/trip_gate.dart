@@ -15,6 +15,7 @@ import '../../theme/app_text_theme.dart';
 import '../../widgets/update_checker_banner.dart';
 import '../../widgets/widgets.dart';
 import 'create_trip_screen.dart';
+import '../../data/invite_data.dart';
 
 class TripGate extends ConsumerStatefulWidget {
   const TripGate({super.key});
@@ -247,7 +248,7 @@ class _JoinWithCodeSheetState extends State<JoinWithCodeSheet> {
   }
 
   Future<void> _submit() async {
-    final code = _codeCtrl.text.trim().toUpperCase();
+    final code = InviteCode.normalize(_codeCtrl.text);
     if (code.isEmpty) return;
     setState(() { _loading = true; _error = null; });
     try {

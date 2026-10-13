@@ -11,6 +11,7 @@ import '../theme/app_text_theme.dart';
 import '../theme/app_decorations.dart';
 import '../widgets/widgets.dart';
 import 'members/add_member_sheet.dart';
+import 'members/invite_sheet.dart';
 
 class MembersScreen extends ConsumerWidget {
   const MembersScreen({super.key});
@@ -38,20 +39,22 @@ class MembersScreen extends ConsumerWidget {
                 mode: LaunchMode.externalApplication,
               ),
             ),
-          if (isOwner) ...[
-            WabwayButton(
-              label: 'Add member',
-              icon: Icons.person_add_rounded,
-              size: WabwayButtonSize.sm,
-              onPressed: () => showAddMemberSheet(
-                context,
-                tripId: trip.id,
-                existingMemberIds: members.map((m) => m.userId).toSet(),
-                onMemberAdded: () => ref.read(tripNotifierProvider.notifier).load(),
-              ),
-            ),
-            const SizedBox(width: kSpace4),
-          ],
+          // Everyone can invite (codes); only the organiser can add an
+          // existing user directly (RLS: trip_members insert is owner-only).
+          WabwayButton(
+            label: isOwner ? 'Add member' : 'Invite',
+            icon: Icons.person_add_rounded,
+            size: WabwayButtonSize.sm,
+            onPressed: () => isOwner
+                ? showAddMemberSheet(
+                    context,
+                    tripId: trip.id,
+                    existingMemberIds: members.map((m) => m.userId).toSet(),
+                    onMemberAdded: () => ref.read(tripNotifierProvider.notifier).load(),
+                  )
+                : showInviteSheet(context, tripId: trip.id),
+          ),
+          const SizedBox(width: kSpace4),
         ],
       ),
       body: members.isEmpty

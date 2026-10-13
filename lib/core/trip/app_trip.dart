@@ -29,7 +29,7 @@ class AppTrip {
   factory AppTrip.fromMap(Map<String, dynamic> map) => AppTrip(
         id:              map['id'] as String,
         name:            map['name'] as String,
-        defaultCurrency: map['default_currency'] as String? ?? 'JPY',
+        defaultCurrency: map['default_currency'] as String? ?? (map['home_currency'] as String? ?? 'CAD'),
         homeCurrency:    map['home_currency'] as String? ?? 'CAD',
         destination:     map['destination'] as String?,
         startDate:       map['start_date'] != null

@@ -20,6 +20,7 @@ import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 import 'add_accommodation_sheet.dart';
+import '../../core/text_utils.dart';
 
 enum _StaySort { checkIn, alphabetical, newest }
 
@@ -110,9 +111,9 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen>
     var list = _filterStatus == null
         ? List<Accommodation>.from(_items)
         : _items.where((a) => a.status == _filterStatus).toList();
-    final q = _search.toLowerCase().trim();
+    final q = foldForSearch(_search.trim());
     if (q.isNotEmpty) {
-      bool m(String? s) => s != null && s.toLowerCase().contains(q);
+      bool m(String? s) => searchMatches(s, q);
       list = list.where((a) => m(a.name) || m(a.city) || m(a.address) || m(a.notes)).toList();
     }
     switch (_sort) {

@@ -468,12 +468,12 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
   // mixed in with a filtered subset that includes a different sort order.
 
   List<Receipt> get _filteredReceipts {
-    final q = _receiptSearch.toLowerCase().trim();
+    final q = foldForSearch(_receiptSearch.trim());
     bool matchesSearch(Receipt r) {
       if (q.isEmpty) return true;
-      return r.title.toLowerCase().contains(q) ||
-          r.category.label.toLowerCase().contains(q) ||
-          (r.notes?.toLowerCase().contains(q) ?? false);
+      return searchMatches(r.title, q) ||
+          searchMatches(r.category.label, q) ||
+          searchMatches(r.notes, q);
     }
     final base = _receipts.where((r) {
       if (_filterCategory != null && r.category != _filterCategory) return false;
@@ -536,10 +536,10 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
 
   List<CashWithdrawal> get _sortedWithdrawals {
     var list = List<CashWithdrawal>.from(_withdrawals);
-    final q = _cashSearch.toLowerCase().trim();
+    final q = foldForSearch(_cashSearch.trim());
     if (q.isNotEmpty) {
       list = list.where((w) {
-        bool m(String? s) => s != null && s.toLowerCase().contains(q);
+        bool m(String? s) => searchMatches(s, q);
         return m(w.currency) || m(w.notes) || m(fmtAmount(w.amount, w.currency));
       }).toList();
     }
@@ -596,6 +596,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
       userId:       _userId,
       members:      _members,
       homeCurrency: _homeCurrency,
+      defaultCurrency: ref.read(activeTripProvider)?.defaultCurrency,
     );
     if (receipt != null && mounted) {
       setState(() {
@@ -613,6 +614,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
       tripId:  _activeTripId,
       userId:  _userId,
       members: _members,
+      defaultCurrency: ref.read(activeTripProvider)?.defaultCurrency,
     );
     if (w != null && mounted) {
       setState(() {

@@ -23,8 +23,22 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
   final _nameCtrl = TextEditingController();
   final _destinationCtrl = TextEditingController();
 
-  String _spendingCurrency = 'JPY';
   String _homeCurrency = 'CAD';
+  // Follows the destination's local currency until the user picks one.
+  late String _spendingCurrency = _homeCurrency;
+  bool _spendingTouched = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _destinationCtrl.addListener(_syncSpendingCurrency);
+  }
+
+  void _syncSpendingCurrency() {
+    if (_spendingTouched) return;
+    final next = currencyForDestination(_destinationCtrl.text) ?? _homeCurrency;
+    if (next != _spendingCurrency) setState(() => _spendingCurrency = next);
+  }
 
   DateTime? _startDate;
   DateTime? _endDate;
@@ -91,8 +105,16 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final canGoBack = Navigator.canPop(context);
     return Scaffold(
       backgroundColor: kColorCream,
+      appBar: canGoBack
+          ? AppBar(
+              backgroundColor: kColorCream,
+              elevation: 0,
+              leading: const BackButton(),
+            )
+          : null,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -156,14 +178,20 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                             label: 'Spending currency',
                             description: 'The currency you\'ll use at your destination — receipts will be pre-filled with this.',
                             value: _spendingCurrency,
-                            onChanged: (v) => setState(() => _spendingCurrency = v),
+                            onChanged: (v) => setState(() {
+                              _spendingCurrency = v;
+                              _spendingTouched = true;
+                            }),
                           ),
                           const SizedBox(height: kSpace4),
                           _CurrencyField(
                             label: 'Settlement currency',
                             description: 'The currency everyone pays each other back in (usually your home currency).',
                             value: _homeCurrency,
-                            onChanged: (v) => setState(() => _homeCurrency = v),
+                            onChanged: (v) {
+                              setState(() => _homeCurrency = v);
+                              _syncSpendingCurrency();
+                            },
                           ),
                           if (_error != null) ...[
                             const SizedBox(height: kSpace3),
@@ -180,6 +208,15 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                             fullWidth: true,
                             size: WabwayButtonSize.lg,
                           ),
+                          if (canGoBack) ...[
+                            const SizedBox(height: kSpace2),
+                            WabwayButton(
+                              label: 'Cancel',
+                              variant: WabwayButtonVariant.ghost,
+                              fullWidth: true,
+                              onPressed: _loading ? null : () => Navigator.pop(context),
+                            ),
+                          ],
                         ],
                       ),
                     ),

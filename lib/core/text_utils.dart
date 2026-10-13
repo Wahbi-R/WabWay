@@ -17,7 +17,11 @@ extension on String {
 
 /// "1 day", "3 days", "1 spot". Pass [plural] for irregular words.
 String pluralize(int count, String singular, {String? plural}) =>
-    '$count ${count == 1 ? singular : (plural ?? '${singular}s')}';
+    '$count ${pluralWord(count, singular, plural: plural)}';
+
+/// Just the word: pluralWord(1, 'Day') → "Day", pluralWord(3, 'Day') → "Days".
+String pluralWord(int count, String singular, {String? plural}) =>
+    count == 1 ? singular : (plural ?? '${singular}s');
 
 /// Lowercases and strips diacritics so "senso" matches "Sensō-ji",
 /// "cafe" matches "Café", "munchen" matches "München".

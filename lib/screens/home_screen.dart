@@ -6,6 +6,7 @@ import '../core/image_cache_manager.dart';
 import '../widgets/android_download_banner.dart';
 import '../widgets/update_checker_banner.dart';
 import '../widgets/wabway_avatar.dart';
+import '../core/text_utils.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/async_screen_mixin.dart';
 import '../core/providers/profile_provider.dart';
@@ -152,6 +153,20 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> with AsyncScreenMixin {
   _HomeData? _data;
+
+  // Home lives in the shell's IndexedStack, so initState runs once. The shell
+  // wraps each tab in TickerMode(enabled: selected) — use that to refresh
+  // silently whenever Home becomes visible again, so stats made on other tabs
+  // (a new plan day, a receipt) show up without pull-to-refresh.
+  bool _visible = true;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final visible = TickerMode.of(context);
+    if (visible && !_visible && _data != null) _load(silent: true);
+    _visible = visible;
+  }
 
   @override
   void initState() {
@@ -347,6 +362,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with AsyncScreenMixin {
             userId: ref.read(profileProvider)?.id ?? '',
             members: tripMembers,
             homeCurrency: data?.homeCurrency ?? 'CAD',
+            defaultCurrency: trip?.defaultCurrency,
           );
           _refresh();
         },
@@ -609,7 +625,7 @@ class _TripHero extends StatelessWidget {
                     ),
                     Expanded(
                       child: _HeroStat(
-                        label: 'Days',
+                        label: pluralWord(data?.days.length ?? 0, 'Day'),
                         value: data != null ? '${data!.days.length}' : '—',
                       ),
                     ),

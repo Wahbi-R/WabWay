@@ -103,7 +103,7 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
   bool          _loading   = false;
   bool          _mapsLoading = false;
   bool          _classifying = false;
-  bool          _notifyOnAdd = true;
+  bool          _notifyOnAdd = false;
   String?       _error;
 
   static const _kPrefSpotNotify = 'spot_add_notify';
@@ -147,7 +147,7 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
     _mapsCtrl.addListener(_onMapsUrlChanged);
     SharedPreferences.getInstance().then((p) {
       if (!mounted) return;
-      setState(() => _notifyOnAdd = p.getBool(_kPrefSpotNotify) ?? true);
+      setState(() => _notifyOnAdd = p.getBool(_kPrefSpotNotify) ?? false);
     });
   }
 

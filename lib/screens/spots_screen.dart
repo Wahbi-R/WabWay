@@ -214,22 +214,22 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> with AsyncScreenMixin
   // for spots that have no image yet. Each lookup is fire-and-forget — results
   // stream in over ~1-2 seconds and update the list row by row.
   List<Accommodation> get _filteredStays {
-    final q = _searchQuery.toLowerCase();
+    final q = foldForSearch(_searchQuery);
     if (q.isEmpty) return _stays;
     return _stays.where((s) =>
-      s.name.toLowerCase().contains(q) ||
-      s.city.toLowerCase().contains(q) ||
-      (s.address?.toLowerCase().contains(q) ?? false)
+      searchMatches(s.name, q) ||
+      searchMatches(s.city, q) ||
+      searchMatches(s.address, q)
     ).toList();
   }
 
   List<Spot> get _filtered {
     final list = _spots.where((s) {
-      final q = _searchQuery.toLowerCase();
+      final q = foldForSearch(_searchQuery);
       final matchesSearch = q.isEmpty ||
-          s.name.toLowerCase().contains(q) ||
-          s.city.toLowerCase().contains(q) ||
-          s.area.toLowerCase().contains(q);
+          searchMatches(s.name, q) ||
+          searchMatches(s.city, q) ||
+          searchMatches(s.area, q);
       final matchesCat    = _filterCategory == null || s.category == _filterCategory;
       final matchesStatus = _filterStatuses.isEmpty || _filterStatuses.contains(s.status);
       final matchesCity   = _filterCity == null ||

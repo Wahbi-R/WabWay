@@ -22,6 +22,7 @@ import '../widgets/widgets.dart';
 import 'docs/doc_card.dart';
 import 'docs/doc_detail.dart';
 import 'docs/add_doc_sheet.dart';
+import '../core/text_utils.dart';
 
 enum _DocSort { newest, alphabetical, type }
 
@@ -211,14 +212,14 @@ class _DocsScreenState extends ConsumerState<DocsScreen> with AsyncScreenMixin {
           : _docs.where((d) => d.id == _selectedDocId).firstOrNull;
 
   List<TripDocument> get _filtered {
-    final q = _search.toLowerCase().trim();
+    final q = foldForSearch(_search.trim());
     final results = _docs.where((d) {
       final matchType = _filterType == null || d.type == _filterType;
       final matchUploader = _filterUploaderId == null || d.uploadedById == _filterUploaderId;
       final matchSearch = q.isEmpty ||
-          d.title.toLowerCase().contains(q) ||
-          d.type.label.toLowerCase().contains(q) ||
-          _memberName(d.uploadedById).toLowerCase().contains(q);
+          searchMatches(d.title, q) ||
+          searchMatches(d.type.label, q) ||
+          searchMatches(_memberName(d.uploadedById), q);
       return matchType && matchUploader && matchSearch;
     }).toList();
     switch (_sort) {

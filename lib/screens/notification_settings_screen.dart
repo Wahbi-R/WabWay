@@ -11,6 +11,20 @@ const kPrefNotifMoney     = 'notif_money';
 const kPrefNotifDocuments = 'notif_documents';
 const kPrefNotifItinerary = 'notif_itinerary';
 
+/// Defaults when the user hasn't chosen yet — opt-in, so a new crew isn't
+/// flooded. Crew chat/SOS stays on. These gate what YOUR actions send to the
+/// crew. Users who already chose keep their choice (only unset keys use this).
+const kNotifDefaults = <String, bool>{
+  kPrefNotifCrew:      true,
+  kPrefNotifActivity:  false,
+  kPrefNotifMoney:     false,
+  kPrefNotifDocuments: false,
+  kPrefNotifItinerary: false,
+};
+
+bool notifPref(SharedPreferences prefs, String key) =>
+    prefs.getBool(key) ?? kNotifDefaults[key] ?? false;
+
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({super.key});
 
@@ -21,11 +35,11 @@ class NotificationSettingsScreen extends StatefulWidget {
 
 class _NotificationSettingsScreenState
     extends State<NotificationSettingsScreen> {
-  bool _crew      = true;
-  bool _activity  = true;
-  bool _money     = true;
-  bool _documents = true;
-  bool _itinerary = true;
+  bool _crew      = kNotifDefaults[kPrefNotifCrew]!;
+  bool _activity  = kNotifDefaults[kPrefNotifActivity]!;
+  bool _money     = kNotifDefaults[kPrefNotifMoney]!;
+  bool _documents = kNotifDefaults[kPrefNotifDocuments]!;
+  bool _itinerary = kNotifDefaults[kPrefNotifItinerary]!;
   bool _loaded    = false;
 
   @override
@@ -38,11 +52,11 @@ class _NotificationSettingsScreenState
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
     setState(() {
-      _crew      = prefs.getBool(kPrefNotifCrew)      ?? true;
-      _activity  = prefs.getBool(kPrefNotifActivity)  ?? true;
-      _money     = prefs.getBool(kPrefNotifMoney)     ?? true;
-      _documents = prefs.getBool(kPrefNotifDocuments) ?? true;
-      _itinerary = prefs.getBool(kPrefNotifItinerary) ?? true;
+      _crew      = notifPref(prefs, kPrefNotifCrew);
+      _activity  = notifPref(prefs, kPrefNotifActivity);
+      _money     = notifPref(prefs, kPrefNotifMoney);
+      _documents = notifPref(prefs, kPrefNotifDocuments);
+      _itinerary = notifPref(prefs, kPrefNotifItinerary);
       _loaded    = true;
     });
   }

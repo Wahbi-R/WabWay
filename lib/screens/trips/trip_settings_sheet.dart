@@ -14,6 +14,8 @@ import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 import '../../data/date_utils.dart';
+import '../../core/supabase/plan_service.dart';
+import '../../core/supabase/client.dart';
 
 Future<void> showTripSettingsSheet(
   BuildContext context,
@@ -170,6 +172,17 @@ class _TripSettingsSheetState extends State<_TripSettingsSheet> {
         groupChatUrl:       _chatUrlCtrl.text.trim().isEmpty ? null : _chatUrlCtrl.text.trim(),
         clearGroupChatUrl:  _chatUrlCtrl.text.trim().isEmpty && widget.trip.groupChatUrl != null,
       );
+      // New/extended date range → add the missing days (never removes any).
+      final datesChanged = _startDate != widget.trip.startDate || _endDate != widget.trip.endDate;
+      final userId = supabase.auth.currentUser?.id;
+      if (datesChanged && userId != null) {
+        try {
+          await PlanService.ensureTripDays(
+            tripId: widget.trip.id, start: _startDate, end: _endDate,
+            createdBy: userId, city: dest.isEmpty ? null : dest,
+          );
+        } catch (_) {}
+      }
       if (!mounted) return;
       widget.onSaved();
       Navigator.pop(context);
@@ -293,7 +306,7 @@ class _TripSettingsSheetState extends State<_TripSettingsSheet> {
                     Text('Total budget (optional)',
                         style: kStyleCaptionMedium.copyWith(color: kColorInk)),
                     const SizedBox(height: kSpace1),
-                    Text('Group spending is compared against this in ${_homeCurrency}.',
+                    Text('In $_homeCurrency. Every receipt is converted to $_homeCurrency for the trip total, whatever currency you pay or settle up in.',
                         style: kStyleCaption.copyWith(color: kColorInkSoft)),
                     const SizedBox(height: kSpace2),
                     TextField(

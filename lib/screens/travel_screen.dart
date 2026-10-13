@@ -24,6 +24,7 @@ import '../widgets/widgets.dart';
 import 'travel/travel_item_card.dart';
 import 'travel/travel_item_detail.dart';
 import 'travel/add_travel_sheet.dart';
+import '../core/text_utils.dart';
 
 class TravelScreen extends ConsumerStatefulWidget {
   const TravelScreen({super.key});
@@ -63,9 +64,9 @@ class _TravelScreenState extends ConsumerState<TravelScreen> with AsyncScreenMix
     if (_statusFilter != null) {
       items = items.where((i) => i.status == _statusFilter).toList();
     }
-    final q = _search.toLowerCase().trim();
+    final q = foldForSearch(_search.trim());
     if (q.isNotEmpty) {
-      bool m(String? s) => s != null && s.toLowerCase().contains(q);
+      bool m(String? s) => searchMatches(s, q);
       items = items
           .where((i) => m(i.title) || m(i.location) || m(i.destination) ||
               m(i.confirmationNumber) || m(i.notes))

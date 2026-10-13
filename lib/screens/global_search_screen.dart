@@ -30,6 +30,7 @@ import 'money/receipt_detail.dart';
 import 'plan/item_detail.dart';
 import 'spots/spot_detail.dart';
 import 'travel/travel_item_detail.dart';
+import '../core/text_utils.dart';
 
 // Opens the full-trip search dialog. Caller must supply tripId + metadata so
 // results can navigate directly to detail screens without re-injecting TripState.
@@ -168,9 +169,9 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> with AsyncScre
   // ─── Search filter ────────────────────────────────────────────────────────────
 
   List<_Result> get _results {
-    final q = _query.toLowerCase().trim();
+    final q = foldForSearch(_query.trim());
     if (q.isEmpty) return const [];
-    bool m(String? s) => s != null && s.toLowerCase().contains(q);
+    bool m(String? s) => searchMatches(s, q);
 
     final out = <_Result>[];
 

@@ -6,6 +6,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
+import '../../data/currencies.dart';
 
 /// Opens the Add Withdrawal form.
 ///
@@ -17,6 +18,7 @@ Future<CashWithdrawal?> showAddCashSheet(
   String? tripId,
   String? userId,
   List<TripMember>? members,
+  String? defaultCurrency,
 }) {
   final effectiveUserId = userId ?? supabase.auth.currentUser?.id ?? kYouId;
   final effectiveMembers = (members != null && members.isNotEmpty)
@@ -35,6 +37,7 @@ Future<CashWithdrawal?> showAddCashSheet(
       tripId:  tripId,
       userId:  effectiveUserId,
       members: effectiveMembers,
+      defaultCurrency: defaultCurrency,
       scrollController: scroll,
       showDragHandle: handle,
       onSubmit: close,
@@ -48,6 +51,7 @@ class _AddCashContent extends StatefulWidget {
     required this.tripId,
     required this.userId,
     required this.members,
+    this.defaultCurrency,
     this.scrollController,
     this.showDragHandle = false,
   });
@@ -57,6 +61,7 @@ class _AddCashContent extends StatefulWidget {
   final String? tripId;
   final String userId;
   final List<TripMember> members;
+  final String? defaultCurrency;
   final ScrollController? scrollController;
   final bool showDragHandle;
 
@@ -73,7 +78,7 @@ class _AddCashContentState extends State<_AddCashContent> {
   late String _withdrawnById;
   late Map<String, TextEditingController> _distCtrls;
 
-  String  _currency = 'JPY';
+  late String _currency = widget.defaultCurrency ?? 'JPY';
   bool    _loading  = false;
   String? _error;
 
@@ -206,11 +211,10 @@ class _AddCashContentState extends State<_AddCashContent> {
                           label: 'Currency',
                           value: _currency,
                           onChanged: (v) =>
-                              setState(() => _currency = v ?? 'JPY'),
-                          items: const [
-                            WabwaySelectItem(value: 'JPY', label: 'JPY ¥'),
-                            WabwaySelectItem(value: 'USD', label: 'USD \$'),
-                            WabwaySelectItem(value: 'EUR', label: 'EUR €'),
+                              setState(() => _currency = v ?? _currency),
+                          items: [
+                            for (final c in currencyOptions(include: _currency))
+                              WabwaySelectItem(value: c.$1, label: c.$2),
                           ],
                         ),
                       ),

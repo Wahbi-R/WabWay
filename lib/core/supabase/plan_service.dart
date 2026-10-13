@@ -190,6 +190,62 @@ abstract final class PlanService {
 
   // ── Mutations ─────────────────────────────────────────────────────────────────
 
+  /// Dates in [start]..[end] (inclusive, date-only) not yet covered by [existing].
+  static List<DateTime> missingTripDates(
+      List<TripDay> existing, DateTime start, DateTime end) {
+    final have = existing.map((d) => DateTime(d.date.year, d.date.month, d.date.day)).toSet();
+    final out = <DateTime>[];
+    var cur = DateTime(start.year, start.month, start.day);
+    final last = DateTime(end.year, end.month, end.day);
+    while (!cur.isAfter(last)) {
+      if (!have.contains(cur)) out.add(cur);
+      cur = cur.add(const Duration(days: 1));
+    }
+    return out;
+  }
+
+  /// Creates a day for every date in the trip range that doesn't have one.
+  /// Only ever INSERTS — never deletes or edits existing days or their items.
+  /// New days get [city] (normally the trip destination). Returns the new days.
+  static Future<List<TripDay>> createMissingTripDays({
+    required String tripId,
+    required DateTime start,
+    required DateTime end,
+    required String createdBy,
+    required List<TripDay> existing,
+    String city = '',
+  }) async {
+    final missing = missingTripDates(existing, start, end);
+    if (missing.isEmpty) return const [];
+    final base = existing.isEmpty
+        ? 0
+        : existing.map((d) => d.dayNumber).reduce((a, b) => a > b ? a : b);
+    return Future.wait(List.generate(missing.length, (i) => createDay(
+          tripId:    tripId,
+          dayNumber: base + i + 1,
+          date:      missing[i],
+          city:      city,
+          createdBy: createdBy,
+        )));
+  }
+
+  /// Loads the plan and fills in any missing days for the trip's date range.
+  /// No-op when the trip has no dates. Safe to call repeatedly.
+  static Future<List<TripDay>> ensureTripDays({
+    required String tripId,
+    required DateTime? start,
+    required DateTime? end,
+    required String createdBy,
+    String? city,
+  }) async {
+    if (start == null || end == null || end.isBefore(start)) return const [];
+    final existing = await loadAll(tripId);
+    return createMissingTripDays(
+      tripId: tripId, start: start, end: end, createdBy: createdBy,
+      existing: existing, city: city ?? '',
+    );
+  }
+
   static Future<TripDay> createDay({
     required String tripId,
     required int dayNumber,

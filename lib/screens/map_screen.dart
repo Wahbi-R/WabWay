@@ -323,7 +323,7 @@ class _MapScreenState extends ConsumerState<MapScreen> with AsyncScreenMixin {
             child: SpotDetailContent(
               spot: spot,
               myVote: _myVoteFor(spot, userId),
-              canDelete: spot.addedById == userId,
+              canDelete: canManageItem(spot.addedById, isOrganiser: ref.read(isOrganiserProvider)),
               onEdit: (updated) => setState(() {
                 final idx = _spots.indexWhere((s) => s.id == updated.id);
                 if (idx != -1) _spots[idx] = updated;

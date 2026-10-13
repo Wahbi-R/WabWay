@@ -1,3 +1,5 @@
+import '../../widgets/widgets.dart';
+import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -184,6 +186,7 @@ class _SignInScreenState extends State<SignInScreen> {
                             rawError:  _rawError,
                             onSend:    _sendMagicLink,
                             onSwitch:  () => _switchMode(_SignInMode.password),
+                            onBack:    () => _switchMode(_SignInMode.magicLink),
                           ),
                         _SignInMode.forgotPassword => _ForgotPasswordForm(
                             key: const ValueKey('forgot'),
@@ -409,6 +412,7 @@ class _MagicLinkForm extends StatelessWidget {
     required this.error,
     required this.onSend,
     required this.onSwitch,
+    required this.onBack,
     this.rawError,
   });
 
@@ -419,6 +423,7 @@ class _MagicLinkForm extends StatelessWidget {
   final String? rawError;
   final VoidCallback onSend;
   final VoidCallback onSwitch;
+  final VoidCallback onBack;
 
   @override
   Widget build(BuildContext context) {
@@ -429,6 +434,9 @@ class _MagicLinkForm extends StatelessWidget {
         body: 'A sign-in link was sent to\n${emailCtrl.text.trim()}',
         linkLabel: 'Use a password instead',
         onLink: onSwitch,
+        onResend: () => AuthService.sendMagicLink(emailCtrl.text),
+        onBack: onBack,
+        backLabel: 'Use a different email',
       );
     }
     return Column(
@@ -522,6 +530,8 @@ class _PasswordForm extends StatelessWidget {
         body: 'We sent a confirmation link to\n${emailCtrl.text.trim()}\n\nClick it to activate your account.',
         linkLabel: 'Use a magic link instead',
         onLink: onSwitch,
+        onResend: () => AuthService.resendSignupConfirmation(emailCtrl.text),
+        onBack: onToggleFlow,
       );
     }
 
@@ -532,6 +542,8 @@ class _PasswordForm extends StatelessWidget {
         body: 'You already have an account with this email. We\'ve sent you a sign-in link — after signing in, you can set your name and password from account settings.',
         linkLabel: 'Use a magic link instead',
         onLink: onSwitch,
+        onResend: () => AuthService.sendMagicLink(emailCtrl.text),
+        onBack: onToggleFlow,
       );
     }
 
@@ -665,13 +677,16 @@ class _ForgotPasswordForm extends StatelessWidget {
 
 // ─── Reusable "sent" confirmation state ───────────────────────────────────────
 
-class _SentState extends StatelessWidget {
+class _SentState extends StatefulWidget {
   const _SentState({
     required this.icon,
     required this.title,
     required this.body,
     required this.linkLabel,
     required this.onLink,
+    this.onResend,
+    this.onBack,
+    this.backLabel = 'Back to sign in',
   });
 
   final IconData icon;
@@ -679,6 +694,55 @@ class _SentState extends StatelessWidget {
   final String body;
   final String linkLabel;
   final VoidCallback onLink;
+
+  /// Re-sends the email. When set, shows "Resend email" with a cooldown so a
+  /// lost email is never a dead end.
+  final Future<void> Function()? onResend;
+
+  /// Returns to the form (e.g. to fix a typo in the email).
+  final VoidCallback? onBack;
+  final String backLabel;
+
+  @override
+  State<_SentState> createState() => _SentStateState();
+}
+
+class _SentStateState extends State<_SentState> {
+  static const _cooldown = 30;
+  bool _resending = false;
+  int _secondsLeft = 0;
+  Timer? _timer;
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _resend() async {
+    setState(() => _resending = true);
+    try {
+      await widget.onResend!();
+      if (!mounted) return;
+      showWabwaySnack(context, 'Email sent again — check your spam folder too.');
+      setState(() => _secondsLeft = _cooldown);
+      _timer?.cancel();
+      _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+        if (!mounted) {
+          t.cancel();
+          return;
+        }
+        setState(() => _secondsLeft--);
+        if (_secondsLeft <= 0) t.cancel();
+      });
+    } catch (_) {
+      if (mounted) {
+        showWabwaySnack(context, 'Could not resend. Wait a minute and try again.', error: true);
+      }
+    } finally {
+      if (mounted) setState(() => _resending = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -692,34 +756,41 @@ class _SentState extends StatelessWidget {
             color: kColorSuccessSoft,
             borderRadius: kRadiusMd,
           ),
-          child: Icon(icon, color: kColorSuccess, size: 24),
+          child: Icon(widget.icon, color: kColorSuccess, size: 24),
         ),
         const SizedBox(height: kSpace4),
-        Text(title, style: kStyleTitle, textAlign: TextAlign.center),
+        Text(widget.title, style: kStyleTitle, textAlign: TextAlign.center),
         const SizedBox(height: kSpace2),
-        Text(body, style: kStyleCaption, textAlign: TextAlign.center),
+        Text(widget.body, style: kStyleCaption, textAlign: TextAlign.center),
         if (!kIsWeb) ...[
           const SizedBox(height: kSpace4),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: () => launchUrl(
-                Uri(scheme: 'mailto'),
-                mode: LaunchMode.externalApplication,
-              ),
-              icon: const Icon(Icons.mail_outline_rounded, size: 18),
-              label: const Text('Open email app'),
-              style: FilledButton.styleFrom(
-                backgroundColor: kColorPrimary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: kSpace3),
-                shape: const RoundedRectangleBorder(borderRadius: kRadiusMd),
-              ),
+          WabwayButton(
+            label: 'Open email app',
+            icon: Icons.mail_outline_rounded,
+            fullWidth: true,
+            onPressed: () => launchUrl(
+              Uri(scheme: 'mailto'),
+              mode: LaunchMode.externalApplication,
             ),
           ),
         ],
+        if (widget.onResend != null) ...[
+          const SizedBox(height: kSpace3),
+          WabwayButton(
+            label: _secondsLeft > 0 ? 'Resend in ${_secondsLeft}s' : "Didn't get it? Resend email",
+            icon: Icons.refresh_rounded,
+            variant: WabwayButtonVariant.ghost,
+            fullWidth: true,
+            loading: _resending,
+            onPressed: (_resending || _secondsLeft > 0) ? null : _resend,
+          ),
+        ],
         const SizedBox(height: kSpace4),
-        _SwitchLink(label: linkLabel, onTap: onLink),
+        _SwitchLink(label: widget.linkLabel, onTap: widget.onLink),
+        if (widget.onBack != null) ...[
+          const SizedBox(height: kSpace3),
+          _SwitchLink(label: widget.backLabel, onTap: widget.onBack!),
+        ],
       ],
     );
   }

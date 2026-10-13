@@ -8,6 +8,9 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
+import 'package:flutter/services.dart';
+import '../../data/invite_data.dart';
+import 'invite_sheet.dart';
 
 Future<void> showAddMemberSheet(
   BuildContext context, {
@@ -15,45 +18,15 @@ Future<void> showAddMemberSheet(
   required Set<String> existingMemberIds,
   required VoidCallback onMemberAdded,
 }) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    backgroundColor: Colors.transparent,
-    builder: (_) => _AddMemberSheet(
+  return showWabwayAutoSheet<void>(
+    context,
+    builder: (_, handle) => _AddMemberSheet(
       tripId: tripId,
       existingMemberIds: existingMemberIds,
       onMemberAdded: onMemberAdded,
+      showDragHandle: handle,
     ),
   );
-}
-
-Future<void> _sendEmailInvite(String email, String tripId) async {
-  String? code;
-  try {
-    final invite = await InviteService.createInvite(tripId);
-    code = invite.displayCode;
-  } catch (_) {
-    code = null;
-  }
-
-  final body = code != null
-      ? Uri.encodeComponent(
-          "Hey! I'm using WabWay to plan our trip and I'd love for you to join.\n\n"
-          "Download the app at wabway.app, create an account, and use invite code:\n\n"
-          "$code\n\n"
-          "See you there!",
-        )
-      : Uri.encodeComponent(
-          "Hey! I'm using WabWay to plan our trip and I'd love for you to join.\n\n"
-          "Download the app at wabway.app and ask me for an invite code.",
-        );
-
-  final subject = Uri.encodeComponent("Join my trip on WabWay!");
-  final uri = Uri.parse("mailto:$email?subject=$subject&body=$body");
-  if (await canLaunchUrl(uri)) {
-    await launchUrl(uri);
-  }
 }
 
 class _AddMemberSheet extends StatefulWidget {
@@ -61,11 +34,13 @@ class _AddMemberSheet extends StatefulWidget {
     required this.tripId,
     required this.existingMemberIds,
     required this.onMemberAdded,
+    this.showDragHandle = true,
   });
 
   final String tripId;
   final Set<String> existingMemberIds;
   final VoidCallback onMemberAdded;
+  final bool showDragHandle;
 
   @override
   State<_AddMemberSheet> createState() => _AddMemberSheetState();
@@ -147,7 +122,7 @@ class _AddMemberSheetState extends State<_AddMemberSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const WabwayDragHandle(),
+            if (widget.showDragHandle) const WabwayDragHandle(),
             const SizedBox(height: kSpace3),
 
             Row(
@@ -233,87 +208,130 @@ class _EmailInviteState extends StatefulWidget {
 }
 
 class _EmailInviteStateState extends State<_EmailInviteState> {
-  bool _sending = false;
-  bool _sent = false;
+  InviteCode? _code;
+  String? _error;
+  bool _copied = false;
 
-  Future<void> _send() async {
-    setState(() => _sending = true);
-    await _sendEmailInvite(widget.email, widget.tripId);
-    if (mounted) setState(() { _sending = false; _sent = true; });
+  @override
+  void initState() {
+    super.initState();
+    _create();
+  }
+
+  // Create the code up front so it's always visible — never hidden inside a
+  // mail app that may not exist on this device.
+  Future<void> _create() async {
+    setState(() => _error = null);
+    try {
+      final code = await InviteService.createInvite(widget.tripId);
+      if (mounted) setState(() => _code = code);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Could not create an invite code. Check your connection and try again.');
+      }
+    }
+  }
+
+  Future<void> _copy() async {
+    await Clipboard.setData(ClipboardData(text: _code!.code));
+    if (!mounted) return;
+    setState(() => _copied = true);
+    showWabwaySnack(context, 'Code copied');
+  }
+
+  Future<void> _email() async {
+    final uri = Uri(
+      scheme: 'mailto',
+      path: widget.email,
+      query: 'subject=${Uri.encodeComponent('Join my trip on WabWay!')}'
+          '&body=${Uri.encodeComponent(inviteMessage(_code!))}',
+    );
+    final ok = await canLaunchUrl(uri) && await launchUrl(uri);
+    if (!ok && mounted) {
+      showWabwaySnack(context, 'No mail app found — share or copy the code instead.', error: true);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_sent) {
-      return Column(
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: const BoxDecoration(
-              color: kColorSuccessSoft,
-              borderRadius: kRadiusMd,
-            ),
-            child: const Icon(Icons.mark_email_read_rounded, color: kColorSuccess, size: 28),
-          ),
-          const SizedBox(height: kSpace4),
-          Text('Invite sent!', style: kStyleTitle, textAlign: TextAlign.center),
-          const SizedBox(height: kSpace2),
-          Text(
-            'We\'ve opened your mail app. Once ${widget.email} signs up and enters the code, they\'ll join the trip.',
-            style: kStyleCaption,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: kSpace5),
-          WabwayButton(
-            label: 'Done',
-            fullWidth: true,
-            size: WabwayButtonSize.lg,
-            onPressed: widget.onDone,
-          ),
-        ],
-      );
-    }
-
+    final code = _code;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          width: 56,
-          height: 56,
-          decoration: const BoxDecoration(
-            color: kColorSurfaceSunken,
-            borderRadius: kRadiusMd,
-          ),
-          child: const Icon(Icons.person_off_rounded, color: kColorInkSoft, size: 28),
-        ),
-        const SizedBox(height: kSpace4),
-        Text(
-          'No WabWay account found',
-          style: kStyleTitle,
-          textAlign: TextAlign.center,
-        ),
+        Text('No WabWay account yet', style: kStyleTitle, textAlign: TextAlign.center),
         const SizedBox(height: kSpace2),
         Text(
-          '${widget.email} doesn\'t have a WabWay account yet. Send them an email invite with a code to join.',
+          "${widget.email} isn't on WabWay yet. Send them this code — once they sign up and enter it, they'll join the trip.",
           style: kStyleCaption,
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: kSpace5),
-        WabwayButton(
-          label: 'Send email invite',
-          icon: Icons.email_rounded,
-          fullWidth: true,
-          size: WabwayButtonSize.lg,
-          loading: _sending,
-          onPressed: _sending ? null : _send,
-        ),
+        if (_error != null) ...[
+          Text(_error!, style: kStyleCaption.copyWith(color: kColorDanger), textAlign: TextAlign.center),
+          const SizedBox(height: kSpace3),
+          WabwayButton(label: 'Try again', variant: WabwayButtonVariant.ghost, onPressed: _create),
+        ] else if (code == null)
+          const Center(
+            child: Padding(padding: EdgeInsets.all(kSpace4), child: CircularProgressIndicator()),
+          )
+        else ...[
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: kSpace4),
+            decoration: BoxDecoration(
+              color: kColorSurfaceSunken,
+              borderRadius: kRadiusMd,
+              border: Border.all(color: kColorBorder),
+            ),
+            child: SelectableText(
+              code.displayCode,
+              textAlign: TextAlign.center,
+              style: kStyleTitle.copyWith(letterSpacing: 4),
+            ),
+          ),
+          const SizedBox(height: kSpace4),
+          WabwayButton(
+            label: 'Share invite',
+            icon: Icons.ios_share_rounded,
+            fullWidth: true,
+            size: WabwayButtonSize.lg,
+            onPressed: () => shareInviteCode(code),
+          ),
+          const SizedBox(height: kSpace2),
+          Row(
+            children: [
+              Expanded(
+                child: WabwayButton(
+                  label: _copied ? 'Copied' : 'Copy code',
+                  icon: _copied ? Icons.check_rounded : Icons.copy_rounded,
+                  variant: WabwayButtonVariant.ghost,
+                  onPressed: _copy,
+                ),
+              ),
+              const SizedBox(width: kSpace2),
+              Expanded(
+                child: WabwayButton(
+                  label: 'Email it',
+                  icon: Icons.email_rounded,
+                  variant: WabwayButtonVariant.ghost,
+                  onPressed: _email,
+                ),
+              ),
+            ],
+          ),
+        ],
         const SizedBox(height: kSpace3),
         WabwayButton(
           label: 'Try a different email',
           variant: WabwayButtonVariant.ghost,
           fullWidth: true,
           onPressed: widget.onBack,
+        ),
+        const SizedBox(height: kSpace2),
+        WabwayButton(
+          label: 'Done',
+          variant: WabwayButtonVariant.ghost,
+          fullWidth: true,
+          onPressed: widget.onDone,
         ),
       ],
     );

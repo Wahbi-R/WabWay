@@ -19,6 +19,7 @@ import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
 import '../widgets/widgets.dart';
 import 'links/add_link_sheet.dart';
+import '../core/text_utils.dart';
 
 enum _LinkSort { newest, oldest, alphabetical }
 
@@ -47,12 +48,12 @@ class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin
     var list = _filterCategory == null
         ? List<TripLink>.from(_links)
         : _links.where((l) => l.category == _filterCategory).toList();
-    final q = _search.toLowerCase().trim();
+    final q = foldForSearch(_search.trim());
     if (q.isNotEmpty) {
       list = list.where((l) =>
-        l.title.toLowerCase().contains(q) ||
-        l.domain.toLowerCase().contains(q) ||
-        (l.notes?.toLowerCase().contains(q) ?? false),
+        searchMatches(l.title, q) ||
+        searchMatches(l.domain, q) ||
+        searchMatches(l.notes, q),
       ).toList();
     }
     switch (_sort) {
@@ -68,13 +69,13 @@ class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin
 
   Map<AutoLinkSource, List<AutoLink>> get _filteredAutoLinks {
     if (_search.isEmpty) return _autoLinks;
-    final q = _search.toLowerCase().trim();
+    final q = foldForSearch(_search.trim());
     final filtered = <AutoLinkSource, List<AutoLink>>{};
     for (final entry in _autoLinks.entries) {
       final items = entry.value
           .where((l) =>
-              l.itemName.toLowerCase().contains(q) ||
-              l.domain.toLowerCase().contains(q))
+              searchMatches(l.itemName, q) ||
+              searchMatches(l.domain, q))
           .toList();
       if (items.isNotEmpty) filtered[entry.key] = items;
     }

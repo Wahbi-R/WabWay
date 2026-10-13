@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../data/invite_data.dart';
 
 /// Handles invite links of the form:
 ///   https://wabway.wabble.ca/?invite=ABCD1234
@@ -36,7 +37,8 @@ class InviteLinkHandler {
   }
 
   void _initWeb() {
-    final code = Uri.base.queryParameters['invite']?.trim().toUpperCase();
+    final raw = Uri.base.queryParameters['invite'];
+    final code = raw == null ? null : InviteCode.normalize(raw);
     if (code != null && code.isNotEmpty) _setCode(code);
   }
 
@@ -59,7 +61,8 @@ class InviteLinkHandler {
   void _parseAndSet(String url) {
     final uri = Uri.tryParse(url);
     if (uri == null) return;
-    final code = uri.queryParameters['invite']?.trim().toUpperCase();
+    final raw = uri.queryParameters['invite'];
+    final code = raw == null ? null : InviteCode.normalize(raw);
     if (code != null && code.isNotEmpty) _setCode(code);
   }
 

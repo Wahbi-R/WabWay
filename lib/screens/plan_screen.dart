@@ -31,6 +31,7 @@ import 'plan/day_card.dart';
 import 'plan/item_detail.dart';
 import 'plan/add_item_sheet.dart';
 import 'plan/day_picker_sheet.dart';
+import '../core/text_utils.dart';
 
 class PlanScreen extends ConsumerStatefulWidget {
   const PlanScreen({super.key});
@@ -175,9 +176,9 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
   // Flatten all itinerary items across days and filter by the query.
   // Returns (item, day) pairs so search results can show day context.
   List<({ItineraryItem item, TripDay day})> get _planSearchResults {
-    final q = _search.toLowerCase().trim();
+    final q = foldForSearch(_search.trim());
     if (q.isEmpty) return const [];
-    bool m(String? s) => s != null && s.toLowerCase().contains(q);
+    bool m(String? s) => searchMatches(s, q);
     final out = <({ItineraryItem item, TripDay day})>[];
     for (final day in _days) {
       for (final item in day.sortedItems) {
@@ -603,7 +604,15 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
     } else {
       defaultDate = TripState.maybeOf(context)?.trip.startDate ?? DateTime.now();
     }
-    final draft = await _showAddDayDialog(context, defaultDate: defaultDate);
+    // Pre-fill the city: carry over the latest day's city, else the trip destination.
+    final lastCity = _days.isEmpty
+        ? ''
+        : (_days.reduce((a, b) => a.date.isAfter(b.date) ? a : b).city);
+    final defaultCity = lastCity.isNotEmpty
+        ? lastCity
+        : TripState.maybeOf(context)?.trip.destination;
+    final draft = await _showAddDayDialog(context,
+        defaultDate: defaultDate, defaultCity: defaultCity);
     if (draft == null || !mounted) return;
     if (_activeTripId.isEmpty || _userId.isEmpty) return;
 
@@ -643,22 +652,10 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
     if (trip == null || trip.startDate == null || trip.endDate == null) return;
     final messenger = ScaffoldMessenger.of(context);
 
-    // Collect dates already covered by existing days (date-only comparison).
-    final existingDates = _days
-        .map((d) => DateTime(d.date.year, d.date.month, d.date.day))
-        .toSet();
-
-    // Enumerate every date in the trip range that is not yet covered.
-    final missingDates = <DateTime>[];
-    var current = DateTime(trip.startDate!.year, trip.startDate!.month, trip.startDate!.day);
-    final tripEnd  = DateTime(trip.endDate!.year,  trip.endDate!.month,  trip.endDate!.day);
-    while (!current.isAfter(tripEnd)) {
-      if (!existingDates.contains(current)) missingDates.add(current);
-      current = current.add(const Duration(days: 1));
-    }
+    final missingDates = PlanService.missingTripDates(_days, trip.startDate!, trip.endDate!);
 
     if (missingDates.isEmpty) {
-      messenger.showSnackBar(const SnackBar(content: Text('All trip days are already added.')));
+      showWabwaySnack(context, 'All trip days are already added.');
       return;
     }
     final tripId = _activeTripId;
@@ -667,19 +664,15 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
 
     // Use a silent load so the existing plan stays visible while days are created.
     final gen = beginLoad(silent: true);
-    final baseNumber = _days.isEmpty ? 0 : _days.map((d) => d.dayNumber).reduce((a, b) => a > b ? a : b);
     final List<TripDay> newDays;
     try {
-      // Pre-assign day numbers and create all missing days in parallel.
-      newDays = await Future.wait(
-        List.generate(missingDates.length, (i) => PlanService.createDay(
-          tripId:    tripId,
-          dayNumber: baseNumber + i + 1,
-          date:      missingDates[i],
-          city:      '',
-          createdBy: userId,
-          notes:     null,
-        )),
+      newDays = await PlanService.createMissingTripDays(
+        tripId:    tripId,
+        start:     trip.startDate!,
+        end:       trip.endDate!,
+        createdBy: userId,
+        existing:  _days,
+        city:      trip.destination ?? '',
       );
       commitLoad(gen, () {
         _days.addAll(newDays);
@@ -2462,25 +2455,31 @@ class _CalendarItemTile extends StatelessWidget {
 
 // ─── Add day dialog ───────────────────────────────────────────────────────────
 
-Future<TripDay?> _showAddDayDialog(BuildContext context, {required DateTime defaultDate}) {
+Future<TripDay?> _showAddDayDialog(
+  BuildContext context, {
+  required DateTime defaultDate,
+  String? defaultCity,
+}) {
   return showDialog<TripDay>(
     context: context,
-    builder: (ctx) => _AddDayDialog(defaultDate: defaultDate),
+    builder: (ctx) => _AddDayDialog(defaultDate: defaultDate, defaultCity: defaultCity),
   );
 }
 
 class _AddDayDialog extends StatefulWidget {
-  const _AddDayDialog({required this.defaultDate});
+  const _AddDayDialog({required this.defaultDate, this.defaultCity});
 
   final DateTime defaultDate;
+
+  /// Pre-filled city — the previous day's city, else the trip destination.
+  final String? defaultCity;
 
   @override
   State<_AddDayDialog> createState() => _AddDayDialogState();
 }
 
 class _AddDayDialogState extends State<_AddDayDialog> {
-  final _formKey = GlobalKey<FormState>();
-  final _cityCtrl = TextEditingController();
+  late final TextEditingController _cityCtrl;
   final _notesCtrl = TextEditingController();
   late DateTime _date;
 
@@ -2488,6 +2487,7 @@ class _AddDayDialogState extends State<_AddDayDialog> {
   void initState() {
     super.initState();
     _date = widget.defaultDate;
+    _cityCtrl = TextEditingController(text: widget.defaultCity ?? '');
   }
 
   @override
@@ -2497,18 +2497,7 @@ class _AddDayDialogState extends State<_AddDayDialog> {
     super.dispose();
   }
 
-  Future<void> _pickDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _date,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2030),
-    );
-    if (picked != null) setState(() => _date = picked);
-  }
-
   void _submit() {
-    if (!_formKey.currentState!.validate()) return;
     Navigator.pop(
       context,
       TripDay(
@@ -2529,50 +2518,26 @@ class _AddDayDialogState extends State<_AddDayDialog> {
       title: Text('Add day', style: kStyleBodySemibold),
       content: SizedBox(
         width: 360,
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-              Text('Date',
-                  style: kStyleCaptionMedium.copyWith(color: kColorInk)),
-              const SizedBox(height: kSpace2),
-              GestureDetector(
-                onTap: _pickDate,
-                child: Container(
-                  height: 48,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: kSpace3),
-                  decoration: BoxDecoration(
-                    color: kColorSurfaceSunken,
-                    borderRadius: kRadiusMd,
-                    border: Border.all(color: kColorBorder),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.calendar_today_rounded,
-                          size: 16, color: kColorInkSoft),
-                      const SizedBox(width: kSpace2),
-                      Text(
-                        '${_date.year}-${_date.month.toString().padLeft(2, '0')}-${_date.day.toString().padLeft(2, '0')}',
-                        style: kStyleBody,
-                      ),
-                    ],
-                  ),
-                ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              WabwayDateField(
+                label: 'Date',
+                value: _date,
+                clearable: false,
+                onChanged: (d) { if (d != null) setState(() => _date = d); },
               ),
               const SizedBox(height: kSpace3),
-              WabwayTextField(
-                label: 'City',
-                hint: 'e.g. Tokyo',
+              PlaceSearchField(
+                label: 'City (optional)',
+                hint: 'e.g. Kyoto',
                 controller: _cityCtrl,
                 textInputAction: TextInputAction.next,
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty)
-                        ? 'City is required'
-                        : null,
+                limit: 4,
+                onSelected: (p) => _cityCtrl.text =
+                    p.city.isNotEmpty ? p.city : p.name,
               ),
               const SizedBox(height: kSpace3),
               WabwayTextField(
@@ -2585,17 +2550,14 @@ class _AddDayDialogState extends State<_AddDayDialog> {
           ),
         ),
       ),
-      ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: Text('Cancel',
-              style: kStyleBody.copyWith(color: kColorInkSoft)),
+          child: Text('Cancel', style: kStyleBody.copyWith(color: kColorInkSoft)),
         ),
         TextButton(
           onPressed: _submit,
-          child: Text('Add day',
-              style: kStyleBodyMedium.copyWith(color: kColorPrimary)),
+          child: Text('Add day', style: kStyleBodyMedium.copyWith(color: kColorPrimaryDark)),
         ),
       ],
     );

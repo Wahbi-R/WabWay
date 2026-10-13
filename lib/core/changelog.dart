@@ -11,6 +11,25 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 406,
+    label: 'Bug fixes',
+    changes: [
+      "Invite codes now work when typed with the space, exactly as shown",
+      "Home stats update when you come back to Home, and say \"1 Day\" instead of \"1 Days\"",
+      "Search finds places with accents, like Sensō-ji when you type \"senso\"",
+      "Spots added from search now fill in City and Area (e.g. Tokyo · Asakusa)",
+      "Foreign-currency receipts ask for an exchange rate instead of saving as \$0, and split labels read \"split 3 ways\"",
+      "Inviting someone without an account always shows the invite code to share, copy or email",
+      "Didn't get the confirmation email? You can now resend it or go back",
+      "Add to Plan shows when a spot is already in your plan",
+      "Trip days are created automatically from your trip dates",
+      "New days pre-fill the city, and receipts start in your trip's currency instead of yen",
+      "Only the person who added a spot (or the organiser) can edit it",
+      "Fewer notifications by default — turn on more in notification settings",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 405,
     label: 'UI consistency',
     changes: [

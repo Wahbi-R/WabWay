@@ -675,7 +675,7 @@ class _ActionsSectionState extends ConsumerState<_ActionsSection> {
   Future<void> _addToItinerary() async {
     if (_itineraryLoading) return;
     if (widget.days.isEmpty) {
-      showWabwaySnack(context, 'Add trip days in Plan first.');
+      showWabwaySnack(context, 'Set your trip dates in Trip settings to start planning days.');
       return;
     }
 

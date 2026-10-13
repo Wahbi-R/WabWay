@@ -34,9 +34,9 @@ class _PackingScreenState extends ConsumerState<PackingScreen> with AsyncScreenM
   final _searchCtrl = TextEditingController();
 
   List<PackingItem> _getFiltered() {
-    final q = _search.toLowerCase().trim();
+    final q = foldForSearch(_search.trim());
     if (q.isEmpty) return _items;
-    return _items.where((i) => i.title.toLowerCase().contains(q)).toList();
+    return _items.where((i) => searchMatches(i.title, q)).toList();
   }
 
   @override

@@ -61,7 +61,7 @@ abstract final class InviteService {
   static Future<String> redeemInvite(String code) async {
     final result = await supabase.rpc(
       'redeem_trip_invite',
-      params: {'p_code': code},
+      params: {'p_code': InviteCode.normalize(code)},
     );
     return result as String;
   }

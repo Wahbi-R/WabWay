@@ -11,6 +11,13 @@ import '../../theme/app_text_theme.dart';
 import '../../core/async_screen_mixin.dart';
 import '../../widgets/widgets.dart';
 
+/// The one invite message — used by the invite sheet, Add member, and email.
+String inviteMessage(InviteCode code) =>
+    'Join my trip on WabWay! Tap the link or enter code ${code.displayCode} in the app:\n'
+    '${InviteLinkHandler.linkFor(code.code)}';
+
+Future<void> shareInviteCode(InviteCode code) => Share.share(inviteMessage(code));
+
 Future<void> showInviteSheet(
   BuildContext context, {
   required String tripId,
@@ -96,12 +103,7 @@ class _InviteSheetState extends State<_InviteSheet> with AsyncScreenMixin {
     if (mounted) setState(() => _copied.remove(code.id));
   }
 
-  Future<void> _shareLink(InviteCode code) async {
-    final link = InviteLinkHandler.linkFor(code.code);
-    await Share.share(
-      'Join my trip on WabWay! Tap the link or enter code ${code.displayCode} in the app:\n$link',
-    );
-  }
+  Future<void> _shareLink(InviteCode code) => shareInviteCode(code);
 
   @override
   Widget build(BuildContext context) {

@@ -23,6 +23,7 @@ import '../../data/connection_data.dart';
 import '../shared/connections_section.dart';
 import 'add_spot_sheet.dart';
 import 'spot_vote_chip.dart';
+import '../../data/date_utils.dart';
 
 // ─── Member name helper ────────────────────────────────────────────────────────
 
@@ -80,7 +81,7 @@ class SpotDetailScreen extends ConsumerWidget {
             color: kColorInkSoft,
             onPressed: () => _openLink(context, spot.mapsUrl ?? spot.name),
           ),
-          if (onEdit != null)
+          if (onEdit != null && canDelete)
             IconButton(
               icon: const Icon(Icons.edit_outlined),
               color: kColorInkSoft,
@@ -271,7 +272,7 @@ class _SpotDetailContentState extends ConsumerState<SpotDetailContent> {
                     label: widget.spot.status.label,
                     tone: widget.spot.status.tone,
                   ),
-                  if (widget.onEdit != null) ...[
+                  if (widget.onEdit != null && widget.canDelete) ...[
                     const SizedBox(width: kSpace2),
                     GestureDetector(
                       onTap: () async {
@@ -605,11 +606,55 @@ class _AddToPlanButton extends ConsumerStatefulWidget {
 class _AddToPlanButtonState extends ConsumerState<_AddToPlanButton> {
   bool _loading = false;
 
+  /// The day this spot is already planned on (via linkedSpotId), if any.
+  TripDay? _plannedDay;
+
   ItineraryItemType get _itemType => switch (widget.spot.category) {
     SpotCategory.food      => ItineraryItemType.food,
     SpotCategory.nightlife => ItineraryItemType.activity,
     _                      => ItineraryItemType.spot,
   };
+
+  @override
+  void initState() {
+    super.initState();
+    _checkPlanned();
+  }
+
+  @override
+  void didUpdateWidget(covariant _AddToPlanButton old) {
+    super.didUpdateWidget(old);
+    if (old.spot.id != widget.spot.id) {
+      _plannedDay = null;
+      _checkPlanned();
+    }
+  }
+
+  TripDay? _dayWithSpot(List<TripDay> days) => days
+      .where((d) => d.items.any((i) => i.linkedSpotId == widget.spot.id))
+      .firstOrNull;
+
+  Future<void> _checkPlanned() async {
+    final tripId = ref.read(activeTripIdProvider);
+    if (tripId.isEmpty) return;
+    try {
+      final days = await PlanService.loadAll(tripId);
+      if (mounted) setState(() => _plannedDay = _dayWithSpot(days));
+    } catch (_) {}
+  }
+
+  /// Loads the plan; if the trip has dates but no days yet, creates them
+  /// (same routine as Plan → "Add all trip days") instead of dead-ending.
+  Future<List<TripDay>> _loadOrCreateDays(String tripId, String userId) async {
+    final days = await PlanService.loadAll(tripId);
+    if (days.isNotEmpty) return days;
+    final trip = ref.read(activeTripProvider);
+    final created = await PlanService.ensureTripDays(
+      tripId: tripId, start: trip?.startDate, end: trip?.endDate,
+      createdBy: userId, city: trip?.destination,
+    );
+    return created;
+  }
 
   Future<void> _tap() async {
     if (_loading) return;
@@ -619,7 +664,7 @@ class _AddToPlanButtonState extends ConsumerState<_AddToPlanButton> {
     setState(() => _loading = true);
     List<TripDay> days;
     try {
-      days = await PlanService.loadAll(tripId);
+      days = await _loadOrCreateDays(tripId, userId);
     } catch (_) {
       days = [];
     } finally {
@@ -629,11 +674,7 @@ class _AddToPlanButtonState extends ConsumerState<_AddToPlanButton> {
     if (!mounted) return;
 
     if (days.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Add trip days in Plan first.',
-            style: kStyleBody.copyWith(color: Colors.white)),
-        behavior: SnackBarBehavior.floating,
-      ));
+      showWabwaySnack(context, 'Set your trip dates in Trip settings to start planning days.');
       return;
     }
 
@@ -644,9 +685,7 @@ class _AddToPlanButtonState extends ConsumerState<_AddToPlanButton> {
     final day = days.where((d) => d.id == dayId).firstOrNull;
     if (day == null) return;
 
-    final timeStr = timeOfDay != null
-        ? '${timeOfDay.hour.toString().padLeft(2, '0')}:${timeOfDay.minute.toString().padLeft(2, '0')}'
-        : null;
+    final timeStr = timeOfDay != null ? fmtTimeOfDay(timeOfDay.hour, timeOfDay.minute) : null;
 
     setState(() => _loading = true);
     try {
@@ -666,22 +705,12 @@ class _AddToPlanButtonState extends ConsumerState<_AddToPlanButton> {
         sortOrder:    day.items.length,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(
-          'Added to Day ${day.dayNumber} · ${day.city}',
-          style: kStyleBody.copyWith(color: Colors.white),
-        ),
-        backgroundColor: kColorSuccess,
-        behavior: SnackBarBehavior.floating,
-      ));
+      setState(() => _plannedDay = day);
+      showWabwaySnack(context,
+          'Added to Day ${day.dayNumber}${day.city.isEmpty ? '' : ' · ${day.city}'}');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Could not add to plan: $e',
-            style: kStyleBody.copyWith(color: Colors.white)),
-        backgroundColor: kColorDanger,
-        behavior: SnackBarBehavior.floating,
-      ));
+      showWabwaySnack(context, 'Could not add to plan. Try again.', error: true);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -689,24 +718,16 @@ class _AddToPlanButtonState extends ConsumerState<_AddToPlanButton> {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton.icon(
-        onPressed: _loading ? null : _tap,
-        icon: _loading
-            ? const SizedBox(
-                width: 14, height: 14,
-                child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(kColorPrimary)),
-              )
-            : const Icon(Icons.event_note_rounded, size: 16),
-        label: const Text('Add to Plan'),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: kColorPrimary,
-          side: BorderSide(color: kColorPrimary.withValues(alpha: 0.5)),
-          padding: const EdgeInsets.symmetric(vertical: 11),
-          shape: const RoundedRectangleBorder(borderRadius: kRadiusMd),
-        ),
-      ),
+    final planned = _plannedDay;
+    return WabwayButton(
+      label: planned == null
+          ? 'Add to Plan'
+          : 'In plan · Day ${planned.dayNumber} — add to another day',
+      icon: planned == null ? Icons.event_note_rounded : Icons.event_available_rounded,
+      variant: WabwayButtonVariant.ghost,
+      fullWidth: true,
+      loading: _loading,
+      onPressed: _loading ? null : _tap,
     );
   }
 }

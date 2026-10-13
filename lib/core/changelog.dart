@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 412,
+    label: "Bug fixes",
+    changes: [
+      "Invite codes work with the space even on older versions of the app",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 411,
     label: "Home",
     changes: [

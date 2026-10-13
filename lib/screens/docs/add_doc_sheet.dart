@@ -261,7 +261,7 @@ class _AddDocContentState extends State<_AddDocContent> {
                   const SizedBox(height: kSpace4),
 
                   WabwayTextField(
-                    label: 'Notes',
+                    label: 'Notes (optional)',
                     hint: 'Optional notes…',
                     controller: _notesCtrl,
                     maxLines: 3,
@@ -422,7 +422,7 @@ class _LinkSection extends StatelessWidget {
         const SizedBox(height: kSpace2),
 
         WabwaySelectField<DocLinkedType?>(
-          label: 'Link type',
+          label: 'Link to (optional)',
           value: linkType,
           onChanged: onLinkTypeChanged,
           items: [

@@ -226,9 +226,7 @@ class _MapScreenState extends ConsumerState<MapScreen> with AsyncScreenMixin {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Location services are off — enable them in Settings')),
-          );
+          showWabwaySnack(context, 'Location services are off — enable them in Settings');
           await Geolocator.openLocationSettings();
         }
         return;
@@ -239,18 +237,14 @@ class _MapScreenState extends ConsumerState<MapScreen> with AsyncScreenMixin {
       }
       if (permission == LocationPermission.deniedForever) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Location access is blocked — opening Settings')),
-          );
+          showWabwaySnack(context, 'Location access is blocked — opening Settings');
           await Geolocator.openAppSettings();
         }
         return;
       }
       if (permission == LocationPermission.denied) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Location permission denied')),
-          );
+          showWabwaySnack(context, 'Location permission denied');
         }
         return;
       }
@@ -265,9 +259,7 @@ class _MapScreenState extends ConsumerState<MapScreen> with AsyncScreenMixin {
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not get location')),
-        );
+        showWabwaySnack(context, 'Could not get location');
       }
     } finally {
       if (mounted) setState(() => _locating = false);
@@ -338,9 +330,7 @@ class _MapScreenState extends ConsumerState<MapScreen> with AsyncScreenMixin {
                         nav.pop();
                       } catch (_) {
                         if (!mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Could not delete spot. Try again.')),
-                        );
+                        showWabwaySnack(context, 'Could not delete spot. Try again.');
                       }
                     }
                   : null,
@@ -374,25 +364,13 @@ class _MapScreenState extends ConsumerState<MapScreen> with AsyncScreenMixin {
           // Map / List toggle
           Padding(
             padding: const EdgeInsets.only(right: kSpace3),
-            child: SegmentedButton<bool>(
-              segments: const [
-                ButtonSegment(
-                  value: true,
-                  icon: Icon(Icons.map_rounded, size: 16),
-                  label: Text('Map'),
-                ),
-                ButtonSegment(
-                  value: false,
-                  icon: Icon(Icons.list_rounded, size: 16),
-                  label: Text('List'),
-                ),
+            child: WabwaySegmentTabs<bool>(
+              tabs: const [
+                (true, 'Map', Icons.map_rounded),
+                (false, 'List', Icons.list_rounded),
               ],
-              selected: {_showMap},
-              onSelectionChanged: (s) => setState(() => _showMap = s.first),
-              style: const ButtonStyle(
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                visualDensity: VisualDensity.compact,
-              ),
+              selected: _showMap,
+              onChanged: (v) => setState(() => _showMap = v),
             ),
           ),
         ],

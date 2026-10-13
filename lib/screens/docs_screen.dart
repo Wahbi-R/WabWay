@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
@@ -51,7 +50,6 @@ class _DocsScreenState extends ConsumerState<DocsScreen> with AsyncScreenMixin {
   String _search = '';
 
   final _searchCtrl = TextEditingController();
-  final _filterScrollCtrl = ScrollController();
 
   void _rebuildMemberName() {
     final members = ref.read(tripMembersProvider);
@@ -81,7 +79,6 @@ class _DocsScreenState extends ConsumerState<DocsScreen> with AsyncScreenMixin {
     _debounce?.cancel();
     _realtimeChannel?.unsubscribe();
     _searchCtrl.dispose();
-    _filterScrollCtrl.dispose();
     super.dispose();
   }
 
@@ -178,12 +175,7 @@ class _DocsScreenState extends ConsumerState<DocsScreen> with AsyncScreenMixin {
       await DocService.deleteDocument(doc.id);
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Could not delete document.',
-              style: kStyleBody.copyWith(color: Colors.white)),
-          backgroundColor: kColorDanger,
-          behavior: SnackBarBehavior.floating,
-        ));
+        showWabwaySnack(context, 'Could not delete document.', error: true);
       }
       return;
     }
@@ -363,12 +355,15 @@ class _DocsScreenState extends ConsumerState<DocsScreen> with AsyncScreenMixin {
                   width: 360,
                   child: Column(
                     children: [
-                      _FilterStrip(
+                      WabwayFilterStrip<DocType>(
                         selected: _filterType,
-                        onSelect: (t) => setState(() {
-                          _filterType = _filterType == t ? null : t;
-                        }),
-                        scrollController: _filterScrollCtrl,
+                        options: [
+                          for (final t in DocType.values)
+                            if (_docs.any((d) => d.type == t))
+                              (value: t, label: t.label, count: _docs.where((d) => d.type == t).length),
+                        ],
+                        allCount: _docs.length,
+                        onChanged: (t) => setState(() => _filterType = t),
                       ),
                       _uploaderFilterStrip(),
                       Expanded(child: _buildDesktopList()),
@@ -395,6 +390,13 @@ class _DocsScreenState extends ConsumerState<DocsScreen> with AsyncScreenMixin {
           description: _search.isNotEmpty
               ? 'Try a different search term.'
               : 'Upload your first document.',
+          action: _search.isEmpty
+              ? WabwayButton(
+                  label: 'Add document',
+                  icon: Icons.upload_file_rounded,
+                  onPressed: () => _addDoc(context),
+                )
+              : null,
         ),
       );
     }
@@ -413,11 +415,18 @@ class _DocsScreenState extends ConsumerState<DocsScreen> with AsyncScreenMixin {
   Widget _buildDesktopDetail(BuildContext context) {
     final doc = _selectedDoc;
     if (doc == null) {
-      return const Center(
+      return Center(
         child: WabwayEmptyState(
           icon: Icons.insert_drive_file_rounded,
           title: 'Select a document',
           description: 'Click any document in the list to view details.',
+          action: WabwayButton(
+          label: 'Add document',
+          icon: Icons.add_rounded,
+          size: WabwayButtonSize.sm,
+          variant: WabwayButtonVariant.ghost,
+          onPressed: () => _addDoc(context),
+        ),
         ),
       );
     }
@@ -489,13 +498,16 @@ class _DocsScreenState extends ConsumerState<DocsScreen> with AsyncScreenMixin {
       ),
       body: Column(
         children: [
-          _FilterStrip(
-            selected: _filterType,
-            onSelect: (t) => setState(() {
-              _filterType = _filterType == t ? null : t;
-            }),
-            scrollController: _filterScrollCtrl,
-          ),
+          WabwayFilterStrip<DocType>(
+                        selected: _filterType,
+                        options: [
+                          for (final t in DocType.values)
+                            if (_docs.any((d) => d.type == t))
+                              (value: t, label: t.label, count: _docs.where((d) => d.type == t).length),
+                        ],
+                        allCount: _docs.length,
+                        onChanged: (t) => setState(() => _filterType = t),
+                      ),
           _uploaderFilterStrip(),
           Expanded(
             child: items.isEmpty
@@ -545,15 +557,7 @@ class _DocsScreenState extends ConsumerState<DocsScreen> with AsyncScreenMixin {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'docs_fab',
-        onPressed: () => _addDoc(context),
-        icon: const Icon(Icons.upload_file_rounded),
-        label: Text(
-          'Add document',
-          style: kStyleButtonMd.copyWith(color: kColorTextOnPrimary),
-        ),
-      ),
+      floatingActionButton: WabwayAddFab(heroTag: 'docs_fab', label: 'Add document', icon: Icons.upload_file_rounded, onPressed: () => _addDoc(context)),
     );
   }
 }
@@ -632,103 +636,6 @@ class _DesktopDocsBar extends StatelessWidget {
 
 // ── Filter strip ─────────────────────────────────────────────────────────────
 
-class _FilterStrip extends StatelessWidget {
-  const _FilterStrip({
-    required this.selected,
-    required this.onSelect,
-    required this.scrollController,
-  });
-
-  final DocType? selected;
-  final ValueChanged<DocType> onSelect;
-  final ScrollController scrollController;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 44,
-      decoration: const BoxDecoration(
-        color: kColorBgRaised,
-        border: Border(bottom: BorderSide(color: kColorBorder)),
-      ),
-      child: ScrollConfiguration(
-        behavior: ScrollConfiguration.of(context).copyWith(
-          dragDevices: {
-            PointerDeviceKind.touch,
-            PointerDeviceKind.mouse,
-            PointerDeviceKind.trackpad,
-          },
-        ),
-        child: ListView.separated(
-          controller: scrollController,
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(
-              horizontal: kSpace3, vertical: kSpace2),
-          itemCount: DocType.values.length,
-          separatorBuilder: (_, __) => const SizedBox(width: kSpace1),
-          itemBuilder: (_, i) {
-            final type = DocType.values[i];
-            return _FilterChip(
-              label: type.label,
-              icon: type.icon,
-              color: type.color,
-              selected: selected == type,
-              onTap: () => onSelect(type),
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({
-    required this.label,
-    required this.icon,
-    required this.color,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final Color color;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: kSpace3),
-        decoration: BoxDecoration(
-          color: selected ? color.withValues(alpha: 0.12) : Colors.transparent,
-          borderRadius: kRadiusPill,
-          border: Border.all(
-            color: selected ? color.withValues(alpha: 0.4) : kColorBorder,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 13, color: selected ? color : kColorInkSoft),
-            const SizedBox(width: kSpace1),
-            Text(
-              label,
-              style: kStyleCaptionMedium.copyWith(
-                color: selected ? color : kColorInkSoft,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 PopupMenuItem<_DocSort> _docSortItem(
     _DocSort value, String label, _DocSort current) {

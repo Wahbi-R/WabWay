@@ -205,14 +205,7 @@ class _ParsedItineraryScreenState extends State<ParsedItineraryScreen>
       final msg = planCount > 0
           ? 'Saved $count booking${count == 1 ? '' : 's'} to Travel and $planCount to Plan'
           : 'Saved $count booking${count == 1 ? '' : 's'} to Travel';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(msg,
-            style: kStyleBodyMedium.copyWith(color: kColorTextOnPrimary)),
-        backgroundColor: kColorPrimary,
-        behavior: SnackBarBehavior.floating,
-        shape: const RoundedRectangleBorder(borderRadius: kRadiusMd),
-        margin: const EdgeInsets.all(kSpace4),
-      ));
+      showWabwaySnack(context, msg);
       widget.onDone?.call();
     } catch (e) {
       if (!mounted) return;
@@ -222,9 +215,7 @@ class _ParsedItineraryScreenState extends State<ParsedItineraryScreen>
           for (final i in succeeded) _selected[i] = false;
         });
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-      );
+      showWabwaySnack(context, 'Error: $e', error: true);
     } finally {
       if (mounted) setState(() => _saving = false);
     }

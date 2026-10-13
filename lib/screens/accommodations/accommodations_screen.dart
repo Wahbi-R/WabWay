@@ -173,21 +173,11 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen>
     } catch (_) {
       if (!mounted) return;
       setState(() => _items.insert(0, item));
-      ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(
-        content: Text('Could not delete "${item.name}". Try again.',
-            style: kStyleBody.copyWith(color: Colors.white)),
-        behavior: SnackBarBehavior.floating,
-      ));
+      showWabwaySnack(this.context, 'Could not delete "${item.name}". Try again.');
       return;
     }
     if (!mounted) return;
-    ScaffoldMessenger.of(this.context).showSnackBar(
-      SnackBar(
-        content: Text('"${item.name}" deleted.',
-            style: kStyleBody.copyWith(color: Colors.white)),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    showWabwaySnack(this.context, '"${item.name}" deleted.');
   }
 
   Future<void> _openAdd(BuildContext context, {Accommodation? editing}) async {
@@ -247,7 +237,7 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen>
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
-            title: Text('Stay', style: kStyleTitle),
+            title: Text('Stays', style: kStyleTitle),
             pinned: true,
             actions: [
               if (_items.isNotEmpty) ...[
@@ -273,7 +263,8 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen>
                   ],
                 ),
               ],
-              const SizedBox(width: kSpace2),
+              WabwayHeaderAddButton(label: 'Add stay', onPressed: () => _openAdd(context)),
+              const SizedBox(width: kSpace4),
             ],
           ),
           SliverToBoxAdapter(
@@ -356,15 +347,7 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen>
           const SliverToBoxAdapter(child: SizedBox(height: kSpace16)),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'stays_fab',
-        onPressed: () => _openAdd(context),
-        icon: const Icon(Icons.add_rounded),
-        label: Text(
-          'Add stay',
-          style: kStyleButtonMd.copyWith(color: kColorTextOnPrimary),
-        ),
-      ),
+      floatingActionButton: isDesktopLayout(context) ? null : WabwayAddFab(heroTag: 'stays_fab', label: 'Add stay', onPressed: () => _openAdd(context)),
     );
     if (!offline) return scaffold;
     return Stack(
@@ -532,12 +515,7 @@ class _AccommodationCard extends StatelessWidget {
                             GestureDetector(
                               onTap: () {
                                 Clipboard.setData(ClipboardData(text: item.confirmationNumber!));
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Confirmation number copied'),
-                                    duration: Duration(seconds: 2),
-                                  ),
-                                );
+                                showWabwaySnack(context, 'Confirmation number copied', duration: Duration(seconds: 2));
                               },
                               child: const Icon(Icons.copy_rounded, size: 13, color: kColorInkSoft),
                             ),

@@ -8,6 +8,7 @@ import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 import 'create_trip_screen.dart';
 import 'trip_gate.dart';
+import 'trip_list_tile.dart';
 
 Future<void> showTripSwitcherSheet(BuildContext context, WidgetRef ref) {
   final currentTripId = ref.read(activeTripIdProvider);
@@ -117,47 +118,9 @@ class _TripSwitcherSheet extends StatelessWidget {
 
                   return Column(
                     children: [
-                      ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: kSpace4,
-                          vertical: kSpace2,
-                        ),
-                        leading: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: isActive ? kColorPrimary : kColorSurfaceSunken,
-                            borderRadius: kRadiusMd,
-                          ),
-                          child: Center(
-                            child: Text(
-                              trip.name.isNotEmpty
-                                  ? trip.name[0].toUpperCase()
-                                  : 'T',
-                              style: kStyleBodySemibold.copyWith(
-                                color: isActive ? Colors.white : kColorInkSoft,
-                              ),
-                            ),
-                          ),
-                        ),
-                        title: Text(
-                          trip.name,
-                          style: kStyleBodyMedium.copyWith(
-                            color: isActive ? kColorPrimary : kColorInk,
-                            fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
-                          ),
-                        ),
-                        subtitle: trip.destination != null
-                            ? Padding(
-                                padding: const EdgeInsets.only(top: 2),
-                                child: Text(trip.destination!, style: kStyleCaption),
-                              )
-                            : null,
-                        trailing: isActive
-                            ? const Icon(Icons.check_circle_rounded,
-                                color: kColorPrimary, size: 20)
-                            : Icon(Icons.chevron_right_rounded,
-                                color: kColorTextTertiary(), size: 18),
+                      TripListTile(
+                        trip: trip,
+                        isActive: isActive,
                         onTap: isActive ? null : () => onSwitch(trip),
                       ),
                       if (!isLast)
@@ -176,7 +139,6 @@ class _TripSwitcherSheet extends StatelessWidget {
                   child: WabwayButton(
                     label: 'Create trip',
                     icon: Icons.add_rounded,
-                    variant: WabwayButtonVariant.secondary,
                     onPressed: onCreateTrip,
                     fullWidth: true,
                   ),
@@ -186,7 +148,7 @@ class _TripSwitcherSheet extends StatelessWidget {
                   child: WabwayButton(
                     label: 'Join trip',
                     icon: Icons.group_add_rounded,
-                    variant: WabwayButtonVariant.secondary,
+                    variant: WabwayButtonVariant.ghost,
                     onPressed: onJoinTrip,
                     fullWidth: true,
                   ),

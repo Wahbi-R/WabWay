@@ -82,10 +82,7 @@ class _PinsScreenState extends ConsumerState<PinsScreen> with AsyncScreenMixin {
       _load(silent: true);
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Could not unpin. Try again.'),
-        behavior: SnackBarBehavior.floating,
-      ));
+      showWabwaySnack(context, 'Could not unpin. Try again.');
     }
   }
 
@@ -95,10 +92,7 @@ class _PinsScreenState extends ConsumerState<PinsScreen> with AsyncScreenMixin {
       _load(silent: true);
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Could not delete. Try again.'),
-        behavior: SnackBarBehavior.floating,
-      ));
+      showWabwaySnack(context, 'Could not delete. Try again.');
     }
   }
 
@@ -164,27 +158,14 @@ class _EmptyState extends StatelessWidget {
   final VoidCallback onAdd;
 
   @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.push_pin_outlined, size: 48, color: kColorInkSoft),
-          const SizedBox(height: 16),
-          Text('Pinboard is empty', style: kStyleBodyMedium),
-          const SizedBox(height: 8),
-          Text('Post notes the whole group can see.', style: kStyleCaption, textAlign: TextAlign.center),
-          const SizedBox(height: 20),
-          FilledButton.icon(
-            onPressed: onAdd,
-            icon: const Icon(Icons.add_rounded, size: 18),
-            label: const Text('Post a note'),
-            style: FilledButton.styleFrom(backgroundColor: kColorPrimary),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Center(
+        child: WabwayEmptyState(
+          icon: Icons.push_pin_outlined,
+          title: 'Pinboard is empty',
+          description: 'Post notes the whole group can see.',
+          action: WabwayButton(label: 'Post a note', icon: Icons.add_rounded, onPressed: onAdd),
+        ),
+      );
 }
 
 // ─── Pin card ─────────────────────────────────────────────────────────────────

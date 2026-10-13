@@ -559,10 +559,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
     final receipts = _filteredReceipts;
     if (receipts.isEmpty) return;
     if (kIsWeb) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Export is not supported on web.', style: kStyleBody.copyWith(color: Colors.white)),
-        behavior: SnackBarBehavior.floating,
-      ));
+      showWabwaySnack(context, 'Export is not supported on web.');
       return;
     }
     final tripName = ref.read(activeTripProvider)?.name ?? 'Trip';
@@ -927,11 +924,18 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
     if (_tab == _MoneyTab.receipts) {
       final receipt = _selectedReceipt;
       if (receipt == null) {
-        return const Center(
+        return Center(
           child: WabwayEmptyState(
             icon: Icons.receipt_long_rounded,
             title: 'Select a receipt',
             description: 'Tap any receipt in the list to view details.',
+            action: WabwayButton(
+          label: 'Add receipt',
+          icon: Icons.add_rounded,
+          size: WabwayButtonSize.sm,
+          variant: WabwayButtonVariant.ghost,
+          onPressed: () => _addReceipt(context),
+        ),
           ),
         );
       }
@@ -953,11 +957,18 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
 
     final withdrawal = _selectedWithdrawal;
     if (withdrawal == null) {
-      return const Center(
+      return Center(
         child: WabwayEmptyState(
           icon: Icons.atm_rounded,
           title: 'Select a withdrawal',
           description: 'Tap any withdrawal to view details.',
+          action: WabwayButton(
+          label: 'Add withdrawal',
+          icon: Icons.add_rounded,
+          size: WabwayButtonSize.sm,
+          variant: WabwayButtonVariant.ghost,
+          onPressed: () => _addWithdrawal(context),
+        ),
         ),
       );
     }
@@ -1070,11 +1081,16 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
           children: [
             // Receipts tab — summary cards + search + filter + list all scroll together
             _receipts.isEmpty
-                ? const Center(
+                ? Center(
                     child: WabwayEmptyState(
                       icon: Icons.receipt_long_rounded,
                       title: 'No receipts yet',
-                      description: 'Tap + to add the first expense.',
+                      description: 'Log the first group expense.',
+                      action: WabwayButton(
+                        label: 'Add receipt',
+                        icon: Icons.receipt_long_rounded,
+                        onPressed: () => _addReceipt(context),
+                      ),
                     ),
                   )
                 : CustomScrollView(
@@ -1173,11 +1189,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
                                   direction: DismissDirection.endToStart,
                                   confirmDismiss: (_) async {
                                     _deleteReceipt(r.id);
-                                    ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-                                      content: Text('"${r.title}" deleted.',
-                                          style: kStyleBody.copyWith(color: Colors.white)),
-                                      behavior: SnackBarBehavior.floating,
-                                    ));
+                                    showWabwaySnack(ctx, '"${r.title}" deleted.');
                                     return false;
                                   },
                                   background: Container(
@@ -1228,10 +1240,15 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
 
             // Cash tab
             _withdrawals.isEmpty
-                ? const WabwayEmptyState(
+                ? WabwayEmptyState(
                     icon: Icons.atm_rounded,
                     title: 'No withdrawals yet',
-                    description: 'Tap + to log an ATM withdrawal.',
+                    description: 'Log an ATM withdrawal to share cash fairly.',
+                    action: WabwayButton(
+                      label: 'Add withdrawal',
+                      icon: Icons.atm_rounded,
+                      onPressed: () => _addWithdrawal(context),
+                    ),
                   )
                 : Builder(builder: (_) {
                     final sorted = _sortedWithdrawals;
@@ -1297,19 +1314,11 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
         ),
         floatingActionButton: _tab == _MoneyTab.settleUp
             ? null
-            : FloatingActionButton.extended(
-                heroTag: 'money_fab',
-                onPressed: () => _tab == _MoneyTab.cash
-                    ? _addWithdrawal(context)
-                    : _addReceipt(context),
-                icon: Icon(_tab == _MoneyTab.cash
+            : WabwayAddFab(heroTag: 'money_fab', label: _tab == _MoneyTab.cash ? 'Add withdrawal' : 'Add receipt', icon: _tab == _MoneyTab.cash
                     ? Icons.atm_rounded
-                    : Icons.receipt_long_rounded),
-                label: Text(
-                  _tab == _MoneyTab.cash ? 'Add withdrawal' : 'Add receipt',
-                  style: kStyleButtonMd.copyWith(color: kColorTextOnPrimary),
-                ),
-              ),
+                    : Icons.receipt_long_rounded, onPressed: () => _tab == _MoneyTab.cash
+                    ? _addWithdrawal(context)
+                    : _addReceipt(context)),
       ),
     );
   }
@@ -1364,20 +1373,15 @@ class _DesktopMoneyBar extends StatelessWidget {
           ],
           const SizedBox(width: kSpace6),
 
-          // Tab chips
-          for (final tab in _MoneyTab.values)
-            Padding(
-              padding: const EdgeInsets.only(right: kSpace1),
-              child: _DesktopTabChip(
-                label: switch (tab) {
-                  _MoneyTab.receipts => 'Receipts',
-                  _MoneyTab.cash => 'Cash',
-                  _MoneyTab.settleUp => 'Settle Up',
-                },
-                selected: activeTab == tab,
-                onTap: () => onTabChange(tab),
-              ),
-            ),
+          WabwaySegmentTabs<_MoneyTab>(
+            tabs: const [
+              (_MoneyTab.receipts, 'Receipts', null),
+              (_MoneyTab.cash, 'Cash', null),
+              (_MoneyTab.settleUp, 'Settle Up', null),
+            ],
+            selected: activeTab,
+            onChanged: onTabChange,
+          ),
 
           const Spacer(),
 
@@ -1393,46 +1397,6 @@ class _DesktopMoneyBar extends StatelessWidget {
               onPressed: onAdd,
             ),
         ],
-      ),
-    );
-  }
-}
-
-class _DesktopTabChip extends StatelessWidget {
-  const _DesktopTabChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding:
-            const EdgeInsets.symmetric(horizontal: kSpace3, vertical: kSpace1),
-        decoration: BoxDecoration(
-          color: selected ? kColorPrimarySoft : Colors.transparent,
-          borderRadius: kRadiusPill,
-          border: Border.all(
-            color: selected
-                ? kColorPrimaryDark.withValues(alpha: 0.25)
-                : Colors.transparent,
-          ),
-        ),
-        child: Text(
-          label,
-          style: kStyleCaptionMedium.copyWith(
-            color: selected ? kColorPrimaryDark : kColorInkSoft,
-            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-          ),
-        ),
       ),
     );
   }

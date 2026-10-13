@@ -267,9 +267,7 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
     setState(() => _scanning = false);
 
     if (result == null || result.items.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Scan unavailable — fill in manually')),
-      );
+      showWabwaySnack(context, 'Scan unavailable — fill in manually');
       return;
     }
 
@@ -452,9 +450,7 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
       ]);
       if (!mounted) return;
       if (anyLinkFailed) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Receipt saved, but some document links could not be synced.'),
-        ));
+        showWabwaySnack(context, 'Receipt saved, but some document links could not be synced.');
       }
       widget.onSubmit(receipt);
       if (!_isEditing && widget.tripId != null) {
@@ -490,12 +486,7 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
             );
             if (mounted) {
               Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Saved offline — will sync when you reconnect'),
-                  duration: Duration(seconds: 4),
-                ),
-              );
+              showWabwaySnack(context, 'Saved offline — will sync when you reconnect', duration: Duration(seconds: 4));
             }
             return;
           } catch (_) {
@@ -627,15 +618,13 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
                   ],
                   const SizedBox(height: kSpace4),
 
-                  WabwaySelectField<ReceiptCategory>(
+                  WabwayChoiceChips<ReceiptCategory>(
                     label: 'Category',
-                    value: _category,
-                    onChanged: (v) =>
-                        setState(() => _category = v ?? ReceiptCategory.food),
-                    items: ReceiptCategory.values
-                        .map((c) =>
-                            WabwaySelectItem(value: c, label: c.label))
-                        .toList(),
+                    choices: [
+                      for (final c in ReceiptCategory.values) WabwayChoice(c, c.label, icon: c.icon),
+                    ],
+                    selected: _category,
+                    onChanged: (c) => setState(() => _category = c),
                   ),
                   const SizedBox(height: kSpace4),
 

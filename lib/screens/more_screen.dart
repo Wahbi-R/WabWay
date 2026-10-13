@@ -28,6 +28,7 @@ import 'diagnostics_screen.dart';
 import 'notification_settings_screen.dart';
 import '../core/changelog.dart';
 import 'trips/trip_actions.dart';
+import '../widgets/wabway_snack.dart';
 
 class MoreScreen extends ConsumerWidget {
   const MoreScreen({super.key});
@@ -665,12 +666,7 @@ class _TransferOwnershipSheetState extends State<_TransferOwnershipSheet> {
     } catch (_) {
       if (mounted) {
         setState(() => _saving = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Transfer failed. Try again.',
-              style: kStyleBody.copyWith(color: Colors.white)),
-          backgroundColor: kColorDanger,
-          behavior: SnackBarBehavior.floating,
-        ));
+        showWabwaySnack(context, 'Transfer failed. Try again.', error: true);
       }
     }
   }

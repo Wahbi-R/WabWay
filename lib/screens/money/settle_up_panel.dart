@@ -84,21 +84,12 @@ class _SettleUpPanelState extends State<SettleUpPanel> {
       );
       widget.onSettled?.call();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Settlement saved', style: kStyleBody.copyWith(color: Colors.white)),
-          backgroundColor: kColorSuccess,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-        ));
+        showWabwaySnack(context, 'Settlement saved', duration: const Duration(seconds: 2));
       }
     } catch (_) {
       if (mounted) {
         setState(() => s.isSettled = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Could not save. Try again.', style: kStyleBody.copyWith(color: Colors.white)),
-          backgroundColor: kColorDanger,
-          behavior: SnackBarBehavior.floating,
-        ));
+        showWabwaySnack(context, 'Could not save. Try again.', error: true);
       }
     } finally {
       if (mounted) setState(() => _saving = false);

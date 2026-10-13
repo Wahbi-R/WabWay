@@ -179,19 +179,11 @@ class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin
     } catch (_) {
       if (!mounted) return;
       _load();
-      ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(
-        content: Text('Could not delete "${link.title}". Try again.',
-            style: kStyleBody.copyWith(color: Colors.white)),
-        behavior: SnackBarBehavior.floating,
-      ));
+      showWabwaySnack(this.context, 'Could not delete "${link.title}". Try again.');
       return;
     }
     if (!mounted) return;
-    ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(
-      content: Text('"${link.title}" removed.',
-          style: kStyleBody.copyWith(color: Colors.white)),
-      behavior: SnackBarBehavior.floating,
-    ));
+    showWabwaySnack(this.context, '"${link.title}" removed.');
   }
 
   Future<void> _deleteLink(TripLink link) async {
@@ -205,9 +197,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin
     } catch (_) {
       if (!mounted) return;
       _load();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not delete link. Please try again.')),
-      );
+      showWabwaySnack(context, 'Could not delete link. Please try again.');
     }
   }
 
@@ -272,13 +262,8 @@ class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin
               ],
             ),
           ],
-          IconButton(
-            icon: const Icon(Icons.add_rounded),
-            color: kColorPrimary,
-            tooltip: 'Save a link',
-            onPressed: _addLink,
-          ),
-          const SizedBox(width: kSpace2),
+          WabwayHeaderAddButton(label: 'Save a link', onPressed: _addLink),
+          const SizedBox(width: kSpace4),
         ],
       ),
       body: loading
@@ -431,11 +416,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin
                       ),
                     ),
       floatingActionButton: _hasAnyContent
-          ? FloatingActionButton(
-              onPressed: _addLink,
-              backgroundColor: kColorPrimary,
-              child: const Icon(Icons.add_rounded, color: Colors.white),
-            )
+          ? (isDesktopLayout(context) ? null : WabwayAddFab(label: 'Save a link', onPressed: _addLink))
           : null,
     );
     if (!offline) return scaffold;

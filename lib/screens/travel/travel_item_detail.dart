@@ -409,9 +409,7 @@ class _MetaRow extends StatelessWidget {
       onTap: () async {
         await Clipboard.setData(ClipboardData(text: value));
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Copied'), duration: Duration(seconds: 2)),
-          );
+          showWabwaySnack(context, 'Copied', duration: Duration(seconds: 2));
         }
       },
       child: row,
@@ -501,12 +499,7 @@ class _PlanItemSection extends StatelessWidget {
         WabwayCard(
           hoverable: true,
           padding: const EdgeInsets.all(kSpace3),
-          onTap: () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Go to itinerary: ${item.title}',
-                style: kStyleBody.copyWith(color: Colors.white)),
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 2),
-          )),
+          onTap: () => showWabwaySnack(context, 'Go to itinerary: ${item.title}', duration: const Duration(seconds: 2)),
           child: Row(
             children: [
               Container(
@@ -557,12 +550,7 @@ class _PlanDaySection extends StatelessWidget {
         WabwayCard(
           hoverable: true,
           padding: const EdgeInsets.all(kSpace3),
-          onTap: () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Go to Day ${day.dayNumber}',
-                style: kStyleBody.copyWith(color: Colors.white)),
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 2),
-          )),
+          onTap: () => showWabwaySnack(context, 'Go to Day ${day.dayNumber}', duration: const Duration(seconds: 2)),
           child: Row(
             children: [
               Container(
@@ -733,22 +721,10 @@ class _ActionsSectionState extends ConsumerState<_ActionsSection> {
         linkedDayId: dayId,
       );
       widget.onUpdated?.call(updated);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(
-          'Added to Day ${day.dayNumber} · ${day.city}',
-          style: kStyleBody.copyWith(color: Colors.white),
-        ),
-        backgroundColor: kColorSuccess,
-        behavior: SnackBarBehavior.floating,
-      ));
+      showWabwaySnack(context, 'Added to Day ${day.dayNumber} · ${day.city}');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Could not add to plan: $e',
-            style: kStyleBody.copyWith(color: Colors.white)),
-        backgroundColor: kColorDanger,
-        behavior: SnackBarBehavior.floating,
-      ));
+      showWabwaySnack(context, 'Could not add to plan: $e', error: true);
     } finally {
       if (mounted) setState(() => _itineraryLoading = false);
     }
@@ -863,7 +839,7 @@ class _ActionsSectionState extends ConsumerState<_ActionsSection> {
             WabwayButton(
               label: 'Delete',
               icon: Icons.delete_outline_rounded,
-              variant: WabwayButtonVariant.danger,
+              variant: WabwayButtonVariant.dangerOutline,
               size: WabwayButtonSize.sm,
               onPressed: () => _confirmDelete(context),
             ),
@@ -905,10 +881,7 @@ Future<void> _openDoc(BuildContext context, TripDocument doc) async {
   }
   if (url == null || url.isEmpty) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Could not open document.', style: kStyleBody.copyWith(color: Colors.white)),
-        behavior: SnackBarBehavior.floating,
-      ));
+      showWabwaySnack(context, 'Could not open document.');
     }
     return;
   }
@@ -916,10 +889,7 @@ Future<void> _openDoc(BuildContext context, TripDocument doc) async {
   if (await canLaunchUrl(uri)) {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   } else if (context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('Could not open document.', style: kStyleBody.copyWith(color: Colors.white)),
-      behavior: SnackBarBehavior.floating,
-    ));
+    showWabwaySnack(context, 'Could not open document.');
   }
 }
 

@@ -232,11 +232,7 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Could not save stay.', style: kStyleBody.copyWith(color: Colors.white)),
-        backgroundColor: kColorDanger,
-        behavior: SnackBarBehavior.floating,
-      ));
+      showWabwaySnack(context, 'Could not save stay.', error: true);
     }
   }
 
@@ -251,11 +247,7 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _deleting = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Could not delete stay.', style: kStyleBody.copyWith(color: Colors.white)),
-        backgroundColor: kColorDanger,
-        behavior: SnackBarBehavior.floating,
-      ));
+      showWabwaySnack(context, 'Could not delete stay.', error: true);
     }
   }
 
@@ -553,7 +545,7 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
             const SizedBox(height: kSpace3),
             WabwayButton(
               label: 'Delete stay',
-              variant: WabwayButtonVariant.ghost,
+              variant: WabwayButtonVariant.dangerOutline,
               loading: _deleting,
               onPressed: _saving || _deleting ? null : _delete,
               fullWidth: true,

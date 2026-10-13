@@ -11,6 +11,22 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 408,
+    label: "UI consistency",
+    changes: [
+      "Every list has the same orange \"Add …\" button — bottom-right on phones, top-right on desktop",
+      "Empty screens now always offer a button to add the first item",
+      "Delete buttons look the same everywhere, and each item has just one",
+      "Tabs on Money and Map match the rest of the app",
+      "Documents and Travel filters show how many items are in each",
+      "Spots search is always visible",
+      "Trip switcher rows always show the destination and dates",
+      "Choosing a travel type, booking status or receipt category is one tap",
+      "Votes and other actions now confirm with a short message",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 407,
     label: "Import & place search",
     changes: [

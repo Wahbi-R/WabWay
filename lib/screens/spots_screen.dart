@@ -317,7 +317,11 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> with AsyncScreenMixin
       } else {
         await SpotService.upsertVote(spotId: spotId, userId: myId, vote: type);
       }
+      if (mounted) {
+        showWabwaySnack(context, type == null ? 'Vote removed' : 'Voted ${type.label}');
+      }
     } catch (_) {
+      if (mounted) showWabwaySnack(context, 'Could not save your vote.', error: true);
       await _loadSpots(silent: true);
     }
   }
@@ -339,13 +343,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> with AsyncScreenMixin
       });
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Could not delete spot.', style: kStyleBody.copyWith(color: Colors.white)),
-            backgroundColor: kColorDanger,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        showWabwaySnack(context, 'Could not delete spot.', error: true);
       }
     }
   }
@@ -390,12 +388,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> with AsyncScreenMixin
     final skipped = ids.length - count;
     if (count == 0) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text("You don't have permission to delete the selected spots.",
-              style: kStyleBody.copyWith(color: Colors.white)),
-          backgroundColor: kColorDanger,
-          behavior: SnackBarBehavior.floating,
-        ));
+        showWabwaySnack(context, "You don't have permission to delete the selected spots.", error: true);
       }
       return;
     }
@@ -422,12 +415,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> with AsyncScreenMixin
     if (!mounted) return;
     _exitSelectionMode();
     if (failed > 0) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('$failed ${failed == 1 ? 'spot' : 'spots'} could not be deleted.',
-            style: kStyleBody.copyWith(color: Colors.white)),
-        backgroundColor: kColorDanger,
-        behavior: SnackBarBehavior.floating,
-      ));
+      showWabwaySnack(context, '$failed ${failed == 1 ? 'spot' : 'spots'} could not be deleted.', error: true);
     }
   }
 
@@ -458,11 +446,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> with AsyncScreenMixin
     }
 
     if (kIsWeb) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Export is not supported on web.',
-            style: kStyleBody.copyWith(color: Colors.white)),
-        behavior: SnackBarBehavior.floating,
-      ));
+      showWabwaySnack(context, 'Export is not supported on web.');
       return;
     }
 
@@ -798,9 +782,7 @@ class _MobileLayout extends StatelessWidget {
                     '${selectedIds.length} selected',
                     style: kStyleTitle,
                   )
-                : showSearch
-                    ? _SearchField(controller: searchCtrl, onChanged: onSearch)
-                    : Text('Spots', style: kStyleTitle),
+                : Text('Spots', style: kStyleTitle),
             pinned: true,
             actions: selectionMode
                 ? [
@@ -813,15 +795,8 @@ class _MobileLayout extends StatelessWidget {
                     const SizedBox(width: kSpace2),
                   ]
                 : [
-                    IconButton(
-                      icon: Icon(
-                        showSearch ? Icons.close_rounded : Icons.search_rounded,
-                      ),
-                      color: kColorInkSoft,
-                      onPressed: onToggleSearch,
-                    ),
                     // Share the filtered list as a CSV
-                    if (!showSearch && spots.isNotEmpty)
+                    if (spots.isNotEmpty)
                       IconButton(
                         icon: const Icon(Icons.ios_share_rounded),
                         color: kColorInkSoft,
@@ -878,6 +853,13 @@ class _MobileLayout extends StatelessWidget {
                     ),
                     const SizedBox(width: kSpace2),
                   ],
+          ),
+          SliverToBoxAdapter(
+            child: WabwaySearchBar(
+              controller: searchCtrl,
+              hint: 'Search spots…',
+              onChanged: onSearch,
+            ),
           ),
           SliverToBoxAdapter(
             child: _CategoryFilterStrip(
@@ -971,15 +953,7 @@ class _MobileLayout extends StatelessWidget {
       ),
       floatingActionButton: selectionMode
           ? null
-          : FloatingActionButton.extended(
-              heroTag: 'spots_fab',
-              onPressed: onAdd,
-              icon: const Icon(Icons.add_rounded),
-              label: Text(
-                'Add a spot',
-                style: kStyleButtonMd.copyWith(color: kColorTextOnPrimary),
-              ),
-            ),
+          : WabwayAddFab(heroTag: 'spots_fab', label: 'Add a spot', onPressed: onAdd),
     );
   }
 }
@@ -1089,6 +1063,11 @@ class _DesktopLayout extends StatelessWidget {
                   width: 380,
                   child: Column(
                     children: [
+                      WabwaySearchBar(
+                        controller: searchCtrl,
+                        hint: 'Search spots…',
+                        onChanged: onSearch,
+                      ),
                       _CategoryFilterStrip(
                         selected: filterCategory,
                         staysSelected: filterStays,
@@ -1116,6 +1095,13 @@ class _DesktopLayout extends StatelessWidget {
                                   description: searchQuery.isNotEmpty
                                       ? 'No spots match "$searchQuery".'
                                       : 'Add the first place worth visiting.',
+                                  action: searchQuery.isEmpty
+                                      ? WabwayButton(
+                                          label: 'Add a spot',
+                                          icon: Icons.add_rounded,
+                                          onPressed: onAdd,
+                                        )
+                                      : null,
                                 ),
                               )
                             : ListView(
@@ -1261,7 +1247,7 @@ class _DesktopTopBar extends StatelessWidget {
                   label: 'Delete',
                   icon: Icons.delete_outline_rounded,
                   size: WabwayButtonSize.sm,
-                  variant: WabwayButtonVariant.danger,
+                  variant: WabwayButtonVariant.dangerOutline,
                   onPressed: selectedCount == 0 ? null : onDeleteSelected,
                 ),
               ],
@@ -1269,19 +1255,7 @@ class _DesktopTopBar extends StatelessWidget {
           : Row(
               children: [
                 Text('Spots', style: kStyleTitle),
-                const SizedBox(width: kSpace4),
-                if (showSearch)
-                  Expanded(
-                    child: _SearchField(controller: searchCtrl, onChanged: onSearch),
-                  )
-                else
-                  const Spacer(),
-                WabwayIconButton(
-                  icon: showSearch ? Icons.close_rounded : Icons.search_rounded,
-                  label: showSearch ? 'Close search' : 'Search',
-                  onPressed: onToggleSearch,
-                ),
-                const SizedBox(width: kSpace2),
+                const Spacer(),
                 if (hasSpots)
                   WabwayIconButton(
                     icon: Icons.ios_share_rounded,
@@ -1760,50 +1734,6 @@ class _SpotsProgressBar extends StatelessWidget {
   }
 }
 
-class _SearchField extends StatelessWidget {
-  const _SearchField({
-    required this.controller,
-    required this.onChanged,
-  });
-
-  final TextEditingController controller;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      autofocus: true,
-      onChanged: onChanged,
-      style: kStyleBody,
-      decoration: InputDecoration(
-        hintText: 'Search spots…',
-        hintStyle: kStyleBody.copyWith(color: kColorInkSoft),
-        prefixIcon:
-            const Icon(Icons.search_rounded, size: 18, color: kColorInkSoft),
-        isDense: true,
-        filled: true,
-        fillColor: kColorSurfaceSunken,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: kSpace4,
-          vertical: kSpace2,
-        ),
-        border: const OutlineInputBorder(
-          borderRadius: kRadiusSm,
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: const OutlineInputBorder(
-          borderRadius: kRadiusSm,
-          borderSide: BorderSide.none,
-        ),
-        focusedBorder: const OutlineInputBorder(
-          borderRadius: kRadiusSm,
-          borderSide: BorderSide(color: kColorPrimary),
-        ),
-      ),
-    );
-  }
-}
 
 // ── Stays section ─────────────────────────────────────────────────────────────
 

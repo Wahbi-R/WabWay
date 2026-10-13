@@ -47,18 +47,6 @@ class CashDetailScreen extends StatelessWidget {
         ),
         title: Text('ATM Withdrawal', style: kStyleTitle),
         actions: [
-          if (onDelete != null)
-            IconButton(
-              icon: const Icon(Icons.delete_outline_rounded),
-              color: kColorDanger,
-              onPressed: () async {
-                final ok = await _confirmDelete(context);
-                if (ok && context.mounted) {
-                  Navigator.pop(context);
-                  onDelete!();
-                }
-              },
-            ),
           const SizedBox(width: kSpace2),
         ],
       ),
@@ -69,6 +57,12 @@ class CashDetailScreen extends StatelessWidget {
           myId:       myId,
           members:    members,
           tripId:     tripId,
+          onDelete:   onDelete == null
+              ? null
+              : () {
+                  Navigator.pop(context);
+                  onDelete!();
+                },
         ),
       ),
     );
@@ -240,7 +234,7 @@ class CashDetailContent extends StatelessWidget {
                 WabwayButton(
                   label: 'Delete withdrawal',
                   icon: Icons.delete_outline_rounded,
-                  variant: WabwayButtonVariant.ghost,
+                  variant: WabwayButtonVariant.dangerOutline,
                   fullWidth: true,
                   onPressed: () async {
                     final ok = await _confirmDelete(context);

@@ -107,8 +107,11 @@ class SpotVoteChipGroup extends StatelessWidget {
 
 /// Compact vote summary row shown on list tiles (only active vote types with counts).
 class SpotVoteSummary extends StatelessWidget {
-  const SpotVoteSummary({super.key, required this.votes});
+  const SpotVoteSummary({super.key, required this.votes, this.myVote});
   final SpotVotes votes;
+
+  /// Highlighted the same way as the detail screen's selected vote pill.
+  final VoteType? myVote;
 
   @override
   Widget build(BuildContext context) {
@@ -122,6 +125,7 @@ class SpotVoteSummary extends StatelessWidget {
                 type: type,
                 count: votes.count(type),
                 compact: true,
+                selected: type == myVote,
               ))
           .toList(),
     );

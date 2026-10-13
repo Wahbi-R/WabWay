@@ -122,7 +122,7 @@ class SpotListTile extends StatelessWidget {
                     const SizedBox(height: kSpace2),
                     Row(
                       children: [
-                        if (spot.votes.total > 0) SpotVoteSummary(votes: spot.votes),
+                        if (spot.votes.total > 0) SpotVoteSummary(votes: spot.votes, myVote: myVote),
                         if (spot.votes.total > 0 && spot.comments.isNotEmpty)
                           const SizedBox(width: kSpace3),
                         if (spot.comments.isNotEmpty) ...[
@@ -133,19 +133,6 @@ class SpotListTile extends StatelessWidget {
                             style: kStyleCaption,
                           ),
                         ],
-                      ],
-                    ),
-                  ],
-                  if (myVote != null) ...[
-                    const SizedBox(height: kSpace2),
-                    Row(
-                      children: [
-                        Icon(Icons.how_to_vote_rounded, size: 12, color: myVote!.color),
-                        const SizedBox(width: 4),
-                        Text(
-                          'You voted: ${myVote!.label}',
-                          style: kStyleOverline.copyWith(color: myVote!.color),
-                        ),
                       ],
                     ),
                   ],

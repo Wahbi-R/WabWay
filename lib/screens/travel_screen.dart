@@ -277,11 +277,7 @@ class _TravelScreenState extends ConsumerState<TravelScreen> with AsyncScreenMix
     final items = _filtered;
     if (items.isEmpty) return;
     if (kIsWeb) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Export is not supported on web.',
-            style: kStyleBody.copyWith(color: Colors.white)),
-        behavior: SnackBarBehavior.floating,
-      ));
+      showWabwaySnack(context, 'Export is not supported on web.');
       return;
     }
     final tripName = ref.read(activeTripProvider)?.name ?? 'Trip';
@@ -370,22 +366,8 @@ class _TravelScreenState extends ConsumerState<TravelScreen> with AsyncScreenMix
                         hint: 'Search travel…',
                         onChanged: (v) => setState(() => _search = v),
                       ),
-                      _FilterChips(
-                        selected: _filter,
-                        onSelect: (t) => setState(() {
-                          _filter = _filter == t ? null : t;
-                          _selectedId = null;
-                        }),
-                        items: _items,
-                      ),
-                      _StatusFilterChips(
-                        selected: _statusFilter,
-                        onSelect: (s) => setState(() {
-                          _statusFilter = _statusFilter == s ? null : s;
-                          _selectedId = null;
-                        }),
-                        items: _items,
-                      ),
+                      _typeFilterStrip(),
+                      _statusFilterStrip(),
                       Expanded(child: _buildList(desktop: true)),
                     ],
                   ),
@@ -415,11 +397,18 @@ class _TravelScreenState extends ConsumerState<TravelScreen> with AsyncScreenMix
         ),
       );
     }
-    return const Center(
+    return Center(
       child: WabwayEmptyState(
         icon: Icons.flight_rounded,
         title: 'Select a travel item',
-        description: 'Pick a flight, hotel, or booking from the list to see details.',
+        description: 'Pick a flight, train or other booking from the list to see details.',
+        action: WabwayButton(
+          label: 'Add travel item',
+          icon: Icons.add_rounded,
+          size: WabwayButtonSize.sm,
+          variant: WabwayButtonVariant.ghost,
+          onPressed: () => _addItem(context),
+        ),
       ),
     );
   }
@@ -454,30 +443,37 @@ class _TravelScreenState extends ConsumerState<TravelScreen> with AsyncScreenMix
             hint: 'Search travel…',
             onChanged: (v) => setState(() => _search = v),
           ),
-          _FilterChips(
-            selected: _filter,
-            onSelect: (t) => setState(() => _filter = _filter == t ? null : t),
-            items: _items,
-          ),
-          _StatusFilterChips(
-            selected: _statusFilter,
-            onSelect: (s) => setState(() => _statusFilter = _statusFilter == s ? null : s),
-            items: _items,
-          ),
+          _typeFilterStrip(),
+          _statusFilterStrip(),
           Expanded(child: _buildList(desktop: false)),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'travel_fab',
-        onPressed: () => _addItem(context),
-        icon: const Icon(Icons.add_rounded),
-        label: Text(
-          'Add travel',
-          style: kStyleButtonMd.copyWith(color: kColorTextOnPrimary),
-        ),
-      ),
+      floatingActionButton: WabwayAddFab(heroTag: 'travel_fab', label: 'Add travel', onPressed: () => _addItem(context)),
     );
   }
+
+  // Filters use the shared WabwayFilterStrip (counts, hidden when < 2 kinds).
+  Widget _typeFilterStrip() => WabwayFilterStrip<TravelItemType>(
+        selected: _filter,
+        allLabel: null,
+        options: [
+          for (final t in TravelItemType.values)
+            if (_items.any((i) => i.type == t))
+              (value: t, label: t.label, count: _items.where((i) => i.type == t).length),
+        ],
+        onChanged: (t) => setState(() { _filter = t; _selectedId = null; }),
+      );
+
+  Widget _statusFilterStrip() => WabwayFilterStrip<TravelBookingStatus>(
+        selected: _statusFilter,
+        allLabel: null,
+        options: [
+          for (final st in TravelBookingStatus.values)
+            if (_items.any((i) => i.status == st))
+              (value: st, label: st.label, count: _items.where((i) => i.status == st).length),
+        ],
+        onChanged: (st) => setState(() { _statusFilter = st; _selectedId = null; }),
+      );
 
   // ─── Shared list ──────────────────────────────────────────────────────────────
 
@@ -513,20 +509,17 @@ class _TravelScreenState extends ConsumerState<TravelScreen> with AsyncScreenMix
             ? Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const WabwayEmptyState(
+                  WabwayEmptyState(
                     icon: Icons.flight_rounded,
                     title: 'No travel items yet',
                     description:
-                        'Add flights, hotels, trains, tickets, and reservations here.',
-                  ),
-                  if (!desktop) ...[
-                    const SizedBox(height: kSpace4),
-                    WabwayButton(
+                        'Add flights, trains, buses, ferries and car hire here.',
+                    action: WabwayButton(
                       label: 'Add travel item',
                       icon: Icons.add_rounded,
                       onPressed: () => _addItem(context),
                     ),
-                  ],
+                  ),
                 ],
               )
             : _search.isNotEmpty
@@ -594,11 +587,7 @@ class _TravelScreenState extends ConsumerState<TravelScreen> with AsyncScreenMix
           direction: DismissDirection.endToStart,
           confirmDismiss: (_) async {
             _delete(item.id);
-            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-              content: Text('"${item.title}" removed.',
-                  style: kStyleBody.copyWith(color: Colors.white)),
-              behavior: SnackBarBehavior.floating,
-            ));
+            showWabwaySnack(ctx, '"${item.title}" removed.');
             return false;
           },
           background: Container(
@@ -701,179 +690,3 @@ class _DesktopTravelBar extends StatelessWidget {
 }
 
 // ─── Booking status filter chips ──────────────────────────────────────────────
-
-class _StatusFilterChips extends StatelessWidget {
-  const _StatusFilterChips({
-    required this.selected,
-    required this.onSelect,
-    required this.items,
-  });
-
-  final TravelBookingStatus? selected;
-  final ValueChanged<TravelBookingStatus> onSelect;
-  final List<TravelItem> items;
-
-  @override
-  Widget build(BuildContext context) {
-    final presentStatuses = TravelBookingStatus.values
-        .where((s) => items.any((i) => i.status == s))
-        .toList();
-    // Only show if more than one status is present
-    if (presentStatuses.length < 2) return const SizedBox.shrink();
-    return SizedBox(
-      height: 40,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: kSpace4, vertical: kSpace1),
-        children: presentStatuses.map((status) {
-          final isActive = selected == status;
-          final count = items.where((i) => i.status == status).length;
-          return Padding(
-            padding: const EdgeInsets.only(right: kSpace2),
-            child: GestureDetector(
-              onTap: () => onSelect(status),
-              child: AnimatedContainer(
-                duration: kDurationFast,
-                padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: 5),
-                decoration: BoxDecoration(
-                  color: isActive ? status.color : kColorSurfaceSunken,
-                  borderRadius: kRadiusPill,
-                  border: Border.all(
-                    color: isActive ? status.color : kColorBorder,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      status.icon,
-                      size: 12,
-                      color: isActive ? Colors.white : status.color,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${status.label} ($count)',
-                      style: kStyleCaption.copyWith(
-                        color: isActive ? Colors.white : kColorInk,
-                        fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-}
-
-// ─── Filter chips ─────────────────────────────────────────────────────────────
-
-class _FilterChips extends StatelessWidget {
-  const _FilterChips({
-    required this.selected,
-    required this.onSelect,
-    required this.items,
-  });
-
-  final TravelItemType? selected;
-  final ValueChanged<TravelItemType> onSelect;
-  // Full unfiltered list — used to compute per-type counts and hide empty types.
-  final List<TravelItem> items;
-
-  @override
-  Widget build(BuildContext context) {
-    final presentTypes = TravelItemType.values
-        .where((t) => items.any((i) => i.type == t))
-        .toList();
-    if (presentTypes.length < 2) return const SizedBox.shrink();
-    return SizedBox(
-      height: 48,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: kSpace4, vertical: kSpace2),
-        children: presentTypes.map((type) {
-          final isActive = selected == type;
-          final count = items.where((i) => i.type == type).length;
-          return Padding(
-            padding: const EdgeInsets.only(right: kSpace2),
-            child: _FilterChip(
-              type: type,
-              isActive: isActive,
-              count: count,
-              onTap: () => onSelect(type),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-}
-
-class _FilterChip extends StatefulWidget {
-  const _FilterChip({
-    required this.type,
-    required this.isActive,
-    required this.count,
-    required this.onTap,
-  });
-  final TravelItemType type;
-  final bool isActive;
-  final int count;
-  final VoidCallback onTap;
-
-  @override
-  State<_FilterChip> createState() => _FilterChipState();
-}
-
-class _FilterChipState extends State<_FilterChip> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = widget.type.color;
-    final softColor = widget.type.softColor;
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: kDurationFast,
-          curve: kEaseStandard,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: widget.isActive ? color : _hovered ? softColor : kColorPaper,
-            borderRadius: kRadiusPill,
-            border: Border.all(
-              color: widget.isActive ? color : kColorBorder,
-              width: widget.isActive ? 1.5 : 1,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                widget.type.icon,
-                size: 14,
-                color: widget.isActive ? Colors.white : color,
-              ),
-              const SizedBox(width: 5),
-              Text(
-                '${widget.type.label} (${widget.count})',
-                style: kStyleCaption.copyWith(
-                  color: widget.isActive ? Colors.white : kColorInk,
-                  fontWeight: widget.isActive ? FontWeight.w600 : FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}

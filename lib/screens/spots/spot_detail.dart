@@ -209,9 +209,7 @@ class _SpotDetailContentState extends ConsumerState<SpotDetailContent> {
       if (mounted) widget.onEdit?.call(updated);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not update: $e'), duration: const Duration(seconds: 3)),
-        );
+        showWabwaySnack(context, 'Could not update: $e', duration: const Duration(seconds: 3));
       }
     }
   }
@@ -335,9 +333,7 @@ class _SpotDetailContentState extends ConsumerState<SpotDetailContent> {
                   onTap: () async {
                     await Clipboard.setData(ClipboardData(text: widget.spot.address!));
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Address copied'), duration: Duration(seconds: 2)),
-                      );
+                      showWabwaySnack(context, 'Address copied', duration: Duration(seconds: 2));
                     }
                   },
                   child: Row(
@@ -751,15 +747,7 @@ Future<void> _openLink(BuildContext context, String url) async {
   } else {
     await Clipboard.setData(ClipboardData(text: url));
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Link copied',
-              style: kStyleBody.copyWith(color: Colors.white)),
-          backgroundColor: kColorInk,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      showWabwaySnack(context, 'Link copied', duration: const Duration(seconds: 2));
     }
   }
 }

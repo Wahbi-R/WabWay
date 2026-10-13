@@ -662,7 +662,7 @@ class _ActionsSectionState extends ConsumerState<_ActionsSection> {
             WabwayButton(
               label: 'Delete',
               icon: Icons.delete_outline_rounded,
-              variant: WabwayButtonVariant.danger,
+              variant: WabwayButtonVariant.dangerOutline,
               size: WabwayButtonSize.sm,
               onPressed: () => _confirmDelete(context),
             ),
@@ -713,10 +713,7 @@ Future<void> _openMaps(BuildContext context, String url) async {
   if (await canLaunchUrl(uri)) {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   } else if (context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('Could not open Maps.', style: kStyleBody.copyWith(color: Colors.white)),
-      behavior: SnackBarBehavior.floating,
-    ));
+    showWabwaySnack(context, 'Could not open Maps.');
   }
 }
 
@@ -731,10 +728,7 @@ Future<void> _openDoc(BuildContext context, TripDocument doc) async {
   }
   if (url == null || url.isEmpty) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Could not open document.', style: kStyleBody.copyWith(color: Colors.white)),
-        behavior: SnackBarBehavior.floating,
-      ));
+      showWabwaySnack(context, 'Could not open document.');
     }
     return;
   }
@@ -742,10 +736,7 @@ Future<void> _openDoc(BuildContext context, TripDocument doc) async {
   if (await canLaunchUrl(uri)) {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   } else if (context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('Could not open document.', style: kStyleBody.copyWith(color: Colors.white)),
-      behavior: SnackBarBehavior.floating,
-    ));
+    showWabwaySnack(context, 'Could not open document.');
   }
 }
 

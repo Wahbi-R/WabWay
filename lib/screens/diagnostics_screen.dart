@@ -8,6 +8,7 @@ import '../core/trip/app_trip.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
+import '../widgets/wabway_snack.dart';
 
 class DiagnosticsScreen extends StatefulWidget {
   const DiagnosticsScreen({super.key, this.profile, this.trip});
@@ -99,14 +100,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
                         tooltip: 'Copy',
                         onPressed: () {
                           Clipboard.setData(ClipboardData(text: e.value.value));
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Copied: ${e.value.label}',
-                                  style: kStyleBody.copyWith(color: Colors.white)),
-                              duration: const Duration(seconds: 1),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
+                          showWabwaySnack(context, 'Copied: ${e.value.label}', duration: const Duration(seconds: 1));
                         },
                       ),
                     ),

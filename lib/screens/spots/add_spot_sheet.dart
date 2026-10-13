@@ -488,7 +488,7 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
                     children: [
                       Expanded(
                         child: WabwayTextField(
-                          label: 'City',
+                          label: 'City (optional)',
                           hint: 'Tokyo',
                           controller: _cityCtrl,
                           textInputAction: TextInputAction.next,
@@ -497,7 +497,7 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
                       const SizedBox(width: kSpace3),
                       Expanded(
                         child: WabwayTextField(
-                          label: 'Area',
+                          label: 'Area (optional)',
                           hint: 'Asakusa',
                           controller: _areaCtrl,
                           textInputAction: TextInputAction.next,
@@ -517,7 +517,7 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
                   const SizedBox(height: kSpace4),
 
                   WabwayTextField(
-                    label: 'Country',
+                    label: 'Country (optional)',
                     hint: 'e.g. Japan',
                     controller: _countryCtrl,
                     textInputAction: TextInputAction.next,
@@ -562,7 +562,7 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
                   const SizedBox(height: kSpace4),
 
                   WabwayTextField(
-                    label: 'Google Maps URL',
+                    label: 'Google Maps URL (optional)',
                     hint: 'Paste any Maps link — short or full',
                     controller: _mapsCtrl,
                     prefixIcon: Icons.map_rounded,
@@ -588,7 +588,7 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
                   const SizedBox(height: kSpace4),
 
                   WabwayTextField(
-                    label: 'Source URL',
+                    label: 'Source URL (optional)',
                     hint: 'Instagram, TikTok, article link…',
                     controller: _sourceCtrl,
                     prefixIcon: Icons.link_rounded,
@@ -598,7 +598,7 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
                   const SizedBox(height: kSpace4),
 
                   WabwayTextField(
-                    label: 'Notes',
+                    label: 'Notes (optional)',
                     hint: 'Tips, context, opening hours…',
                     controller: _notesCtrl,
                     maxLines: 4,

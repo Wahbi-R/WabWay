@@ -112,18 +112,6 @@ class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
               ),
             ],
           ),
-          if (widget.onDelete != null)
-            IconButton(
-              icon: const Icon(Icons.delete_outline_rounded),
-              color: kColorDanger,
-              onPressed: () async {
-                final ok = await _confirmDelete(context, _receipt.title);
-                if (ok && context.mounted) {
-                  Navigator.pop(context);
-                  widget.onDelete!();
-                }
-              },
-            ),
           const SizedBox(width: kSpace2),
         ],
       ),
@@ -134,7 +122,14 @@ class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
           myId:      widget.myId,
           members:   widget.members,
           tripId:    widget.tripId,
-          onDelete:  widget.onDelete,
+          // One delete button (in the content); on this full-screen route it
+          // also closes the page.
+          onDelete:  widget.onDelete == null
+              ? null
+              : () {
+                  Navigator.pop(context);
+                  widget.onDelete!();
+                },
           onUpdated: (r) {
             setState(() => _receipt = r);
             widget.onUpdated?.call(r);
@@ -302,7 +297,7 @@ class ReceiptDetailContent extends StatelessWidget {
                 WabwayButton(
                   label: 'Delete receipt',
                   icon: Icons.delete_outline_rounded,
-                  variant: WabwayButtonVariant.ghost,
+                  variant: WabwayButtonVariant.dangerOutline,
                   fullWidth: true,
                   onPressed: () async {
                     final ok = await _confirmDelete(context, receipt.title);

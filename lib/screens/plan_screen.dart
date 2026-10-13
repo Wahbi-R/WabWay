@@ -418,10 +418,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
 
   Future<void> _addItemForSpot(BuildContext context, Spot spot) async {
     if (_days.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Add a trip day first.', style: kStyleBody.copyWith(color: Colors.white)),
-        behavior: SnackBarBehavior.floating,
-      ));
+      showWabwaySnack(context, 'Add a trip day first.');
       return;
     }
     final result = await showDayPickerSheet(context, days: _days);
@@ -455,11 +452,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
       _syncItemConnection(item.id, null, spot.id, EntityType.spot);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(
-        content: Text('Failed to add item: $e', style: kStyleBody.copyWith(color: Colors.white)),
-        backgroundColor: kColorDanger,
-        behavior: SnackBarBehavior.floating,
-      ));
+      showWabwaySnack(this.context, 'Failed to add item: $e', error: true);
     }
   }
 
@@ -506,13 +499,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
     }
     await Clipboard.setData(ClipboardData(text: buf.toString().trim()));
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Day $n copied to clipboard'),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      showWabwaySnack(context, 'Day $n copied to clipboard', duration: const Duration(seconds: 2));
     }
   }
 
@@ -572,9 +559,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
       _syncItemConnection(copy.id, null, copy.linkedStayId, EntityType.stay);
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to duplicate item — please try again')),
-        );
+        showWabwaySnack(context, 'Failed to duplicate item — please try again');
       }
     }
   }
@@ -715,11 +700,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
     }
     final text = buf.toString().trim();
     if (kIsWeb) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Export is not supported on web.',
-            style: kStyleBody.copyWith(color: Colors.white)),
-        behavior: SnackBarBehavior.floating,
-      ));
+      showWabwaySnack(context, 'Export is not supported on web.');
       return;
     }
     unawaited(Share.share(text, subject: '$tripName — Itinerary'));
@@ -727,11 +708,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
 
   Future<void> _exportToCalendar() async {
     if (kIsWeb) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Calendar export is not supported on web.',
-            style: kStyleBody.copyWith(color: Colors.white)),
-        behavior: SnackBarBehavior.floating,
-      ));
+      showWabwaySnack(context, 'Calendar export is not supported on web.');
       return;
     }
     if (_days.isEmpty) return;
@@ -791,11 +768,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Could not export calendar.',
-              style: kStyleBody.copyWith(color: Colors.white)),
-          behavior: SnackBarBehavior.floating,
-        ));
+        showWabwaySnack(context, 'Could not export calendar.');
       }
     }
   }
@@ -1029,60 +1002,36 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
               color: kColorPrimary,
               onPressed: _scrollToToday,
             ),
-          if (!_showCalendar) ...[
-            if ((_hideCompleted || _completedCount > 0) && _search.isEmpty)
-              IconButton(
-                icon: Icon(
-                  _hideCompleted
-                      ? Icons.visibility_off_rounded
-                      : Icons.visibility_rounded,
-                  size: 20,
-                ),
-                tooltip: _hideCompleted ? 'Show completed' : 'Hide completed',
-                color: _hideCompleted ? kColorPrimary : kColorInkSoft,
-                onPressed: () => setState(() => _hideCompleted = !_hideCompleted),
-              ),
-            if (_days.length >= 2 && _search.isEmpty)
-              IconButton(
-                icon: Icon(
-                  _forceCollapsed == true
-                      ? Icons.unfold_more_rounded
-                      : Icons.unfold_less_rounded,
-                  size: 20,
-                ),
-                tooltip: _forceCollapsed == true ? 'Expand all days' : 'Collapse all days',
-                color: _forceCollapsed == true ? kColorPrimary : kColorInkSoft,
-                onPressed: () => setState(() =>
-                    _forceCollapsed = _forceCollapsed == true ? false : true),
-              ),
-            if (_days.isNotEmpty) ...[
-              IconButton(
-                icon: const Icon(Icons.ios_share_rounded, size: 20),
-                tooltip: 'Export plan',
-                color: kColorInkSoft,
-                onPressed: _exportPlan,
-              ),
-              if (!kIsWeb)
-                IconButton(
-                  icon: const Icon(Icons.calendar_month_rounded, size: 20),
-                  tooltip: 'Export to calendar (.ics)',
-                  color: kColorInkSoft,
-                  onPressed: _exportToCalendar,
-                ),
-            ],
-          ],
-          if (() { final t = TripState.maybeOf(context)?.trip; return t?.startDate != null && t?.endDate != null; }())
-            IconButton(
-              icon: const Icon(Icons.date_range_rounded, size: 20),
-              tooltip: 'Add all trip days',
-              color: kColorInkSoft,
-              onPressed: () => _addAllTripDays(context),
-            ),
-          TextButton.icon(
-            onPressed: () => _addDay(context),
-            icon: const Icon(Icons.add_rounded, size: 18),
-            label: Text('Day', style: kStyleCaptionMedium),
-            style: TextButton.styleFrom(foregroundColor: kColorInkSoft),
+          PopupMenuButton<String>(
+            tooltip: 'More',
+            icon: const Icon(Icons.more_vert_rounded, color: kColorInkSoft),
+            onSelected: (v) {
+              switch (v) {
+                case 'day':      _addDay(context);
+                case 'days':     _addAllTripDays(context);
+                case 'done':     setState(() => _hideCompleted = !_hideCompleted);
+                case 'collapse': setState(() => _forceCollapsed = _forceCollapsed == true ? false : true);
+                case 'export':   _exportPlan();
+                case 'ics':      _exportToCalendar();
+              }
+            },
+            itemBuilder: (_) {
+              final t = TripState.maybeOf(context)?.trip;
+              final hasDates = t?.startDate != null && t?.endDate != null;
+              return [
+                const PopupMenuItem(value: 'day', child: Text('Add day')),
+                if (hasDates)
+                  const PopupMenuItem(value: 'days', child: Text('Add all trip days')),
+                if (!_showCalendar && (_hideCompleted || _completedCount > 0) && _search.isEmpty)
+                  PopupMenuItem(value: 'done', child: Text(_hideCompleted ? 'Show completed' : 'Hide completed')),
+                if (!_showCalendar && _days.length >= 2 && _search.isEmpty)
+                  PopupMenuItem(value: 'collapse', child: Text(_forceCollapsed == true ? 'Expand all days' : 'Collapse all days')),
+                if (!_showCalendar && _days.isNotEmpty)
+                  const PopupMenuItem(value: 'export', child: Text('Export plan')),
+                if (!_showCalendar && _days.isNotEmpty && !kIsWeb)
+                  const PopupMenuItem(value: 'ics', child: Text('Export to calendar (.ics)')),
+              ];
+            },
           ),
           const SizedBox(width: kSpace2),
         ],
@@ -1205,9 +1154,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
                         ),
                       ],
                     ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'plan_fab',
-        onPressed: () async {
+      floatingActionButton: WabwayAddFab(heroTag: 'plan_fab', label: 'Add item', icon: Icons.event_note_rounded, onPressed: () async {
           if (_days.isEmpty) {
             _addDay(context);
           } else if (_days.length == 1) {
@@ -1218,13 +1165,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
             final (dayId, _) = result;
             _addItem(this.context, dayId);
           }
-        },
-        icon: const Icon(Icons.event_note_rounded),
-        label: Text(
-          'Add item',
-          style: kStyleButtonMd.copyWith(color: kColorTextOnPrimary),
-        ),
-      ),
+        }),
     );
   }
 
@@ -2006,7 +1947,7 @@ class _DesktopPlanBar extends StatelessWidget {
                 borderRadius: kRadiusPill,
               ),
               child: Text(
-                '$dayCount days',
+                pluralize(dayCount, 'day'),
                 style: GoogleFonts.ibmPlexMono(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -2015,26 +1956,6 @@ class _DesktopPlanBar extends StatelessWidget {
               ),
             ),
           const Spacer(),
-          if (onExport != null) ...[
-            WabwayButton(
-              label: 'Export',
-              icon: Icons.ios_share_rounded,
-              size: WabwayButtonSize.sm,
-              variant: WabwayButtonVariant.ghost,
-              onPressed: onExport,
-            ),
-            const SizedBox(width: kSpace2),
-          ],
-          if (onExportCalendar != null) ...[
-            WabwayButton(
-              label: 'Calendar',
-              icon: Icons.calendar_month_rounded,
-              size: WabwayButtonSize.sm,
-              variant: WabwayButtonVariant.ghost,
-              onPressed: onExportCalendar,
-            ),
-            const SizedBox(width: kSpace2),
-          ],
           if (onToggleHideCompleted != null) ...[
             WabwayButton(
               label: hideCompleted ? 'Show done' : 'Hide done',
@@ -2042,28 +1963,35 @@ class _DesktopPlanBar extends StatelessWidget {
                   ? Icons.visibility_off_rounded
                   : Icons.visibility_rounded,
               size: WabwayButtonSize.sm,
-              variant: hideCompleted
-                  ? WabwayButtonVariant.primary
-                  : WabwayButtonVariant.ghost,
+              variant: WabwayButtonVariant.ghost,
               onPressed: onToggleHideCompleted,
             ),
             const SizedBox(width: kSpace2),
           ],
-          if (showAddAllDays) ...[
-            WabwayButton(
-              label: 'Add all days',
-              icon: Icons.date_range_rounded,
-              size: WabwayButtonSize.sm,
-              variant: WabwayButtonVariant.ghost,
-              onPressed: onAddAllDays,
+          if (onExport != null || onExportCalendar != null || showAddAllDays)
+            PopupMenuButton<String>(
+              tooltip: 'More',
+              icon: const Icon(Icons.more_horiz_rounded, color: kColorInkSoft),
+              onSelected: (v) => switch (v) {
+                'export' => onExport?.call(),
+                'ics'    => onExportCalendar?.call(),
+                'days'   => onAddAllDays(),
+                _        => null,
+              },
+              itemBuilder: (_) => [
+                if (showAddAllDays)
+                  const PopupMenuItem(value: 'days', child: Text('Add all trip days')),
+                if (onExport != null)
+                  const PopupMenuItem(value: 'export', child: Text('Export plan')),
+                if (onExportCalendar != null)
+                  const PopupMenuItem(value: 'ics', child: Text('Export to calendar (.ics)')),
+              ],
             ),
-            const SizedBox(width: kSpace2),
-          ],
+          const SizedBox(width: kSpace2),
           WabwayButton(
-            label: 'Add Day',
-            icon: Icons.calendar_today_rounded,
+            label: 'Add day',
+            icon: Icons.add_rounded,
             size: WabwayButtonSize.sm,
-            variant: WabwayButtonVariant.ghost,
             onPressed: onAddDay,
           ),
         ],

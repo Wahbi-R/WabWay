@@ -78,22 +78,11 @@ class _ExtractedSpotsScreenState extends State<ExtractedSpotsScreen> {
       }
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(
-          'Added $count spot${count == 1 ? '' : 's'}',
-          style: kStyleBodyMedium.copyWith(color: kColorTextOnPrimary),
-        ),
-        backgroundColor: kColorPrimary,
-        behavior: SnackBarBehavior.floating,
-        shape: const RoundedRectangleBorder(borderRadius: kRadiusMd),
-        margin: const EdgeInsets.all(kSpace4),
-      ));
+      showWabwaySnack(context, 'Added $count spot${count == 1 ? '' : 's'}');
       widget.onDone?.call();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-      );
+      showWabwaySnack(context, 'Error: $e', error: true);
       setState(() => _saving = false);
     }
   }

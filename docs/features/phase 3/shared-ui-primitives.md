@@ -27,3 +27,23 @@ Each primitive was **promoted from an existing implementation**, not written fre
 - Forms: dialog on desktop, bottom sheet with drag handle on mobile — decided by the helper, never per screen.
 - Avatars always get the real display name; "You" is a label, not a name.
 - `WabwayButton.dangerOutline` for delete in panels/forms; filled `danger` only inside confirm dialogs.
+
+## Build 408 — consistency sweep (Muse spec §1–20)
+| Spec § | Result |
+|---|---|
+| 1, 13 Primary add | `WabwayAddFab` on mobile, `WabwayHeaderAddButton` on desktop (same label). Plan's icon cluster → overflow menu. |
+| 2, 15 Empty states | Every first-run empty state and "Select a…" pane has the screen's add CTA. |
+| 7, 9 Destructive | `dangerOutline` everywhere in panels; one delete per receipt/withdrawal. |
+| 10 Tabs | `TabBar` (with controller) or `WabwaySegmentTabs` (state-driven) — no pills/segmented. |
+| 10 Filters | `WabwayFilterStrip` with counts (Docs, Travel). |
+| 11 Search | `WabwaySearchBar` always visible (Spots). |
+| 12 CTA colour | Orange primary for Find Me / Create trip; red only for destructive. |
+| 14 Labels | "(optional)" suffix convention. |
+| 5 Pickers | `WabwayChoiceChips` for travel type/status, receipt category. |
+| 17 Votes | List card highlights your vote with the same chip as the detail screen. |
+| 18 Trip rows | `TripListTile`. |
+| 20 Toasts | `showWabwaySnack` (76 call sites converted). |
+
+Muse ≠ code notes: trip switcher buttons were already `WabwayButton` (variant only);
+Links search already showed whenever content exists; mobile keeps FABs and drag
+handles (adaptive decision).

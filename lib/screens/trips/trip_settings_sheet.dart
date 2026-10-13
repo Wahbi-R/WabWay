@@ -118,10 +118,7 @@ class _TripSettingsSheetState extends State<_TripSettingsSheet> {
 
   Future<void> _pickCoverPhoto() async {
     if (kIsWeb) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Photo upload is not supported on web.'),
-        behavior: SnackBarBehavior.floating,
-      ));
+      showWabwaySnack(context, 'Photo upload is not supported on web.');
       return;
     }
     final picker = ImagePicker();

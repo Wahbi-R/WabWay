@@ -92,12 +92,7 @@ class _MapsImportScreenState extends State<MapsImportScreen> {
     if (places != null && places.isNotEmpty) {
       _setPlaces(places);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text(
-            "Couldn't scan automatically — try the Google Takeout export instead"),
-        behavior: SnackBarBehavior.floating,
-        duration: Duration(seconds: 4),
-      ));
+      showWabwaySnack(context, "Couldn't scan automatically — try the Google Takeout export instead", duration: Duration(seconds: 4));
     }
   }
 
@@ -109,12 +104,7 @@ class _MapsImportScreenState extends State<MapsImportScreen> {
         final fast = TakeoutParser.parseCsvFast(bytes);
         if (!mounted) return;
         if (fast.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text("Couldn't read any places — make sure you picked "
-                "a CSV from Takeout/Saved/"),
-            behavior: SnackBarBehavior.floating,
-            duration: Duration(seconds: 5),
-          ));
+          showWabwaySnack(context, "Couldn't read any places — make sure you picked " "a CSV from Takeout/Saved/", duration: Duration(seconds: 5));
           return;
         }
         _setPlaces(fast);
@@ -125,12 +115,7 @@ class _MapsImportScreenState extends State<MapsImportScreen> {
         final places = TakeoutParser.parseJson(bytes);
         if (!mounted) return;
         if (places == null || places.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text("Couldn't find any places — make sure you picked "
-                "Saved Places.json from Takeout/Maps (your places)/"),
-            behavior: SnackBarBehavior.floating,
-            duration: Duration(seconds: 5),
-          ));
+          showWabwaySnack(context, "Couldn't find any places — make sure you picked " "Saved Places.json from Takeout/Maps (your places)/", duration: Duration(seconds: 5));
           return;
         }
         _setPlaces(places);
@@ -239,23 +224,12 @@ class _MapsImportScreenState extends State<MapsImportScreen> {
       }
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(
-          'Added $_savingTotal spot${_savingTotal == 1 ? '' : 's'}',
-          style: kStyleBodyMedium.copyWith(color: kColorTextOnPrimary),
-        ),
-        backgroundColor: kColorPrimary,
-        behavior: SnackBarBehavior.floating,
-        shape: const RoundedRectangleBorder(borderRadius: kRadiusMd),
-        margin: const EdgeInsets.all(kSpace4),
-      ));
+      showWabwaySnack(context, 'Added $_savingTotal spot${_savingTotal == 1 ? '' : 's'}');
       widget.onDone?.call();
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-      );
+      showWabwaySnack(context, 'Error: $e', error: true);
       setState(() => _saving = false);
     }
   }

@@ -962,13 +962,7 @@ class _ActionsSectionState extends State<_ActionsSection> {
         widget.onLinkAdded?.call(DocLinkedType.receipt, r.id);
       } catch (_) {}
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Receipt "${r.title}" created',
-              style: kStyleBody.copyWith(color: Colors.white)),
-          backgroundColor: kColorSuccess,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-        ));
+        showWabwaySnack(context, 'Receipt "${r.title}" created', duration: const Duration(seconds: 2));
       }
     }
   }
@@ -1049,7 +1043,7 @@ class _ActionsSectionState extends State<_ActionsSection> {
             WabwayButton(
               label: 'Delete',
               icon: Icons.delete_outline_rounded,
-              variant: WabwayButtonVariant.danger,
+              variant: WabwayButtonVariant.dangerOutline,
               size: WabwayButtonSize.sm,
               onPressed: _confirmDelete,
             ),
@@ -1191,13 +1185,7 @@ class _ActionsSheetContentState extends State<_ActionsSheetContent> {
                   );
                 } catch (_) {}
                 if (outerCtx.mounted) {
-                  ScaffoldMessenger.of(outerCtx).showSnackBar(SnackBar(
-                    content: Text('Receipt "${r.title}" created',
-                        style: kStyleBody.copyWith(color: Colors.white)),
-                    backgroundColor: kColorSuccess,
-                    behavior: SnackBarBehavior.floating,
-                    duration: const Duration(seconds: 2),
-                  ));
+                  showWabwaySnack(outerCtx, 'Receipt "${r.title}" created', duration: const Duration(seconds: 2));
                 }
               }
             },

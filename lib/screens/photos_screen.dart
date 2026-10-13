@@ -189,11 +189,7 @@ class _PhotosScreenState extends ConsumerState<PhotosScreen> with AsyncScreenMix
                   ),
                 ),
       floatingActionButton: _albums.isNotEmpty
-          ? FloatingActionButton(
-              onPressed: _addAlbum,
-              backgroundColor: kColorPrimary,
-              child: const Icon(Icons.add_rounded, color: Colors.white),
-            )
+          ? WabwayAddFab(label: 'Add album', onPressed: _addAlbum)
           : null,
     );
 

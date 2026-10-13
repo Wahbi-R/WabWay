@@ -366,7 +366,7 @@ class _CodeCard extends StatelessWidget {
                     label: 'Revoke',
                     icon: Icons.block_rounded,
                     size: WabwayButtonSize.sm,
-                    variant: WabwayButtonVariant.danger,
+                    variant: WabwayButtonVariant.dangerOutline,
                     onPressed: onRevoke,
                   ),
                 ],

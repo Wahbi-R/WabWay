@@ -25,6 +25,7 @@ import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
 import '../widgets/wabway_avatar.dart';
 import '../widgets/wabway_confirm_dialog.dart';
+import '../widgets/widgets.dart';
 
 class CrewScreen extends ConsumerStatefulWidget {
   const CrewScreen({super.key});
@@ -494,12 +495,7 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
 
   void _showError(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(message,
-          style: kStyleBody.copyWith(color: Colors.white)),
-      backgroundColor: kColorDanger,
-      behavior: SnackBarBehavior.floating,
-    ));
+    showWabwaySnack(context, message, error: true);
   }
 
   @override
@@ -1386,31 +1382,14 @@ class _InputBar extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // SOS button — prominent, full width
-              SizedBox(
-                width: double.infinity,
-                height: 44,
-                child: FilledButton.icon(
-                  onPressed: sendingFindMe ? null : onFindMe,
-                  icon: sendingFindMe
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Icon(Icons.crisis_alert_rounded, size: 20),
-                  label: Text(
-                    sendingFindMe ? 'Alerting crew…' : 'Find Me',
-                    style: kStyleBodySemibold.copyWith(color: Colors.white),
-                  ),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: sendingFindMe ? kColorBorder : kColorDanger,
-                    foregroundColor: Colors.white,
-                    shape: const RoundedRectangleBorder(borderRadius: kRadiusMd),
-                    padding: EdgeInsets.zero,
-                  ),
-                ),
+              // SOS button — prominent, full width. Orange primary: red is
+              // reserved for destructive actions.
+              WabwayButton(
+                label: sendingFindMe ? 'Alerting crew…' : 'Find Me',
+                icon: Icons.crisis_alert_rounded,
+                fullWidth: true,
+                loading: sendingFindMe,
+                onPressed: sendingFindMe ? null : onFindMe,
               ),
               const SizedBox(height: kSpace2),
               // Message row

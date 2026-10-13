@@ -267,23 +267,11 @@ class _IncomingShareScreenState extends ConsumerState<IncomingShareScreen> {
       final result = await SocialPlaceExtractor.extract(_activeShare!.rawContent);
       if (!mounted) return;
       if (result == null) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Could not load the post — it may be private'),
-          behavior: SnackBarBehavior.floating,
-          duration: Duration(seconds: 4),
-        ));
+        showWabwaySnack(context, 'Could not load the post — it may be private', duration: Duration(seconds: 4));
         return;
       }
       if (result.places.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(
-            result.caption.isEmpty
-                ? 'No caption found in this post'
-                : 'No recognisable places found in caption',
-          ),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 4),
-        ));
+        showWabwaySnack(context, result.caption.isEmpty ? 'No caption found in this post' : 'No recognisable places found in caption', duration: const Duration(seconds: 4));
         return;
       }
       await Navigator.push<void>(
@@ -314,11 +302,7 @@ class _IncomingShareScreenState extends ConsumerState<IncomingShareScreen> {
       final result = await SocialPlaceExtractor.extractFromAudio(_activeShare!.rawContent);
       if (!mounted) return;
       if (result == null) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Could not transcribe audio — check server or try the caption method'),
-          behavior: SnackBarBehavior.floating,
-          duration: Duration(seconds: 5),
-        ));
+        showWabwaySnack(context, 'Could not transcribe audio — check server or try the caption method', duration: Duration(seconds: 5));
         return;
       }
       await Navigator.push<void>(
@@ -350,15 +334,7 @@ class _IncomingShareScreenState extends ConsumerState<IncomingShareScreen> {
       final result = await SocialPlaceExtractor.extractFromText(text);
       if (!mounted) return;
       if (result.places.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(
-            text.isEmpty
-                ? 'Paste some caption text first'
-                : 'No recognisable places found in the text',
-          ),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 4),
-        ));
+        showWabwaySnack(context, text.isEmpty ? 'Paste some caption text first' : 'No recognisable places found in the text', duration: const Duration(seconds: 4));
         return;
       }
       await Navigator.push<void>(
@@ -389,11 +365,7 @@ class _IncomingShareScreenState extends ConsumerState<IncomingShareScreen> {
       final result = await GoogleMapsParser.parse(_activeShare!.rawContent);
       if (!mounted) return;
       if (result == null) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Could not reach Google Maps — check your connection'),
-          behavior: SnackBarBehavior.floating,
-          duration: Duration(seconds: 4),
-        ));
+        showWabwaySnack(context, 'Could not reach Google Maps — check your connection', duration: Duration(seconds: 4));
         return;
       }
       await Navigator.push<void>(
@@ -462,11 +434,7 @@ class _IncomingShareScreenState extends ConsumerState<IncomingShareScreen> {
           200 => 'AI read the file but found no bookings — try OCR',
           _ => 'AI failed (HTTP $aiStatus) — try OCR instead',
         };
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(msg),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 5),
-        ));
+        showWabwaySnack(context, msg, duration: const Duration(seconds: 5));
         return;
       }
       await _pushResults(result, bytes, ext, filePath ?? _fileName);
@@ -488,11 +456,7 @@ class _IncomingShareScreenState extends ConsumerState<IncomingShareScreen> {
       final result = await ItineraryScanner.scanWithOcr(bytes, ext);
       if (!mounted) return;
       if (result.bookings.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('No booking patterns found — fill in manually'),
-          behavior: SnackBarBehavior.floating,
-          duration: Duration(seconds: 4),
-        ));
+        showWabwaySnack(context, 'No booking patterns found — fill in manually', duration: Duration(seconds: 4));
         return;
       }
       await _pushResults(result, bytes, ext, filePath ?? _fileName);

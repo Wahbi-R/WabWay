@@ -228,9 +228,7 @@ class _AddTravelContentState extends State<_AddTravelContent> {
       final data = await BoardingPassParser.parse(bytes, ext);
       if (!mounted) return;
       if (data == null || !data.hasUsefulData) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not read boarding pass — fill in manually.')),
-        );
+        showWabwaySnack(context, 'Could not read boarding pass — fill in manually.');
         return;
       }
       setState(() {
@@ -346,32 +344,23 @@ class _AddTravelContentState extends State<_AddTravelContent> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: WabwaySelectField<TravelItemType>(
-                          label: 'Type',
-                          value: _type,
-                          onChanged: (v) =>
-                              setState(() => _type = v ?? TravelItemType.flight),
-                          items: TravelItemType.values
-                              .map((t) => WabwaySelectItem(value: t, label: t.label))
-                              .toList(),
-                        ),
-                      ),
-                      const SizedBox(width: kSpace3),
-                      Expanded(
-                        child: WabwaySelectField<TravelBookingStatus>(
-                          label: 'Status',
-                          value: _status,
-                          onChanged: (v) =>
-                              setState(() => _status = v ?? TravelBookingStatus.booked),
-                          items: TravelBookingStatus.values
-                              .map((s) => WabwaySelectItem(value: s, label: s.label))
-                              .toList(),
-                        ),
-                      ),
+                  WabwayChoiceChips<TravelItemType>(
+                    label: 'Type',
+                    choices: [
+                      for (final t in TravelItemType.values) WabwayChoice(t, t.label, icon: t.icon),
                     ],
+                    selected: _type,
+                    onChanged: (t) => setState(() => _type = t),
+                  ),
+                  const SizedBox(height: kSpace4),
+                  WabwayChoiceChips<TravelBookingStatus>(
+                    label: 'Status',
+                    choices: [
+                      for (final st in TravelBookingStatus.values)
+                        WabwayChoice(st, st.label, icon: st.icon, color: st.color),
+                    ],
+                    selected: _status,
+                    onChanged: (st) => setState(() => _status = st),
                   ),
                   const SizedBox(height: kSpace3),
 

@@ -203,10 +203,7 @@ class _PackingScreenState extends ConsumerState<PackingScreen> with AsyncScreenM
       await Future.wait(toAdd.map((t) => PackingService.addItem(tripId, t, userId)));
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Some items could not be added. Try again.'),
-        behavior: SnackBarBehavior.floating,
-      ));
+      showWabwaySnack(context, 'Some items could not be added. Try again.');
     }
     _load(silent: true);
   }
@@ -370,12 +367,7 @@ class _PackingScreenState extends ConsumerState<PackingScreen> with AsyncScreenM
                 ),
               ),
             ),
-          IconButton(
-            icon: const Icon(Icons.add_rounded),
-            color: kColorInkSoft,
-            tooltip: 'Add item',
-            onPressed: _addItem,
-          ),
+          WabwayHeaderAddButton(label: 'Add item', onPressed: _addItem),
           PopupMenuButton<String>(
             iconColor: kColorInkSoft,
             onSelected: (v) {
@@ -452,6 +444,9 @@ class _PackingScreenState extends ConsumerState<PackingScreen> with AsyncScreenM
                 ],
               ),
       ),
+      floatingActionButton: total == 0 || isDesktopLayout(context)
+          ? null
+          : WabwayAddFab(label: 'Add item', onPressed: _addItem),
     );
   }
 }
@@ -464,37 +459,26 @@ class _EmptyState extends StatelessWidget {
   final VoidCallback onTemplate;
 
   @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.luggage_rounded, size: 48, color: kColorInkSoft),
-          const SizedBox(height: 16),
-          Text('Nothing to pack yet', style: kStyleBodyMedium),
-          const SizedBox(height: 8),
-          Text('Add items your group needs to bring.',
-              style: kStyleCaption),
-          const SizedBox(height: 20),
-          FilledButton.icon(
-            onPressed: onAdd,
-            icon: const Icon(Icons.add_rounded, size: 18),
-            label: const Text('Add item'),
-            style:
-                FilledButton.styleFrom(backgroundColor: kColorPrimary),
+  Widget build(BuildContext context) => Center(
+        child: WabwayEmptyState(
+          icon: Icons.luggage_rounded,
+          title: 'Nothing to pack yet',
+          description: 'Add items your group needs to bring.',
+          action: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              WabwayButton(label: 'Add item', icon: Icons.add_rounded, onPressed: onAdd),
+              const SizedBox(height: kSpace2),
+              WabwayButton(
+                label: 'Add from template',
+                icon: Icons.list_alt_rounded,
+                variant: WabwayButtonVariant.ghost,
+                onPressed: onTemplate,
+              ),
+            ],
           ),
-          const SizedBox(height: 10),
-          OutlinedButton.icon(
-            onPressed: onTemplate,
-            icon: const Icon(Icons.list_alt_rounded, size: 18),
-            label: const Text('Add from template'),
-            style:
-                OutlinedButton.styleFrom(foregroundColor: kColorPrimary),
-          ),
-        ],
-      ),
-    );
-  }
+        ),
+      );
 }
 
 // ─── Progress bar ─────────────────────────────────────────────────────────────

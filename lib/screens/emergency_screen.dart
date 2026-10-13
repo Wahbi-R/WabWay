@@ -97,31 +97,14 @@ class _EmptyState extends StatelessWidget {
   final VoidCallback onEdit;
 
   @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.health_and_safety_rounded, size: 48, color: kColorInkSoft),
-          const SizedBox(height: 16),
-          Text('No emergency info yet', style: kStyleBodyMedium),
-          const SizedBox(height: 8),
-          Text(
-            'Add insurance numbers, emergency contacts,\nand local emergency info before your trip.',
-            style: kStyleCaption,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 20),
-          FilledButton.icon(
-            onPressed: onEdit,
-            icon: const Icon(Icons.add_rounded, size: 18),
-            label: const Text('Add info'),
-            style: FilledButton.styleFrom(backgroundColor: kColorPrimary),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Center(
+        child: WabwayEmptyState(
+          icon: Icons.health_and_safety_rounded,
+          title: 'No emergency info yet',
+          description: 'Add insurance numbers, emergency contacts and local emergency info before your trip.',
+          action: WabwayButton(label: 'Add info', icon: Icons.add_rounded, onPressed: onEdit),
+        ),
+      );
 }
 
 // ─── Info body ────────────────────────────────────────────────────────────────
@@ -326,9 +309,7 @@ class _InfoRow extends StatelessWidget {
               onTap: () async {
                 await Clipboard.setData(ClipboardData(text: value));
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Copied'), duration: Duration(seconds: 2)),
-                  );
+                  showWabwaySnack(context, 'Copied', duration: Duration(seconds: 2));
                 }
               },
               child: const Padding(

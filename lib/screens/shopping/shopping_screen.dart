@@ -202,11 +202,7 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> with AsyncScree
   }
 
   void _showError(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg, style: kStyleBody.copyWith(color: Colors.white)),
-      backgroundColor: kColorDanger,
-      behavior: SnackBarBehavior.floating,
-    ));
+    showWabwaySnack(context, msg, error: true);
   }
 
   // ─── UI ──────────────────────────────────────────────────────────────────────
@@ -838,7 +834,7 @@ class _ItemSheetState extends State<_ItemSheet> {
                       const SizedBox(height: kSpace3),
                       WabwayButton(
                         label: 'Delete item',
-                        variant: WabwayButtonVariant.ghost,
+                        variant: WabwayButtonVariant.dangerOutline,
                         loading: _deleting,
                         onPressed: _saving || _deleting ? null : _delete,
                         fullWidth: true,

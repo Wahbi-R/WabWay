@@ -265,6 +265,34 @@ abstract final class PlanService {
     return _dayFromRow(row, []);
   }
 
+  /// Persists a draft returned by `showAddItemSheet` — the one place that maps
+  /// sheet fields to [createItem] (Plan screen, Import, …).
+  static Future<ItineraryItem> createItemFromDraft(
+    ItineraryItem d, {
+    required String tripId,
+    required String dayId,
+    required String createdBy,
+    required int sortOrder,
+  }) =>
+      createItem(
+        tripId:          tripId,
+        dayId:           dayId,
+        title:           d.title,
+        type:            d.type,
+        createdBy:       createdBy,
+        time:            d.time,
+        city:            d.city,
+        country:         d.country,
+        location:        d.location,
+        mapsUrl:         d.mapsUrl,
+        confirmationUrl: d.confirmationUrl,
+        notes:           d.notes,
+        linkedSpotId:    d.linkedSpotId,
+        linkedStayId:    d.linkedStayId,
+        linkedDocIds:    d.linkedDocIds,
+        sortOrder:       sortOrder,
+      );
+
   static Future<ItineraryItem> createItem({
     required String tripId,
     required String dayId,

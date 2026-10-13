@@ -9,6 +9,8 @@ import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 import '../../data/date_utils.dart';
+import '../../widgets/place_search_field.dart';
+import '../../data/share_data.dart';
 
 // ─── Entry point ──────────────────────────────────────────────────────────────
 
@@ -16,6 +18,7 @@ Future<TravelItem?> showAddTravelSheet(
   BuildContext context, {
   List<TripDocument> docs = const [],
   TravelItem? initialItem,
+  ImportPrefill? prefill,
 }) {
   return showWabwayFormSheet<TravelItem>(
     context,
@@ -26,6 +29,7 @@ Future<TravelItem?> showAddTravelSheet(
     builder: (ctx, scroll, handle, close) => _AddTravelContent(
       docs: docs,
       initialItem: initialItem,
+      prefill: prefill,
       scrollController: scroll,
       showDragHandle: handle,
       onSubmit: close,
@@ -40,6 +44,7 @@ class _AddTravelContent extends StatefulWidget {
     this.scrollController,
     this.showDragHandle = false,
     this.initialItem,
+    this.prefill,
   });
 
   final ValueChanged<TravelItem> onSubmit;
@@ -47,6 +52,9 @@ class _AddTravelContent extends StatefulWidget {
   final ScrollController? scrollController;
   final bool showDragHandle;
   final TravelItem? initialItem;
+
+  /// New-item prefill (Import). Never switches the sheet into edit mode.
+  final ImportPrefill? prefill;
 
   @override
   State<_AddTravelContent> createState() => _AddTravelContentState();
@@ -102,6 +110,17 @@ class _AddTravelContentState extends State<_AddTravelContent> {
       _endTime      = _parseTime(item.endTime);
       _boardingTime = _parseTime(item.boardingTime);
       _linkedDocIds.addAll(item.linkedDocIds);
+    } else if (widget.prefill != null) {
+      final pre = widget.prefill!;
+      _titleCtrl.text       = pre.title ?? '';
+      _locationCtrl.text    = pre.location ?? '';
+      _destinationCtrl.text = pre.destination ?? '';
+      _confirmCtrl.text     = pre.confirmationNumber ?? '';
+      _urlCtrl.text         = pre.url ?? '';
+      _notesCtrl.text       = pre.notes ?? '';
+      _date                 = pre.date;
+      _endDate              = pre.endDate;
+      _linkedDocIds.addAll(pre.linkedDocIds);
     }
   }
 
@@ -274,6 +293,14 @@ class _AddTravelContentState extends State<_AddTravelContent> {
   }
 
   bool get _isTransit => _type != TravelItemType.other;
+
+  /// Biases place search toward the right kind of place for the travel type.
+  String? get _placeSuffix => switch (_type) {
+        TravelItemType.flight => 'airport',
+        TravelItemType.train  => 'station',
+        TravelItemType.ferry  => 'port',
+        _                     => null,
+      };
   bool get _isMultiDay => _type == TravelItemType.car;
 
   @override
@@ -432,7 +459,7 @@ class _AddTravelContentState extends State<_AddTravelContent> {
                   ),
                   const SizedBox(height: kSpace4),
 
-                  WabwayTextField(
+                  PlaceSearchField(
                     label: _isTransit ? 'From (origin)' : 'Location',
                     hint: _type == TravelItemType.flight
                         ? 'e.g. London Heathrow (LHR)'
@@ -447,11 +474,17 @@ class _AddTravelContentState extends State<_AddTravelContent> {
                                         : 'e.g. Azabudai Hills, Tokyo',
                     controller: _locationCtrl,
                     textInputAction: TextInputAction.next,
+                    querySuffix: _placeSuffix,
+                    onSelected: (p) => setState(() {
+                      if (!_isTransit && p.address.isNotEmpty && _addressCtrl.text.trim().isEmpty) {
+                        _addressCtrl.text = p.address;
+                      }
+                    }),
                   ),
                   const SizedBox(height: kSpace4),
 
                   if (_isTransit) ...[
-                    WabwayTextField(
+                    PlaceSearchField(
                       label: 'To (destination)',
                       hint: _type == TravelItemType.flight
                           ? 'e.g. Narita International Airport (NRT)'
@@ -462,6 +495,8 @@ class _AddTravelContentState extends State<_AddTravelContent> {
                                   : 'e.g. Kyoto Station',
                       controller: _destinationCtrl,
                       textInputAction: TextInputAction.next,
+                      querySuffix: _placeSuffix,
+                      onSelected: (_) {},
                     ),
                     const SizedBox(height: kSpace4),
                   ] else ...[
@@ -476,7 +511,7 @@ class _AddTravelContentState extends State<_AddTravelContent> {
 
                   WabwayTextField(
                     label: 'Confirmation number (optional)',
-                    hint: 'Booking reference',
+                    hint: 'e.g. ABC123',
                     controller: _confirmCtrl,
                     textInputAction: TextInputAction.next,
                   ),

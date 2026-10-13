@@ -13,6 +13,7 @@ import '../../widgets/place_search_field.dart';
 import '../../widgets/widgets.dart';
 import '../../core/text_utils.dart';
 import '../../data/currencies.dart';
+import '../../data/share_data.dart';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -32,6 +33,7 @@ Future<ItineraryItem?> showAddItemSheet(
   List<TripDocument> docs = const [],
   List<Accommodation> stays = const [],
   ItineraryItem? initialItem,
+  ImportPrefill? prefill,
 }) {
   return showWabwayFormSheet<ItineraryItem>(
     context,
@@ -45,6 +47,7 @@ Future<ItineraryItem?> showAddItemSheet(
       docs: docs,
       stays: stays,
       initialItem: initialItem,
+      prefill: prefill,
       defaultCurrency: defaultCurrency,
       scrollController: scroll,
       showDragHandle: handle,
@@ -64,6 +67,7 @@ class _AddItemContent extends StatefulWidget {
     this.scrollController,
     this.showDragHandle = false,
     this.initialItem,
+    this.prefill,
   });
 
   final String dayId;
@@ -75,6 +79,9 @@ class _AddItemContent extends StatefulWidget {
   final ScrollController? scrollController;
   final bool showDragHandle;
   final ItineraryItem? initialItem;
+
+  /// New-item prefill (Import). Never switches the sheet into edit mode.
+  final ImportPrefill? prefill;
 
   @override
   State<_AddItemContent> createState() => _AddItemContentState();
@@ -103,6 +110,16 @@ class _AddItemContentState extends State<_AddItemContent> {
   void initState() {
     super.initState();
     _currency = widget.defaultCurrency;
+    final pre = widget.prefill;
+    if (widget.initialItem == null && pre != null) {
+      _titleCtrl.text    = pre.title ?? '';
+      _locationCtrl.text = pre.location ?? '';
+      _mapsCtrl.text     = pre.mapsUrl ?? '';
+      _confirmCtrl.text  = pre.url ?? '';
+      _notesCtrl.text    = pre.notes ?? '';
+      _linkedDocIds.addAll(pre.linkedDocIds);
+      if (pre.mapsUrl != null || pre.url != null) _showAdvanced = true;
+    }
     final item = widget.initialItem;
     if (item != null) {
       _titleCtrl.text    = item.title;

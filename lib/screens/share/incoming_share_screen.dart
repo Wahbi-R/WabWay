@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../core/images/wikipedia_image_service.dart';
 import '../../core/ocr/gemini_parser.dart';
 import '../../core/ocr/itinerary_scanner.dart';
 import '../../core/places/google_maps_parser.dart';
@@ -15,18 +14,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers/profile_provider.dart';
 import '../../core/providers/trip_provider.dart';
 import '../../core/supabase/doc_service.dart';
-import '../../core/supabase/links_service.dart';
-import '../../core/supabase/money_service.dart';
 import '../../core/supabase/plan_service.dart';
 import '../../core/supabase/spot_service.dart';
 import '../../core/supabase/travel_service.dart';
 import '../../data/docs_data.dart';
-import '../../data/links_data.dart';
 import '../../data/money_data.dart';
-import '../../data/plan_data.dart';
 import '../../data/share_data.dart';
 import '../../data/spot_data.dart';
-import '../../data/travel_data.dart';
 import '../../screens/accommodations/add_accommodation_sheet.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
@@ -37,14 +31,24 @@ import 'destination_selector.dart';
 import 'extracted_spots_screen.dart';
 import 'maps_import_screen.dart';
 import 'parsed_itinerary_screen.dart';
-import 'share_form.dart';
+import 'dart:typed_data';
+import '../../core/places/url_metadata_service.dart';
+import '../../core/supabase/accommodation_service.dart';
+import '../../data/accommodation_data.dart' show Accommodation;
+import '../docs/add_doc_sheet.dart';
+import '../links/add_link_sheet.dart';
+import '../money/add_receipt_sheet.dart';
+import '../plan/add_item_sheet.dart';
+import '../plan/day_picker_sheet.dart';
+import '../spots/add_spot_sheet.dart';
+import '../travel/add_travel_sheet.dart';
 
 // ─── Entry point for import mode ─────────────────────────────────────────────
 
 void showImportScreen(BuildContext context, WidgetRef ref) {
   final tripId = ref.read(activeTripIdProvider);
   final userId = ref.read(profileProvider)!.id;
-  final homeCurrency = ref.read(activeTripProvider)?.homeCurrency ?? 'JPY';
+  final homeCurrency = ref.read(activeTripProvider)?.homeCurrency ?? 'CAD';
   Navigator.of(context).push(MaterialPageRoute<void>(
     builder: (_) => IncomingShareScreen(
       share: null,
@@ -58,13 +62,13 @@ void showImportScreen(BuildContext context, WidgetRef ref) {
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-class IncomingShareScreen extends StatefulWidget {
+class IncomingShareScreen extends ConsumerStatefulWidget {
   const IncomingShareScreen({
     super.key,
     required this.share,
     required this.tripId,
     required this.userId,
-    this.homeCurrency = 'JPY',
+    this.homeCurrency = 'CAD',
     this.onDone,
   });
 
@@ -75,10 +79,10 @@ class IncomingShareScreen extends StatefulWidget {
   final VoidCallback? onDone;
 
   @override
-  State<IncomingShareScreen> createState() => _IncomingShareScreenState();
+  ConsumerState<IncomingShareScreen> createState() => _IncomingShareScreenState();
 }
 
-class _IncomingShareScreenState extends State<IncomingShareScreen> {
+class _IncomingShareScreenState extends ConsumerState<IncomingShareScreen> {
   IncomingShare? _activeShare;
   ShareDestination? _destination;
 
@@ -86,7 +90,6 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
   bool _scanningOcr    = false;
   bool _scanningPlaces = false;
   bool _scanningAudio  = false;
-  bool _scanningStay   = false;
   bool _scanningMaps   = false;
 
   final _urlCtrl = TextEditingController();
@@ -94,13 +97,10 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
   String? _fileName;
   String? _fileExt;
 
-  List<TripDay> _days = [];
-  TripDay? _selectedDay;
-  bool _daysLoading = false;
-  ItineraryItemType _planItemType = ItineraryItemType.activity;
+  UrlMetadata? _meta;
+  bool _fetchingMeta = false;
+  bool _saving = false;
 
-  final _planTitleCtrl  = TextEditingController();
-  final _planNotesCtrl  = TextEditingController();
   final _captionCtrl    = TextEditingController();
   bool _scanningPasted  = false;
 
@@ -108,7 +108,7 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
   bool get _showSourceStep => _inImportMode && _activeShare == null;
 
   bool get _anyScan =>
-      _scanningAi || _scanningOcr || _scanningPlaces || _scanningAudio || _scanningStay || _scanningMaps || _scanningPasted;
+      _scanningAi || _scanningOcr || _scanningPlaces || _scanningAudio || _scanningMaps || _scanningPasted;
 
   bool get _canParseItinerary =>
       !kIsWeb &&
@@ -125,9 +125,6 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
   bool get _canImportMaps =>
       _activeShare?.contentType == ShareContentType.googleMapsLink;
 
-  bool get _canSaveAsStay =>
-      _activeShare?.contentType == ShareContentType.accommodationLink;
-
   @override
   void initState() {
     super.initState();
@@ -137,15 +134,12 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
   @override
   void dispose() {
     _urlCtrl.dispose();
-    _planTitleCtrl.dispose();
-    _planNotesCtrl.dispose();
     _captionCtrl.dispose();
     super.dispose();
   }
 
   void _selectDestination(ShareDestination dest) {
     setState(() => _destination = dest);
-    if (dest == ShareDestination.planItem) _loadDays();
   }
 
   // ─── Source picking (import mode) ─────────────────────────────────────────
@@ -192,7 +186,6 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
         rawContent: f.name,
         detectedTitle: nameWithoutExt,
       );
-      _planTitleCtrl.text = nameWithoutExt;
     });
   }
 
@@ -215,7 +208,6 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
         rawContent: picked.name,
         detectedTitle: nameWithoutExt,
       );
-      _planTitleCtrl.text = nameWithoutExt;
     });
   }
 
@@ -231,8 +223,8 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
         rawContent: url,
         detectedTitle: title,
       );
-      _planTitleCtrl.text = title;
     });
+    _fetchMeta(url);
   }
 
   void _showImageSourceSheet() {
@@ -266,106 +258,7 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
     );
   }
 
-  // ─── Plan item ────────────────────────────────────────────────────────────
-
-  Future<void> _loadDays() async {
-    if (_days.isNotEmpty || _daysLoading) return;
-    setState(() => _daysLoading = true);
-    try {
-      final days = await PlanService.loadAll(widget.tripId);
-      if (!mounted) return;
-      setState(() {
-        _days = days;
-        _selectedDay = days.isNotEmpty ? days.first : null;
-        _daysLoading = false;
-      });
-    } catch (_) {
-      if (mounted) setState(() => _daysLoading = false);
-    }
-  }
-
-  Future<void> _savePlanItem() async {
-    final title = _planTitleCtrl.text.trim();
-    if (title.isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Please enter a title'),
-        behavior: SnackBarBehavior.floating,
-      ));
-      return;
-    }
-    if (_selectedDay == null) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Select an itinerary day'),
-        behavior: SnackBarBehavior.floating,
-      ));
-      return;
-    }
-    try {
-      TripDocument? doc;
-      final filePath = _activeShare?.filePath;
-      final planBytes = _fileBytes ?? (filePath != null ? await readFileAsBytes(filePath) : null);
-      if (planBytes != null) {
-        final ext = _fileExt ?? filePath?.split('.').last.toLowerCase() ?? 'bin';
-        doc = await DocService.uploadAndCreate(
-          tripId: widget.tripId,
-          userId: widget.userId,
-          title: title,
-          type: DocType.other,
-          ext: ext,
-          bytes: planBytes,
-          fileSizeKb: (planBytes.length / 1024).round(),
-        );
-      }
-      await PlanService.createItem(
-        tripId: widget.tripId,
-        dayId: _selectedDay!.id,
-        title: title,
-        type: _planItemType,
-        createdBy: widget.userId,
-        notes: _planNotesCtrl.text.trim().isEmpty ? null : _planNotesCtrl.text.trim(),
-        linkedDocIds: doc != null ? [doc.id] : [],
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(
-          'Saved as plan item',
-          style: kStyleBodyMedium.copyWith(color: kColorTextOnPrimary),
-        ),
-        backgroundColor: kColorPrimary,
-        behavior: SnackBarBehavior.floating,
-        shape: const RoundedRectangleBorder(borderRadius: kRadiusMd),
-        margin: const EdgeInsets.all(kSpace4),
-        duration: const Duration(seconds: 2),
-      ));
-      widget.onDone?.call();
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Failed to save — please try again'),
-        behavior: SnackBarBehavior.floating,
-      ));
-    }
-  }
-
   // ─── Scanning actions ──────────────────────────────────────────────────────
-
-  Future<void> _saveAsStay() async {
-    if (_anyScan) return;
-    setState(() => _scanningStay = true);
-    try {
-      final url = _activeShare!.rawContent;
-      final result = await ListingParser.parse(url);
-      if (!mounted) return;
-      await showAddStaySheet(context,
-          tripId: widget.tripId, userId: widget.userId,
-          prefilled: result, initialUrl: url);
-      if (mounted) widget.onDone?.call();
-    } finally {
-      if (mounted) setState(() => _scanningStay = false);
-    }
-  }
 
   Future<void> _findPlaces() async {
     if (_anyScan) return;
@@ -634,169 +527,209 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
     );
   }
 
-  // ─── Save ──────────────────────────────────────────────────────────────────
+  // ─── Continue → the entity's ONE Add sheet, pre-filled ────────────────────
+  //
+  // Import never re-implements an entity form. It works out what it can from
+  // the shared content (link metadata, file, Maps URL) and hands that to the
+  // same Add sheet the rest of the app uses.
 
-  Future<void> _handleSave(ShareSaveData data) async {
+  Future<void> _fetchMeta(String url) async {
+    setState(() { _fetchingMeta = true; _meta = null; });
+    final meta = await UrlMetadataService.fetch(url);
+    if (!mounted || _activeShare?.rawContent != url) return;
+    setState(() {
+      _fetchingMeta = false;
+      _meta = meta;
+      if (meta?.isLodging == true && _destination == null) {
+        _destination = ShareDestination.stay;
+      }
+    });
+  }
+
+  String? get _sourceUrl {
+    final raw = _activeShare?.rawContent.trim() ?? '';
+    return raw.startsWith('http://') || raw.startsWith('https://') ? raw : null;
+  }
+
+  Future<(Uint8List, String, String)?> _fileForShare() async {
+    final filePath = _activeShare?.filePath;
+    final bytes = _fileBytes ?? (filePath != null ? await readFileAsBytes(filePath) : null);
+    if (bytes == null) return null;
+    final ext = _fileExt ??
+        (filePath != null ? _extFromShare(filePath, _activeShare!.contentType) : 'bin');
+    final name = _fileName ?? filePath?.split('/').last ?? 'file.$ext';
+    return (bytes, name, ext);
+  }
+
+  ImportPrefill _prefill({
+    Uint8List? bytes,
+    String? fileName,
+    String? fileExt,
+    List<String> docIds = const [],
+  }) {
+    final share = _activeShare!;
+    final meta = _meta;
+    final url = _sourceUrl;
+    final isMaps = share.contentType == ShareContentType.googleMapsLink;
+    return ImportPrefill(
+      title: meta?.title ?? share.detectedTitle,
+      notes: meta?.description,
+      url: isMaps ? null : url,
+      mapsUrl: isMaps ? url : null,
+      location: meta?.locality ?? meta?.address,
+      date: meta?.startDate,
+      endDate: meta?.endDate,
+      confirmationNumber: meta?.confirmationNumber,
+      amount: meta?.price,
+      currency: meta?.currency,
+      fileBytes: bytes,
+      fileName: fileName,
+      fileExt: fileExt,
+      linkedDocIds: docIds,
+    );
+  }
+
+  /// Travel and plan items attach files as documents. Upload first so the
+  /// sheet's doc picker shows it pre-selected; removed again if cancelled.
+  Future<TripDocument?> _uploadShareFile() async {
+    final f = await _fileForShare();
+    if (f == null) return null;
+    return DocService.uploadAndCreate(
+      tripId: widget.tripId,
+      userId: widget.userId,
+      title: _prefill().title ?? f.$2,
+      type: DocType.other,
+      ext: f.$3,
+      bytes: f.$1,
+      fileSizeKb: (f.$1.length / 1024).round(),
+    );
+  }
+
+  Future<void> _discardDoc(TripDocument? doc) async {
+    if (doc == null) return;
+    try {
+      await DocService.deleteDocument(doc.id);
+    } catch (_) {}
+  }
+
+  Future<void> _continue() async {
     final dest = _destination;
-    if (dest == null) return;
+    if (dest == null || _saving) return;
+    setState(() => _saving = true);
+    try {
+      final saved = await _openSheetFor(dest);
+      if (!mounted) return;
+      if (saved) {
+        showWabwaySnack(context, 'Saved as ${dest.label.toLowerCase()}');
+        widget.onDone?.call();
+      }
+    } catch (_) {
+      if (mounted) showWabwaySnack(context, 'Could not save — please try again.', error: true);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
 
+  Future<bool> _openSheetFor(ShareDestination dest) async {
     final tripId = widget.tripId;
     final userId = widget.userId;
+    final trip = ref.read(activeTripProvider);
 
     switch (dest) {
       case ShareDestination.spot:
-        final isMaps = _activeShare!.contentType == ShareContentType.googleMapsLink;
-        final imageUrl = kIsWeb
-            ? null
-            : await WikipediaImageService.fetchThumbnailUrl(data.title);
-        await SpotService.createSpot(
-          tripId: tripId,
-          name: data.title,
-          city: data.location ?? 'Unknown',
-          area: '',
-          category: _spotCategory(data.category),
-          status: SpotStatus.idea,
-          addedBy: userId,
-          sourceUrl: isMaps ? null : _activeShare!.rawContent,
-          mapsUrl: data.mapsUrl,
-          notes: data.notes.isEmpty ? null : data.notes,
-          country: data.country,
-          latitude: data.latitude,
-          longitude: data.longitude,
-          placeSource: data.placeSource,
-          imageUrl: imageUrl,
-        );
-
-      case ShareDestination.document:
-        final filePath = _activeShare?.filePath;
-        final docBytes = _fileBytes ?? (filePath != null ? await readFileAsBytes(filePath) : null);
-        if (docBytes != null) {
-          final ext = _fileExt ?? filePath?.split('.').last.toLowerCase() ?? 'bin';
-          await DocService.uploadAndCreate(
-            tripId: tripId,
-            userId: userId,
-            title: data.title,
-            type: _docType(data.docType),
-            ext: ext,
-            bytes: docBytes,
-            fileSizeKb: (docBytes.length / 1024).round(),
-            notes: data.notes.isEmpty ? null : data.notes,
-          );
-        } else {
-          await DocService.createDocument(
-            tripId: tripId,
-            userId: userId,
-            title: data.title,
-            type: _docType(data.docType),
-            ext: 'url',
-            notes: data.notes.isEmpty ? null : data.notes,
-          );
-        }
-
-      case ShareDestination.travelItem:
-        TripDocument? travelDoc;
-        final travelFilePath = _activeShare?.filePath;
-        final travelBytes = _fileBytes ?? (travelFilePath != null ? await readFileAsBytes(travelFilePath) : null);
-        if (travelBytes != null) {
-          final ext = _fileExt ?? travelFilePath?.split('.').last.toLowerCase() ?? 'bin';
-          travelDoc = await DocService.uploadAndCreate(
-            tripId: tripId,
-            userId: userId,
-            title: data.title,
-            type: _docType(data.docType),
-            ext: ext,
-            bytes: travelBytes,
-            fileSizeKb: (travelBytes.length / 1024).round(),
-            notes: data.notes.isEmpty ? null : data.notes,
-          );
-        }
-        final travelItem = await TravelService.createItem(
-          tripId: tripId,
-          title: data.title,
-          type: _travelItemType(data.travelType),
-          createdBy: userId,
-          date: data.date,
-          notes: data.notes.isEmpty ? null : data.notes,
-        );
-        if (travelDoc != null) {
-          await DocService.addLink(
-            documentId: travelDoc.id,
-            linkedType: DocLinkedType.travelItem,
-            linkedId: travelItem.id,
-            createdBy: userId,
-          );
-        }
-
-      case ShareDestination.receipt:
-        TripDocument? receiptDoc;
-        final receiptFilePath = _activeShare?.filePath;
-        final receiptBytes = _fileBytes ?? (receiptFilePath != null ? await readFileAsBytes(receiptFilePath) : null);
-        if (receiptBytes != null) {
-          final ext = _fileExt ?? receiptFilePath?.split('.').last.toLowerCase() ?? 'jpg';
-          receiptDoc = await DocService.uploadAndCreate(
-            tripId: tripId,
-            userId: userId,
-            title: data.title,
-            type: DocType.receipt,
-            ext: ext,
-            bytes: receiptBytes,
-            fileSizeKb: (receiptBytes.length / 1024).round(),
-          );
-        }
-        final amount = data.amount ?? 0.0;
-        final receipt = await MoneyService.createReceipt(
-          tripId:            tripId,
-          paidBy:            userId,
-          title:             data.title,
-          amount:            amount,
-          currency:          widget.homeCurrency,
-          homeAmount:        amount,
-          exchangeRate:      1.0,
-          transactionFeePct: 0.0,
-          category:          _receiptCategory(data.category),
-          date:              data.date ?? DateTime.now(),
-          notes:             data.notes.isEmpty ? null : data.notes,
-          splits:            [ReceiptSplit(memberId: userId, amount: amount)],
-        );
-        if (receiptDoc != null) {
-          await DocService.addLink(
-            documentId: receiptDoc.id,
-            linkedType: DocLinkedType.receipt,
-            linkedId: receipt.id,
-            createdBy: userId,
-          );
-        }
+        return await showAddSpotSheet(context,
+                tripId: tripId, userId: userId, prefill: _prefill()) !=
+            null;
 
       case ShareDestination.link:
-        final url = _activeShare?.rawContent ?? '';
-        if (url.isEmpty) return;
-        await LinksService.createLink(
-          tripId: tripId,
-          addedBy: userId,
-          title: data.title,
-          url: url,
-          category: _linkCategory(_activeShare!.contentType),
-          notes: data.notes.isEmpty ? null : data.notes,
-        );
+        return await showAddLinkSheet(context,
+                tripId: tripId, userId: userId,
+                prefillUrl: _sourceUrl, prefillTitle: _prefill().title) !=
+            null;
+
+      case ShareDestination.stay:
+        final url = _sourceUrl;
+        final listing = url == null ? null : await ListingParser.parse(url);
+        if (!mounted) return false;
+        return await showAddStaySheet(context,
+                tripId: tripId, userId: userId,
+                prefilled: listing, initialUrl: url) !=
+            null;
+
+      case ShareDestination.document:
+        final f = await _fileForShare();
+        if (!mounted) return false;
+        return await showAddDocSheet(context,
+                tripId: tripId,
+                tripName: trip?.name ?? '',
+                userId: userId,
+                availableSpots: const [],
+                prefill: _prefill(bytes: f?.$1, fileName: f?.$2, fileExt: f?.$3)) !=
+            null;
+
+      case ShareDestination.receipt:
+        final f = await _fileForShare();
+        if (!mounted) return false;
+        final members = ref
+            .read(tripMembersProvider)
+            .map((m) => TripMember(id: m.userId, name: m.profile.displayName))
+            .toList();
+        return await showAddReceiptSheet(context,
+                tripId: tripId,
+                userId: userId,
+                members: members,
+                homeCurrency: trip?.homeCurrency ?? widget.homeCurrency,
+                defaultCurrency: trip?.defaultCurrency,
+                prefill: _prefill(bytes: f?.$1, fileName: f?.$2, fileExt: f?.$3)) !=
+            null;
+
+      case ShareDestination.travelItem:
+        final doc = await _uploadShareFile();
+        final docs = await DocService.loadDocuments(tripId)
+            .catchError((_) => <TripDocument>[]);
+        if (!mounted) return false;
+        final draft = await showAddTravelSheet(context,
+            docs: docs, prefill: _prefill(docIds: [if (doc != null) doc.id]));
+        if (draft == null) {
+          await _discardDoc(doc);
+          return false;
+        }
+        await TravelService.createFromDraft(draft, tripId: tripId, createdBy: userId);
+        return true;
 
       case ShareDestination.planItem:
-        await _savePlanItem();
-        return;
+        final days = await PlanService.loadAll(tripId);
+        if (!mounted) return false;
+        if (days.isEmpty) {
+          showWabwaySnack(context, 'Set your trip dates in Trip settings to start planning days.');
+          return false;
+        }
+        final picked = await showDayPickerSheet(context, days: days);
+        if (picked == null || !mounted) return false;
+        final day = days.firstWhere((d) => d.id == picked.$1);
+        final doc = await _uploadShareFile();
+        final lists = await Future.wait<List<Object>>([
+          SpotService.loadSpots(tripId).catchError((_) => <Spot>[]),
+          DocService.loadDocuments(tripId).catchError((_) => <TripDocument>[]),
+          AccommodationService.loadAll(tripId).catchError((_) => <Accommodation>[]),
+        ]);
+        if (!mounted) return false;
+        final draft = await showAddItemSheet(context,
+            dayId: day.id,
+            defaultCurrency: trip?.defaultCurrency ?? widget.homeCurrency,
+            spots: lists[0].cast<Spot>(),
+            docs: lists[1].cast<TripDocument>(),
+            stays: lists[2].cast<Accommodation>(),
+            prefill: _prefill(docIds: [if (doc != null) doc.id]));
+        if (draft == null) {
+          await _discardDoc(doc);
+          return false;
+        }
+        await PlanService.createItemFromDraft(draft,
+            tripId: tripId, dayId: day.id, createdBy: userId,
+            sortOrder: day.items.length);
+        return true;
     }
-
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(
-        'Saved as ${dest.label.toLowerCase()}',
-        style: kStyleBodyMedium.copyWith(color: kColorTextOnPrimary),
-      ),
-      backgroundColor: kColorPrimary,
-      behavior: SnackBarBehavior.floating,
-      shape: const RoundedRectangleBorder(borderRadius: kRadiusMd),
-      margin: const EdgeInsets.all(kSpace4),
-      duration: const Duration(seconds: 2),
-    ));
-    widget.onDone?.call();
   }
 
   void _handleDiscard() {
@@ -828,49 +761,44 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
     }
   }
 
-  static SpotCategory _spotCategory(String? raw) => switch (raw) {
-        'food' => SpotCategory.food,
-        'shopping' => SpotCategory.shopping,
-        'accommodation' => SpotCategory.experience,
-        'attraction' => SpotCategory.landmark,
-        _ => SpotCategory.landmark,
-      };
-
-  static DocType _docType(String? raw) => switch (raw) {
-        'flight' => DocType.flight,
-        'hotel' => DocType.hotel,
-        'ticket' => DocType.ticket,
-        'insurance' => DocType.insurance,
-        'screenshot' => DocType.screenshot,
-        _ => DocType.other,
-      };
-
-  static TravelItemType _travelItemType(String? raw) => switch (raw) {
-        'flight' => TravelItemType.flight,
-        'train'  => TravelItemType.train,
-        'bus'    => TravelItemType.bus,
-        'ferry'  => TravelItemType.ferry,
-        'car'    => TravelItemType.car,
-        _        => TravelItemType.other,
-      };
-
-  static ReceiptCategory _receiptCategory(String? raw) => switch (raw) {
-        'food' => ReceiptCategory.food,
-        'transport' => ReceiptCategory.transport,
-        'accommodation' => ReceiptCategory.accommodation,
-        'activity' => ReceiptCategory.activity,
-        'shopping' => ReceiptCategory.shopping,
-        _ => ReceiptCategory.other,
-      };
-
-  static LinkCategory _linkCategory(ShareContentType contentType) =>
-      switch (contentType) {
-        ShareContentType.instagramLink => LinkCategory.social,
-        ShareContentType.tiktokLink => LinkCategory.social,
-        ShareContentType.youtubeLink => LinkCategory.article,
-        ShareContentType.blogArticle => LinkCategory.article,
-        _ => LinkCategory.general,
-      };
+  Widget _buildContinue() {
+    final dest = _destination!;
+    final metaTitle = _meta?.title;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_fetchingMeta)
+          Row(
+            children: [
+              const SizedBox(
+                width: 14, height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              const SizedBox(width: kSpace2),
+              Text('Reading the link…', style: kStyleCaption),
+            ],
+          )
+        else if (metaTitle != null)
+          Text('Found: $metaTitle', style: kStyleCaption, maxLines: 2, overflow: TextOverflow.ellipsis),
+        const SizedBox(height: kSpace3),
+        WabwayButton(
+          label: 'Continue — add ${dest.label.toLowerCase()} details',
+          icon: dest.icon,
+          fullWidth: true,
+          size: WabwayButtonSize.lg,
+          loading: _saving,
+          onPressed: (_saving || _anyScan) ? null : _continue,
+        ),
+        const SizedBox(height: kSpace2),
+        WabwayButton(
+          label: 'Discard',
+          variant: WabwayButtonVariant.ghost,
+          fullWidth: true,
+          onPressed: _saving ? null : _handleDiscard,
+        ),
+      ],
+    );
+  }
 
   // ─── Build ────────────────────────────────────────────────────────────────
 
@@ -964,298 +892,8 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
 
   // ─── Plan item form ───────────────────────────────────────────────────────
 
-  Widget _buildPlanItemForm() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        WabwayTextField(
-          label: 'Title',
-          controller: _planTitleCtrl,
-          textInputAction: TextInputAction.next,
-        ),
-        const SizedBox(height: kSpace4),
-        if (_daysLoading)
-          const Center(
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: kSpace4),
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(kColorPrimary),
-              ),
-            ),
-          )
-        else if (_days.isEmpty)
-          Container(
-            padding: const EdgeInsets.all(kSpace4),
-            decoration: BoxDecoration(
-              color: kColorSurfaceSunken,
-              borderRadius: kRadiusMd,
-              border: Border.all(color: kColorBorder),
-            ),
-            child: Text(
-              'No itinerary days yet. Add a day in the Plan tab first.',
-              style: kStyleCaption,
-            ),
-          )
-        else ...[
-          Text('Itinerary day', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
-          const SizedBox(height: kSpace3),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: kSpace3),
-            decoration: BoxDecoration(
-              color: kColorSurfaceSunken,
-              borderRadius: kRadiusMd,
-              border: Border.all(color: kColorBorder),
-            ),
-            child: DropdownButton<TripDay>(
-              value: _selectedDay,
-              isExpanded: true,
-              underline: const SizedBox.shrink(),
-              style: kStyleBodyMedium,
-              items: _days
-                  .map((d) => DropdownMenuItem(
-                        value: d,
-                        child: Text('Day ${d.dayNumber} – ${d.city}', style: kStyleBodyMedium),
-                      ))
-                  .toList(),
-              onChanged: (d) => setState(() => _selectedDay = d),
-            ),
-          ),
-        ],
-        const SizedBox(height: kSpace4),
-        Text('Type', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
-        const SizedBox(height: kSpace3),
-        Wrap(
-          spacing: kSpace2,
-          runSpacing: kSpace2,
-          children: ItineraryItemType.values.map((t) {
-            final isSelected = t == _planItemType;
-            return GestureDetector(
-              onTap: () => setState(() => _planItemType = t),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: kSpace2),
-                decoration: BoxDecoration(
-                  color: isSelected ? kColorPrimary : kColorSurfaceSunken,
-                  borderRadius: kRadiusMd,
-                  border: Border.all(color: isSelected ? kColorPrimary : kColorBorder),
-                ),
-                child: Text(
-                  t.label,
-                  style: kStyleBodyMedium.copyWith(
-                    color: isSelected ? kColorTextOnPrimary : kColorInk,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-        const SizedBox(height: kSpace4),
-        WabwayTextField(
-          label: 'Notes (optional)',
-          controller: _planNotesCtrl,
-          maxLines: 3,
-        ),
-        const SizedBox(height: kSpace5),
-        Row(
-          children: [
-            Expanded(
-              child: WabwayButton(
-                label: 'Discard',
-                variant: WabwayButtonVariant.ghost,
-                onPressed: _handleDiscard,
-                fullWidth: true,
-              ),
-            ),
-            const SizedBox(width: kSpace3),
-            Expanded(
-              flex: 2,
-              child: WabwayButton(
-                label: 'Save plan item',
-                icon: Icons.check_rounded,
-                onPressed: _savePlanItem,
-                fullWidth: true,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  // ─── Desktop ──────────────────────────────────────────────────────────────
-
-  Widget _buildDesktop() {
-    final share = _activeShare!;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 380,
-          child: Container(
-            color: kColorBgRaised,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(kSpace5),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Detected content',
-                    style: kStyleCaptionMedium.copyWith(color: kColorInkSoft),
-                  ),
-                  const SizedBox(height: kSpace2),
-                  ContentPreviewCard(share: share),
-                  const SizedBox(height: kSpace5),
-                  _ContentTypeInfoCard(contentType: share.contentType),
-                ],
-              ),
-            ),
-          ),
-        ),
-        const VerticalDivider(width: 1, thickness: 1, color: kColorBorder),
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(kSpace5),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                DestinationSelector(
-                  contentType: share.contentType,
-                  selected: _destination,
-                  onSelect: _selectDestination,
-                ),
-                if (_destination != null) ...[
-                  const SizedBox(height: kSpace5),
-                  const Divider(color: kColorBorder),
-                  const SizedBox(height: kSpace4),
-                  if (_canParseItinerary) ...[
-                    if (GeminiParser.isAvailable)
-                      _ParseItineraryBanner(
-                        icon: Icons.auto_awesome_rounded,
-                        label: 'Parse with AI',
-                        subtitle: 'Reads flights, hotels & trains via Gemini',
-                        scanning: _scanningAi,
-                        disabled: _anyScan,
-                        onTap: _parseWithAi,
-                      ),
-                    if (GeminiParser.isAvailable) const SizedBox(height: kSpace2),
-                    _ParseItineraryBanner(
-                      icon: Icons.document_scanner_rounded,
-                      label: 'Read text / PDF',
-                      subtitle: 'On-device OCR · no AI required',
-                      scanning: _scanningOcr,
-                      disabled: _anyScan,
-                      onTap: _parseWithOcr,
-                    ),
-                    const SizedBox(height: kSpace4),
-                  ],
-                  if (_isCsvShare) ...[
-                    _ParseItineraryBanner(
-                      icon: Icons.table_chart_rounded,
-                      label: 'Import spots from CSV',
-                      subtitle: 'Import saved places from Google Takeout',
-                      scanning: false,
-                      disabled: _anyScan,
-                      onTap: _importFromCsv,
-                    ),
-                    const SizedBox(height: kSpace4),
-                  ],
-                  if (_canImportMaps) ...[
-                    _ParseItineraryBanner(
-                      icon: Icons.pin_drop_rounded,
-                      label: 'Import from Google Maps',
-                      subtitle: 'Add all pins as spots · works with lists & My Maps',
-                      scanning: _scanningMaps,
-                      disabled: _anyScan,
-                      onTap: _importFromMaps,
-                    ),
-                    const SizedBox(height: kSpace4),
-                  ],
-                  if (_canFindPlaces) ...[
-                    _ParseItineraryBanner(
-                      icon: Icons.place_rounded,
-                      label: 'Find places',
-                      subtitle: 'Extract locations from caption · no AI',
-                      scanning: _scanningPlaces,
-                      disabled: _anyScan,
-                      onTap: _findPlaces,
-                    ),
-                    const SizedBox(height: kSpace2),
-                    if (SocialPlaceExtractor.audioServerAvailable) ...[
-                      _ParseItineraryBanner(
-                        icon: Icons.graphic_eq_rounded,
-                        label: 'Extract from audio',
-                        subtitle: 'Transcribes spoken place names from the video',
-                        scanning: _scanningAudio,
-                        disabled: _anyScan,
-                        onTap: _transcribeAudio,
-                      ),
-                      const SizedBox(height: kSpace2),
-                    ],
-                    _PasteCaptionCard(
-                      controller: _captionCtrl,
-                      scanning: _scanningPasted,
-                      disabled: _anyScan,
-                      onFind: _findPlacesInPastedText,
-                    ),
-                    const SizedBox(height: kSpace4),
-                  ],
-                  if (_canSaveAsStay) ...[
-                    _ParseItineraryBanner(
-                      icon: Icons.hotel_rounded,
-                      label: 'Save as stay',
-                      subtitle: 'Parse listing details automatically',
-                      scanning: _scanningStay,
-                      disabled: _anyScan,
-                      onTap: _saveAsStay,
-                    ),
-                    const SizedBox(height: kSpace4),
-                  ],
-                  Text(
-                    'Details',
-                    style: kStyleCaptionMedium.copyWith(color: kColorInkSoft),
-                  ),
-                  const SizedBox(height: kSpace3),
-                  if (_destination == ShareDestination.planItem)
-                    _buildPlanItemForm()
-                  else
-                    ShareForm(
-                      key: ValueKey(_destination),
-                      share: _activeShare,
-                      destination: _destination!,
-                      onSave: _handleSave,
-                      onDiscard: _handleDiscard,
-                    ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ─── Mobile ───────────────────────────────────────────────────────────────
-
-  Widget _buildMobile() {
-    final share = _activeShare!;
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(kSpace4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ContentPreviewCard(share: share),
-          const SizedBox(height: kSpace5),
-          DestinationSelector(
-            contentType: share.contentType,
-            selected: _destination,
-            onSelect: _selectDestination,
-          ),
-          if (_destination != null) ...[
-            const SizedBox(height: kSpace5),
-            Container(width: double.infinity, height: 1, color: kColorBorder),
-            const SizedBox(height: kSpace4),
+  /// Smart extractors offered for the shared content (both layouts).
+  List<Widget> _buildActions() => [
             if (_canParseItinerary) ...[
               if (GeminiParser.isAvailable)
                 _ParseItineraryBanner(
@@ -1328,32 +966,86 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
               ),
               const SizedBox(height: kSpace4),
             ],
-            if (_canSaveAsStay) ...[
-              _ParseItineraryBanner(
-                icon: Icons.hotel_rounded,
-                label: 'Save as stay',
-                subtitle: 'Parse listing details automatically',
-                scanning: _scanningStay,
-                disabled: _anyScan,
-                onTap: _saveAsStay,
+      ];
+
+  // ─── Desktop ──────────────────────────────────────────────────────────────
+
+  Widget _buildDesktop() {
+    final share = _activeShare!;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 380,
+          child: Container(
+            color: kColorBgRaised,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(kSpace5),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Detected content',
+                    style: kStyleCaptionMedium.copyWith(color: kColorInkSoft),
+                  ),
+                  const SizedBox(height: kSpace2),
+                  ContentPreviewCard(share: share),
+                  const SizedBox(height: kSpace5),
+                  _ContentTypeInfoCard(contentType: share.contentType),
+                ],
               ),
-              const SizedBox(height: kSpace4),
-            ],
-            Text(
-              'Details',
-              style: kStyleCaptionMedium.copyWith(color: kColorInkSoft),
             ),
-            const SizedBox(height: kSpace3),
-            if (_destination == ShareDestination.planItem)
-              _buildPlanItemForm()
-            else
-              ShareForm(
-                key: ValueKey(_destination),
-                share: _activeShare,
-                destination: _destination!,
-                onSave: _handleSave,
-                onDiscard: _handleDiscard,
-              ),
+          ),
+        ),
+        const VerticalDivider(width: 1, thickness: 1, color: kColorBorder),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(kSpace5),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                DestinationSelector(
+                  contentType: share.contentType,
+                  selected: _destination,
+                  onSelect: _selectDestination,
+                ),
+                if (_destination != null) ...[
+                  const SizedBox(height: kSpace5),
+                  const Divider(color: kColorBorder),
+                  const SizedBox(height: kSpace4),
+                  ..._buildActions(),
+                  _buildContinue(),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ─── Mobile ───────────────────────────────────────────────────────────────
+
+  Widget _buildMobile() {
+    final share = _activeShare!;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(kSpace4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ContentPreviewCard(share: share),
+          const SizedBox(height: kSpace5),
+          DestinationSelector(
+            contentType: share.contentType,
+            selected: _destination,
+            onSelect: _selectDestination,
+          ),
+          if (_destination != null) ...[
+            const SizedBox(height: kSpace5),
+            Container(width: double.infinity, height: 1, color: kColorBorder),
+            const SizedBox(height: kSpace4),
+            ..._buildActions(),
+            _buildContinue(),
             const SizedBox(height: kSpace12),
           ],
         ],

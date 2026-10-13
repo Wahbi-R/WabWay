@@ -18,6 +18,7 @@ import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 import '../../data/currencies.dart';
+import '../../data/share_data.dart';
 
 /// Opens the Add Receipt form, or Edit Receipt when [existingReceipt] is passed.
 ///
@@ -33,6 +34,7 @@ Future<Receipt?> showAddReceiptSheet(
   String homeCurrency = 'CAD',
   String? defaultCurrency,
   bool isDuplicate = false,
+  ImportPrefill? prefill,
 }) {
   final effectiveUserId = userId ?? supabase.auth.currentUser?.id ?? kYouId;
   final effectiveMembers = (members != null && members.isNotEmpty)
@@ -54,6 +56,7 @@ Future<Receipt?> showAddReceiptSheet(
       existingReceipt: existingReceipt,
       homeCurrency:    homeCurrency,
       defaultCurrency: defaultCurrency,
+      prefill: prefill,
       isDuplicate:     isDuplicate,
       scrollController: scroll,
       showDragHandle: handle,
@@ -72,6 +75,7 @@ class _AddReceiptContent extends StatefulWidget {
     required this.members,
     required this.homeCurrency,
     this.defaultCurrency,
+    this.prefill,
     this.existingReceipt,
     this.isDuplicate = false,
     this.scrollController,
@@ -88,6 +92,7 @@ class _AddReceiptContent extends StatefulWidget {
   /// Currency a NEW receipt starts in — the trip's spending currency.
   /// Falls back to [homeCurrency].
   final String? defaultCurrency;
+  final ImportPrefill? prefill;
   /// When set, the form pre-fills with this receipt and updates rather than creates.
   final Receipt? existingReceipt;
   /// When true, pre-fills from [existingReceipt] but creates a new receipt instead of editing.
@@ -214,6 +219,20 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
         }
       }).catchError((_) {});
     } else {
+      final pre = widget.prefill;
+      if (pre != null) {
+        _titleCtrl.text = pre.title ?? '';
+        _notesCtrl.text = pre.notes ?? '';
+        if (pre.amount != null) {
+          _amountCtrl.text = pre.amount!.toStringAsFixed(
+              pre.amount!.truncateToDouble() == pre.amount ? 0 : 2);
+        }
+        if (pre.currency != null) _currency = pre.currency!;
+        if (pre.fileBytes != null) {
+          _photoBytes = pre.fileBytes;
+          _photoExt   = pre.fileExt ?? 'jpg';
+        }
+      }
       _paidById  = widget.userId;
       _splitWith = {for (final m in widget.members) m.id};
       _customCtrls = {

@@ -14,6 +14,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
+import '../../core/text_utils.dart';
 
 class ParsedItineraryScreen extends StatefulWidget {
   const ParsedItineraryScreen({
@@ -174,6 +175,21 @@ class _ParsedItineraryScreenState extends State<ParsedItineraryScreen>
         for (int i = 0; i < widget.bookings.length; i++)
           if (_selected[i]) i,
       ];
+      // "Build trip": bookings on dates with no plan day get one (insert-only,
+      // same routine as Plan → Add all trip days), so nothing is dropped.
+      final missing = <DateTime>{
+        for (final i in selectedIndices)
+          if (_addToPlan[i] && _matchingDay(widget.bookings[i].date) == null)
+            DateTime(widget.bookings[i].date.year, widget.bookings[i].date.month,
+                widget.bookings[i].date.day),
+      };
+      for (final date in missing) {
+        final created = await PlanService.createMissingTripDays(
+          tripId: widget.tripId, start: date, end: date,
+          createdBy: widget.userId, existing: _days,
+        );
+        _days = [..._days, ...created];
+      }
       for (final i in selectedIndices) {
         await _saveBooking(i, docId);
         succeeded.add(i);
@@ -184,7 +200,7 @@ class _ParsedItineraryScreenState extends State<ParsedItineraryScreen>
       final planCount = _selected
           .asMap()
           .entries
-          .where((e) => e.value && _addToPlan[e.key] && _matchingDay(widget.bookings[e.key].date) != null)
+          .where((e) => e.value && _addToPlan[e.key])
           .length;
       final msg = planCount > 0
           ? 'Saved $count booking${count == 1 ? '' : 's'} to Travel and $planCount to Plan'
@@ -283,24 +299,12 @@ class _ParsedItineraryScreenState extends State<ParsedItineraryScreen>
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(kSpace4),
-              child: FilledButton(
+              child: WabwayButton(
+                label: 'Save ${pluralize(selectedCount, 'item')} to Travel',
+                fullWidth: true,
+                size: WabwayButtonSize.lg,
+                loading: _saving,
                 onPressed: selectedCount == 0 || _saving ? null : _save,
-                style: FilledButton.styleFrom(
-                  backgroundColor: kColorPrimary,
-                  minimumSize: const Size.fromHeight(48),
-                  shape: const RoundedRectangleBorder(borderRadius: kRadiusMd),
-                ),
-                child: _saving
-                    ? const SizedBox(
-                        width: 20, height: 20,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white),
-                      )
-                    : Text(
-                        'Save $selectedCount item${selectedCount == 1 ? '' : 's'} to Travel',
-                        style: kStyleBodyMedium.copyWith(
-                            color: kColorTextOnPrimary),
-                      ),
               ),
             ),
           ),
@@ -604,18 +608,18 @@ class _PlanToggle extends StatelessWidget {
       );
     }
 
-    final canAdd = matchingDay != null;
-    final sub = canAdd
-        ? 'Day ${matchingDay!.dayNumber} – ${matchingDay!.city}'
-        : 'No matching plan day for this date';
+    // A missing day is created on save, so adding to the plan is always possible.
+    final sub = matchingDay != null
+        ? 'Day ${matchingDay!.dayNumber}${matchingDay!.city.isEmpty ? '' : ' – ${matchingDay!.city}'}'
+        : 'A new plan day will be created for this date';
 
     return Row(
       children: [
         SizedBox(
           width: 20, height: 20,
           child: Checkbox(
-            value: canAdd && addToPlan,
-            onChanged: canAdd ? (v) => onToggle(v ?? false) : null,
+            value: addToPlan,
+            onChanged: (v) => onToggle(v ?? false),
             activeColor: kColorPrimary,
             visualDensity: VisualDensity.compact,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
@@ -629,13 +633,13 @@ class _PlanToggle extends StatelessWidget {
               Text(
                 'Also add to itinerary',
                 style: kStyleCaption.copyWith(
-                  color: canAdd ? kColorInk : kColorInkSoft,
+                  color: kColorInk,
                 ),
               ),
               Text(
                 sub,
                 style: kStyleCaption.copyWith(
-                  color: canAdd ? kColorInkSoft : kColorInkSoft.withValues(alpha: 0.6),
+                  color: kColorInkSoft,
                   fontSize: 11,
                 ),
               ),

@@ -1,5 +1,5 @@
-import 'package:http/http.dart' as http;
 import '../../data/accommodation_data.dart';
+import 'url_metadata_service.dart';
 
 class ListingResult {
   const ListingResult({
@@ -10,6 +10,9 @@ class ListingResult {
     this.currency,
     this.imageUrl,
     required this.source,
+    this.checkIn,
+    this.checkOut,
+    this.confirmationNumber,
   });
 
   final String name;
@@ -19,54 +22,51 @@ class ListingResult {
   final String? currency;
   final String? imageUrl;
   final AccommodationSource source;
+  final DateTime? checkIn;
+  final DateTime? checkOut;
+  final String? confirmationNumber;
 }
 
 abstract final class ListingParser {
-  static const _ua = 'Mozilla/5.0 (compatible; WabWay/1.1; +https://wabway.app)';
-
+  /// Stay details from a listing / booking URL. Metadata comes from the one
+  /// shared [UrlMetadataService] (server-side, schema.org-aware); this adds the
+  /// stay-specific cleanup: strip "- Airbnb" suffixes, price-per-night and
+  /// city heuristics when the page has no structured data.
   static Future<ListingResult?> parse(String url) async {
     try {
       final source = AccommodationSource.fromUrl(url);
-      final res = await http
-          .get(Uri.parse(url), headers: {'User-Agent': _ua})
-          .timeout(const Duration(seconds: 12));
-      if (res.statusCode != 200) return null;
-      final html = res.body;
+      final meta = await UrlMetadataService.fetch(url);
+      if (meta == null) return null;
 
-      final rawTitle = _ogTag(html, 'og:title') ?? '';
-      final rawDesc  = _ogTag(html, 'og:description') ?? '';
-      final imageUrl = _ogTag(html, 'og:image');
-
+      final rawTitle = meta.title ?? '';
+      final rawDesc  = meta.description ?? '';
       final name = _cleanTitle(rawTitle, source);
       if (name.isEmpty) return null;
 
       final priceResult = _extractPrice(rawDesc);
-      final city        = _extractCity(rawTitle, rawDesc, source);
+      final nights = (meta.startDate != null && meta.endDate != null)
+          ? meta.endDate!.difference(meta.startDate!).inDays
+          : 0;
+      // A structured total price is for the whole stay — convert to per night.
+      final structuredPerNight = (meta.price != null && nights > 0)
+          ? meta.price! / nights
+          : meta.price;
 
       return ListingResult(
-        name:          name,
-        city:          city,
-        pricePerNight: priceResult?.$1,
-        currency:      priceResult?.$2,
-        imageUrl:      imageUrl,
-        source:        source,
+        name:               name,
+        city:               meta.locality ?? _extractCity(rawTitle, rawDesc, source),
+        address:            meta.address,
+        pricePerNight:      structuredPerNight ?? priceResult?.$1,
+        currency:           meta.price != null ? meta.currency : priceResult?.$2,
+        imageUrl:           meta.image,
+        source:             source,
+        checkIn:            meta.startDate,
+        checkOut:           meta.endDate,
+        confirmationNumber: meta.confirmationNumber,
       );
     } catch (_) {
       return null;
     }
-  }
-
-  static String? _ogTag(String html, String property) {
-    final re = RegExp(
-      '<meta[^>]+property=["\']$property["\'][^>]+content=["\']([^"\']*)["\']',
-      caseSensitive: false,
-    );
-    final m = re.firstMatch(html) ??
-        RegExp(
-          '<meta[^>]+content=["\']([^"\']*)["\'][^>]+property=["\']$property["\']',
-          caseSensitive: false,
-        ).firstMatch(html);
-    return m?.group(1)?.isNotEmpty == true ? _decodeEntities(m!.group(1)!) : null;
   }
 
   static String _cleanTitle(String raw, AccommodationSource source) {
@@ -124,11 +124,4 @@ abstract final class ListingParser {
     return null;
   }
 
-  static String _decodeEntities(String s) => s
-      .replaceAll('&amp;',  '&')
-      .replaceAll('&lt;',   '<')
-      .replaceAll('&gt;',   '>')
-      .replaceAll('&quot;', '"')
-      .replaceAll('&#39;',  "'")
-      .replaceAll('&nbsp;', ' ');
 }

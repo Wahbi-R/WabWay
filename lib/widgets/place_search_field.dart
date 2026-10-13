@@ -28,6 +28,7 @@ class PlaceSearchField extends StatefulWidget {
     this.autofocus = false,
     this.textInputAction = TextInputAction.search,
     this.locationBias,
+    this.querySuffix,
   });
 
   final ValueChanged<PlaceSuggestion> onSelected;
@@ -43,6 +44,11 @@ class PlaceSearchField extends StatefulWidget {
   /// Automatically appended to the search query when the user hasn't typed
   /// a location word already. Shown in the helper text below the field.
   final String? locationBias;
+
+  /// Appended to the query when the user hasn't typed it already — e.g.
+  /// "airport" for flight origin/destination, "station" for trains — so
+  /// "london" finds London Heathrow instead of the city.
+  final String? querySuffix;
 
   @override
   State<PlaceSearchField> createState() => _PlaceSearchFieldState();
@@ -106,10 +112,14 @@ class _PlaceSearchFieldState extends State<PlaceSearchField> {
     // hasn't already provided — keeps results geo-relevant without changing
     // what appears in the text field.
     final bias = widget.locationBias;
-    final effectiveQuery = (bias != null && bias.isNotEmpty &&
-            !_queryHasBias(userQuery, bias))
-        ? '$userQuery $bias'
+    final suffix = widget.querySuffix;
+    var effectiveQuery = (suffix != null && suffix.isNotEmpty &&
+            !userQuery.toLowerCase().contains(suffix.toLowerCase()))
+        ? '$userQuery $suffix'
         : userQuery;
+    if (bias != null && bias.isNotEmpty && !_queryHasBias(userQuery, bias)) {
+      effectiveQuery = '$effectiveQuery $bias';
+    }
 
     setState(() { _loading = true; _results = []; _showResults = true; });
     final results = await PlaceSearchService.search(

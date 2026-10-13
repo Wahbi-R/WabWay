@@ -11,6 +11,18 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 407,
+    label: "Import & place search",
+    changes: [
+      "Importing a link now opens the same form you use to add things by hand, already filled in with the page's title, image, dates and price",
+      "Hotel and Airbnb links can be imported straight into Stays, including check-in/out dates and confirmation number",
+      "Travel From/To, Stays city and Plan day city search real places — flights look up airports, trains look up stations",
+      "Spot address search works like the main place search",
+      "Importing an itinerary adds bookings to your plan even on days you hadn't created yet",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 406,
     label: 'Bug fixes',
     changes: [

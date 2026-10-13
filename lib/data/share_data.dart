@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 // ─── Share content type ───────────────────────────────────────────────────────
@@ -110,7 +111,7 @@ enum ShareContentType {
             ShareDestination.document
           ],
         ShareContentType.screenshot        => [ShareDestination.document],
-        ShareContentType.accommodationLink => [ShareDestination.travelItem],
+        ShareContentType.accommodationLink => [ShareDestination.stay, ShareDestination.link],
         ShareContentType.csvFile           => [ShareDestination.spot],
       };
 }
@@ -123,7 +124,8 @@ enum ShareDestination {
   travelItem,
   document,
   receipt,
-  planItem;
+  planItem,
+  stay;
 
   String get label => switch (this) {
         ShareDestination.spot => 'Spot',
@@ -132,15 +134,17 @@ enum ShareDestination {
         ShareDestination.document => 'Document',
         ShareDestination.receipt => 'Receipt',
         ShareDestination.planItem => 'Plan item',
+        ShareDestination.stay => 'Stay',
       };
 
   String get description => switch (this) {
         ShareDestination.spot => 'Save as a place to visit',
         ShareDestination.link => 'Save the URL with a title',
-        ShareDestination.travelItem => 'Add to flights, hotels, or bookings',
+        ShareDestination.travelItem => 'Flights, trains, buses, ferries or car hire',
         ShareDestination.document => 'Store as a trip document',
         ShareDestination.receipt => 'Log as a group expense',
         ShareDestination.planItem => 'Add to an itinerary day',
+        ShareDestination.stay => 'Save where you\'re staying',
       };
 
   IconData get icon => switch (this) {
@@ -150,6 +154,7 @@ enum ShareDestination {
         ShareDestination.document => Icons.description_rounded,
         ShareDestination.receipt => Icons.receipt_long_rounded,
         ShareDestination.planItem => Icons.event_note_rounded,
+        ShareDestination.stay => Icons.hotel_rounded,
       };
 
   Color get color => switch (this) {
@@ -159,6 +164,7 @@ enum ShareDestination {
         ShareDestination.document => const Color(0xFF5B6E8A),
         ShareDestination.receipt => const Color(0xFFD6A84F),
         ShareDestination.planItem => const Color(0xFF4A9B8A),
+        ShareDestination.stay => const Color(0xFF8A6BAE),
       };
 
   Color get softColor => switch (this) {
@@ -168,6 +174,7 @@ enum ShareDestination {
         ShareDestination.document => const Color(0xFFECEEF2),
         ShareDestination.receipt => const Color(0xFFF8F0E2),
         ShareDestination.planItem => const Color(0xFFE8F3F1),
+        ShareDestination.stay => const Color(0xFFF0EAF5),
       };
 }
 
@@ -314,3 +321,49 @@ final kMockIncomingShares = <IncomingShare>[
     sharedAt: DateTime(2024, 10, 21, 15, 0),
   ),
 ];
+
+
+// ─── Import prefill ───────────────────────────────────────────────────────────
+
+/// Values Import (or any other flow) hands to an entity's ONE Add sheet so it
+/// opens pre-filled — instead of re-implementing that entity's form.
+/// Every field is optional; each sheet uses the ones that apply.
+class ImportPrefill {
+  const ImportPrefill({
+    this.title,
+    this.notes,
+    this.url,
+    this.mapsUrl,
+    this.location,
+    this.destination,
+    this.date,
+    this.endDate,
+    this.confirmationNumber,
+    this.amount,
+    this.currency,
+    this.fileBytes,
+    this.fileName,
+    this.fileExt,
+    this.linkedDocIds = const [],
+  });
+
+  final String? title;
+  final String? notes;
+
+  /// The source link (blog post, booking page, listing…).
+  final String? url;
+  final String? mapsUrl;
+  final String? location;
+  final String? destination;
+  final DateTime? date;
+  final DateTime? endDate;
+  final String? confirmationNumber;
+  final double? amount;
+  final String? currency;
+  final Uint8List? fileBytes;
+  final String? fileName;
+  final String? fileExt;
+
+  /// Documents already uploaded for this import, to pre-select in doc pickers.
+  final List<String> linkedDocIds;
+}

@@ -140,6 +140,36 @@ abstract final class TravelService {
 
   // ── Mutations ─────────────────────────────────────────────────────────────────
 
+  /// Persists a draft returned by `showAddTravelSheet` — the one place that
+  /// maps sheet fields to [createItem] (Travel screen, Import, …).
+  static Future<TravelItem> createFromDraft(
+    TravelItem d, {
+    required String tripId,
+    required String createdBy,
+  }) =>
+      createItem(
+        tripId:             tripId,
+        title:              d.title,
+        type:               d.type,
+        status:             d.status,
+        createdBy:          createdBy,
+        date:               d.date,
+        endDate:            d.endDate,
+        time:               d.time,
+        endTime:            d.endTime,
+        location:           d.location,
+        destination:        d.destination,
+        confirmationNumber: d.confirmationNumber,
+        address:            d.address,
+        notes:              d.notes,
+        departureTerminal:  d.departureTerminal,
+        arrivalTerminal:    d.arrivalTerminal,
+        gate:               d.gate,
+        seat:               d.seat,
+        boardingTime:       d.boardingTime,
+        linkedDocIds:       d.linkedDocIds,
+      );
+
   static Future<TravelItem> createItem({
     required String tripId,
     required String title,

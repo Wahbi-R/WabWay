@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import '../../core/image_cache_manager.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,30 +16,13 @@ import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 import '../../core/text_utils.dart';
+import '../../core/places/url_metadata_service.dart';
 
-// Fetches the og:image meta tag from a URL. Returns null on error or CORS block.
+// Product image for a pasted link — via the shared link-metadata service.
 Future<String?> _fetchOgImage(String rawUrl) async {
-  try {
-    final uri = Uri.tryParse(rawUrl.trim());
-    if (uri == null || !uri.hasScheme) return null;
-    final resp = await http
-        .get(uri, headers: {'User-Agent': 'WabWayBot/1.0'})
-        .timeout(const Duration(seconds: 8));
-    final body = resp.body;
-    final patterns = [
-      RegExp(r'''property=["']og:image["'][^>]+content=["'](https?://[^"']+)["']'''),
-      RegExp(r'''content=["'](https?://[^"']+)["'][^>]+property=["']og:image["']'''),
-      RegExp(r'''name=["']twitter:image["'][^>]+content=["'](https?://[^"']+)["']'''),
-      RegExp(r'''content=["'](https?://[^"']+)["'][^>]+name=["']twitter:image["']'''),
-    ];
-    for (final p in patterns) {
-      final m = p.firstMatch(body);
-      if (m != null) return m.group(1);
-    }
-    return null;
-  } catch (_) {
-    return null;
-  }
+  final uri = Uri.tryParse(rawUrl.trim());
+  if (uri == null || !uri.hasScheme) return null;
+  return (await UrlMetadataService.fetch(rawUrl.trim()))?.image;
 }
 
 class ShoppingScreen extends ConsumerStatefulWidget {

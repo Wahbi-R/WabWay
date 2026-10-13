@@ -243,28 +243,8 @@ class _TravelScreenState extends ConsumerState<TravelScreen> with AsyncScreenMix
     if (_activeTripId.isEmpty || _userId.isEmpty) return;
 
     try {
-      final created = await TravelService.createItem(
-        tripId:             _activeTripId,
-        title:              formItem.title,
-        type:               formItem.type,
-        status:             formItem.status,
-        createdBy:          _userId,
-        date:               formItem.date,
-        endDate:            formItem.endDate,
-        time:               formItem.time,
-        endTime:            formItem.endTime,
-        location:           formItem.location,
-        destination:        formItem.destination,
-        confirmationNumber: formItem.confirmationNumber,
-        address:            formItem.address,
-        notes:              formItem.notes,
-        departureTerminal:  formItem.departureTerminal,
-        arrivalTerminal:    formItem.arrivalTerminal,
-        gate:               formItem.gate,
-        seat:               formItem.seat,
-        boardingTime:       formItem.boardingTime,
-        linkedDocIds:       formItem.linkedDocIds,
-      );
+      final created = await TravelService.createFromDraft(
+        formItem, tripId: _activeTripId, createdBy: _userId);
       if (!mounted) return;
       setState(() {
         _items.add(created);

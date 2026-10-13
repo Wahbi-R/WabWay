@@ -14,6 +14,7 @@ import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/place_search_field.dart';
 import '../../widgets/widgets.dart';
+import '../../data/share_data.dart';
 
 Future<Spot?> showAddSpotSheet(
   BuildContext context, {
@@ -21,8 +22,10 @@ Future<Spot?> showAddSpotSheet(
   required String userId,
   double? initialLatitude,
   double? initialLongitude,
+  ImportPrefill? prefill,
 }) => _showSpotSheet(context, tripId: tripId, userId: userId,
-      initialLatitude: initialLatitude, initialLongitude: initialLongitude);
+      initialLatitude: initialLatitude, initialLongitude: initialLongitude,
+      prefill: prefill);
 
 Future<Spot?> showEditSpotSheet(
   BuildContext context, {
@@ -38,6 +41,7 @@ Future<Spot?> _showSpotSheet(
   Spot? initialSpot,
   double? initialLatitude,
   double? initialLongitude,
+  ImportPrefill? prefill,
 }) {
   return showWabwayFormSheet<Spot>(
     context,
@@ -51,6 +55,7 @@ Future<Spot?> _showSpotSheet(
       initialSpot: initialSpot,
       initialLatitude: initialLatitude,
       initialLongitude: initialLongitude,
+      prefill: prefill,
       scrollController: scroll,
       showDragHandle: handle,
       onSubmit: close,
@@ -68,6 +73,7 @@ class _AddSpotContent extends ConsumerStatefulWidget {
     this.initialSpot,
     this.initialLatitude,
     this.initialLongitude,
+    this.prefill,
     this.scrollController,
     this.showDragHandle = false,
   });
@@ -78,6 +84,7 @@ class _AddSpotContent extends ConsumerStatefulWidget {
   final Spot? initialSpot;
   final double? initialLatitude;
   final double? initialLongitude;
+  final ImportPrefill? prefill;
   final ScrollController? scrollController;
   final bool showDragHandle;
 
@@ -116,9 +123,6 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
   String? _placeId;
 
   // Address search state
-  List<PlaceSuggestion> _addrResults   = [];
-  bool                  _addrSearching = false;
-  bool                  _showAddrResults = false;
 
 
   @override
@@ -145,6 +149,15 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
       _longitude = widget.initialLongitude;
     }
     _mapsCtrl.addListener(_onMapsUrlChanged);
+    final pre = widget.prefill;
+    if (s == null && pre != null) {
+      _nameCtrl.text   = pre.title ?? '';
+      _notesCtrl.text  = pre.notes ?? '';
+      _sourceCtrl.text = pre.url ?? '';
+      // Set after the listener so a Google Maps link resolves the place
+      // (name, coords, city, area) exactly like pasting it by hand.
+      if (pre.mapsUrl != null) _mapsCtrl.text = pre.mapsUrl!;
+    }
     SharedPreferences.getInstance().then((p) {
       if (!mounted) return;
       setState(() => _notifyOnAdd = p.getBool(_kPrefSpotNotify) ?? false);
@@ -239,8 +252,6 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
       _longitude       = place.longitude;
       _placeSource     = 'place_search';
       _placeId         = place.placeId;
-      _showAddrResults = false;
-      _addrResults     = [];
     });
 
     // When the category is still uncertain (landmark default), ask Claude.
@@ -289,21 +300,9 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
     return SpotCategory.landmark;
   }
 
-  Future<void> _searchAddress() async {
-    final q = _addressCtrl.text.trim();
-    if (q.isEmpty) return;
-    setState(() {
-      _addrSearching   = true;
-      _addrResults     = [];
-      _showAddrResults = true;
-    });
-    final results = await PlaceSearchService.search(q, limit: 5);
-    if (!mounted) return;
-    setState(() { _addrSearching = false; _addrResults = results; });
-  }
-
   void _applyAddressResult(PlaceSuggestion place) {
     setState(() {
+      // PlaceSearchField writes the place name into the field; prefer the address.
       _addressCtrl.text = place.address.isNotEmpty ? place.address : place.name;
       _latitude  ??= place.latitude;
       _longitude ??= place.longitude;
@@ -313,8 +312,6 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
       if (_cityCtrl.text.trim().isEmpty && place.city.isNotEmpty) {
         _cityCtrl.text = place.city;
       }
-      _showAddrResults = false;
-      _addrResults     = [];
     });
   }
 
@@ -510,29 +507,13 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
                   ),
                   const SizedBox(height: kSpace4),
 
-                  WabwayTextField(
-                    label: 'Address',
-                    hint: 'Street address (optional)',
+                  PlaceSearchField(
+                    label: 'Address (optional)',
+                    hint: 'Street address — search to fill in the rest',
                     controller: _addressCtrl,
-                    suffixIcon: _addrSearching
-                        ? Icons.hourglass_top_rounded
-                        : Icons.search_rounded,
-                    onSuffixTap: _searchAddress,
-                    textInputAction: TextInputAction.search,
-                    onFieldSubmitted: (_) => _searchAddress(),
+                    limit: 5,
+                    onSelected: _applyAddressResult,
                   ),
-                  if (_showAddrResults) ...[
-                    const SizedBox(height: 2),
-                    _AddrResultsDropdown(
-                      results: _addrResults,
-                      loading: _addrSearching,
-                      onSelected: _applyAddressResult,
-                      onDismiss: () => setState(() {
-                        _showAddrResults = false;
-                        _addrResults     = [];
-                      }),
-                    ),
-                  ],
                   const SizedBox(height: kSpace4),
 
                   WabwayTextField(
@@ -682,113 +663,4 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
     );
   }
 
-}
-
-// ─── Address search results dropdown ─────────────────────────────────────────
-
-class _AddrResultsDropdown extends StatelessWidget {
-  const _AddrResultsDropdown({
-    required this.results,
-    required this.loading,
-    required this.onSelected,
-    required this.onDismiss,
-  });
-
-  final List<PlaceSuggestion> results;
-  final bool loading;
-  final ValueChanged<PlaceSuggestion> onSelected;
-  final VoidCallback onDismiss;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: kColorPaper,
-        borderRadius: kRadiusMd,
-        border: Border.all(color: kColorBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: loading
-          ? const Padding(
-              padding: EdgeInsets.all(kSpace4),
-              child: Center(
-                child: SizedBox(
-                  width: 20, height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
-            )
-          : results.isEmpty
-              ? Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: kSpace4, vertical: kSpace3),
-                  child: Text('No results found',
-                      style: kStyleCaption.copyWith(color: kColorInkSoft)),
-                )
-              : Column(
-                  children: [
-                    ...results.map((p) {
-                      final subtitle = [
-                        if (p.address.isNotEmpty) p.address,
-                        if (p.city.isNotEmpty)    p.city,
-                        if (p.country.isNotEmpty) p.country,
-                      ].join(', ');
-                      return InkWell(
-                        onTap: () => onSelected(p),
-                        borderRadius: kRadiusMd,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: kSpace3, vertical: kSpace3),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.place_outlined, size: 16,
-                                  color: kColorInkSoft),
-                              const SizedBox(width: kSpace2),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(p.name, style: kStyleBodyMedium),
-                                    if (subtitle.isNotEmpty)
-                                      Text(subtitle,
-                                          style: kStyleCaption.copyWith(
-                                              color: kColorInkSoft),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }),
-                    InkWell(
-                      onTap: onDismiss,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: kSpace3, vertical: kSpace2),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.close_rounded, size: 14,
-                                color: kColorInkSoft),
-                            const SizedBox(width: 4),
-                            Text('Dismiss',
-                                style: kStyleCaption.copyWith(
-                                    color: kColorInkSoft)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-    );
-  }
 }

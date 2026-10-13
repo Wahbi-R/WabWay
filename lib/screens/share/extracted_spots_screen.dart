@@ -9,6 +9,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
+import '../../core/text_utils.dart';
 
 class ExtractedSpotsScreen extends StatefulWidget {
   const ExtractedSpotsScreen({
@@ -169,24 +170,12 @@ class _ExtractedSpotsScreenState extends State<ExtractedSpotsScreen> {
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(kSpace4),
-              child: FilledButton(
+              child: WabwayButton(
+                label: 'Add ${pluralize(selectedCount, 'spot')}',
+                fullWidth: true,
+                size: WabwayButtonSize.lg,
+                loading: _saving,
                 onPressed: selectedCount == 0 || _saving ? null : _save,
-                style: FilledButton.styleFrom(
-                  backgroundColor: kColorPrimary,
-                  minimumSize: const Size.fromHeight(48),
-                  shape: const RoundedRectangleBorder(borderRadius: kRadiusMd),
-                ),
-                child: _saving
-                    ? const SizedBox(
-                        width: 20, height: 20,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white),
-                      )
-                    : Text(
-                        'Add $selectedCount spot${selectedCount == 1 ? '' : 's'}',
-                        style: kStyleBodyMedium.copyWith(
-                            color: kColorTextOnPrimary),
-                      ),
               ),
             ),
           ),

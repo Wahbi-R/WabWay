@@ -15,6 +15,7 @@ import 'accommodations_screen.dart';
 import '../shared/connections_section.dart';
 import '../../data/date_utils.dart';
 import '../../data/currencies.dart';
+import '../../widgets/place_search_field.dart';
 
 /// Add / edit a stay. Pops with an [AccommodationSheetResult].
 Future<AccommodationSheetResult?> showAddStaySheet(
@@ -135,6 +136,9 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
           : r.pricePerNight!.toStringAsFixed(2);
     }
     if (r.currency != null) _currency = r.currency!;
+    if (r.checkIn != null) _checkIn = r.checkIn;
+    if (r.checkOut != null) _checkOut = r.checkOut;
+    if (r.confirmationNumber != null) _confirmCtrl.text = r.confirmationNumber!;
   }
 
   @override
@@ -421,10 +425,13 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
           ),
           const SizedBox(height: kSpace3),
 
-          WabwayTextField(
+          PlaceSearchField(
             label: 'City',
+            hint: 'e.g. Kyoto',
             controller: _cityCtrl,
             textInputAction: TextInputAction.next,
+            limit: 4,
+            onSelected: (p) => _cityCtrl.text = p.city.isNotEmpty ? p.city : p.name,
           ),
           const SizedBox(height: kSpace3),
 

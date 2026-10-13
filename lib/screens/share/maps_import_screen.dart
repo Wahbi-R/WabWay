@@ -13,6 +13,7 @@ import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 import 'maps_web_scrape_screen.dart';
+import '../../core/text_utils.dart';
 
 class MapsImportScreen extends StatefulWidget {
   const MapsImportScreen({
@@ -349,21 +350,12 @@ class _MapsImportScreenState extends State<MapsImportScreen> {
                       const SizedBox(height: kSpace4),
                       SizedBox(
                         width: double.infinity,
-                        child: FilledButton.icon(
+                        child: WabwayButton(
+                          label: 'Scan list',
+                          icon: Icons.travel_explore_rounded,
+                          fullWidth: true,
+                          size: WabwayButtonSize.lg,
                           onPressed: _tryScrapeWebView,
-                          style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xFF4A7AB5),
-                            minimumSize: const Size.fromHeight(48),
-                            shape: const RoundedRectangleBorder(
-                                borderRadius: kRadiusMd),
-                          ),
-                          icon: const Icon(Icons.travel_explore_rounded,
-                              color: Colors.white),
-                          label: Text(
-                            'Scan list',
-                            style: kStyleBodyMedium.copyWith(
-                                color: kColorTextOnPrimary),
-                          ),
                         ),
                       ),
                       const SizedBox(height: kSpace5),
@@ -413,29 +405,15 @@ class _MapsImportScreenState extends State<MapsImportScreen> {
                     const SizedBox(height: kSpace5),
                     SizedBox(
                       width: double.infinity,
-                      child: FilledButton.icon(
+                      child: WabwayButton(
+                        label: _loadingTakeout
+                            ? 'Geocoding places…'
+                            : 'Pick .csv or Saved Places.json',
+                        icon: Icons.upload_file_rounded,
+                        fullWidth: true,
+                        size: WabwayButtonSize.lg,
+                        loading: _loadingTakeout,
                         onPressed: _loadingTakeout ? null : _loadFromTakeout,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: kColorPrimary,
-                          minimumSize: const Size.fromHeight(48),
-                          shape: const RoundedRectangleBorder(
-                              borderRadius: kRadiusMd),
-                        ),
-                        icon: _loadingTakeout
-                            ? const SizedBox(
-                                width: 18, height: 18,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: Colors.white),
-                              )
-                            : const Icon(Icons.upload_file_rounded,
-                                color: Colors.white),
-                        label: Text(
-                          _loadingTakeout
-                              ? 'Geocoding places…'
-                              : 'Pick .csv or Saved Places.json',
-                          style: kStyleBodyMedium.copyWith(
-                              color: kColorTextOnPrimary),
-                        ),
                       ),
                     ),
                   ],
@@ -530,36 +508,14 @@ class _MapsImportScreenState extends State<MapsImportScreen> {
             SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(kSpace4),
-                child: FilledButton(
+                child: WabwayButton(
+                  label: _saving
+                      ? 'Adding $_savingCount of $_savingTotal…'
+                      : 'Add ${pluralize(selectedCount, 'spot')}',
+                  fullWidth: true,
+                  size: WabwayButtonSize.lg,
+                  loading: _saving,
                   onPressed: selectedCount == 0 || _saving || _geocoding ? null : _save,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: kColorPrimary,
-                    minimumSize: const Size.fromHeight(48),
-                    shape: const RoundedRectangleBorder(
-                        borderRadius: kRadiusMd),
-                  ),
-                  child: _saving
-                      ? Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const SizedBox(
-                              width: 16, height: 16,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white),
-                            ),
-                            const SizedBox(width: kSpace2),
-                            Text(
-                              'Adding $_savingCount of $_savingTotal…',
-                              style: kStyleBodyMedium.copyWith(
-                                  color: kColorTextOnPrimary),
-                            ),
-                          ],
-                        )
-                      : Text(
-                          'Add $selectedCount spot${selectedCount == 1 ? '' : 's'}',
-                          style: kStyleBodyMedium.copyWith(
-                              color: kColorTextOnPrimary),
-                        ),
                 ),
               ),
             ),

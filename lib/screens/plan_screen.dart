@@ -393,24 +393,9 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
     if (_activeTripId.isEmpty || _userId.isEmpty) return;
 
     try {
-      final item = await PlanService.createItem(
-        tripId:          _activeTripId,
-        dayId:           dayId,
-        title:           draft.title,
-        type:            draft.type,
-        createdBy:       _userId,
-        time:            draft.time,
-        city:            draft.city,
-        country:         draft.country,
-        location:        draft.location,
-        mapsUrl:         draft.mapsUrl,
-        confirmationUrl: draft.confirmationUrl,
-        notes:           draft.notes,
-        linkedSpotId:    draft.linkedSpotId,
-        linkedStayId:    draft.linkedStayId,
-        linkedDocIds:    draft.linkedDocIds,
-        sortOrder:       day.items.length,
-      );
+      final item = await PlanService.createItemFromDraft(draft,
+          tripId: _activeTripId, dayId: dayId, createdBy: _userId,
+          sortOrder: day.items.length);
       if (!mounted) return;
       setState(() {
         day.items.add(item);
@@ -1947,11 +1932,13 @@ class _EditDaySheetState extends State<_EditDaySheet> {
             ),
 
             const SizedBox(height: kSpace4),
-            WabwayTextField(
-              label: 'City',
+            PlaceSearchField(
+              label: 'City (optional)',
               hint: 'e.g. Tokyo',
               controller: _cityCtrl,
               textInputAction: TextInputAction.next,
+              limit: 4,
+              onSelected: (p) => _cityCtrl.text = p.city.isNotEmpty ? p.city : p.name,
             ),
 
             const SizedBox(height: kSpace4),

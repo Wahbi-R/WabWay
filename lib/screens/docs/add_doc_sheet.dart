@@ -10,6 +10,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
+import '../../data/share_data.dart';
 
 Future<TripDocument?> showAddDocSheet(
   BuildContext context, {
@@ -17,6 +18,7 @@ Future<TripDocument?> showAddDocSheet(
   required String tripName,
   required String userId,
   required List<Spot> availableSpots,
+  ImportPrefill? prefill,
 }) {
   return showWabwayFormSheet<TripDocument>(
     context,
@@ -29,6 +31,7 @@ Future<TripDocument?> showAddDocSheet(
       tripName: tripName,
       userId: userId,
       availableSpots: availableSpots,
+      prefill: prefill,
       scrollController: scroll,
       showDragHandle: handle,
       onSubmit: close,
@@ -43,6 +46,7 @@ class _AddDocContent extends StatefulWidget {
     required this.userId,
     required this.availableSpots,
     required this.onSubmit,
+    this.prefill,
     this.scrollController,
     this.showDragHandle = false,
   });
@@ -52,6 +56,7 @@ class _AddDocContent extends StatefulWidget {
   final String userId;
   final List<Spot> availableSpots;
   final ValueChanged<TripDocument> onSubmit;
+  final ImportPrefill? prefill;
   final ScrollController? scrollController;
   final bool showDragHandle;
 
@@ -75,6 +80,25 @@ class _AddDocContentState extends State<_AddDocContent> {
 
   bool _loading = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final pre = widget.prefill;
+    if (pre != null) {
+      _titleCtrl.text = pre.title ?? '';
+      // Documents have no URL column yet — keep the source link in notes so
+      // it is never silently dropped.
+      final notes = [if (pre.notes != null) pre.notes!, if (pre.url != null) pre.url!];
+      _notesCtrl.text = notes.join('\n');
+      if (pre.fileBytes != null) {
+        _fileBytes  = pre.fileBytes;
+        _fileName   = pre.fileName;
+        _fileExt    = pre.fileExt?.toLowerCase();
+        _fileSizeKb = (pre.fileBytes!.length / 1024).round();
+      }
+    }
+  }
 
   @override
   void dispose() {

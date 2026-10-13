@@ -10,6 +10,7 @@ import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 import 'item_tile.dart';
+import '../../core/text_utils.dart';
 
 // ─── Trip day card ────────────────────────────────────────────────────────────
 
@@ -714,12 +715,7 @@ class _TinyAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final initials = name.trim().split(' ')
-        .where((w) => w.isNotEmpty)
-        .take(2)
-        .map((w) => w[0])
-        .join()
-        .toUpperCase();
+    final initials = initialsFor(name);
     return Container(
       width: 18,
       height: 18,

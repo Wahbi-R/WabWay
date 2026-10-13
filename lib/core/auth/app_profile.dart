@@ -1,3 +1,4 @@
+import '../text_utils.dart';
 class AppProfile {
   const AppProfile({
     required this.id,
@@ -49,11 +50,5 @@ class AppProfile {
         avatarUrl: avatarUrl,
       );
 
-  String get initials {
-    final parts = displayName.trim().split(RegExp(r'\s+'));
-    if (parts.length >= 2) {
-      return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
-    }
-    return displayName.isNotEmpty ? displayName[0].toUpperCase() : '?';
-  }
+  String get initials => initialsFor(displayName);
 }

@@ -100,7 +100,7 @@ class SpotDetailScreen extends ConsumerWidget {
             IconButton(
               icon: const Icon(Icons.delete_outline_rounded),
               color: kColorDanger,
-              onPressed: () => _confirmDelete(context, onDelete!),
+              onPressed: () => _confirmDelete(context, spot.name, onDelete!),
             ),
           const SizedBox(width: kSpace2),
         ],
@@ -295,7 +295,7 @@ class _SpotDetailContentState extends ConsumerState<SpotDetailContent> {
                   if (widget.canDelete && widget.onDelete != null) ...[
                     const SizedBox(width: kSpace2),
                     GestureDetector(
-                      onTap: () => _confirmDelete(context, widget.onDelete!),
+                      onTap: () => _confirmDelete(context, widget.spot.name, widget.onDelete!),
                       child: const Icon(
                         Icons.delete_outline_rounded,
                         size: 18,
@@ -714,26 +714,11 @@ class _AddToPlanButtonState extends ConsumerState<_AddToPlanButton> {
 // ─── Delete confirmation ───────────────────────────────────────────────────────
 
 Future<void> _confirmDelete(
-    BuildContext context, VoidCallback onConfirmed) async {
-  final confirmed = await showDialog<bool>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text('Delete spot?'),
-      content:
-          const Text('This will remove the spot for everyone in the trip.'),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: const Text('Cancel'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, true),
-          child: const Text('Delete', style: TextStyle(color: kColorDanger)),
-        ),
-      ],
-    ),
-  );
-  if (confirmed == true) onConfirmed();
+    BuildContext context, String name, VoidCallback onConfirmed) async {
+  if (await showWabwayDeleteConfirm(context, entity: 'spot', name: name,
+      detail: 'for everyone in the trip')) {
+    onConfirmed();
+  }
 }
 
 // ─── Link launcher ─────────────────────────────────────────────────────────────

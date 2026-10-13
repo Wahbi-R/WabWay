@@ -39,93 +39,26 @@ Future<Spot?> _showSpotSheet(
   double? initialLatitude,
   double? initialLongitude,
 }) {
-  final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
-
-  if (isDesktop) {
-    return showDialog<Spot>(
-      context: context,
-      builder: (dialogCtx) => Dialog(
-        backgroundColor: kColorPaper,
-        shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
-        insetPadding: const EdgeInsets.symmetric(
-            horizontal: kSpace8, vertical: kSpace8),
-        child: SizedBox(
-          width: 520,
-          height: MediaQuery.sizeOf(dialogCtx).height * 0.85,
-          child: _AddSpotContent(
-            tripId: tripId,
-            userId: userId,
-            initialSpot: initialSpot,
-            initialLatitude: initialLatitude,
-            initialLongitude: initialLongitude,
-            onSubmit: (spot) => Navigator.pop(dialogCtx, spot),
-          ),
-        ),
-      ),
-    );
-  }
-
-  return showModalBottomSheet<Spot>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    backgroundColor: Colors.transparent,
-    builder: (ctx) => _AddSpotSheet(
+  return showWabwayFormSheet<Spot>(
+    context,
+    desktopHeightFactor: 0.85,
+    initialChildSize: 0.88,
+    minChildSize: 0.5,
+    maxChildSize: 0.96,
+    builder: (ctx, scroll, handle, close) => _AddSpotContent(
       tripId: tripId,
       userId: userId,
       initialSpot: initialSpot,
       initialLatitude: initialLatitude,
       initialLongitude: initialLongitude,
-      onSubmit: (spot) => Navigator.pop(ctx, spot),
+      scrollController: scroll,
+      showDragHandle: handle,
+      onSubmit: close,
     ),
   );
 }
 
 // ─── Mobile bottom sheet container ────────────────────────────────────────────
-
-class _AddSpotSheet extends StatelessWidget {
-  const _AddSpotSheet({
-    required this.tripId,
-    required this.userId,
-    required this.onSubmit,
-    this.initialSpot,
-    this.initialLatitude,
-    this.initialLongitude,
-  });
-  final String tripId;
-  final String userId;
-  final ValueChanged<Spot> onSubmit;
-  final Spot? initialSpot;
-  final double? initialLatitude;
-  final double? initialLongitude;
-
-  @override
-  Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.88,
-      minChildSize: 0.5,
-      maxChildSize: 0.96,
-      builder: (_, scrollCtrl) => DecoratedBox(
-        decoration: const BoxDecoration(
-          color: kColorPaper,
-          borderRadius: kRadiusSheet,
-        ),
-        child: _AddSpotContent(
-          tripId: tripId,
-          userId: userId,
-          initialSpot: initialSpot,
-          initialLatitude: initialLatitude,
-          initialLongitude: initialLongitude,
-          scrollController: scrollCtrl,
-          onSubmit: onSubmit,
-          showDragHandle: true,
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Shared form content ──────────────────────────────────────────────────────
 
 class _AddSpotContent extends ConsumerStatefulWidget {
   const _AddSpotContent({

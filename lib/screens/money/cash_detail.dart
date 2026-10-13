@@ -13,28 +13,9 @@ import '../../widgets/widgets.dart';
 
 // ─── Confirmation helper ──────────────────────────────────────────────────────
 
-Future<bool> _confirmDelete(BuildContext context) async {
-  return await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Delete withdrawal?'),
-          content: const Text(
-              'This will permanently remove this ATM withdrawal for everyone in the trip.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Delete',
-                  style: TextStyle(color: kColorDanger)),
-            ),
-          ],
-        ),
-      ) ??
-      false;
-}
+Future<bool> _confirmDelete(BuildContext context) =>
+    showWabwayDeleteConfirm(context, entity: 'withdrawal',
+        detail: 'for everyone in the trip');
 
 // ─── Mobile full-screen route ─────────────────────────────────────────────────
 

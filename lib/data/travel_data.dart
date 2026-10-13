@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'date_utils.dart';
 
 // ─── Booking status ───────────────────────────────────────────────────────────
 
@@ -307,21 +308,6 @@ final kMockTravelItems = <TravelItem>[
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-String fmtTravelDate(DateTime d) {
-  const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-  ];
-  return '${months[d.month - 1]} ${d.day}';
-}
+String fmtTravelDate(DateTime d) => fmtDate(d);
 
-String fmtTravelDateRange(DateTime start, DateTime end) {
-  if (start.month == end.month) {
-    const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-    ];
-    return '${months[start.month - 1]} ${start.day}–${end.day}';
-  }
-  return '${fmtTravelDate(start)} – ${fmtTravelDate(end)}';
-}
+String fmtTravelDateRange(DateTime start, DateTime end) => fmtDateRange(start, end);

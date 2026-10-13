@@ -24,6 +24,7 @@ import 'money/cash_detail.dart';
 import 'money/add_cash_sheet.dart';
 import 'money/currency_converter_sheet.dart';
 import 'money/settle_up_panel.dart';
+import '../core/text_utils.dart';
 
 enum _MoneyTab { receipts, cash, settleUp }
 
@@ -1605,7 +1606,7 @@ class _SpendingByMemberCard extends StatelessWidget {
             const SizedBox(height: kSpace3),
             ...sorted.map((e) {
               final name = memberName[e.key] ?? e.key.substring(0, 4);
-              final initials = name.trim().split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join().toUpperCase();
+              final initials = initialsFor(name);
               final pct = grandTotal > 0 ? e.value / grandTotal : 0.0;
               return Padding(
                 padding: const EdgeInsets.only(bottom: kSpace2),

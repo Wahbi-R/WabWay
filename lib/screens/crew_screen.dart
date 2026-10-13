@@ -24,6 +24,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
 import '../widgets/wabway_avatar.dart';
+import '../widgets/wabway_confirm_dialog.dart';
 
 class CrewScreen extends ConsumerStatefulWidget {
   const CrewScreen({super.key});
@@ -344,27 +345,10 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
     if (_sendingFindMe) return;
 
     // Confirm before alerting the whole crew.
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: kColorPaper,
-        title: const Text('Alert your crew?'),
-        content: const Text(
-          'Everyone in the trip will get a high-priority notification and can navigate to your location.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: kColorDanger),
-            child: const Text('Send SOS'),
-          ),
-        ],
-      ),
-    );
+    final confirm = await showWabwayConfirm(context,
+        title: 'Alert your crew?',
+        message: 'Everyone in the trip will get a high-priority notification and can navigate to your location.',
+        confirmLabel: 'Send SOS');
     if (confirm != true || !mounted) return;
 
     final granted = await _ensureLocationPermission();
@@ -482,27 +466,10 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
   }
 
   Future<void> _onSetMeetupPoint(LatLng point) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: kColorPaper,
-        title: const Text('Set meetup point?'),
-        content: const Text(
-          "Share this location with your crew as a meeting spot. They'll get a notification and can navigate here.",
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: kColorSecondary),
-            child: const Text('Share'),
-          ),
-        ],
-      ),
-    );
+    final confirm = await showWabwayConfirm(context,
+        title: 'Set meetup point?',
+        message: "Share this location with your crew as a meeting spot. They'll get a notification and can navigate here.",
+        confirmLabel: 'Share', destructive: false);
     if (confirm != true || !mounted) return;
 
     try {

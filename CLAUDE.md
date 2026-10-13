@@ -44,6 +44,35 @@ Concrete checks before creating:
 
 Duplicating something means every future bug-fix or improvement has to be applied in two places. The rule: if you would write `// same as X but with Y changed`, that's a signal to parameterise X, not copy it.
 
+## Canonical components — use these, never re-implement
+
+The app's main UX debt came from the same element being rebuilt per screen (6 confirm dialogs, 5 date fields, 7 initials functions, an Import flow that re-coded every Add form). **A private `_DateField` / `_snack` / `_confirmDelete` dialog body / `_EmptyState` / hand-rolled initials / `showModalBottomSheet(DraggableScrollableSheet…)` form in a screen is a bug.** Use the canonical piece below; if it doesn't fit, add a parameter to it.
+
+| Element | Use | File |
+|---|---|---|
+| Buttons | `WabwayButton` — `primary` (orange CTA), `secondary`, `ghost`, `dangerOutline` (delete in panels/forms), `danger` (filled, only inside confirm dialogs) | `lib/widgets/wabway_button.dart` |
+| Delete / confirm | `showWabwayDeleteConfirm(entity:, name:)`, `showWabwayConfirm(...)` | `lib/widgets/wabway_confirm_dialog.dart` |
+| Single-field prompt (rename, quick add) | `showWabwayTextPrompt` | `lib/widgets/wabway_confirm_dialog.dart` |
+| Toast / feedback | `showWabwaySnack(context, msg, error:)` | `lib/widgets/wabway_snack.dart` |
+| Create/edit form presentation | `showWabwayFormSheet` (draggable) / `showWabwayAutoSheet` (content-sized) — dialog on desktop, sheet + drag handle on mobile | `lib/widgets/wabway_form_sheet.dart` |
+| Date / time / range field | `WabwayDateField`, `WabwayTimeField`, `WabwayPickerField` (custom picker e.g. ranges) | `lib/widgets/wabway_date_field.dart` |
+| Date formatting | `fmtDate`, `fmtDateLong`, `fmtDateRange`, `fmtTimeOfDay`, `isoDate` | `lib/data/date_utils.dart` |
+| Short fixed choice (status/category/type) | `WabwayChoiceChips` | `lib/widgets/wabway_choice_chips.dart` |
+| Long/open choice | `WabwaySelectField` | `lib/widgets/wabway_select_field.dart` |
+| List filter chips with counts | `WabwayFilterStrip` | `lib/widgets/wabway_filter_strip.dart` |
+| Search box | `WabwaySearchBar` + `foldForSearch` / `searchMatches` (diacritic-insensitive) | `lib/widgets/wabway_search_bar.dart`, `lib/core/text_utils.dart` |
+| Avatars / initials | `WabwayAvatar(name: realName)`, `initialsFor`, `avatarColorFor` — never pass `'You'` as the name | `lib/widgets/wabway_avatar.dart` |
+| Plurals | `pluralize(n, 'day')` | `lib/core/text_utils.dart` |
+| Empty state | `WabwayEmptyState(action: WabwayButton(...))` | `lib/widgets/wabway_empty_state.dart` |
+| Status badge | `WabwayBadge` | `lib/widgets/wabway_badge.dart` |
+| Place / address input | `PlaceSearchField` (returns name, address, city, area, coords, category) | `lib/widgets/place_search_field.dart` |
+| Attach docs to an item | `DocMultiPicker` | `lib/widgets/doc_multi_picker.dart` |
+| Link any two entities | `ConnectionsSection` + `ConnectionService` (`trip_connections`) | `lib/screens/shared/connections_section.dart` |
+| Organiser / edit permission | `isOrganiserProvider`, `canManageItem(createdById, isOrganiser:)` | `lib/core/providers/trip_provider.dart` |
+| Trip delete / leave / remove member | `confirmDeleteTrip`, `confirmLeaveTrip`, `confirmRemoveMember` | `lib/screens/trips/trip_actions.dart` |
+
+Entity Add sheets (`showAddSpotSheet`, `showAddTravelSheet`, `showAddLinkSheet`, `showAddStaySheet`, …) are the ONLY create forms for their entity — other flows (Import, quick-add, search) must call them with prefill values, never rebuild the fields.
+
 ## Async screen state — use AsyncScreenMixin
 
 Every `State` (or `ConsumerState`) that loads data asynchronously **must** use `AsyncScreenMixin` from `lib/core/async_screen_mixin.dart`. Never declare `_loadGen`, `_loading`, `_error`, or `_offline` fields directly on a screen — the mixin provides them.

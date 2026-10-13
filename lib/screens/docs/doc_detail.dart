@@ -184,7 +184,7 @@ class _DocDetailContentState extends State<DocDetailContent> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _linkLoading = false);
-      _snack('Could not add link. Please try again.');
+      showWabwaySnack(context, 'Could not add link. Please try again.');
     }
   }
 
@@ -205,19 +205,10 @@ class _DocDetailContentState extends State<DocDetailContent> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _unlinkingKeys.remove(key));
-      _snack('Could not remove link. Please try again.');
+      showWabwaySnack(context, 'Could not remove link. Please try again.');
     }
   }
 
-  void _snack(String msg) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg, style: kStyleBody.copyWith(color: Colors.white)),
-      backgroundColor: kColorDanger,
-      behavior: SnackBarBehavior.floating,
-      duration: const Duration(seconds: 3),
-    ));
-  }
 
   void _showLinkPicker() {
     final alreadyLinked = _links
@@ -899,12 +890,12 @@ class _ActionsSectionState extends State<_ActionsSection> {
       final url = await DocService.getSignedUrl(widget.doc.storagePath!);
       if (!mounted) return;
       if (url == null) {
-        _snack('Could not generate link for this file.');
+        showWabwaySnack(context, 'Could not generate link for this file.');
         return;
       }
       await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     } catch (_) {
-      if (mounted) _snack('Could not open file.');
+      if (mounted) showWabwaySnack(context, 'Could not open file.');
     } finally {
       if (mounted) setState(() => _openLoading = false);
     }
@@ -912,7 +903,7 @@ class _ActionsSectionState extends State<_ActionsSection> {
 
   Future<void> _shareFile() async {
     if (kIsWeb) {
-      _snack('Share is not available on web.');
+      showWabwaySnack(context, 'Share is not available on web.');
       return;
     }
     setState(() => _shareLoading = true);
@@ -926,12 +917,12 @@ class _ActionsSectionState extends State<_ActionsSection> {
       }
       if (!mounted) return;
       if (shareUrl == null) {
-        _snack('Nothing to share for this document.');
+        showWabwaySnack(context, 'Nothing to share for this document.');
         return;
       }
       await Share.share(shareUrl, subject: widget.doc.title);
     } catch (_) {
-      if (mounted) _snack('Could not share.');
+      if (mounted) showWabwaySnack(context, 'Could not share.');
     } finally {
       if (mounted) setState(() => _shareLoading = false);
     }
@@ -982,90 +973,25 @@ class _ActionsSectionState extends State<_ActionsSection> {
     }
   }
 
-  void _snack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg, style: kStyleBody.copyWith(color: Colors.white)),
-      behavior: SnackBarBehavior.floating,
-      duration: const Duration(seconds: 2),
-    ));
-  }
 
   Future<void> _showRenameDialog() async {
-    final ctrl = TextEditingController(text: widget.doc.title);
+    final newTitle = await showWabwayTextPrompt(context,
+        title: 'Rename document', initialValue: widget.doc.title,
+        hint: 'Document title', confirmLabel: 'Rename');
+    if (newTitle == null || newTitle == widget.doc.title) return;
     try {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: kColorPaper,
-          shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
-          title: Text('Rename document', style: kStyleBodySemibold),
-          content: TextField(
-            controller: ctrl,
-            autofocus: true,
-            decoration: InputDecoration(
-              hintText: 'Document title',
-              hintStyle: kStyleBody.copyWith(color: kColorInkSoft),
-            ),
-            style: kStyleBody,
-            textInputAction: TextInputAction.done,
-            onSubmitted: (_) => Navigator.pop(ctx, true),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text('Cancel', style: kStyleBody.copyWith(color: kColorInkSoft)),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text('Rename', style: kStyleBodyMedium.copyWith(color: kColorPrimary)),
-            ),
-          ],
-        ),
-      );
-      if (confirmed != true) return;
-      final newTitle = ctrl.text.trim();
-      if (newTitle.isEmpty || newTitle == widget.doc.title) return;
-      try {
-        await DocService.renameDocument(widget.doc.id, newTitle);
-        widget.onRenamed?.call(newTitle);
-        if (mounted) _snack('Renamed to "$newTitle".');
-      } catch (_) {
-        if (mounted) _snack('Could not rename. Please try again.');
-      }
-    } finally {
-      ctrl.dispose();
+      await DocService.renameDocument(widget.doc.id, newTitle);
+      widget.onRenamed?.call(newTitle);
+      if (mounted) showWabwaySnack(context, 'Renamed to "$newTitle".');
+    } catch (_) {
+      if (mounted) showWabwaySnack(context, 'Could not rename. Please try again.');
     }
   }
 
-  void _confirmDelete() {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: kColorPaper,
-        shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
-        title: Text('Delete document?', style: kStyleBodySemibold),
-        content: Text(
-          'This will permanently remove "${widget.doc.title}" from your trip.',
-          style: kStyleBody,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('Cancel',
-                style: kStyleBody.copyWith(color: kColorInkSoft)),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              widget.onDelete?.call();
-              if (context.mounted) Navigator.maybePop(context);
-            },
-            child: Text('Delete',
-                style: kStyleBodyMedium.copyWith(color: kColorDanger)),
-          ),
-        ],
-      ),
-    );
+  Future<void> _confirmDelete() async {
+    if (!await showWabwayDeleteConfirm(context, entity: 'document', name: widget.doc.title)) return;
+    widget.onDelete?.call();
+    if (mounted) Navigator.maybePop(context);
   }
 
   @override
@@ -1216,52 +1142,17 @@ class _ActionsSheetContentState extends State<_ActionsSheetContent> {
             label: 'Rename',
             onTap: () async {
               Navigator.pop(context);
-              final ctrl = TextEditingController(text: widget.doc.title);
+              final newTitle = await showWabwayTextPrompt(widget.context,
+                  title: 'Rename document', initialValue: widget.doc.title,
+                  hint: 'Document title', confirmLabel: 'Rename');
+              if (newTitle == null || newTitle == widget.doc.title) return;
               try {
-                final confirmed = await showDialog<bool>(
-                  context: widget.context,
-                  builder: (ctx) => AlertDialog(
-                    backgroundColor: kColorPaper,
-                    shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
-                    title: Text('Rename document', style: kStyleBodySemibold),
-                    content: TextField(
-                      controller: ctrl,
-                      autofocus: true,
-                      style: kStyleBody,
-                      textInputAction: TextInputAction.done,
-                      onSubmitted: (_) => Navigator.pop(ctx, true),
-                      decoration: InputDecoration(
-                        hintText: 'Document title',
-                        hintStyle: kStyleBody.copyWith(color: kColorInkSoft),
-                      ),
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, false),
-                        child: Text('Cancel', style: kStyleBody.copyWith(color: kColorInkSoft)),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, true),
-                        child: Text('Rename', style: kStyleBodyMedium.copyWith(color: kColorPrimary)),
-                      ),
-                    ],
-                  ),
-                );
-                if (confirmed != true) return;
-                final newTitle = ctrl.text.trim();
-                if (newTitle.isEmpty || newTitle == widget.doc.title) return;
-                try {
-                  await DocService.renameDocument(widget.doc.id, newTitle);
-                  widget.onRenamed?.call(newTitle);
-                } catch (_) {
-                  if (widget.context.mounted) {
-                    ScaffoldMessenger.of(widget.context).showSnackBar(
-                      const SnackBar(content: Text('Rename failed — please try again')),
-                    );
-                  }
+                await DocService.renameDocument(widget.doc.id, newTitle);
+                widget.onRenamed?.call(newTitle);
+              } catch (_) {
+                if (widget.context.mounted) {
+                  showWabwaySnack(widget.context, 'Could not rename. Please try again.', error: true);
                 }
-              } finally {
-                ctrl.dispose();
               }
             },
           ),

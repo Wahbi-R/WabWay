@@ -75,28 +75,10 @@ class _InviteSheetState extends State<_InviteSheet> with AsyncScreenMixin {
   }
 
   Future<void> _revoke(InviteCode code) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: kColorPaper,
-        shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
-        title: Text('Revoke code?', style: kStyleBodySemibold),
-        content: Text(
-          '"${code.displayCode}" will stop working immediately.',
-          style: kStyleBody,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Cancel', style: kStyleBody.copyWith(color: kColorInkSoft)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('Revoke', style: kStyleBodyMedium.copyWith(color: kColorDanger)),
-          ),
-        ],
-      ),
-    );
+    final confirmed = await showWabwayConfirm(context,
+        title: 'Revoke code?',
+        message: '"${code.displayCode}" will stop working immediately.',
+        confirmLabel: 'Revoke');
     if (confirmed != true || !mounted) return;
     setState(() => _codes = _codes.where((c) => c.id != code.id).toList());
     try {

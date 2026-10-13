@@ -11,49 +11,18 @@ Future<TripPhotoAlbum?> showAddAlbumSheet(
   required String tripId,
   required String userId,
 }) {
-  return showModalBottomSheet<TripPhotoAlbum>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    backgroundColor: Colors.transparent,
-    builder: (ctx) => _AddAlbumSheet(
+  return showWabwayFormSheet<TripPhotoAlbum>(
+    context,
+    initialChildSize: 0.75,
+    maxChildSize: 0.95,
+    builder: (ctx, scroll, handle, close) => _AddAlbumContent(
       tripId: tripId,
       userId: userId,
-      onSubmit: (album) => Navigator.pop(ctx, album),
+      scrollController: scroll,
+      showDragHandle: handle,
+      onSubmit: close,
     ),
   );
-}
-
-class _AddAlbumSheet extends StatelessWidget {
-  const _AddAlbumSheet({
-    required this.tripId,
-    required this.userId,
-    required this.onSubmit,
-  });
-  final String tripId;
-  final String userId;
-  final ValueChanged<TripPhotoAlbum> onSubmit;
-
-  @override
-  Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.75,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      builder: (_, ctrl) => DecoratedBox(
-        decoration: const BoxDecoration(
-          color: kColorPaper,
-          borderRadius: kRadiusSheet,
-        ),
-        child: _AddAlbumContent(
-          tripId: tripId,
-          userId: userId,
-          scrollController: ctrl,
-          onSubmit: onSubmit,
-        ),
-      ),
-    );
-  }
 }
 
 class _AddAlbumContent extends StatefulWidget {
@@ -62,11 +31,13 @@ class _AddAlbumContent extends StatefulWidget {
     required this.userId,
     required this.onSubmit,
     this.scrollController,
+    this.showDragHandle = false,
   });
   final String tripId;
   final String userId;
   final ValueChanged<TripPhotoAlbum> onSubmit;
   final ScrollController? scrollController;
+  final bool showDragHandle;
 
   @override
   State<_AddAlbumContent> createState() => _AddAlbumContentState();
@@ -134,7 +105,7 @@ class _AddAlbumContentState extends State<_AddAlbumContent> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const WabwayDragHandle(),
+        if (widget.showDragHandle) const WabwayDragHandle(),
         Padding(
           padding: const EdgeInsets.fromLTRB(kSpace4, kSpace2, kSpace4, 0),
           child: Row(

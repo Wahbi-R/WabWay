@@ -7,6 +7,8 @@ import '../../theme/app_text_theme.dart';
 import '../../widgets/wabway_button.dart';
 import '../../widgets/wabway_text_field.dart';
 import '../../widgets/destination_autocomplete.dart';
+import '../../data/date_utils.dart';
+import '../../widgets/widgets.dart';
 
 class CreateTripScreen extends StatefulWidget {
   const CreateTripScreen({super.key, required this.onCreated});
@@ -133,17 +135,17 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                           Row(
                             children: [
                               Expanded(
-                                child: _DateTile(
-                                  label: 'Start date',
-                                  date: _startDate,
+                                child: WabwayPickerField(
+                                  label: 'Start date (optional)',
+                                  value: _startDate == null ? null : fmtDateLong(_startDate!),
                                   onTap: _pickDateRange,
                                 ),
                               ),
                               const SizedBox(width: kSpace3),
                               Expanded(
-                                child: _DateTile(
-                                  label: 'End date',
-                                  date: _endDate,
+                                child: WabwayPickerField(
+                                  label: 'End date (optional)',
+                                  value: _endDate == null ? null : fmtDateLong(_endDate!),
                                   onTap: _pickDateRange,
                                 ),
                               ),
@@ -352,71 +354,3 @@ class _Logo extends StatelessWidget {
   }
 }
 
-// ─── Date tile ────────────────────────────────────────────────────────────────
-
-class _DateTile extends StatelessWidget {
-  const _DateTile({
-    required this.label,
-    required this.date,
-    required this.onTap,
-  });
-
-  final String label;
-  final DateTime? date;
-  final VoidCallback onTap;
-
-  static const _months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-  ];
-
-  String get _formatted => date == null
-      ? 'Optional'
-      : '${_months[date!.month - 1]} ${date!.day}, ${date!.year}';
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: kColorPaper,
-          border: Border.all(color: kColorBorder),
-          borderRadius: kRadiusMd,
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: kSpace3,
-            vertical: kSpace3,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: kStyleCaption),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  Icon(
-                    Icons.calendar_today_rounded,
-                    size: 13,
-                    color: date == null ? kColorInkSoft : kColorPrimary,
-                  ),
-                  const SizedBox(width: kSpace2),
-                  Flexible(
-                    child: Text(
-                      _formatted,
-                      style: kStyleBody.copyWith(
-                        color: date == null ? kColorInkSoft : kColorInk,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}

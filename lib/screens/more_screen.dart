@@ -27,6 +27,7 @@ import 'trips/trip_switcher_sheet.dart';
 import 'diagnostics_screen.dart';
 import 'notification_settings_screen.dart';
 import '../core/changelog.dart';
+import 'trips/trip_actions.dart';
 
 class MoreScreen extends ConsumerWidget {
   const MoreScreen({super.key});
@@ -36,7 +37,7 @@ class MoreScreen extends ConsumerWidget {
     final members = ref.watch(tripMembersProvider);
     final trip = ref.watch(activeTripProvider);
     final currentUserId = ref.watch(profileProvider)?.id;
-    final isOwner = members.any((m) => m.userId == currentUserId && m.isOwner);
+    final isOwner = ref.watch(isOrganiserProvider);
     final reload = () => ref.read(tripNotifierProvider.notifier).load();
 
     return Scaffold(
@@ -171,7 +172,7 @@ class MoreScreen extends ConsumerWidget {
                                     icon: const Icon(Icons.person_remove_outlined,
                                         size: 18, color: kColorDanger),
                                     tooltip: 'Remove member',
-                                    onPressed: () => _confirmRemoveMember(
+                                    onPressed: () => confirmRemoveMember(
                                         context, trip?.id ?? '', member, reload),
                                   )
                                 : null,
@@ -329,7 +330,7 @@ class MoreScreen extends ConsumerWidget {
                       icon: Icons.delete_rounded,
                       label: 'Delete trip',
                       color: kColorDanger,
-                      onTap: () => _confirmDeleteTrip(context, trip, reload),
+                      onTap: () => confirmDeleteTrip(context, trip, reload),
                     ),
                   ],
                   if (!isOwner) ...[
@@ -338,7 +339,7 @@ class MoreScreen extends ConsumerWidget {
                       icon: Icons.logout_rounded,
                       label: 'Leave trip',
                       color: kColorDanger,
-                      onTap: () => _confirmLeaveTrip(context, trip, reload),
+                      onTap: () => confirmLeaveTrip(context, trip, reload),
                     ),
                   ],
                 ],
@@ -494,121 +495,6 @@ class _SectionHeader extends StatelessWidget {
 }
 
 // ─── Trip actions ─────────────────────────────────────────────────────────────
-
-Future<void> _confirmRemoveMember(
-    BuildContext context, String tripId, member, VoidCallback onRefresh) async {
-  final confirmed = await showDialog<bool>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      backgroundColor: kColorPaper,
-      shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
-      title: Text('Remove member?', style: kStyleBodySemibold),
-      content: Text(
-        'Remove ${member.profile.displayName} from the trip? They will lose access immediately.',
-        style: kStyleBody,
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: Text('Cancel', style: kStyleBody.copyWith(color: kColorInkSoft)),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, true),
-          child: Text('Remove', style: kStyleBodyMedium.copyWith(color: kColorDanger)),
-        ),
-      ],
-    ),
-  );
-  if (confirmed != true || !context.mounted) return;
-  try {
-    await TripService.removeMember(tripId, member.userId as String);
-    if (context.mounted) onRefresh();
-  } catch (_) {
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Could not remove member.',
-            style: kStyleBody.copyWith(color: Colors.white)),
-        backgroundColor: kColorDanger,
-        behavior: SnackBarBehavior.floating,
-      ));
-    }
-  }
-}
-
-Future<void> _confirmLeaveTrip(BuildContext context, trip, VoidCallback onRefresh) async {
-  final confirmed = await showDialog<bool>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      backgroundColor: kColorPaper,
-      shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
-      title: Text('Leave trip?', style: kStyleBodySemibold),
-      content: Text(
-        'You will lose access to "${trip.name}" and all its data.',
-        style: kStyleBody,
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: Text('Cancel', style: kStyleBody.copyWith(color: kColorInkSoft)),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, true),
-          child: Text('Leave', style: kStyleBodyMedium.copyWith(color: kColorDanger)),
-        ),
-      ],
-    ),
-  );
-  if (confirmed != true || !context.mounted) return;
-  try {
-    await TripService.leaveTrip(trip.id);
-    if (context.mounted) onRefresh();
-  } catch (_) {
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Could not leave trip.', style: kStyleBody.copyWith(color: Colors.white)),
-        behavior: SnackBarBehavior.floating,
-      ));
-    }
-  }
-}
-
-Future<void> _confirmDeleteTrip(BuildContext context, trip, VoidCallback onRefresh) async {
-  final confirmed = await showDialog<bool>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      backgroundColor: kColorPaper,
-      shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
-      title: Text('Delete trip?', style: kStyleBodySemibold),
-      content: Text(
-        'This will permanently delete "${trip.name}" and all its data for every member. This cannot be undone.',
-        style: kStyleBody,
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: Text('Cancel', style: kStyleBody.copyWith(color: kColorInkSoft)),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, true),
-          child: Text('Delete', style: kStyleBodyMedium.copyWith(color: kColorDanger)),
-        ),
-      ],
-    ),
-  );
-  if (confirmed != true || !context.mounted) return;
-  try {
-    await TripService.deleteTrip(trip.id);
-    if (context.mounted) onRefresh();
-  } catch (_) {
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Could not delete trip.', style: kStyleBody.copyWith(color: Colors.white)),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: kColorDanger,
-      ));
-    }
-  }
-}
 
 void _showTransferOwnershipSheet(
   BuildContext context,

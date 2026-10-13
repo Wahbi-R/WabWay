@@ -158,30 +158,3 @@ class WabwayActionTile extends StatelessWidget {
     );
   }
 }
-
-// ─── Attach document / photo placeholder ─────────────────────────────────────
-
-class WabwayAttachPlaceholder extends StatelessWidget {
-  const WabwayAttachPlaceholder({super.key, required this.label});
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: kSpace6),
-      decoration: BoxDecoration(
-        color: kColorSurfaceSunken,
-        borderRadius: kRadiusMd,
-        border: Border.all(color: kColorBorder),
-      ),
-      child: Column(
-        children: [
-          const Icon(Icons.attach_file_rounded, size: 24, color: kColorInkSoft),
-          const SizedBox(height: kSpace2),
-          Text(label, style: kStyleCaption),
-        ],
-      ),
-    );
-  }
-}

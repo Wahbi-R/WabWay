@@ -93,30 +93,8 @@ class _PhotosScreenState extends ConsumerState<PhotosScreen> with AsyncScreenMix
   }
 
   Future<void> _delete(TripPhotoAlbum album) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: kColorPaper,
-        shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
-        title: Text('Remove album?', style: kStyleBodySemibold),
-        content: Text(
-          '"${album.title}" will be removed for everyone.',
-          style: kStyleBody,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Cancel',
-                style: kStyleBody.copyWith(color: kColorInkSoft)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('Remove',
-                style: kStyleBodyMedium.copyWith(color: kColorDanger)),
-          ),
-        ],
-      ),
-    );
+    final confirmed = await showWabwayDeleteConfirm(context,
+        entity: 'album', name: album.title, detail: 'for everyone in the trip');
     if (confirmed != true) return;
     setState(() => _albums = _albums.where((a) => a.id != album.id).toList());
     try {

@@ -13,19 +13,18 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
+import '../../data/date_utils.dart';
 
 Future<void> showTripSettingsSheet(
   BuildContext context,
   WidgetRef ref, {
   required AppTrip trip,
 }) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    backgroundColor: Colors.transparent,
-    builder: (_) => _TripSettingsSheet(
+  return showWabwayAutoSheet<void>(
+    context,
+    builder: (_, handle) => _TripSettingsSheet(
       trip: trip,
+      showDragHandle: handle,
       onSaved: () => ref.read(tripNotifierProvider.notifier).load(),
     ),
   );
@@ -35,8 +34,13 @@ Future<void> showTripSettingsSheet(
 // ─── Sheet ────────────────────────────────────────────────────────────────────
 
 class _TripSettingsSheet extends StatefulWidget {
-  const _TripSettingsSheet({required this.trip, required this.onSaved});
+  const _TripSettingsSheet({
+    required this.trip,
+    required this.onSaved,
+    this.showDragHandle = true,
+  });
   final AppTrip trip;
+  final bool showDragHandle;
   final VoidCallback onSaved;
 
   @override
@@ -174,11 +178,6 @@ class _TripSettingsSheetState extends State<_TripSettingsSheet> {
     }
   }
 
-  String _fmtDate(DateTime d) {
-    const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    return '${mo[d.month - 1]} ${d.day}, ${d.year}';
-  }
-
   @override
   Widget build(BuildContext context) {
     final bottomPad = MediaQuery.viewInsetsOf(context).bottom;
@@ -193,7 +192,7 @@ class _TripSettingsSheetState extends State<_TripSettingsSheet> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const WabwayDragHandle(),
+            if (widget.showDragHandle) const WabwayDragHandle(),
             Padding(
               padding: const EdgeInsets.fromLTRB(kSpace5, kSpace3, kSpace5, 0),
               child: Row(
@@ -238,9 +237,9 @@ class _TripSettingsSheetState extends State<_TripSettingsSheet> {
                     Row(
                       children: [
                         Expanded(
-                          child: _DateField(
+                          child: WabwayPickerField(
                             label: 'Start',
-                            value: _startDate != null ? _fmtDate(_startDate!) : null,
+                            value: _startDate != null ? fmtDateLong(_startDate!) : null,
                             placeholder: 'Not set',
                             onTap: _pickDateRange,
                             onClear: _startDate != null
@@ -250,9 +249,9 @@ class _TripSettingsSheetState extends State<_TripSettingsSheet> {
                         ),
                         const SizedBox(width: kSpace3),
                         Expanded(
-                          child: _DateField(
+                          child: WabwayPickerField(
                             label: 'End',
-                            value: _endDate != null ? _fmtDate(_endDate!) : null,
+                            value: _endDate != null ? fmtDateLong(_endDate!) : null,
                             placeholder: 'Not set',
                             onTap: _pickDateRange,
                             onClear: _endDate != null
@@ -511,67 +510,3 @@ class _CurrencyDropdown extends StatelessWidget {
   }
 }
 
-// ─── Date field ───────────────────────────────────────────────────────────────
-
-class _DateField extends StatelessWidget {
-  const _DateField({
-    required this.label,
-    required this.value,
-    required this.placeholder,
-    required this.onTap,
-    this.onClear,
-  });
-
-  final String label;
-  final String? value;
-  final String placeholder;
-  final VoidCallback onTap;
-  final VoidCallback? onClear;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: kColorSurfaceSunken,
-          borderRadius: kRadiusMd,
-          border: Border.all(color: kColorBorder),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: kSpace3, vertical: kSpace3),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(label,
-                        style: kStyleCaption.copyWith(color: kColorInkSoft)),
-                    const SizedBox(height: 2),
-                    Text(
-                      value ?? placeholder,
-                      style: value != null
-                          ? kStyleBodyMedium
-                          : kStyleBody.copyWith(color: kColorInkSoft),
-                    ),
-                  ],
-                ),
-              ),
-              if (onClear != null)
-                GestureDetector(
-                  onTap: onClear,
-                  child: const Icon(Icons.close_rounded,
-                      size: 16, color: kColorInkSoft),
-                )
-              else
-                const Icon(Icons.calendar_today_outlined,
-                    size: 16, color: kColorInkSoft),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}

@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../offline_cache.dart';
 import '../trip/app_trip.dart';
 import '../trip/app_trip_member.dart';
+import '../supabase/client.dart';
 import '../supabase/trip_service.dart';
 import '../sync_queue.dart';
 
@@ -221,3 +222,21 @@ final tripMembersProvider =
 /// Convenience: all trips the user belongs to.
 final allTripsProvider =
     Provider<List<AppTrip>>((ref) => ref.watch(tripNotifierProvider).trips);
+
+// ─── Permissions ──────────────────────────────────────────────────────────────
+
+/// True when the signed-in user is the active trip's organiser (owner).
+/// The ONE organiser check — don't recompute `members.any(... isOwner)` inline.
+final isOrganiserProvider = Provider<bool>((ref) {
+  final myId = supabase.auth.currentUser?.id;
+  if (myId == null) return false;
+  return ref.watch(tripMembersProvider).any((m) => m.userId == myId && m.isOwner);
+});
+
+/// The one rule for editing/deleting shared trip content (spots, links, docs…):
+/// the person who added it, or the organiser.
+bool canManageItem(String? createdById, {required bool isOrganiser}) {
+  final myId = supabase.auth.currentUser?.id;
+  if (myId == null) return false;
+  return isOrganiser || createdById == myId;
+}

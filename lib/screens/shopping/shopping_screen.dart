@@ -16,6 +16,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
+import '../../core/text_utils.dart';
 
 // Fetches the og:image meta tag from a URL. Returns null on error or CORS block.
 Future<String?> _fetchOgImage(String rawUrl) async {
@@ -198,23 +199,10 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> with AsyncScree
   Future<void> _clearChecked() async {
     if (_checked.isEmpty) return;
     final count = _checked.length;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Clear checked items?'),
-        content: Text(
-            'Remove $count ${count == 1 ? 'item' : 'items'} from the list.'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Clear',
-                  style: TextStyle(color: kColorDanger))),
-        ],
-      ),
-    );
+    final confirmed = await showWabwayConfirm(context,
+      title: 'Clear checked items?',
+      message: 'Remove ${pluralize(count, 'item')} from the list.',
+      confirmLabel: 'Clear');
     if (confirmed != true || !mounted) return;
     setState(() => _items.removeWhere((i) => i.checked));
     try {

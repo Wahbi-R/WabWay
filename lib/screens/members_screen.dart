@@ -21,7 +21,7 @@ class MembersScreen extends ConsumerWidget {
     final trip = ref.watch(activeTripProvider);
     if (trip == null) return const SizedBox.shrink();
     final currentUserId = ref.watch(profileProvider)?.id;
-    final isOwner = members.any((m) => m.userId == currentUserId && m.isOwner);
+    final isOwner = ref.watch(isOrganiserProvider);
 
     return Scaffold(
       backgroundColor: kColorCream,

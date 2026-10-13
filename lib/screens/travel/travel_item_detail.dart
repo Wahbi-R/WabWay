@@ -675,7 +675,7 @@ class _ActionsSectionState extends ConsumerState<_ActionsSection> {
   Future<void> _addToItinerary() async {
     if (_itineraryLoading) return;
     if (widget.days.isEmpty) {
-      _snack(context, 'Add trip days in Plan first.');
+      showWabwaySnack(context, 'Add trip days in Plan first.');
       return;
     }
 
@@ -756,7 +756,7 @@ class _ActionsSectionState extends ConsumerState<_ActionsSection> {
 
   Future<void> _attachDoc() async {
     if (widget.docs.isEmpty) {
-      _snack(context, 'No documents in this trip yet.');
+      showWabwaySnack(context, 'No documents in this trip yet.');
       return;
     }
 
@@ -796,11 +796,11 @@ class _ActionsSectionState extends ConsumerState<_ActionsSection> {
         linkedDayId: widget.item.linkedDayId,
       );
       widget.onUpdated?.call(updated);
-      _snack(context,
+      showWabwaySnack(context,
           newIds.isEmpty ? 'Documents unlinked.' : 'Documents updated.');
     } catch (e) {
       if (!mounted) return;
-      _snack(context, 'Could not update documents: $e');
+      showWabwaySnack(context, 'Could not update documents: $e');
     }
   }
 
@@ -885,43 +885,10 @@ class _ActionsSectionState extends ConsumerState<_ActionsSection> {
     }
   }
 
-  void _snack(BuildContext context, String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg, style: kStyleBody.copyWith(color: Colors.white)),
-      behavior: SnackBarBehavior.floating,
-      duration: const Duration(seconds: 2),
-    ));
-  }
-
-  void _confirmDelete(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: kColorPaper,
-        shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
-        title: Text('Delete travel item?', style: kStyleBodySemibold),
-        content: Text(
-          'Remove "${widget.item.title}" from your travel list?',
-          style: kStyleBody,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('Cancel',
-                style: kStyleBody.copyWith(color: kColorInkSoft)),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              widget.onDelete?.call();
-              if (context.mounted) Navigator.maybePop(context);
-            },
-            child: Text('Delete',
-                style: kStyleBodyMedium.copyWith(color: kColorDanger)),
-          ),
-        ],
-      ),
-    );
+  Future<void> _confirmDelete(BuildContext context) async {
+    if (!await showWabwayDeleteConfirm(context, entity: 'travel item', name: widget.item.title)) return;
+    widget.onDelete?.call();
+    if (context.mounted) Navigator.maybePop(context);
   }
 }
 

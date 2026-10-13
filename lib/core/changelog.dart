@@ -11,6 +11,18 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 405,
+    label: 'UI consistency',
+    changes: [
+      'Delete and confirm prompts now look and read the same everywhere',
+      'Date and time fields look the same in every form',
+      'On desktop, forms open as clean centred dialogs without the mobile drag handle',
+      'Avatars show the same initials for a person everywhere in the app',
+      'Rename and quick-add prompts are consistent across Packing, Pins and Documents',
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 404,
     label: 'Security',
     changes: [

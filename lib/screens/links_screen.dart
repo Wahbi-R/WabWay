@@ -194,28 +194,8 @@ class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin
   }
 
   Future<void> _deleteLink(TripLink link) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: kColorPaper,
-        shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
-        title: Text('Remove link?', style: kStyleBodySemibold),
-        content: Text(
-          '"${link.title}" will be removed for everyone.',
-          style: kStyleBody,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Cancel', style: kStyleBody.copyWith(color: kColorInkSoft)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('Remove', style: kStyleBodyMedium.copyWith(color: kColorDanger)),
-          ),
-        ],
-      ),
-    );
+    final confirmed = await showWabwayDeleteConfirm(context,
+        entity: 'link', name: link.title, detail: 'for everyone in the trip');
     if (confirmed != true) return;
     if (!mounted) return;
     setState(() => _links = _links.where((l) => l.id != link.id).toList());

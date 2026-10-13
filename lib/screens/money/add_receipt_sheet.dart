@@ -39,94 +39,24 @@ Future<Receipt?> showAddReceiptSheet(
           ? kMockMembers
           : [TripMember(id: effectiveUserId, name: 'You')];
 
-  final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
-
-  if (isDesktop) {
-    return showDialog<Receipt>(
-      context: context,
-      builder: (dialogCtx) => Dialog(
-        backgroundColor: kColorPaper,
-        shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
-        insetPadding:
-            const EdgeInsets.symmetric(horizontal: kSpace8, vertical: kSpace8),
-        child: SizedBox(
-          width: 520,
-          height: MediaQuery.sizeOf(dialogCtx).height * 0.90,
-          child: _AddReceiptContent(
-            tripId:          tripId,
-            userId:          effectiveUserId,
-            members:         effectiveMembers,
-            existingReceipt: existingReceipt,
-            homeCurrency:    homeCurrency,
-            isDuplicate:     isDuplicate,
-            onSubmit: (r) => Navigator.pop(dialogCtx, r),
-          ),
-        ),
-      ),
-    );
-  }
-
-  return showModalBottomSheet<Receipt>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    backgroundColor: Colors.transparent,
-    builder: (ctx) => _AddReceiptSheet(
+  return showWabwayFormSheet<Receipt>(
+    context,
+    desktopHeightFactor: 0.90,
+    initialChildSize: 0.92,
+    minChildSize: 0.5,
+    maxChildSize: 0.97,
+    builder: (ctx, scroll, handle, close) => _AddReceiptContent(
       tripId:          tripId,
       userId:          effectiveUserId,
-      isDuplicate:     isDuplicate,
       members:         effectiveMembers,
       existingReceipt: existingReceipt,
       homeCurrency:    homeCurrency,
-      onSubmit: (r) => Navigator.pop(ctx, r),
+      isDuplicate:     isDuplicate,
+      scrollController: scroll,
+      showDragHandle: handle,
+      onSubmit: close,
     ),
   );
-}
-
-class _AddReceiptSheet extends StatelessWidget {
-  const _AddReceiptSheet({
-    required this.onSubmit,
-    required this.tripId,
-    required this.userId,
-    required this.members,
-    required this.homeCurrency,
-    this.existingReceipt,
-    this.isDuplicate = false,
-  });
-
-  final ValueChanged<Receipt> onSubmit;
-  final String? tripId;
-  final String userId;
-  final List<TripMember> members;
-  final String homeCurrency;
-  final Receipt? existingReceipt;
-  final bool isDuplicate;
-
-  @override
-  Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.92,
-      minChildSize: 0.5,
-      maxChildSize: 0.97,
-      builder: (_, ctrl) => DecoratedBox(
-        decoration: const BoxDecoration(
-          color: kColorPaper,
-          borderRadius: kRadiusSheet,
-        ),
-        child: _AddReceiptContent(
-          tripId:           tripId,
-          userId:           userId,
-          members:          members,
-          existingReceipt:  existingReceipt,
-          isDuplicate:      isDuplicate,
-          homeCurrency:     homeCurrency,
-          scrollController: ctrl,
-          onSubmit:         onSubmit,
-          showDragHandle:   true,
-        ),
-      ),
-    );
-  }
 }
 
 enum _SplitMode { equal, custom }
@@ -1345,7 +1275,7 @@ class _EqualSplitPicker extends StatelessWidget {
           onChanged: (v) => onChanged(m.id, v ?? false),
           title: Text(m.isYou ? 'You' : m.name, style: kStyleBodyMedium),
           secondary: WabwayAvatar(
-              name: m.isYou ? 'You' : m.name, size: WabwayAvatarSize.sm),
+              name: m.name, size: WabwayAvatarSize.sm),
           activeColor: kColorPrimary,
           contentPadding: EdgeInsets.zero,
           dense: true,
@@ -1370,7 +1300,7 @@ class _CustomSplitPicker extends StatelessWidget {
           child: Row(
             children: [
               WabwayAvatar(
-                  name: m.isYou ? 'You' : m.name, size: WabwayAvatarSize.sm),
+                  name: m.name, size: WabwayAvatarSize.sm),
               const SizedBox(width: kSpace3),
               Expanded(
                 child:
@@ -1633,7 +1563,7 @@ class _ItemSplitSheetState extends State<_ItemSplitSheet> {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     WabwayAvatar(
-                                      name: m.isYou ? 'You' : m.name,
+                                      name: m.name,
                                       size: WabwayAvatarSize.xs,
                                     ),
                                     const SizedBox(width: 4),
@@ -1677,7 +1607,7 @@ class _ItemSplitSheetState extends State<_ItemSplitSheet> {
                     child: Row(
                       children: [
                         WabwayAvatar(
-                          name: m.isYou ? 'You' : m.name,
+                          name: m.name,
                           size: WabwayAvatarSize.sm,
                         ),
                         const SizedBox(width: kSpace2),

@@ -14,6 +14,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
 import '../widgets/widgets.dart';
+import '../core/text_utils.dart';
 
 class PackingScreen extends ConsumerStatefulWidget {
   const PackingScreen({super.key});
@@ -91,89 +92,24 @@ class _PackingScreenState extends ConsumerState<PackingScreen> with AsyncScreenM
   }
 
   void _addItem() async {
-    final ctrl = TextEditingController();
+    final text = await showWabwayTextPrompt(context,
+        title: 'Add items', hint: 'Passport, charger, adapter…',
+        helper: 'Separate multiple items with commas', confirmLabel: 'Add');
+    if (text == null || !mounted) return;
+    final tripId = _tripId;
+    final userId = _myId;
+    final titles = text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
     try {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: kColorPaper,
-          shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
-          title: Text('Add items', style: kStyleBodySemibold),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextField(
-                controller: ctrl,
-                autofocus: true,
-                style: kStyleBody,
-                decoration: InputDecoration(
-                  hintText: 'Passport, charger, adapter…',
-                  hintStyle: TextStyle(color: kColorInkSoft.withAlpha(120)),
-                  border: OutlineInputBorder(
-                      borderRadius: kRadiusMd,
-                      borderSide: BorderSide(color: kColorBorder)),
-                  focusedBorder: OutlineInputBorder(
-                      borderRadius: kRadiusMd,
-                      borderSide:
-                          BorderSide(color: kColorPrimary, width: 1.5)),
-                  contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 10),
-                ),
-                onSubmitted: (_) => Navigator.pop(ctx, true),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Separate multiple items with commas',
-                style: kStyleCaption.copyWith(
-                    color: kColorInkSoft, fontSize: 11),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Cancel')),
-            TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: Text('Add',
-                    style: TextStyle(color: kColorPrimary))),
-          ],
-        ),
-      );
-      if (confirmed != true || !mounted || ctrl.text.trim().isEmpty) return;
-      final tripId = _tripId;
-      final userId = _myId;
-      final titles = ctrl.text
-          .split(',')
-          .map((s) => s.trim())
-          .where((s) => s.isNotEmpty)
-          .toList();
-      try {
-        for (final t in titles) {
-          await PackingService.addItem(tripId, t, userId);
-        }
-        if (!mounted) return;
-        if (titles.length > 1) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Added ${titles.length} items',
-                style: kStyleBody.copyWith(color: Colors.white)),
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 2),
-          ));
-        }
-        _load(silent: true);
-      } catch (_) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Could not add items. Try again.',
-              style: kStyleBody.copyWith(color: Colors.white)),
-          behavior: SnackBarBehavior.floating,
-        ));
-        _load(silent: true);
+      for (final t in titles) {
+        await PackingService.addItem(tripId, t, userId);
       }
-    } finally {
-      ctrl.dispose();
+      if (!mounted) return;
+      showWabwaySnack(context, titles.length == 1 ? 'Added "${titles.first}"' : 'Added ${titles.length} items');
+      _load(silent: true);
+    } catch (_) {
+      if (!mounted) return;
+      showWabwaySnack(context, 'Could not add items. Try again.', error: true);
+      _load(silent: true);
     }
   }
 
@@ -194,55 +130,14 @@ class _PackingScreenState extends ConsumerState<PackingScreen> with AsyncScreenM
   }
 
   Future<void> _rename(PackingItem item) async {
-    final ctrl = TextEditingController(text: item.title);
-    try {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: kColorPaper,
-          shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
-          title: Text('Rename item', style: kStyleBodySemibold),
-          content: TextField(
-            controller: ctrl,
-            autofocus: true,
-            style: kStyleBody,
-            decoration: InputDecoration(
-              hintText: 'Item name',
-              hintStyle: TextStyle(color: kColorInkSoft.withAlpha(120)),
-              border: OutlineInputBorder(
-                  borderRadius: kRadiusMd,
-                  borderSide: BorderSide(color: kColorBorder)),
-              focusedBorder: OutlineInputBorder(
-                  borderRadius: kRadiusMd,
-                  borderSide: BorderSide(color: kColorPrimary, width: 1.5)),
-              contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12, vertical: 10),
-            ),
-            onSubmitted: (_) => Navigator.pop(ctx, true),
-          ),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Cancel')),
-            TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: Text('Save',
-                    style: TextStyle(color: kColorPrimary))),
-          ],
-        ),
-      );
-      if (confirmed != true ||
-          !mounted ||
-          ctrl.text.trim().isEmpty ||
-          ctrl.text.trim() == item.title) return;
-      setState(() {
-        final idx = _items.indexWhere((i) => i.id == item.id);
-        if (idx >= 0) _items[idx] = item.copyWith(title: ctrl.text.trim());
-      });
-      await PackingService.renameItem(item.id, ctrl.text.trim());
-    } finally {
-      ctrl.dispose();
-    }
+    final title = await showWabwayTextPrompt(context,
+        title: 'Rename item', initialValue: item.title, hint: 'Item name');
+    if (title == null || !mounted || title == item.title) return;
+    setState(() {
+      final idx = _items.indexWhere((i) => i.id == item.id);
+      if (idx >= 0) _items[idx] = item.copyWith(title: title);
+    });
+    await PackingService.renameItem(item.id, title);
   }
 
   Future<void> _delete(PackingItem item) async {
@@ -269,26 +164,11 @@ class _PackingScreenState extends ConsumerState<PackingScreen> with AsyncScreenM
     final myId     = _myId;
     final myPacked = _items.where((i) => i.isPackedBy(myId)).length;
     if (myPacked == 0) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Unpack all your items?'),
-        content: Text(
-          '$myPacked ${myPacked == 1 ? 'item' : 'items'} you packed will be unchecked. '
-          'Other crew members\' checks are not affected.',
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Unpack'),
-          ),
-        ],
-      ),
-    );
+    final confirmed = await showWabwayConfirm(context,
+      title: 'Unpack all your items?',
+      message: '${pluralize(myPacked, 'item')} you packed will be unchecked. '
+          "Other crew members' checks are not affected.",
+      confirmLabel: 'Unpack');
     if (confirmed != true || !mounted) return;
     setState(() {
       _items = _items.map((i) => i.copyWith(
@@ -1053,18 +933,6 @@ class _MemberDots extends StatelessWidget {
   final List<AppTripMember> members;
   final String              myId;
 
-  static const _palette = [
-    Color(0xFFC96F4A),
-    Color(0xFF7D9A75),
-    Color(0xFFD6A84F),
-    Color(0xFF5C7AEA),
-    Color(0xFF9B6EA0),
-  ];
-
-  Color _colorFor(String name) {
-    final hash = name.codeUnits.fold(0, (a, b) => a + b);
-    return _palette[hash % _palette.length];
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -1072,10 +940,8 @@ class _MemberDots extends StatelessWidget {
       children: [
         for (final m in members) ...[
           _Dot(
-            initial: m.profile.displayName.isNotEmpty
-                ? m.profile.displayName[0].toUpperCase()
-                : '?',
-            color: _colorFor(m.profile.displayName),
+            initial: initialsFor(m.profile.displayName),
+            color: avatarColorFor(m.profile.displayName),
             packed: item.isPackedBy(m.userId),
             isMe: m.userId == myId,
           ),

@@ -18,84 +18,22 @@ Future<TripDocument?> showAddDocSheet(
   required String userId,
   required List<Spot> availableSpots,
 }) {
-  final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
-
-  if (isDesktop) {
-    return showDialog<TripDocument>(
-      context: context,
-      builder: (ctx) => Dialog(
-        backgroundColor: kColorPaper,
-        shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
-        insetPadding:
-            const EdgeInsets.symmetric(horizontal: kSpace8, vertical: kSpace8),
-        child: SizedBox(
-          width: 520,
-          height: MediaQuery.sizeOf(ctx).height * 0.90,
-          child: _AddDocContent(
-            tripId: tripId,
-            tripName: tripName,
-            userId: userId,
-            availableSpots: availableSpots,
-            onSubmit: (d) => Navigator.pop(ctx, d),
-          ),
-        ),
-      ),
-    );
-  }
-
-  return showModalBottomSheet<TripDocument>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    backgroundColor: Colors.transparent,
-    builder: (ctx) => _AddDocSheet(
+  return showWabwayFormSheet<TripDocument>(
+    context,
+    desktopHeightFactor: 0.90,
+    initialChildSize: 0.92,
+    minChildSize: 0.5,
+    maxChildSize: 0.97,
+    builder: (ctx, scroll, handle, close) => _AddDocContent(
       tripId: tripId,
       tripName: tripName,
       userId: userId,
       availableSpots: availableSpots,
-      onSubmit: (d) => Navigator.pop(ctx, d),
+      scrollController: scroll,
+      showDragHandle: handle,
+      onSubmit: close,
     ),
   );
-}
-
-class _AddDocSheet extends StatelessWidget {
-  const _AddDocSheet({
-    required this.tripId,
-    required this.tripName,
-    required this.userId,
-    required this.availableSpots,
-    required this.onSubmit,
-  });
-
-  final String tripId;
-  final String tripName;
-  final String userId;
-  final List<Spot> availableSpots;
-  final ValueChanged<TripDocument> onSubmit;
-
-  @override
-  Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.92,
-      minChildSize: 0.5,
-      maxChildSize: 0.97,
-      builder: (_, ctrl) => DecoratedBox(
-        decoration: const BoxDecoration(
-          color: kColorPaper,
-          borderRadius: kRadiusSheet,
-        ),
-        child: _AddDocContent(
-          tripId: tripId,
-          tripName: tripName,
-          userId: userId,
-          availableSpots: availableSpots,
-          scrollController: ctrl,
-          onSubmit: onSubmit,
-          showDragHandle: true,
-        ),
-      ),
-    );
-  }
 }
 
 class _AddDocContent extends StatefulWidget {

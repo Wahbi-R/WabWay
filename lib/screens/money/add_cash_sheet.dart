@@ -25,79 +25,21 @@ Future<CashWithdrawal?> showAddCashSheet(
           ? kMockMembers
           : [TripMember(id: effectiveUserId, name: 'You')];
 
-  final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
-
-  if (isDesktop) {
-    return showDialog<CashWithdrawal>(
-      context: context,
-      builder: (dialogCtx) => Dialog(
-        backgroundColor: kColorPaper,
-        shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
-        insetPadding:
-            const EdgeInsets.symmetric(horizontal: kSpace8, vertical: kSpace8),
-        child: SizedBox(
-          width: 520,
-          height: MediaQuery.sizeOf(dialogCtx).height * 0.90,
-          child: _AddCashContent(
-            tripId:  tripId,
-            userId:  effectiveUserId,
-            members: effectiveMembers,
-            onSubmit: (w) => Navigator.pop(dialogCtx, w),
-          ),
-        ),
-      ),
-    );
-  }
-
-  return showModalBottomSheet<CashWithdrawal>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    backgroundColor: Colors.transparent,
-    builder: (ctx) => _AddCashSheet(
+  return showWabwayFormSheet<CashWithdrawal>(
+    context,
+    desktopHeightFactor: 0.90,
+    initialChildSize: 0.92,
+    minChildSize: 0.5,
+    maxChildSize: 0.97,
+    builder: (ctx, scroll, handle, close) => _AddCashContent(
       tripId:  tripId,
       userId:  effectiveUserId,
       members: effectiveMembers,
-      onSubmit: (w) => Navigator.pop(ctx, w),
+      scrollController: scroll,
+      showDragHandle: handle,
+      onSubmit: close,
     ),
   );
-}
-
-class _AddCashSheet extends StatelessWidget {
-  const _AddCashSheet({
-    required this.onSubmit,
-    required this.tripId,
-    required this.userId,
-    required this.members,
-  });
-
-  final ValueChanged<CashWithdrawal> onSubmit;
-  final String? tripId;
-  final String userId;
-  final List<TripMember> members;
-
-  @override
-  Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.92,
-      minChildSize: 0.5,
-      maxChildSize: 0.97,
-      builder: (_, ctrl) => DecoratedBox(
-        decoration: const BoxDecoration(
-          color: kColorPaper,
-          borderRadius: kRadiusSheet,
-        ),
-        child: _AddCashContent(
-          tripId:          tripId,
-          userId:          userId,
-          members:         members,
-          scrollController: ctrl,
-          onSubmit:        onSubmit,
-          showDragHandle:  true,
-        ),
-      ),
-    );
-  }
 }
 
 class _AddCashContent extends StatefulWidget {
@@ -316,7 +258,7 @@ class _AddCashContentState extends State<_AddCashContent> {
                         child: Row(
                           children: [
                             WabwayAvatar(
-                                name: m.isYou ? 'You' : m.name,
+                                name: m.name,
                                 size: WabwayAvatarSize.sm),
                             const SizedBox(width: kSpace3),
                             Expanded(

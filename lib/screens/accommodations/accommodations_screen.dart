@@ -193,17 +193,8 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen>
     final tripId = _activeTripId;
     if (tripId.isEmpty) return;
     final userId = supabase.auth.currentUser?.id ?? '';
-    final result = await showModalBottomSheet<AccommodationSheetResult>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => AddAccommodationSheet(
-        tripId:  tripId,
-        userId:  userId,
-        editing: editing,
-      ),
-    );
+    final result = await showAddStaySheet(context,
+        tripId: tripId, userId: userId, editing: editing);
     if (result == null || !mounted) return;
     if (result.deleted) {
       setState(() => _items.removeWhere((a) => a.id == editing?.id));

@@ -334,17 +334,8 @@ class _GlobalSearchScreenState extends State<_GlobalSearchScreen> with AsyncScre
               .whereType<String>()
               .join(' · '),
           icon:     Icons.hotel_rounded,
-          onTap: (ctx) => showModalBottomSheet<void>(
-            context: ctx,
-            isScrollControlled: true,
-            useSafeArea: true,
-            backgroundColor: Colors.transparent,
-            builder: (_) => AddAccommodationSheet(
-              tripId:  widget.tripId,
-              userId:  widget.userId,
-              editing: stay,
-            ),
-          ),
+          onTap: (ctx) => showAddStaySheet(ctx,
+              tripId: widget.tripId, userId: widget.userId, editing: stay),
         ));
       }
     }

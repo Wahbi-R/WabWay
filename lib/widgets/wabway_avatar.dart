@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import '../core/text_utils.dart';
 import '../theme/app_text_theme.dart';
+
+export '../core/text_utils.dart' show initialsFor;
 
 enum WabwayAvatarSize { xs, sm, md, lg, xl }
 
@@ -12,7 +15,7 @@ const _kAvatarPalette = [
   Color(0xFFB07AA0),
 ];
 
-Color _paletteColor(String name) {
+Color avatarColorFor(String name) {
   int h = 0;
   for (final c in name.codeUnits) {
     h = ((h * 31) + c) & 0xFFFFFFFF;
@@ -20,12 +23,6 @@ Color _paletteColor(String name) {
   return _kAvatarPalette[h % _kAvatarPalette.length];
 }
 
-String _initials(String name) => name
-    .split(' ')
-    .where((p) => p.isNotEmpty)
-    .take(2)
-    .map((p) => p[0].toUpperCase())
-    .join();
 
 class WabwayAvatar extends StatelessWidget {
   const WabwayAvatar({
@@ -53,7 +50,7 @@ class WabwayAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final px = _px;
     final fontSize = px * 0.4;
-    final color = src != null ? null : _paletteColor(name);
+    final color = src != null ? null : avatarColorFor(name);
 
     return Container(
       width: px,
@@ -71,7 +68,7 @@ class WabwayAvatar extends StatelessWidget {
       child: src == null
           ? Center(
               child: Text(
-                _initials(name).isEmpty ? '?' : _initials(name),
+                initialsFor(name).isEmpty ? '?' : initialsFor(name),
                 style: kStyleButtonMd.copyWith(
                   fontSize: fontSize,
                   color: Colors.white,

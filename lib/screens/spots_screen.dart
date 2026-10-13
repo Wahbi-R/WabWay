@@ -28,6 +28,7 @@ import 'spots/spot_list_tile.dart';
 import 'spots/spot_detail.dart';
 import 'spots/add_spot_sheet.dart';
 import 'map_screen.dart';
+import '../core/text_utils.dart';
 
 // Sort modes available on the spots list. Applied after filters and search.
 enum _SpotSort {
@@ -273,12 +274,8 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> with AsyncScreenMixin
   Spot? get _selected =>
       _selectedId == null ? null : _spots.where((s) => s.id == _selectedId).firstOrNull;
 
-  bool _canDelete(Spot spot) {
-    final myId = supabase.auth.currentUser?.id;
-    if (myId == null) return false;
-    if (spot.addedById == myId) return true;
-    return ref.read(tripMembersProvider).any((m) => m.userId == myId && m.isOwner);
-  }
+  bool _canManage(Spot spot) =>
+      canManageItem(spot.addedById, isOrganiser: ref.read(isOrganiserProvider));
 
   // ─── Mutations ───────────────────────────────────────────────────────────────
 
@@ -386,7 +383,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> with AsyncScreenMixin
     final ids = List<String>.from(_selectedIds);
     final deletable = ids.where((id) {
       final spot = _spots.where((s) => s.id == id).firstOrNull;
-      return spot != null && _canDelete(spot);
+      return spot != null && _canManage(spot);
     }).toList();
 
     final count = deletable.length;
@@ -403,29 +400,11 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> with AsyncScreenMixin
       return;
     }
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Delete $count ${count == 1 ? 'spot' : 'spots'}?',
-            style: kStyleBodyBold),
-        content: Text(
-          skipped > 0
-              ? 'This will permanently delete $count ${count == 1 ? 'spot' : 'spots'}. ($skipped skipped — you don\'t have permission to delete those.)'
-              : 'This will permanently delete $count ${count == 1 ? 'spot' : 'spots'}. This can\'t be undone.',
-          style: kStyleBody,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('Delete', style: TextStyle(color: kColorDanger)),
-          ),
-        ],
-      ),
-    );
+    final confirmed = await showWabwayConfirm(context,
+      title: 'Delete ${pluralize(count, 'spot')}?',
+      message: skipped > 0
+          ? 'This will permanently remove ${pluralize(count, 'spot')}. ($skipped skipped — you don\'t have permission to delete those.) This cannot be undone.'
+          : 'This will permanently remove ${pluralize(count, 'spot')}. This cannot be undone.');
     if (confirmed != true || !mounted) return;
 
     int failed = 0;
@@ -545,7 +524,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> with AsyncScreenMixin
           spot: spot,
           myVote: _myVotes[spot.id],
           onVote: (v) => _onVote(spot.id, v),
-          canDelete: _canDelete(spot),
+          canDelete: _canManage(spot),
           docs: docs,
           onEdit: _onEditSpot,
           onDelete: () {
@@ -623,7 +602,7 @@ class _SpotsScreenState extends ConsumerState<SpotsScreen> with AsyncScreenMixin
             searchCtrl: _searchCtrl,
             showSearch: _showSearch,
             sortBy: _sortBy,
-            canDelete: _canDelete,
+            canDelete: _canManage,
             selectionMode: _selectionMode,
             selectedIds: _selectedIds,
             onSelectSpot: (s) => setState(() => _selectedId = s?.id),

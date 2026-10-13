@@ -3,7 +3,9 @@ import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
 
-enum WabwayButtonVariant { primary, secondary, ghost, danger }
+/// [danger] is filled red — only inside confirmation dialogs.
+/// [dangerOutline] is the destructive action in detail panels and forms.
+enum WabwayButtonVariant { primary, secondary, ghost, danger, dangerOutline }
 enum WabwayButtonSize { sm, md, lg }
 
 class WabwayButton extends StatefulWidget {
@@ -55,6 +57,9 @@ class _WabwayButtonState extends State<WabwayButton> {
         if (_pressed) return kColorDangerActive();
         if (_hovered) return kColorDangerHover();
         return kColorDanger;
+      case WabwayButtonVariant.dangerOutline:
+        if (_pressed || _hovered) return kColorDanger.withValues(alpha: 0.08);
+        return Colors.transparent;
     }
   }
 
@@ -62,12 +67,14 @@ class _WabwayButtonState extends State<WabwayButton> {
     if (_disabled) return kColorInkSoft;
     return switch (widget.variant) {
       WabwayButtonVariant.ghost => kColorPrimaryDark,
+      WabwayButtonVariant.dangerOutline => kColorDanger,
       _ => kColorTextOnPrimary,
     };
   }
 
   Border? get _border => switch (widget.variant) {
     WabwayButtonVariant.ghost => Border.all(color: kColorBorder),
+    WabwayButtonVariant.dangerOutline => Border.all(color: kColorDanger),
     _ => null,
   };
 
@@ -108,7 +115,9 @@ class _WabwayButtonState extends State<WabwayButton> {
 
   @override
   Widget build(BuildContext context) {
-    final hasShadow = widget.variant != WabwayButtonVariant.ghost && !_disabled;
+    final hasShadow = widget.variant != WabwayButtonVariant.ghost &&
+        widget.variant != WabwayButtonVariant.dangerOutline &&
+        !_disabled;
     return Semantics(
       button: true,
       enabled: !_disabled,

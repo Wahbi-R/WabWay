@@ -13,28 +13,9 @@ import 'add_receipt_sheet.dart';
 
 // ─── Confirmation helper ──────────────────────────────────────────────────────
 
-Future<bool> _confirmDelete(BuildContext context, String title) async {
-  return await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Delete?'),
-          content: Text(
-              'This will permanently remove "$title" for everyone in the trip.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Delete',
-                  style: TextStyle(color: kColorDanger)),
-            ),
-          ],
-        ),
-      ) ??
-      false;
-}
+Future<bool> _confirmDelete(BuildContext context, String title) =>
+    showWabwayDeleteConfirm(context, entity: 'receipt', name: title,
+        detail: 'for everyone in the trip');
 
 // ─── Mobile full-screen route ─────────────────────────────────────────────────
 

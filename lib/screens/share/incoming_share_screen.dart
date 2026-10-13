@@ -358,18 +358,9 @@ class _IncomingShareScreenState extends State<IncomingShareScreen> {
       final url = _activeShare!.rawContent;
       final result = await ListingParser.parse(url);
       if (!mounted) return;
-      await showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        useSafeArea: true,
-        backgroundColor: Colors.transparent,
-        builder: (_) => AddAccommodationSheet(
-          tripId: widget.tripId,
-          userId: widget.userId,
-          prefilled: result,
-          initialUrl: url,
-        ),
-      );
+      await showAddStaySheet(context,
+          tripId: widget.tripId, userId: widget.userId,
+          prefilled: result, initialUrl: url);
       if (mounted) widget.onDone?.call();
     } finally {
       if (mounted) setState(() => _scanningStay = false);

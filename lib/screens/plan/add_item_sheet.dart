@@ -31,96 +31,25 @@ Future<ItineraryItem?> showAddItemSheet(
   List<Accommodation> stays = const [],
   ItineraryItem? initialItem,
 }) {
-  final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
-
-  if (isDesktop) {
-    return showDialog<ItineraryItem>(
-      context: context,
-      builder: (ctx) => Dialog(
-        backgroundColor: kColorPaper,
-        shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
-        insetPadding: const EdgeInsets.symmetric(
-            horizontal: kSpace8, vertical: kSpace8),
-        child: SizedBox(
-          width: 520,
-          height: MediaQuery.sizeOf(ctx).height * 0.90,
-          child: _AddItemContent(
-            dayId: dayId,
-            spots: spots,
-            docs: docs,
-            stays: stays,
-            initialItem: initialItem,
-            defaultCurrency: defaultCurrency,
-            onSubmit: (item) => Navigator.pop(ctx, item),
-          ),
-        ),
-      ),
-    );
-  }
-
-  return showModalBottomSheet<ItineraryItem>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    backgroundColor: Colors.transparent,
-    builder: (ctx) => _AddItemSheet(
+  return showWabwayFormSheet<ItineraryItem>(
+    context,
+    desktopHeightFactor: 0.90,
+    initialChildSize: 0.92,
+    minChildSize: 0.5,
+    maxChildSize: 0.97,
+    builder: (ctx, scroll, handle, close) => _AddItemContent(
       dayId: dayId,
       spots: spots,
       docs: docs,
       stays: stays,
       initialItem: initialItem,
       defaultCurrency: defaultCurrency,
-      onSubmit: (item) => Navigator.pop(ctx, item),
+      scrollController: scroll,
+      showDragHandle: handle,
+      onSubmit: close,
     ),
   );
 }
-
-class _AddItemSheet extends StatelessWidget {
-  const _AddItemSheet({
-    required this.dayId,
-    required this.spots,
-    required this.docs,
-    required this.stays,
-    required this.onSubmit,
-    required this.defaultCurrency,
-    this.initialItem,
-  });
-  final String dayId;
-  final List<Spot> spots;
-  final List<TripDocument> docs;
-  final List<Accommodation> stays;
-  final ValueChanged<ItineraryItem> onSubmit;
-  final String defaultCurrency;
-  final ItineraryItem? initialItem;
-
-  @override
-  Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.92,
-      minChildSize: 0.5,
-      maxChildSize: 0.97,
-      builder: (_, ctrl) => DecoratedBox(
-        decoration: const BoxDecoration(
-          color: kColorPaper,
-          borderRadius: kRadiusSheet,
-        ),
-        child: _AddItemContent(
-          dayId: dayId,
-          spots: spots,
-          docs: docs,
-          stays: stays,
-          initialItem: initialItem,
-          defaultCurrency: defaultCurrency,
-          scrollController: ctrl,
-          onSubmit: onSubmit,
-          showDragHandle: true,
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Form content ─────────────────────────────────────────────────────────────
 
 class _AddItemContent extends StatefulWidget {
   const _AddItemContent({
@@ -285,17 +214,6 @@ class _AddItemContentState extends State<_AddItemContent> {
     ));
   }
 
-  Future<void> _pickTime() async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: _time ?? TimeOfDay.now(),
-      builder: (ctx, child) => MediaQuery(
-        data: MediaQuery.of(ctx).copyWith(alwaysUse24HourFormat: true),
-        child: child!,
-      ),
-    );
-    if (picked != null) setState(() => _time = picked);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -372,10 +290,10 @@ class _AddItemContentState extends State<_AddItemContent> {
                   const SizedBox(height: kSpace4),
 
                   // ── Time ──────────────────────────────────────────────────
-                  _TimePicker(
-                    selected: _time,
-                    onTap: _pickTime,
-                    onClear: () => setState(() => _time = null),
+                  WabwayTimeField(
+                    label: 'Time (optional)',
+                    value: _time,
+                    onChanged: (t) => setState(() => _time = t),
                   ),
                   const SizedBox(height: kSpace4),
 
@@ -423,7 +341,7 @@ class _AddItemContentState extends State<_AddItemContent> {
                   const SizedBox(height: kSpace4),
 
                   // ── Attach documents ──────────────────────────────────────
-                  _DocsPicker(
+                  DocMultiPicker(
                     docs: widget.docs,
                     selectedIds: _linkedDocIds,
                     onChanged: (id, checked) => setState(() {
@@ -901,174 +819,3 @@ class _FillFromPickerState extends State<_FillFromPicker> {
   }
 }
 
-// ─── Time picker row ──────────────────────────────────────────────────────────
-
-class _TimePicker extends StatelessWidget {
-  const _TimePicker({
-    required this.selected,
-    required this.onTap,
-    required this.onClear,
-  });
-
-  final TimeOfDay? selected;
-  final VoidCallback onTap;
-  final VoidCallback onClear;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Time (optional)',
-            style: kStyleCaptionMedium.copyWith(color: kColorInk)),
-        const SizedBox(height: kSpace2),
-        GestureDetector(
-          onTap: onTap,
-          child: Container(
-            height: 48,
-            padding: const EdgeInsets.symmetric(horizontal: kSpace3),
-            decoration: BoxDecoration(
-              color: kColorSurfaceSunken,
-              borderRadius: kRadiusMd,
-              border: Border.all(
-                color: selected != null ? kColorPrimary : kColorBorder,
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.schedule_rounded,
-                  size: 18,
-                  color: selected != null ? kColorPrimary : kColorInkSoft,
-                ),
-                const SizedBox(width: kSpace2),
-                Expanded(
-                  child: Text(
-                    selected != null
-                        ? '${selected!.hour.toString().padLeft(2, '0')}:${selected!.minute.toString().padLeft(2, '0')}'
-                        : 'No time set — flexible item',
-                    style: kStyleBody.copyWith(
-                      color: selected != null ? kColorInk : kColorInkSoft,
-                    ),
-                  ),
-                ),
-                if (selected != null)
-                  GestureDetector(
-                    onTap: onClear,
-                    child: const Icon(Icons.close_rounded,
-                        size: 16, color: kColorInkSoft),
-                  )
-                else
-                  const Icon(Icons.chevron_right_rounded,
-                      size: 18, color: kColorInkSoft),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ─── Document multi-picker ────────────────────────────────────────────────────
-
-class _DocsPicker extends StatefulWidget {
-  const _DocsPicker({
-    required this.docs,
-    required this.selectedIds,
-    required this.onChanged,
-  });
-  final List<TripDocument> docs;
-  final Set<String> selectedIds;
-  final void Function(String id, bool checked) onChanged;
-
-  @override
-  State<_DocsPicker> createState() => _DocsPickerState();
-}
-
-class _DocsPickerState extends State<_DocsPicker> {
-  bool _expanded = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _expanded = widget.selectedIds.isNotEmpty;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (widget.docs.isEmpty) return const SizedBox.shrink();
-    final selectedCount = widget.selectedIds.length;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        GestureDetector(
-          onTap: () => setState(() => _expanded = !_expanded),
-          behavior: HitTestBehavior.opaque,
-          child: Row(
-            children: [
-              Text('Attach documents',
-                  style: kStyleCaptionMedium.copyWith(color: kColorInk)),
-              if (selectedCount > 0) ...[
-                const SizedBox(width: kSpace2),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: kColorPrimary,
-                    borderRadius: kRadiusPill,
-                  ),
-                  child: Text(
-                    '$selectedCount',
-                    style: kStyleCaption.copyWith(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-              const Spacer(),
-              Icon(
-                _expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
-                size: 18,
-                color: kColorInkSoft,
-              ),
-            ],
-          ),
-        ),
-        AnimatedSize(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeInOut,
-          child: _expanded
-              ? Column(
-                  children: [
-                    const SizedBox(height: kSpace2),
-                    ...widget.docs.map((d) {
-                      final checked = widget.selectedIds.contains(d.id);
-                      return CheckboxListTile(
-                        value: checked,
-                        onChanged: (v) => widget.onChanged(d.id, v ?? false),
-                        title: Text(d.title, style: kStyleBody),
-                        subtitle: Text(d.type.label, style: kStyleCaption),
-                        secondary: Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: d.type.softColor,
-                            borderRadius: kRadiusMd,
-                          ),
-                          child: Icon(d.type.icon, size: 16, color: d.type.color),
-                        ),
-                        activeColor: kColorPrimary,
-                        contentPadding: EdgeInsets.zero,
-                        dense: true,
-                      );
-                    }),
-                  ],
-                )
-              : const SizedBox.shrink(),
-        ),
-      ],
-    );
-  }
-}

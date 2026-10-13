@@ -13,6 +13,33 @@ import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 import 'accommodations_screen.dart';
 import '../shared/connections_section.dart';
+import '../../data/date_utils.dart';
+
+/// Add / edit a stay. Pops with an [AccommodationSheetResult].
+Future<AccommodationSheetResult?> showAddStaySheet(
+  BuildContext context, {
+  required String tripId,
+  required String userId,
+  Accommodation? editing,
+  ListingResult? prefilled,
+  String? initialUrl,
+}) =>
+    showWabwayFormSheet<AccommodationSheetResult>(
+      context,
+      desktopHeightFactor: 0.9,
+      initialChildSize: 0.92,
+      minChildSize: 0.5,
+      maxChildSize: 0.97,
+      builder: (ctx, scroll, handle, close) => AddAccommodationSheet(
+        tripId: tripId,
+        userId: userId,
+        editing: editing,
+        prefilled: prefilled,
+        initialUrl: initialUrl,
+        scrollController: scroll,
+        showDragHandle: handle,
+      ),
+    );
 
 class AddAccommodationSheet extends StatefulWidget {
   const AddAccommodationSheet({
@@ -22,6 +49,8 @@ class AddAccommodationSheet extends StatefulWidget {
     this.editing,
     this.prefilled,
     this.initialUrl,
+    this.scrollController,
+    this.showDragHandle = true,
   });
 
   final String tripId;
@@ -29,6 +58,8 @@ class AddAccommodationSheet extends StatefulWidget {
   final Accommodation? editing;
   final ListingResult? prefilled;
   final String? initialUrl;
+  final ScrollController? scrollController;
+  final bool showDragHandle;
 
   @override
   State<AddAccommodationSheet> createState() => _AddAccommodationSheetState();
@@ -279,26 +310,10 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.92,
-      minChildSize: 0.5,
-      maxChildSize: 0.97,
-      builder: (context, scrollCtrl) {
-        return DecoratedBox(
-          decoration: const BoxDecoration(
-            color: kColorPaper,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-          ),
-          child: Column(
+    final scrollCtrl = widget.scrollController;
+          return Column(
             children: [
-              const Padding(
-                padding: EdgeInsets.fromLTRB(kSpace4, kSpace3, kSpace4, 0),
-                child: Row(
-                  children: [
-                    WabwayDragHandle(),
-                  ],
-                ),
-              ),
+              if (widget.showDragHandle) const WabwayDragHandle(),
               Padding(
                 padding: const EdgeInsets.fromLTRB(kSpace4, kSpace2, kSpace4, 0),
                 child: Row(
@@ -320,15 +335,12 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
                 child: _step == 0 ? _buildStep0(scrollCtrl) : _buildStep1(scrollCtrl),
               ),
             ],
-          ),
-        );
-      },
-    );
+          );
   }
 
   // ─── Step 0: URL input ──────────────────────────────────────────────────────
 
-  Widget _buildStep0(ScrollController ctrl) {
+  Widget _buildStep0(ScrollController? ctrl) {
     return SingleChildScrollView(
       controller: ctrl,
       padding: const EdgeInsets.fromLTRB(kSpace4, kSpace4, kSpace4, kSpace8),
@@ -372,7 +384,7 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
 
   // ─── Step 1: Form ────────────────────────────────────────────────────────────
 
-  Widget _buildStep1(ScrollController ctrl) {
+  Widget _buildStep1(ScrollController? ctrl) {
     final hasImage = _imageUrl != null && _imageUrl!.isNotEmpty;
     final isEditing = widget.editing != null;
     final detectedSrc = _source ??
@@ -440,17 +452,17 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
           Row(
             children: [
               Expanded(
-                child: _DateField(
+                child: WabwayPickerField(
                   label: 'Check-in',
-                  date: _checkIn,
+                  value: _checkIn == null ? null : fmtDateLong(_checkIn!),
                   onTap: _pickDateRange,
                 ),
               ),
               const SizedBox(width: kSpace3),
               Expanded(
-                child: _DateField(
+                child: WabwayPickerField(
                   label: 'Check-out',
-                  date: _checkOut,
+                  value: _checkOut == null ? null : fmtDateLong(_checkOut!),
                   onTap: _pickDateRange,
                 ),
               ),
@@ -458,32 +470,11 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
           ),
           const SizedBox(height: kSpace4),
 
-          Text('Status', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
-          const SizedBox(height: kSpace2),
-          Wrap(
-            spacing: kSpace2,
-            children: AccommodationStatus.values.map((s) {
-              final sel = _status == s;
-              return GestureDetector(
-                onTap: () => setState(() => _status = s),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 120),
-                  padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: sel ? kColorPrimary : kColorSurfaceSunken,
-                    borderRadius: kRadiusPill,
-                    border: Border.all(color: sel ? kColorPrimary : kColorBorder),
-                  ),
-                  child: Text(
-                    s.label,
-                    style: kStyleCaption.copyWith(
-                      color: sel ? Colors.white : kColorInk,
-                      fontWeight: sel ? FontWeight.w600 : FontWeight.normal,
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
+          WabwayChoiceChips<AccommodationStatus>(
+            label: 'Status',
+            choices: [for (final s in AccommodationStatus.values) WabwayChoice(s, s.label)],
+            selected: _status,
+            onChanged: (s) => setState(() => _status = s),
           ),
           const SizedBox(height: kSpace3),
 
@@ -775,53 +766,3 @@ class _SpotPickerSheet extends StatelessWidget {
   }
 }
 
-// ─── Date field ───────────────────────────────────────────────────────────────
-
-class _DateField extends StatelessWidget {
-  const _DateField({required this.label, required this.date, required this.onTap});
-
-  final String label;
-  final DateTime? date;
-  final VoidCallback onTap;
-
-  static String _fmt(DateTime dt) {
-    const months = ['Jan','Feb','Mar','Apr','May','Jun',
-                    'Jul','Aug','Sep','Oct','Nov','Dec'];
-    return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: 14),
-        decoration: BoxDecoration(
-          color: kColorSurfaceSunken,
-          borderRadius: kRadiusMd,
-          border: Border.all(color: kColorBorder),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label, style: kStyleOverline),
-                  const SizedBox(height: 2),
-                  Text(
-                    date != null ? _fmt(date!) : 'Pick date',
-                    style: kStyleBody.copyWith(
-                      color: date != null ? kColorInk : kColorInkSoft,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.calendar_today_rounded, size: 16, color: kColorInkSoft),
-          ],
-        ),
-      ),
-    );
-  }
-}

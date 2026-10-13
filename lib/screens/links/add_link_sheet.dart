@@ -15,61 +15,21 @@ Future<TripLink?> showAddLinkSheet(
   String? prefillTitle,
   TripLink? existing,
 }) {
-  return showModalBottomSheet<TripLink>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    backgroundColor: Colors.transparent,
-    builder: (ctx) => _AddLinkSheet(
+  return showWabwayFormSheet<TripLink>(
+    context,
+    initialChildSize: 0.85,
+    maxChildSize: 0.95,
+    builder: (ctx, scroll, handle, close) => _AddLinkContent(
       tripId: tripId,
       userId: userId,
       prefillUrl: prefillUrl,
       prefillTitle: prefillTitle,
       existing: existing,
-      onSubmit: (link) => Navigator.pop(ctx, link),
+      scrollController: scroll,
+      showDragHandle: handle,
+      onSubmit: close,
     ),
   );
-}
-
-class _AddLinkSheet extends StatelessWidget {
-  const _AddLinkSheet({
-    required this.tripId,
-    required this.userId,
-    required this.onSubmit,
-    this.prefillUrl,
-    this.prefillTitle,
-    this.existing,
-  });
-  final String tripId;
-  final String userId;
-  final ValueChanged<TripLink> onSubmit;
-  final String? prefillUrl;
-  final String? prefillTitle;
-  final TripLink? existing;
-
-  @override
-  Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.85,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      builder: (_, ctrl) => DecoratedBox(
-        decoration: const BoxDecoration(
-          color: kColorPaper,
-          borderRadius: kRadiusSheet,
-        ),
-        child: _AddLinkContent(
-          tripId: tripId,
-          userId: userId,
-          scrollController: ctrl,
-          prefillUrl: prefillUrl,
-          prefillTitle: prefillTitle,
-          existing: existing,
-          onSubmit: onSubmit,
-        ),
-      ),
-    );
-  }
 }
 
 class _AddLinkContent extends StatefulWidget {
@@ -78,6 +38,7 @@ class _AddLinkContent extends StatefulWidget {
     required this.userId,
     required this.onSubmit,
     this.scrollController,
+    this.showDragHandle = false,
     this.prefillUrl,
     this.prefillTitle,
     this.existing,
@@ -86,6 +47,7 @@ class _AddLinkContent extends StatefulWidget {
   final String userId;
   final ValueChanged<TripLink> onSubmit;
   final ScrollController? scrollController;
+  final bool showDragHandle;
   final String? prefillUrl;
   final String? prefillTitle;
   final TripLink? existing;
@@ -206,7 +168,7 @@ class _AddLinkContentState extends State<_AddLinkContent> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const WabwayDragHandle(),
+        if (widget.showDragHandle) const WabwayDragHandle(),
         Padding(
           padding: const EdgeInsets.fromLTRB(kSpace4, kSpace2, kSpace4, 0),
           child: Row(
@@ -256,49 +218,14 @@ class _AddLinkContentState extends State<_AddLinkContent> {
                   ),
                   const SizedBox(height: kSpace4),
 
-                  // Category chips
-                  Text('Category',
-                      style: kStyleCaptionMedium.copyWith(color: kColorInk)),
-                  const SizedBox(height: kSpace2),
-                  Wrap(
-                    spacing: kSpace2,
-                    runSpacing: kSpace2,
-                    children: LinkCategory.values.map((cat) {
-                      final selected = _category == cat;
-                      return GestureDetector(
-                        onTap: () => setState(() => _category = cat),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 150),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: kSpace3, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: selected ? cat.color : kColorSurfaceSunken,
-                            borderRadius: kRadiusMd,
-                            border: Border.all(
-                              color: selected ? cat.color : kColorBorder,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(cat.icon,
-                                  size: 14,
-                                  color: selected ? Colors.white : kColorInkSoft),
-                              const SizedBox(width: 4),
-                              Text(
-                                cat.label,
-                                style: kStyleCaption.copyWith(
-                                  color: selected ? Colors.white : kColorInk,
-                                  fontWeight: selected
-                                      ? FontWeight.w600
-                                      : FontWeight.normal,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }).toList(),
+                  WabwayChoiceChips<LinkCategory>(
+                    label: 'Category',
+                    choices: [
+                      for (final cat in LinkCategory.values)
+                        WabwayChoice(cat, cat.label, icon: cat.icon, color: cat.color),
+                    ],
+                    selected: _category,
+                    onChanged: (cat) => setState(() => _category = cat),
                   ),
                   const SizedBox(height: kSpace4),
 

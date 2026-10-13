@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/image_cache_manager.dart';
 import '../widgets/android_download_banner.dart';
 import '../widgets/update_checker_banner.dart';
+import '../widgets/wabway_avatar.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/async_screen_mixin.dart';
 import '../core/providers/profile_provider.dart';
@@ -320,7 +321,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with AsyncScreenMixin {
 
     final data = _data;
     final myId    = ref.watch(profileProvider)?.id ?? '';
-    final isOwner = members.any((m) => m.userId == myId && m.isOwner);
+    final isOwner = ref.watch(isOrganiserProvider);
     final tripStart = trip?.startDate;
     final isPreTrip = tripStart != null &&
         DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day)
@@ -811,6 +812,7 @@ class _BalanceChips extends StatelessWidget {
                 }
                 return _MemberBalanceChip(
                   name: memberId == myId ? 'You' : memberName,
+                  avatarName: memberName,
                   settled: settled,
                   net: mainNet,
                   currency: mainCurrency ?? d.homeCurrency,
@@ -827,29 +829,21 @@ class _BalanceChips extends StatelessWidget {
 class _MemberBalanceChip extends StatelessWidget {
   const _MemberBalanceChip({
     required this.name,
+    required this.avatarName,
     required this.settled,
     required this.net,
     required this.currency,
   });
   final String name;
+
+  /// The member's real display name — avatars never use "You".
+  final String avatarName;
   final bool settled;
   final double net;
   final String currency;
 
-  // Consistent pastel color per first letter — avoids needing an index.
-  static Color _avatarColor(String name) {
-    const colors = [
-      Color(0xFFC96F4A), Color(0xFF4A7AB5), Color(0xFF7D9A75),
-      Color(0xFFD6A84F), Color(0xFF8A6BAE), Color(0xFF5B8FA8),
-    ];
-    if (name.isEmpty) return colors[0];
-    return colors[name.codeUnitAt(0) % colors.length];
-  }
-
   @override
   Widget build(BuildContext context) {
-    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
-    final avatarColor = _avatarColor(name);
     final label = settled
         ? 'Settled ✓'
         : (net > 0
@@ -870,22 +864,7 @@ class _MemberBalanceChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 26,
-              height: 26,
-              decoration: BoxDecoration(
-                color: avatarColor,
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                initial,
-                style: kStyleCaptionMedium.copyWith(
-                  color: Colors.white,
-                  fontSize: 11,
-                ),
-              ),
-            ),
+            WabwayAvatar(name: avatarName, size: WabwayAvatarSize.sm),
             const SizedBox(width: kSpace2),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,

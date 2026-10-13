@@ -8,6 +8,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
+import '../../data/date_utils.dart';
 
 // ─── Entry point ──────────────────────────────────────────────────────────────
 
@@ -16,72 +17,21 @@ Future<TravelItem?> showAddTravelSheet(
   List<TripDocument> docs = const [],
   TravelItem? initialItem,
 }) {
-  final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
-
-  if (isDesktop) {
-    return showDialog<TravelItem>(
-      context: context,
-      builder: (ctx) => Dialog(
-        backgroundColor: kColorPaper,
-        shape: const RoundedRectangleBorder(borderRadius: kRadiusLg),
-        insetPadding: const EdgeInsets.symmetric(
-            horizontal: kSpace8, vertical: kSpace8),
-        child: SizedBox(
-          width: 520,
-          height: MediaQuery.sizeOf(ctx).height * 0.90,
-          child: _AddTravelContent(
-            docs: docs,
-            initialItem: initialItem,
-            onSubmit: (item) => Navigator.pop(ctx, item),
-          ),
-        ),
-      ),
-    );
-  }
-
-  return showModalBottomSheet<TravelItem>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    backgroundColor: Colors.transparent,
-    builder: (ctx) => _AddTravelSheet(
+  return showWabwayFormSheet<TravelItem>(
+    context,
+    desktopHeightFactor: 0.90,
+    initialChildSize: 0.92,
+    minChildSize: 0.5,
+    maxChildSize: 0.97,
+    builder: (ctx, scroll, handle, close) => _AddTravelContent(
       docs: docs,
       initialItem: initialItem,
-      onSubmit: (item) => Navigator.pop(ctx, item),
+      scrollController: scroll,
+      showDragHandle: handle,
+      onSubmit: close,
     ),
   );
 }
-
-class _AddTravelSheet extends StatelessWidget {
-  const _AddTravelSheet({required this.onSubmit, required this.docs, this.initialItem});
-  final ValueChanged<TravelItem> onSubmit;
-  final List<TripDocument> docs;
-  final TravelItem? initialItem;
-
-  @override
-  Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.92,
-      minChildSize: 0.5,
-      maxChildSize: 0.97,
-      builder: (_, ctrl) => DecoratedBox(
-        decoration: const BoxDecoration(
-          color: kColorPaper,
-          borderRadius: kRadiusSheet,
-        ),
-        child: _AddTravelContent(
-          docs: docs,
-          initialItem: initialItem,
-          scrollController: ctrl,
-          onSubmit: onSubmit,
-          showDragHandle: true,
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Form content ─────────────────────────────────────────────────────────────
 
 class _AddTravelContent extends StatefulWidget {
   const _AddTravelContent({
@@ -209,9 +159,7 @@ class _AddTravelContentState extends State<_AddTravelContent> {
 
   String? _nz(String s) => s.trim().isEmpty ? null : s.trim();
 
-  String? _fmt(TimeOfDay? t) => t == null
-      ? null
-      : '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+  String? _fmt(TimeOfDay? t) => t == null ? null : fmtTimeOfDay(t.hour, t.minute);
 
   Future<void> _pickDate(bool isEnd) async {
     final initial = isEnd ? (_endDate ?? _date ?? DateTime.now()) : (_date ?? DateTime.now());
@@ -434,9 +382,9 @@ class _AddTravelContentState extends State<_AddTravelContent> {
                   Row(
                     children: [
                       Expanded(
-                        child: _DatePicker(
+                        child: WabwayPickerField(
                           label: _type == TravelItemType.car ? 'Pick-up date' : 'Date',
-                          date: _date,
+                          value: _date == null ? null : fmtDateLong(_date!),
                           onTap: () => _pickDate(false),
                           onClear: () => setState(() => _date = null),
                         ),
@@ -444,9 +392,9 @@ class _AddTravelContentState extends State<_AddTravelContent> {
                       if (_isMultiDay) ...[
                         const SizedBox(width: kSpace3),
                         Expanded(
-                          child: _DatePicker(
+                          child: WabwayPickerField(
                             label: _type == TravelItemType.car ? 'Return date' : 'End date',
-                            date: _endDate,
+                            value: _endDate == null ? null : fmtDateLong(_endDate!),
                             onTap: () => _pickDate(true),
                             onClear: () => setState(() => _endDate = null),
                           ),
@@ -460,9 +408,10 @@ class _AddTravelContentState extends State<_AddTravelContent> {
                   Row(
                     children: [
                       Expanded(
-                        child: _TimePicker(
+                        child: WabwayPickerField(
                           label: _type == TravelItemType.car ? 'Pick-up time' : 'Departs',
-                          time: _time,
+                          icon: Icons.schedule_rounded,
+                          value: _time == null ? null : fmtTimeOfDay(_time!.hour, _time!.minute),
                           onTap: () => _pickTime(false),
                           onClear: () => setState(() => _time = null),
                         ),
@@ -470,9 +419,10 @@ class _AddTravelContentState extends State<_AddTravelContent> {
                       if (_isTransit) ...[
                         const SizedBox(width: kSpace3),
                         Expanded(
-                          child: _TimePicker(
+                          child: WabwayPickerField(
                             label: _type == TravelItemType.car ? 'Return time' : 'Arrives',
-                            time: _endTime,
+                            icon: Icons.schedule_rounded,
+                            value: _endTime == null ? null : fmtTimeOfDay(_endTime!.hour, _endTime!.minute),
                             onTap: () => _pickTime(true),
                             onClear: () => setState(() => _endTime = null),
                           ),
@@ -579,9 +529,10 @@ class _AddTravelContentState extends State<_AddTravelContent> {
                     ),
                     const SizedBox(height: kSpace4),
                     if (_type == TravelItemType.flight)
-                      _TimePicker(
+                      WabwayPickerField(
                         label: 'Boarding time (optional)',
-                        time: _boardingTime,
+                        icon: Icons.schedule_rounded,
+                        value: _boardingTime == null ? null : fmtTimeOfDay(_boardingTime!.hour, _boardingTime!.minute),
                         onTap: () async {
                           final picked = await showTimePicker(
                             context: context,
@@ -616,7 +567,7 @@ class _AddTravelContentState extends State<_AddTravelContent> {
                   ),
                   const SizedBox(height: kSpace4),
 
-                  _DocsPicker(
+                  DocMultiPicker(
                     docs: widget.docs,
                     selectedIds: _linkedDocIds,
                     onChanged: (id, checked) => setState(() {
@@ -641,182 +592,6 @@ class _AddTravelContentState extends State<_AddTravelContent> {
             ),
           ),
         ),
-      ],
-    );
-  }
-}
-
-// ─── Date picker field ────────────────────────────────────────────────────────
-
-class _DatePicker extends StatelessWidget {
-  const _DatePicker({
-    required this.label,
-    required this.date,
-    required this.onTap,
-    required this.onClear,
-  });
-  final String label;
-  final DateTime? date;
-  final VoidCallback onTap;
-  final VoidCallback onClear;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: kStyleCaptionMedium.copyWith(color: kColorInk)),
-        const SizedBox(height: kSpace2),
-        GestureDetector(
-          onTap: onTap,
-          child: Container(
-            height: 48,
-            padding: const EdgeInsets.symmetric(horizontal: kSpace3),
-            decoration: BoxDecoration(
-              color: kColorSurfaceSunken,
-              borderRadius: kRadiusMd,
-              border: Border.all(
-                color: date != null ? kColorPrimary : kColorBorder,
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.calendar_today_rounded,
-                    size: 16,
-                    color: date != null ? kColorPrimary : kColorInkSoft),
-                const SizedBox(width: kSpace2),
-                Expanded(
-                  child: Text(
-                    date != null
-                        ? '${date!.year}-${date!.month.toString().padLeft(2, '0')}-${date!.day.toString().padLeft(2, '0')}'
-                        : 'Select date',
-                    style: kStyleBody.copyWith(
-                      color: date != null ? kColorInk : kColorInkSoft,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-                if (date != null)
-                  GestureDetector(
-                    onTap: onClear,
-                    child: const Icon(Icons.close_rounded,
-                        size: 16, color: kColorInkSoft),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ─── Time picker field ────────────────────────────────────────────────────────
-
-class _TimePicker extends StatelessWidget {
-  const _TimePicker({
-    required this.label,
-    required this.time,
-    required this.onTap,
-    required this.onClear,
-  });
-  final String label;
-  final TimeOfDay? time;
-  final VoidCallback onTap;
-  final VoidCallback onClear;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: kStyleCaptionMedium.copyWith(color: kColorInk)),
-        const SizedBox(height: kSpace2),
-        GestureDetector(
-          onTap: onTap,
-          child: Container(
-            height: 48,
-            padding: const EdgeInsets.symmetric(horizontal: kSpace3),
-            decoration: BoxDecoration(
-              color: kColorSurfaceSunken,
-              borderRadius: kRadiusMd,
-              border: Border.all(
-                color: time != null ? kColorPrimary : kColorBorder,
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.schedule_rounded,
-                    size: 16,
-                    color: time != null ? kColorPrimary : kColorInkSoft),
-                const SizedBox(width: kSpace2),
-                Expanded(
-                  child: Text(
-                    time != null
-                        ? '${time!.hour.toString().padLeft(2, '0')}:${time!.minute.toString().padLeft(2, '0')}'
-                        : '—',
-                    style: kStyleBody.copyWith(
-                      color: time != null ? kColorInk : kColorInkSoft,
-                    ),
-                  ),
-                ),
-                if (time != null)
-                  GestureDetector(
-                    onTap: onClear,
-                    child: const Icon(Icons.close_rounded,
-                        size: 16, color: kColorInkSoft),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ─── Document multi-picker ────────────────────────────────────────────────────
-
-class _DocsPicker extends StatelessWidget {
-  const _DocsPicker({
-    required this.docs,
-    required this.selectedIds,
-    required this.onChanged,
-  });
-  final List<TripDocument> docs;
-  final Set<String> selectedIds;
-  final void Function(String id, bool checked) onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    if (docs.isEmpty) return const SizedBox.shrink();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Attach documents (optional)',
-            style: kStyleCaptionMedium.copyWith(color: kColorInk)),
-        const SizedBox(height: kSpace2),
-        ...docs.map((d) {
-          final checked = selectedIds.contains(d.id);
-          return CheckboxListTile(
-            value: checked,
-            onChanged: (v) => onChanged(d.id, v ?? false),
-            title: Text(d.title, style: kStyleBody),
-            subtitle: Text(d.type.label, style: kStyleCaption),
-            secondary: Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: d.type.softColor,
-                borderRadius: kRadiusMd,
-              ),
-              child: Icon(d.type.icon, size: 16, color: d.type.color),
-            ),
-            activeColor: kColorPrimary,
-            contentPadding: EdgeInsets.zero,
-            dense: true,
-          );
-        }),
       ],
     );
   }

@@ -531,26 +531,10 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
   }
 
   Future<void> _deleteDay(TripDay day) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete day?'),
-        content: Text(
-          'Day ${_dayDisplayNumber(day)} (${day.city}) and all its itinerary items will be permanently deleted.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
+    final confirmed = await showWabwayDeleteConfirm(context,
+      entity: 'day',
+      name: 'Day ${_dayDisplayNumber(day)}${day.city.isEmpty ? '' : ' (${day.city})'}',
+      detail: 'and all its itinerary items');
     if (confirmed != true || !mounted) return;
     setState(() => _days.removeWhere((d) => d.id == day.id));
     PlanService.writeDaysToCache(_activeTripId, _days);

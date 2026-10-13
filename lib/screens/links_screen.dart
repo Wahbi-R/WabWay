@@ -20,6 +20,7 @@ import '../theme/app_text_theme.dart';
 import '../widgets/widgets.dart';
 import 'links/add_link_sheet.dart';
 import '../core/text_utils.dart';
+import 'library_screen.dart' show LibraryTabs;
 
 enum _LinkSort { newest, oldest, alphabetical }
 
@@ -238,7 +239,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin
     final scaffold = Scaffold(
       backgroundColor: kColorCream,
       appBar: AppBar(
-        title: Text('Links', style: kStyleTitle),
+        title: const LibraryTabs(),
         actions: [
           if (_links.isNotEmpty) ...[
             if (!kIsWeb)

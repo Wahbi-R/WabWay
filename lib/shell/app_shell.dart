@@ -14,12 +14,10 @@ import '../theme/app_decorations.dart';
 import '../screens/spots_screen.dart';
 import '../screens/plan_screen.dart';
 import '../screens/money_screen.dart';
-import '../screens/docs_screen.dart';
 import '../screens/more_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/travel_screen.dart';
 import '../screens/map_screen.dart';
-import '../screens/links_screen.dart';
 import '../screens/accommodations/accommodations_screen.dart';
 import '../screens/packing_screen.dart';
 import '../screens/shopping/shopping_screen.dart';
@@ -28,6 +26,7 @@ import '../screens/placeholder_screen.dart';
 import '../screens/trips/trip_switcher_sheet.dart';
 import '../core/changelog.dart';
 import '../core/notifications/notification_service.dart';
+import '../screens/library_screen.dart';
 
 // ─── Navigation destination models ───────────────────────────────────────────
 
@@ -112,13 +111,6 @@ const _desktopDestinations = [
     builder: _buildSpots,
   ),
   _NavDest(
-    key: 'links',
-    label: 'Links',
-    icon: Icons.link_rounded,
-    selectedIcon: Icons.link_rounded,
-    builder: _buildLinks,
-  ),
-  _NavDest(
     key: 'map',
     label: 'Map',
     icon: Icons.map_outlined,
@@ -154,8 +146,8 @@ const _desktopDestinations = [
     builder: _buildMoney,
   ),
   _NavDest(
-    key: 'documents',
-    label: 'Documents',
+    key: 'library',
+    label: 'Library',
     icon: Icons.folder_outlined,
     selectedIcon: Icons.folder_rounded,
     builder: _buildDocs,
@@ -188,13 +180,12 @@ const _desktopDestinations = [
 Widget _buildHome(BuildContext _)    => const HomeScreen();
 Widget _buildCrew(BuildContext _)    => const CrewScreen();
 Widget _buildSpots(BuildContext _)   => const SpotsScreen();
-Widget _buildLinks(BuildContext _)   => const LinksScreen();
 Widget _buildMap(BuildContext _)     => const MapScreen();
 Widget _buildPlan(BuildContext _)    => const PlanScreen();
 Widget _buildTravel(BuildContext _)  => const TravelScreen();
 Widget _buildStays(BuildContext _)   => const AccommodationsScreen();
 Widget _buildMoney(BuildContext _)   => const MoneyScreen();
-Widget _buildDocs(BuildContext _)    => const DocsScreen();
+Widget _buildDocs(BuildContext _)    => const LibraryScreen();
 Widget _buildPacking(BuildContext _)   => const PackingScreen();
 Widget _buildShopping(BuildContext _)  => const ShoppingScreen();
 Widget _buildMore(BuildContext _)      => const MoreScreen();
@@ -239,7 +230,7 @@ class _AppShellState extends ConsumerState<AppShell> {
   // Desktop indices come from the destination list itself, so adding or
   // removing a destination can't silently shift them. Notification keys that
   // differ from destination keys are aliased here.
-  static const _keyAliases = {'docs': 'documents', 'members': 'crew'};
+  static const _keyAliases = {'docs': 'library', 'documents': 'library', 'links': 'library', 'members': 'crew'};
   static int? _desktopIndexFor(String key) {
     final k = _keyAliases[key] ?? key;
     final i = _desktopDestinations.indexWhere((d) => d.key == k);

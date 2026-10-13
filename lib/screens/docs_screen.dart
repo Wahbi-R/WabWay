@@ -16,12 +16,12 @@ import '../data/docs_data.dart';
 import '../data/spot_data.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
-import '../theme/app_text_theme.dart';
 import '../widgets/widgets.dart';
 import 'docs/doc_card.dart';
 import 'docs/doc_detail.dart';
 import 'docs/add_doc_sheet.dart';
 import '../core/text_utils.dart';
+import 'library_screen.dart' show LibraryTabs;
 
 enum _DocSort { newest, alphabetical, type }
 
@@ -454,7 +454,7 @@ class _DocsScreenState extends ConsumerState<DocsScreen> with AsyncScreenMixin {
     return Scaffold(
       backgroundColor: kColorCream,
       appBar: AppBar(
-        title: Text('Documents', style: kStyleTitle),
+        title: const LibraryTabs(),
         actions: [
           if (_docs.isNotEmpty && !kIsWeb)
             IconButton(
@@ -590,7 +590,7 @@ class _DesktopDocsBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: kSpace4),
       child: Row(
         children: [
-          Text('Documents', style: kStyleTitle),
+          const LibraryTabs(),
           const SizedBox(width: kSpace6),
           SizedBox(
             width: 260,

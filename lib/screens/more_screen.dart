@@ -12,10 +12,8 @@ import '../theme/app_text_theme.dart';
 import '../theme/app_decorations.dart';
 import 'accommodations/accommodations_screen.dart';
 import 'crew_screen.dart';
-import 'docs_screen.dart';
 import 'map_screen.dart';
 import 'travel_screen.dart';
-import 'links_screen.dart';
 import 'packing_screen.dart';
 import 'shopping/shopping_screen.dart';
 import 'photos_screen.dart';
@@ -29,6 +27,7 @@ import 'notification_settings_screen.dart';
 import '../core/changelog.dart';
 import 'trips/trip_actions.dart';
 import '../widgets/wabway_snack.dart';
+import 'library_screen.dart';
 
 class MoreScreen extends ConsumerWidget {
   const MoreScreen({super.key});
@@ -197,9 +196,8 @@ class MoreScreen extends ConsumerWidget {
             _ExploreItem(icon: Icons.map_rounded,           label: 'Map',       onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const MapScreen()))),
             _ExploreItem(icon: Icons.flight_rounded,        label: 'Travel',    onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const TravelScreen()))),
             _ExploreItem(icon: Icons.photo_library_rounded, label: 'Photos',    onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const PhotosScreen()))),
-            _ExploreItem(icon: Icons.link_rounded,          label: 'Links',     onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const LinksScreen()))),
             _ExploreItem(icon: Icons.hotel_rounded,         label: 'Stays',     onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const AccommodationsScreen()))),
-            _ExploreItem(icon: Icons.folder_rounded,        label: 'Docs',      onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const DocsScreen()))),
+            _ExploreItem(icon: Icons.folder_rounded,        label: 'Library',   onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const LibraryScreen()))),
             _ExploreItem(icon: Icons.luggage_rounded,       label: 'Packing',   onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const PackingScreen()))),
             _ExploreItem(icon: Icons.shopping_cart_rounded, label: 'Shopping',  onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const ShoppingScreen()))),
           ]),

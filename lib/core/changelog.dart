@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 414,
+    label: "Library",
+    changes: [
+      "Documents and Links now live together in one Library — switch between them at the top",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 413,
     label: "Travel & stays",
     changes: [

@@ -95,15 +95,18 @@ abstract final class ConnectionService {
     return _fromRow(row)!;
   }
 
-  static Future<void> remove(String connectionId) async {
-    if (connectionId.startsWith(_legacyPrefix)) {
-      await supabase
-          .from('document_links')
-          .delete()
-          .eq('id', connectionId.substring(_legacyPrefix.length));
-      return;
-    }
-    await supabase.from('trip_connections').delete().eq('id', connectionId);
+  /// Removes the link between the two entities of [c] — from trip_connections
+  /// (either direction) AND legacy document_links, since migration 047 copied
+  /// rows rather than moving them (deleting one copy would let the other
+  /// reappear).
+  static Future<void> remove(TripConnection c) async {
+    await Future.wait([
+      removeForEntityPair(c.entityAId, c.entityBId),
+      supabase.from('document_links').delete()
+          .eq('document_id', c.entityAId).eq('linked_id', c.entityBId),
+      supabase.from('document_links').delete()
+          .eq('document_id', c.entityBId).eq('linked_id', c.entityAId),
+    ]);
   }
 
   /// Remove a connection between two specific entities (order-insensitive).

@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../../core/share/file_type_registry.dart';
 import '../../core/supabase/doc_service.dart';
+import '../../data/connection_data.dart';
 import '../../data/docs_data.dart';
 import '../../data/spot_data.dart';
 import '../../theme/app_colors.dart';
@@ -19,6 +20,8 @@ Future<TripDocument?> showAddDocSheet(
   required String userId,
   required List<Spot> availableSpots,
   ImportPrefill? prefill,
+  DocType? initialType,
+  String? attachingTo,
 }) {
   return showWabwayFormSheet<TripDocument>(
     context,
@@ -32,6 +35,8 @@ Future<TripDocument?> showAddDocSheet(
       userId: userId,
       availableSpots: availableSpots,
       prefill: prefill,
+      initialType: initialType,
+      attachingTo: attachingTo,
       scrollController: scroll,
       showDragHandle: handle,
       onSubmit: close,
@@ -47,6 +52,8 @@ class _AddDocContent extends StatefulWidget {
     required this.availableSpots,
     required this.onSubmit,
     this.prefill,
+    this.initialType,
+    this.attachingTo,
     this.scrollController,
     this.showDragHandle = false,
   });
@@ -57,6 +64,11 @@ class _AddDocContent extends StatefulWidget {
   final List<Spot> availableSpots;
   final ValueChanged<TripDocument> onSubmit;
   final ImportPrefill? prefill;
+  final DocType? initialType;
+
+  /// Name of the item this document will be attached to (set by
+  /// AttachedDocsSection, which does the attaching) — replaces "Link to".
+  final String? attachingTo;
   final ScrollController? scrollController;
   final bool showDragHandle;
 
@@ -85,6 +97,7 @@ class _AddDocContentState extends State<_AddDocContent> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialType != null) _type = widget.initialType!;
     final pre = widget.prefill;
     if (pre != null) {
       _titleCtrl.text = pre.title ?? '';
@@ -163,12 +176,13 @@ class _AddDocContentState extends State<_AddDocContent> {
         );
       }
 
-      if (_linkType != null && _linkedId != null) {
-        await DocService.addLink(
-          documentId: doc.id,
-          linkedType: _linkType!,
-          linkedId:   _linkedId!,
-          createdBy:  widget.userId,
+      if (_linkType == DocLinkedType.spot && _linkedId != null) {
+        await DocService.attach(
+          tripId:     widget.tripId,
+          userId:     widget.userId,
+          docIds:     [doc.id],
+          entityType: EntityType.spot,
+          entityId:   _linkedId!,
         );
       }
 
@@ -248,6 +262,29 @@ class _AddDocContentState extends State<_AddDocContent> {
                   ),
                   const SizedBox(height: kSpace4),
 
+                  if (widget.attachingTo != null)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(kSpace3),
+                      decoration: const BoxDecoration(
+                        color: kColorSurfaceSunken,
+                        borderRadius: kRadiusMd,
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.attach_file_rounded,
+                              size: 16, color: kColorInkSoft),
+                          const SizedBox(width: kSpace2),
+                          Expanded(
+                            child: Text('Attaching to ${widget.attachingTo}',
+                                style: kStyleBodyMedium,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
                   _LinkSection(
                     linkType: _linkType,
                     linkedId: _linkedId,
@@ -255,8 +292,7 @@ class _AddDocContentState extends State<_AddDocContent> {
                     tripName: widget.tripName,
                     onLinkTypeChanged: (t) => setState(() {
                       _linkType = t;
-                      _linkedId =
-                          t == DocLinkedType.trip ? widget.tripId : null;
+                      _linkedId = null;
                     }),
                     onLinkItemChanged: (id) => setState(() => _linkedId = id),
                   ),
@@ -416,8 +452,9 @@ class _LinkSection extends StatelessWidget {
   final ValueChanged<String> onLinkItemChanged;
 
   // Only offer link types that are currently connectable
+  // Every document already belongs to the trip, so only spots are offered
+  // here; anything else is attached from that item's Documents section.
   static const _supportedLinkTypes = [
-    DocLinkedType.trip,
     DocLinkedType.spot,
   ];
 

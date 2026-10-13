@@ -227,18 +227,13 @@ class _TravelScreenState extends ConsumerState<TravelScreen> with AsyncScreenMix
   }
 
   void _updateItem(TravelItem updated) {
-    final old = _items.where((i) => i.id == updated.id).firstOrNull;
     setState(() {
       final idx = _items.indexWhere((i) => i.id == updated.id);
       if (idx != -1) _items[idx] = updated;
       _selectedId = updated.id;
     });
+    // Attached documents are saved by the item's Documents section itself.
     TravelService.updateItem(updated).catchError((_) => _loadAll(silent: true));
-    if (old != null && _userId.isNotEmpty) {
-      TravelService.syncDocLinks(
-        updated.id, old.linkedDocIds, updated.linkedDocIds, _userId,
-      ).catchError((_) => _loadAll(silent: true));
-    }
   }
 
   Future<void> _addItem(BuildContext context) async {

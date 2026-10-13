@@ -144,6 +144,18 @@ class TravelItem {
   final String? linkedItineraryItemId;
   final String? linkedDayId;
 
+  /// Same item with a different attached-documents list (list badges).
+  TravelItem withDocIds(List<String> ids) => TravelItem(
+        id: id, title: title, type: type, status: status,
+        date: date, endDate: endDate, time: time, endTime: endTime,
+        location: location, destination: destination,
+        confirmationNumber: confirmationNumber, url: url, address: address,
+        notes: notes, departureTerminal: departureTerminal,
+        arrivalTerminal: arrivalTerminal, gate: gate, seat: seat,
+        boardingTime: boardingTime, linkedDocIds: ids,
+        linkedItineraryItemId: linkedItineraryItemId, linkedDayId: linkedDayId,
+      );
+
   bool get hasDate => date != null;
   bool get hasEndDate => endDate != null;
   bool get hasConfirmation => confirmationNumber != null;

@@ -117,7 +117,8 @@ class _ParsedItineraryScreenState extends State<ParsedItineraryScreen>
       }
     }
 
-    final travelItem = await TravelService.createItem(
+    // createItem attaches docId (trip_connections) for both items.
+    await TravelService.createItem(
       tripId:                widget.tripId,
       title:                 title,
       type:                  b.itemType,
@@ -128,24 +129,6 @@ class _ParsedItineraryScreenState extends State<ParsedItineraryScreen>
       linkedItineraryItemId: planItemId,
       linkedDocIds:          docId != null ? [docId] : [],
     );
-
-    if (docId != null) {
-      await DocService.addLink(
-        documentId: docId,
-        linkedType: DocLinkedType.travelItem,
-        linkedId:   travelItem.id,
-        createdBy:  widget.userId,
-      );
-    }
-
-    if (docId != null && planItemId != null) {
-      await DocService.addLink(
-        documentId: docId,
-        linkedType: DocLinkedType.itineraryItem,
-        linkedId:   planItemId,
-        createdBy:  widget.userId,
-      );
-    }
   }
 
   Future<void> _save() async {

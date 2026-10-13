@@ -7,7 +7,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/providers/profile_provider.dart';
 import '../../core/providers/trip_provider.dart';
 import '../../core/supabase/client.dart';
-import '../../core/supabase/doc_service.dart';
 import '../../core/supabase/plan_service.dart';
 import '../../core/supabase/spot_service.dart';
 import '../../data/accommodation_data.dart';
@@ -20,6 +19,7 @@ import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 import '../plan/day_picker_sheet.dart';
 import '../../data/connection_data.dart';
+import '../shared/attached_docs_section.dart';
 import '../shared/connections_section.dart';
 import 'add_spot_sheet.dart';
 import 'spot_vote_chip.dart';
@@ -406,26 +406,17 @@ class _SpotDetailContentState extends ConsumerState<SpotDetailContent> {
                 const SizedBox(height: kSpace4),
               ],
 
-              // ── Linked documents
-              Builder(builder: (context) {
-                final linked = widget.docs.where((d) => d.links.any(
-                    (l) => l.type == DocLinkedType.spot && l.linkedId == widget.spot.id)).toList();
-                if (linked.isEmpty) return const SizedBox.shrink();
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Documents', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
-                    const SizedBox(height: kSpace2),
-                    ...linked.map((doc) => Padding(
-                      padding: const EdgeInsets.only(bottom: kSpace2),
-                      child: _LinkedDocTile(doc: doc),
-                    )),
-                    const SizedBox(height: kSpace4),
-                    const Divider(height: 1),
-                    const SizedBox(height: kSpace4),
-                  ],
-                );
-              }),
+              // ── Documents (tickets, reservations, booking pages)
+              AttachedDocsSection(
+                entityType: EntityType.spot,
+                entityId:   widget.spot.id,
+                tripId:     ref.watch(activeTripIdProvider),
+                entityName: widget.spot.name,
+                uploadType: DocType.ticket,
+              ),
+              const SizedBox(height: kSpace4),
+              const Divider(height: 1),
+              const SizedBox(height: kSpace4),
 
               // ── Notes
               if (widget.spot.notes != null) ...[
@@ -816,77 +807,7 @@ Future<void> _openLink(BuildContext context, String url) async {
   }
 }
 
-// ─── Linked doc tile ──────────────────────────────────────────────────────────
 
-class _LinkedDocTile extends StatefulWidget {
-  const _LinkedDocTile({required this.doc});
-  final TripDocument doc;
-
-  @override
-  State<_LinkedDocTile> createState() => _LinkedDocTileState();
-}
-
-class _LinkedDocTileState extends State<_LinkedDocTile> {
-  bool _loading = false;
-
-  Future<void> _open() async {
-    if (_loading) return;
-    setState(() => _loading = true);
-    try {
-      String? url;
-      if (widget.doc.ext == 'url') {
-        url = widget.doc.notes;
-      } else if (widget.doc.storagePath != null) {
-        url = await DocService.getSignedUrl(widget.doc.storagePath!);
-      }
-      if (!mounted) return;
-      if (url != null) {
-        final uri = Uri.tryParse(url);
-        if (uri != null && await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-        }
-      }
-    } catch (_) {}
-    if (mounted) setState(() => _loading = false);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return WabwayCard(
-      hoverable: true,
-      onTap: _open,
-      padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: kSpace3),
-      child: Row(
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: widget.doc.type.softColor,
-              borderRadius: kRadiusMd,
-            ),
-            child: Icon(widget.doc.type.icon, size: 16, color: widget.doc.type.color),
-          ),
-          const SizedBox(width: kSpace3),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(widget.doc.title, style: kStyleBodyMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
-                Text(widget.doc.type.label, style: kStyleCaption.copyWith(fontSize: 12)),
-              ],
-            ),
-          ),
-          const SizedBox(width: kSpace2),
-          if (_loading)
-            const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(kColorPrimary)))
-          else
-            const Icon(Icons.open_in_new_rounded, size: 16, color: kColorInkSoft),
-        ],
-      ),
-    );
-  }
-}
 
 // ─── Linked stay card ─────────────────────────────────────────────────────────
 

@@ -4,8 +4,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/providers/profile_provider.dart';
 import '../../core/providers/trip_provider.dart';
-import '../../core/supabase/client.dart';
-import '../../core/supabase/doc_service.dart';
 import '../../core/supabase/plan_service.dart';
 import '../../data/money_data.dart' show fmtAmount;
 import '../../data/accommodation_data.dart' show Accommodation;
@@ -17,10 +15,10 @@ import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 import '../../data/connection_data.dart';
+import '../shared/attached_docs_section.dart';
 import '../shared/connections_section.dart';
 import '../../core/async_screen_mixin.dart';
 import 'add_item_sheet.dart';
-import 'doc_attach_sheet.dart';
 import '../../core/text_utils.dart';
 
 // ─── Mobile screen ────────────────────────────────────────────────────────────
@@ -177,10 +175,6 @@ class _ItemDetailContentState extends ConsumerState<ItemDetailContent>
 
   @override
   Widget build(BuildContext context) {
-    final linkedDocs = widget.item.linkedDocIds
-        .map((id) => widget.docs.where((d) => d.id == id).firstOrNull)
-        .whereType<TripDocument>()
-        .toList();
     final myName = ref.watch(profileProvider)?.displayName ?? 'You';
 
     return Column(
@@ -194,10 +188,16 @@ class _ItemDetailContentState extends ConsumerState<ItemDetailContent>
             children: [
               _MetaCard(item: widget.item),
 
-              if (linkedDocs.isNotEmpty) ...[
-                const SizedBox(height: kSpace4),
-                _DocsSection(docs: linkedDocs),
-              ],
+              const SizedBox(height: kSpace4),
+              AttachedDocsSection(
+                entityType: EntityType.planItem,
+                entityId:   widget.item.id,
+                tripId:     ref.watch(activeTripIdProvider),
+                entityName: widget.item.title,
+                uploadType: DocType.reservation,
+                onChanged: (ids) =>
+                    widget.onUpdated?.call(widget.item.copyWith(linkedDocIds: ids)),
+              ),
 
               if (widget.item.notes != null && widget.item.notes!.isNotEmpty) ...[
                 const SizedBox(height: kSpace4),
@@ -470,67 +470,7 @@ class _LinkRow extends StatelessWidget {
   }
 }
 
-// ─── Linked documents section ─────────────────────────────────────────────────
 
-class _DocsSection extends StatelessWidget {
-  const _DocsSection({required this.docs});
-  final List<TripDocument> docs;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Documents', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
-        const SizedBox(height: kSpace2),
-        Wrap(
-          spacing: kSpace2,
-          runSpacing: kSpace2,
-          children: docs.map((d) => _DocChip(doc: d)).toList(),
-        ),
-      ],
-    );
-  }
-}
-
-class _DocChip extends StatelessWidget {
-  const _DocChip({required this.doc});
-  final TripDocument doc;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => _openDoc(context, doc),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: kSpace2),
-        decoration: BoxDecoration(
-          color: doc.type.softColor,
-          borderRadius: kRadiusPill,
-          border: Border.all(color: doc.type.color.withValues(alpha: 0.2)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(doc.type.icon, size: 13, color: doc.type.color),
-            const SizedBox(width: kSpace1),
-            Flexible(
-              child: Text(
-                doc.title,
-                style: kStyleCaption.copyWith(
-                  color: doc.type.color,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 // ─── Actions section ──────────────────────────────────────────────────────────
 
@@ -561,57 +501,6 @@ class _ActionsSection extends ConsumerStatefulWidget {
 }
 
 class _ActionsSectionState extends ConsumerState<_ActionsSection> {
-  Future<void> _attachDoc() async {
-    if (widget.docs.isEmpty) {
-      showWabwaySnack(context, 'No documents in this trip yet.');
-      return;
-    }
-
-    final newIds = await showDocAttachSheet(
-      context,
-      docs: widget.docs,
-      initialSelectedIds: widget.item.linkedDocIds.toSet(),
-    );
-    if (newIds == null || !mounted) return;
-
-    final userId = supabase.auth.currentUser?.id ?? '';
-    try {
-      await PlanService.syncDocLinks(
-        widget.item.id,
-        widget.item.linkedDocIds,
-        newIds,
-        userId,
-      );
-      if (!mounted) return;
-      final updated = ItineraryItem(
-        id: widget.item.id,
-        dayId: widget.item.dayId,
-        title: widget.item.title,
-        type: widget.item.type,
-        time: widget.item.time,
-        city: widget.item.city,
-        country: widget.item.country,
-        location: widget.item.location,
-        mapsUrl: widget.item.mapsUrl,
-        confirmationUrl: widget.item.confirmationUrl,
-        notes: widget.item.notes,
-        linkedSpotId: widget.item.linkedSpotId,
-        linkedStayId: widget.item.linkedStayId,
-        linkedDocIds: newIds,
-        sortOrder: widget.item.sortOrder,
-        isDone: widget.item.isDone,
-        plannedCost: widget.item.plannedCost,
-        currency: widget.item.currency,
-      );
-      widget.onUpdated?.call(updated);
-      showWabwaySnack(context,
-          newIds.isEmpty ? 'Documents unlinked.' : 'Documents updated.');
-    } catch (e) {
-      if (!mounted) return;
-      showWabwaySnack(context, 'Could not update documents: $e');
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -630,13 +519,6 @@ class _ActionsSectionState extends ConsumerState<_ActionsSection> {
                 size: WabwayButtonSize.sm,
                 onPressed: () => _openMaps(context, widget.item.mapsUrl!),
               ),
-            WabwayButton(
-              label: 'Attach Document',
-              icon: Icons.attach_file_rounded,
-              variant: WabwayButtonVariant.ghost,
-              size: WabwayButtonSize.sm,
-              onPressed: _attachDoc,
-            ),
             WabwayButton(
               label: 'Edit',
               icon: Icons.edit_rounded,
@@ -715,29 +597,6 @@ Future<void> _openMaps(BuildContext context, String url) async {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   } else if (context.mounted) {
     showWabwaySnack(context, 'Could not open Maps.');
-  }
-}
-
-Future<void> _openDoc(BuildContext context, TripDocument doc) async {
-  final String? url;
-  if (doc.ext == 'url') {
-    url = doc.notes;
-  } else if (doc.storagePath != null) {
-    url = await DocService.getSignedUrl(doc.storagePath!);
-  } else {
-    url = null;
-  }
-  if (url == null || url.isEmpty) {
-    if (context.mounted) {
-      showWabwaySnack(context, 'Could not open document.');
-    }
-    return;
-  }
-  final uri = Uri.parse(url);
-  if (await canLaunchUrl(uri)) {
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
-  } else if (context.mounted) {
-    showWabwaySnack(context, 'Could not open document.');
   }
 }
 

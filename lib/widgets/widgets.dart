@@ -21,5 +21,6 @@ export 'wabway_date_field.dart';
 export 'wabway_form_sheet.dart';
 export 'wabway_snack.dart';
 export 'doc_multi_picker.dart';
+export 'doc_attach_sheet.dart';
 export 'wabway_add_fab.dart';
 export 'wabway_segment_tabs.dart';

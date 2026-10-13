@@ -359,7 +359,8 @@ class _AddItemContentState extends State<_AddItemContent> {
                   ),
                   const SizedBox(height: kSpace4),
 
-                  // ── Attach documents ──────────────────────────────────────
+                  // ── Attach documents (new items; editing → the item's page)
+                  if (widget.initialItem == null)
                   DocMultiPicker(
                     docs: widget.docs,
                     selectedIds: _linkedDocIds,

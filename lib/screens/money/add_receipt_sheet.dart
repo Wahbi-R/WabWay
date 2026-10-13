@@ -10,6 +10,7 @@ import '../../core/sync_queue.dart';
 import '../../core/supabase/doc_service.dart';
 import '../../core/supabase/exchange_rate_service.dart';
 import '../../core/supabase/money_service.dart';
+import '../../data/connection_data.dart';
 import '../../data/docs_data.dart';
 import '../notification_settings_screen.dart';
 import '../../data/money_data.dart';
@@ -170,10 +171,10 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
   String?    _photoExt;
   String?    _existingStoragePath;
 
-  // Unified list of linked documents shown in the sheet.
-  // Pre-populated with existing links in edit mode; diffed on submit.
-  List<TripDocument> _linkedDocs    = [];
-  Set<String>        _originalDocIds = {};
+  // Documents to attach to a NEW receipt (an existing receipt manages its
+  // attachments from its detail page — AttachedDocsSection).
+  List<TripDocument> _tripDocs = [];
+  final Set<String>  _docIds   = {};
 
   bool get _isEditing => widget.existingReceipt != null && !widget.isDuplicate;
 
@@ -204,20 +205,6 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
         _rateCtrl.text    = ex.exchangeRate.toStringAsFixed(6);
         _feePctCtrl.text  = ex.transactionFeePct.toStringAsFixed(2);
       }
-
-      // Pre-load existing linked documents so the user can see and remove them.
-      // Skipped for duplication — the new receipt starts with no documents.
-      if (!widget.isDuplicate) DocService.loadLinkedDocuments(
-        linkedType: DocLinkedType.receipt,
-        linkedId:   ex.id,
-      ).then((docs) {
-        if (mounted) {
-          setState(() {
-            _linkedDocs     = List.of(docs);
-            _originalDocIds = docs.map((d) => d.id).toSet();
-          });
-        }
-      }).catchError((_) {});
     } else {
       final pre = widget.prefill;
       if (pre != null) {
@@ -232,6 +219,12 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
           _photoBytes = pre.fileBytes;
           _photoExt   = pre.fileExt ?? 'jpg';
         }
+        _docIds.addAll(pre.linkedDocIds);
+      }
+      if (widget.tripId != null) {
+        DocService.loadDocuments(widget.tripId!).then((docs) {
+          if (mounted) setState(() => _tripDocs = docs);
+        }).catchError((_) {});
       }
       _paidById  = widget.userId;
       _splitWith = {for (final m in widget.members) m.id};
@@ -418,36 +411,30 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
             bytes:     _photoBytes!,
             fileSizeKb: (_photoBytes!.lengthInBytes / 1024).round(),
           );
-          await DocService.addLink(
-            documentId: doc.id,
-            linkedType: DocLinkedType.receipt,
-            linkedId:   receipt.id,
-            createdBy:  userId,
+          await DocService.attach(
+            tripId:     widget.tripId!,
+            userId:     userId,
+            docIds:     [doc.id],
+            entityType: EntityType.receipt,
+            entityId:   receipt.id,
           );
         } catch (_) {}
       }
-      // Sync document links: add new ones, remove deleted ones.
-      // All operations are independent — run in parallel; track any failures.
-      final userId       = supabase.auth.currentUser?.id ?? '';
-      final currentIds   = _linkedDocs.map((d) => d.id).toSet();
+      // Attach documents picked for a new receipt (non-fatal).
       bool anyLinkFailed = false;
-      await Future.wait([
-        ..._linkedDocs
-            .where((doc) => !_originalDocIds.contains(doc.id))
-            .map((doc) => DocService.addLink(
-                  documentId: doc.id,
-                  linkedType: DocLinkedType.receipt,
-                  linkedId:   receipt.id,
-                  createdBy:  userId,
-                ).catchError((_) { anyLinkFailed = true; })),
-        ..._originalDocIds
-            .where((id) => !currentIds.contains(id))
-            .map((id) => DocService.deleteLink(
-                  documentId: id,
-                  linkedType: DocLinkedType.receipt,
-                  linkedId:   receipt.id,
-                ).catchError((_) { anyLinkFailed = true; })),
-      ]);
+      if (!_isEditing && _docIds.isNotEmpty && widget.tripId != null) {
+        try {
+          await DocService.attach(
+            tripId:     widget.tripId!,
+            userId:     supabase.auth.currentUser?.id ?? '',
+            docIds:     _docIds,
+            entityType: EntityType.receipt,
+            entityId:   receipt.id,
+          );
+        } catch (_) {
+          anyLinkFailed = true;
+        }
+      }
       if (!mounted) return;
       if (anyLinkFailed) {
         showWabwaySnack(context, 'Receipt saved, but some document links could not be synced.');
@@ -709,12 +696,12 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
                   ],
                   const SizedBox(height: kSpace4),
 
-                  if (widget.tripId != null)
-                    _DocLinkSection(
-                      tripId:     widget.tripId!,
-                      linkedDocs: _linkedDocs,
-                      onAdd:      (doc) => setState(() => _linkedDocs.add(doc)),
-                      onRemove:   (doc) => setState(() => _linkedDocs.remove(doc)),
+                  if (!_isEditing)
+                    DocMultiPicker(
+                      docs: _tripDocs,
+                      selectedIds: _docIds,
+                      onChanged: (id, checked) => setState(() =>
+                          checked ? _docIds.add(id) : _docIds.remove(id)),
                     ),
                 ],
               ),
@@ -1073,156 +1060,7 @@ class _PhotoUploadZone extends StatelessWidget {
   }
 }
 
-// ─── Document link section ────────────────────────────────────────────────────
 
-class _DocLinkSection extends StatefulWidget {
-  const _DocLinkSection({
-    required this.tripId,
-    required this.linkedDocs,
-    required this.onAdd,
-    required this.onRemove,
-  });
-
-  final String tripId;
-  final List<TripDocument> linkedDocs;
-  final ValueChanged<TripDocument> onAdd;
-  final ValueChanged<TripDocument> onRemove;
-
-  @override
-  State<_DocLinkSection> createState() => _DocLinkSectionState();
-}
-
-class _DocLinkSectionState extends State<_DocLinkSection> {
-  List<TripDocument>? _allDocs;
-
-  @override
-  void initState() {
-    super.initState();
-    DocService.loadDocuments(widget.tripId).then((docs) {
-      if (mounted) setState(() => _allDocs = docs);
-    }).catchError((_) {
-      if (mounted) setState(() => _allDocs = []);
-    });
-  }
-
-  void _showPicker() {
-    if (_allDocs == null || _allDocs!.isEmpty) return;
-    final available = _allDocs!
-        .where((d) => !widget.linkedDocs.any((l) => l.id == d.id))
-        .toList();
-    if (available.isEmpty) return;
-
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: kColorPaper,
-      shape: const RoundedRectangleBorder(borderRadius: kRadiusSheet),
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (ctx) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.6,
-        minChildSize: 0.4,
-        maxChildSize: 0.9,
-        builder: (_, ctrl) => Column(
-          children: [
-            const WabwayDragHandle(),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(kSpace4, 0, kSpace4, kSpace3),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Select document', style: kStyleTitle),
-              ),
-            ),
-            const Divider(height: 1),
-            Expanded(
-              child: ListView.builder(
-                controller: ctrl,
-                itemCount: available.length,
-                itemBuilder: (_, i) {
-                  final doc = available[i];
-                  return ListTile(
-                    leading: Icon(doc.type.icon, color: kColorInkSoft),
-                    title: Text(doc.title, style: kStyleBodyMedium),
-                    subtitle: Text(doc.type.label, style: kStyleCaption),
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      widget.onAdd(doc);
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Documents', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
-        const SizedBox(height: kSpace2),
-
-        if (widget.linkedDocs.isNotEmpty) ...[
-          ...widget.linkedDocs.map((doc) => Padding(
-            padding: const EdgeInsets.only(bottom: kSpace2),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: kSpace2),
-              decoration: BoxDecoration(
-                color: kColorSurfaceSunken,
-                borderRadius: kRadiusMd,
-                border: Border.all(color: kColorBorder),
-              ),
-              child: Row(
-                children: [
-                  Icon(doc.type.icon, size: 16, color: kColorInkSoft),
-                  const SizedBox(width: kSpace2),
-                  Expanded(
-                    child: Text(doc.title, style: kStyleBodyMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
-                  ),
-                  GestureDetector(
-                    onTap: () => widget.onRemove(doc),
-                    child: const Icon(Icons.close_rounded, size: 16, color: kColorInkSoft),
-                  ),
-                ],
-              ),
-            ),
-          )),
-          const SizedBox(height: kSpace2),
-        ],
-
-        GestureDetector(
-          onTap: _allDocs == null ? null : _showPicker,
-          child: Container(
-            padding: const EdgeInsets.all(kSpace3),
-            decoration: BoxDecoration(
-              color: kColorSurfaceSunken,
-              borderRadius: kRadiusMd,
-              border: Border.all(color: kColorBorder),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.attach_file_rounded, size: 18, color: kColorInkSoft),
-                const SizedBox(width: kSpace2),
-                Text(
-                  _allDocs == null
-                      ? 'Loading documents…'
-                      : (_allDocs!.isEmpty
-                          ? 'No documents in this trip'
-                          : 'Attach a document'),
-                  style: kStyleBody.copyWith(color: kColorInkSoft),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
 
 // ─── Split controls ───────────────────────────────────────────────────────────
 

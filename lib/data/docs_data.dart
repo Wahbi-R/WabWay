@@ -126,6 +126,7 @@ class TripDocument {
     this.currency,
     this.notes,
     this.url,
+    this.connectedCount,
     this.links = const [],
   });
 
@@ -143,6 +144,11 @@ class TripDocument {
 
   /// Source / booking link for this document (e.g. the page it was imported from).
   final String? url;
+
+  /// How many items this document is attached to (trip_connections + legacy
+  /// links), when known — see [attachedCount].
+  final int? connectedCount;
+  int get attachedCount => connectedCount ?? links.length;
   final List<DocumentLink> links;
 
   String get formattedSize {
@@ -186,6 +192,8 @@ class TripDocument {
         amount: amount,
         currency: currency,
         notes: notes,
+        url: url,
+        connectedCount: connectedCount,
         links: links,
       );
 }

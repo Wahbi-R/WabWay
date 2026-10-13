@@ -66,7 +66,8 @@ The app's main UX debt came from the same element being rebuilt per screen (6 co
 | Empty state | `WabwayEmptyState(action: WabwayButton(...))` | `lib/widgets/wabway_empty_state.dart` |
 | Status badge | `WabwayBadge` | `lib/widgets/wabway_badge.dart` |
 | Place / address input | `PlaceSearchField` (returns name, address, city, area, coords, category) | `lib/widgets/place_search_field.dart` |
-| Attach docs to an item | `DocMultiPicker` | `lib/widgets/doc_multi_picker.dart` |
+| Attach docs to an item (detail screens) | `AttachedDocsSection(entityType:, entityId:, tripId:, entityName:, uploadType:)` — upload / Library / paste link / photo; stored via `DocService.attach/detach` (`trip_connections`) | `lib/screens/shared/attached_docs_section.dart` |
+| Pick docs inside a create form | `DocMultiPicker`, then `DocService.attach` after save | `lib/widgets/doc_multi_picker.dart` |
 | Link any two entities | `ConnectionsSection` + `ConnectionService` (`trip_connections`) | `lib/screens/shared/connections_section.dart` |
 | Organiser / edit permission | `isOrganiserProvider`, `canManageItem(createdById, isOrganiser:)` | `lib/core/providers/trip_provider.dart` |
 | Trip delete / leave / remove member | `confirmDeleteTrip`, `confirmLeaveTrip`, `confirmRemoveMember` | `lib/screens/trips/trip_actions.dart` |

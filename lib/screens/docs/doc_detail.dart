@@ -11,15 +11,10 @@ import '../../core/providers/trip_provider.dart';
 import '../../core/supabase/client.dart';
 import '../../core/async_screen_mixin.dart';
 import '../../core/supabase/doc_service.dart';
-import '../../core/supabase/money_service.dart';
-import '../../core/supabase/plan_service.dart';
-import '../../core/supabase/travel_service.dart';
 import '../../core/supabase/trip_service.dart';
 import '../../data/docs_data.dart';
 import '../../data/money_data.dart';
-import '../../data/plan_data.dart';
 import '../../data/spot_data.dart';
-import '../../data/travel_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
@@ -310,225 +305,7 @@ class _FileMetaCard extends ConsumerWidget {
       const Divider(height: kSpace4, thickness: 1, color: kColorBorder);
 }
 
-// ── Linked section ────────────────────────────────────────────────────────────
 
-// ── Link picker sheet ─────────────────────────────────────────────────────────
-
-class _LinkPickerSheet extends StatefulWidget {
-  const _LinkPickerSheet({
-    required this.tripId,
-    required this.tripName,
-    required this.availableSpots,
-    required this.alreadyLinked,
-    required this.onPick,
-  });
-
-  final String tripId;
-  final String tripName;
-  final List<Spot> availableSpots;
-  final Set<String> alreadyLinked; // "$type_$linkedId" keys
-  final void Function(DocLinkedType type, String linkedId) onPick;
-
-  @override
-  State<_LinkPickerSheet> createState() => _LinkPickerSheetState();
-}
-
-class _LinkPickerSheetState extends State<_LinkPickerSheet>
-    with AsyncScreenMixin {
-  List<Receipt>? _receipts;
-  List<CashWithdrawal>? _withdrawals;
-  List<TravelItem>? _travelItems;
-  List<TripDay>? _days;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    final gen = beginLoad();
-    try {
-      final results = await Future.wait([
-        MoneyService.loadReceipts(widget.tripId),
-        MoneyService.loadWithdrawals(widget.tripId),
-        TravelService.loadItems(widget.tripId),
-        PlanService.loadAll(widget.tripId),
-      ]);
-      commitLoad(gen, () {
-        _receipts    = results[0] as List<Receipt>;
-        _withdrawals = results[1] as List<CashWithdrawal>;
-        _travelItems = results[2] as List<TravelItem>;
-        _days        = results[3] as List<TripDay>;
-      });
-    } catch (_) {
-      failLoad(gen);
-    }
-  }
-
-  bool _linked(DocLinkedType type, String id) =>
-      widget.alreadyLinked.contains('${type.name}_$id');
-
-  @override
-  Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.7,
-      minChildSize: 0.4,
-      maxChildSize: 0.95,
-      expand: false,
-      builder: (_, ctrl) => Column(
-        children: [
-          const WabwayDragHandle(),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(kSpace4, 0, kSpace4, kSpace3),
-            child: Row(
-              children: [
-                Text('Link to…', style: kStyleTitle),
-              ],
-            ),
-          ),
-          const Divider(height: 1, color: kColorBorder),
-          Expanded(
-            child: loading
-                ? const Center(child: CircularProgressIndicator())
-                : error
-                    ? Center(
-                        child: WabwayErrorState(
-                          title: 'Could not load links',
-                          action: TextButton(
-                            onPressed: _load,
-                            child: const Text('Retry'),
-                          ),
-                        ),
-                      )
-                : ListView(
-                    controller: ctrl,
-                    padding: const EdgeInsets.only(bottom: kSpace8),
-                    children: [
-                      // ── Trip ───────────────────────────────────────────
-                      if (!_linked(DocLinkedType.trip, widget.tripId)) ...[
-                        const _SectionHeader(label: 'Trip'),
-                        WabwayActionTile(
-                          icon: DocLinkedType.trip.icon,
-                          label: widget.tripName,
-                          onTap: () => widget.onPick(DocLinkedType.trip, widget.tripId),
-                        ),
-                      ],
-
-                      // ── Spots ──────────────────────────────────────────
-                      ..._buildSection(
-                        label: 'Spots',
-                        items: widget.availableSpots,
-                        linked: (s) => _linked(DocLinkedType.spot, s.id),
-                        icon: (_) => DocLinkedType.spot.icon,
-                        title: (s) => s.name,
-                        subtitle: (s) => '${s.city}, ${s.area}',
-                        onTap: (s) => widget.onPick(DocLinkedType.spot, s.id),
-                      ),
-
-                      // ── Receipts ───────────────────────────────────────
-                      ..._buildSection(
-                        label: 'Receipts',
-                        items: _receipts ?? [],
-                        linked: (r) => _linked(DocLinkedType.receipt, r.id),
-                        icon: (_) => DocLinkedType.receipt.icon,
-                        title: (r) => r.title,
-                        subtitle: (r) => fmtAmount(r.amount, r.currency),
-                        onTap: (r) => widget.onPick(DocLinkedType.receipt, r.id),
-                      ),
-
-                      // ── Cash withdrawals ────────────────────────────────
-                      ..._buildSection(
-                        label: 'Cash withdrawals',
-                        items: _withdrawals ?? [],
-                        linked: (w) => _linked(DocLinkedType.cashWithdrawal, w.id),
-                        icon: (_) => DocLinkedType.cashWithdrawal.icon,
-                        title: (w) => fmtAmount(w.amount, w.currency),
-                        subtitle: (w) => _fmtShortDate(w.date),
-                        onTap: (w) => widget.onPick(DocLinkedType.cashWithdrawal, w.id),
-                      ),
-
-                      // ── Travel items ────────────────────────────────────
-                      ..._buildSection(
-                        label: 'Travel',
-                        items: _travelItems ?? [],
-                        linked: (t) => _linked(DocLinkedType.travelItem, t.id),
-                        icon: (_) => DocLinkedType.travelItem.icon,
-                        title: (t) => t.title,
-                        subtitle: (t) => t.type.label,
-                        onTap: (t) => widget.onPick(DocLinkedType.travelItem, t.id),
-                      ),
-
-                      // ── Plan days ───────────────────────────────────────
-                      if ((_days ?? []).isNotEmpty) ...[
-                        const _SectionHeader(label: 'Plan'),
-                        for (final day in _days!) ...[
-                          // Day itself
-                          if (!_linked(DocLinkedType.itineraryDay, day.id))
-                            WabwayActionTile(
-                              icon: DocLinkedType.itineraryDay.icon,
-                              label: 'Day ${day.dayNumber} — ${day.city}',
-                              subtitle: _fmtShortDate(day.date),
-                              onTap: () => widget.onPick(DocLinkedType.itineraryDay, day.id),
-                            ),
-                          // Items within the day
-                          for (final item in day.items)
-                            if (!_linked(DocLinkedType.itineraryItem, item.id))
-                              WabwayActionTile(
-                                icon: DocLinkedType.itineraryItem.icon,
-                                label: item.title,
-                                subtitle: 'Day ${day.dayNumber} · ${item.type.label}',
-                                onTap: () => widget.onPick(DocLinkedType.itineraryItem, item.id),
-                              ),
-                        ],
-                      ],
-                    ],
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  List<Widget> _buildSection<T>({
-    required String label,
-    required List<T> items,
-    required bool Function(T) linked,
-    required IconData Function(T) icon,
-    required String Function(T) title,
-    required String Function(T) subtitle,
-    required void Function(T) onTap,
-  }) {
-    final available = items.where((i) => !linked(i)).toList();
-    if (available.isEmpty) return [];
-    return [
-      _SectionHeader(label: label),
-      for (final item in available)
-        WabwayActionTile(
-          icon: icon(item),
-          label: title(item),
-          subtitle: subtitle(item),
-          onTap: () => onTap(item),
-        ),
-    ];
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.label});
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(kSpace4, kSpace4, kSpace4, kSpace1),
-      child: Text(
-        label.toUpperCase(),
-        style: kStyleOverline.copyWith(color: kColorInkSoft, letterSpacing: 1),
-      ),
-    );
-  }
-}
 
 // ── Image preview ─────────────────────────────────────────────────────────────
 
@@ -656,9 +433,11 @@ class _ActionsSectionState extends State<_ActionsSection> {
       String? shareUrl;
       if (widget.doc.storagePath != null) {
         shareUrl = await DocService.getSignedUrl(widget.doc.storagePath!);
+      } else if (widget.doc.url != null) {
+        shareUrl = widget.doc.url;
       } else if (widget.doc.notes != null &&
           Uri.tryParse(widget.doc.notes!)?.hasScheme == true) {
-        shareUrl = widget.doc.notes;
+        shareUrl = widget.doc.notes; // pre-417 link documents
       }
       if (!mounted) return;
       if (shareUrl == null) {
@@ -698,11 +477,12 @@ class _ActionsSectionState extends State<_ActionsSection> {
     );
     if (r != null && mounted) {
       try {
-        await DocService.addLink(
-          documentId: widget.doc.id,
-          linkedType: DocLinkedType.receipt,
-          linkedId: r.id,
-          createdBy: myId,
+        await DocService.attach(
+          tripId: widget.tripId,
+          userId: myId,
+          docIds: [widget.doc.id],
+          entityType: EntityType.receipt,
+          entityId: r.id,
         );
         widget.onLinkAdded?.call(DocLinkedType.receipt, r.id);
       } catch (_) {}
@@ -746,13 +526,15 @@ class _ActionsSectionState extends State<_ActionsSection> {
           spacing: kSpace2,
           runSpacing: kSpace2,
           children: [
-            WabwayButton(
-              label: _openLoading ? 'Opening…' : 'Open',
-              icon: Icons.open_in_new_rounded,
-              size: WabwayButtonSize.sm,
-              loading: _openLoading,
-              onPressed: hasFile ? _openFile : null,
-            ),
+            // Link-only documents have no file: Open link is their action.
+            if (hasFile)
+              WabwayButton(
+                label: _openLoading ? 'Opening…' : 'Open',
+                icon: Icons.open_in_new_rounded,
+                size: WabwayButtonSize.sm,
+                loading: _openLoading,
+                onPressed: _openFile,
+              ),
             if (widget.doc.url != null && widget.doc.url!.isNotEmpty)
               WabwayButton(
                 label: 'Open link',
@@ -764,21 +546,24 @@ class _ActionsSectionState extends State<_ActionsSection> {
                   if (uri != null) launchUrl(uri, mode: LaunchMode.externalApplication);
                 },
               ),
-            WabwayButton(
-              label: 'Download',
-              icon: Icons.download_rounded,
-              variant: WabwayButtonVariant.ghost,
-              size: WabwayButtonSize.sm,
-              onPressed: hasFile ? _openFile : null,
-            ),
+            if (hasFile)
+              WabwayButton(
+                label: 'Download',
+                icon: Icons.download_rounded,
+                variant: WabwayButtonVariant.ghost,
+                size: WabwayButtonSize.sm,
+                onPressed: _openFile,
+              ),
             WabwayButton(
               label: 'Share',
               icon: Icons.share_rounded,
               variant: WabwayButtonVariant.ghost,
               size: WabwayButtonSize.sm,
               loading: _shareLoading,
-              onPressed: (hasFile || (widget.doc.notes != null &&
-                      Uri.tryParse(widget.doc.notes!)?.hasScheme == true))
+              onPressed: (hasFile ||
+                      widget.doc.url != null ||
+                      (widget.doc.notes != null &&
+                          Uri.tryParse(widget.doc.notes!)?.hasScheme == true))
                   ? _shareFile
                   : null,
             ),
@@ -933,11 +718,12 @@ class _ActionsSheetContentState extends State<_ActionsSheetContent> {
                   tripId: widget.tripId, userId: myId, members: members);
               if (r != null && outerCtx.mounted) {
                 try {
-                  await DocService.addLink(
-                    documentId: widget.doc.id,
-                    linkedType: DocLinkedType.receipt,
-                    linkedId: r.id,
-                    createdBy: myId,
+                  await DocService.attach(
+                    tripId: widget.tripId,
+                    userId: myId,
+                    docIds: [widget.doc.id],
+                    entityType: EntityType.receipt,
+                    entityId: r.id,
                   );
                 } catch (_) {}
                 if (outerCtx.mounted) {
@@ -971,12 +757,4 @@ String _fmtDateFull(DateTime d) {
     'July', 'August', 'September', 'October', 'November', 'December',
   ];
   return '${months[d.month - 1]} ${d.day}, ${d.year}';
-}
-
-String _fmtShortDate(DateTime d) {
-  const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-  ];
-  return '${months[d.month - 1]} ${d.day}';
 }

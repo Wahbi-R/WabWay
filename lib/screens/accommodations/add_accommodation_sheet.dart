@@ -12,6 +12,8 @@ import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 import 'accommodations_screen.dart';
+import '../shared/attached_docs_section.dart';
+import '../../data/docs_data.dart';
 import '../shared/connections_section.dart';
 import '../../data/date_utils.dart';
 import '../../data/currencies.dart';
@@ -523,6 +525,14 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
           if (isEditing) ...[
             const SizedBox(height: kSpace5),
             const Divider(height: 1),
+            const SizedBox(height: kSpace5),
+            AttachedDocsSection(
+              entityType: EntityType.stay,
+              entityId: widget.editing!.id,
+              tripId: widget.tripId,
+              entityName: widget.editing!.name,
+              uploadType: DocType.hotel,
+            ),
             const SizedBox(height: kSpace5),
             ConnectionsSection(
               entityType: EntityType.stay,

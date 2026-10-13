@@ -1,7 +1,9 @@
 import '../../core/offline_cache.dart';
 import '../../data/date_utils.dart';
 import '../../data/travel_data.dart';
+import '../../data/connection_data.dart';
 import 'client.dart';
+import 'doc_service.dart';
 
 abstract final class TravelService {
   // ── Enum converters ──────────────────────────────────────────────────────────
@@ -60,7 +62,7 @@ abstract final class TravelService {
 
   // ── Queries ──────────────────────────────────────────────────────────────────
 
-  /// Loads all travel items for [tripId] and their document_links.
+  /// Loads all travel items for [tripId] and their attached document ids.
   static Future<List<TravelItem>> loadItems(String tripId) async {
     final itemsData = await supabase
         .from('travel_items')
@@ -69,17 +71,7 @@ abstract final class TravelService {
         .order('date', ascending: true, nullsFirst: false);
 
     final itemIds = itemsData.map((r) => r['id'] as String).toList();
-    final Map<String, List<String>> itemDocIds = {};
-    if (itemIds.isNotEmpty) {
-      final linksData = await supabase
-          .from('document_links')
-          .select('linked_id, document_id')
-          .eq('linked_type', 'travel_item')
-          .inFilter('linked_id', itemIds);
-      for (final row in linksData) {
-        (itemDocIds[row['linked_id'] as String] ??= []).add(row['document_id'] as String);
-      }
-    }
+    final itemDocIds = await DocService.attachedDocIds(itemIds);
 
     final items = itemsData
         .map((r) => _fromRow(r, itemDocIds[r['id'] as String] ?? []))
@@ -229,15 +221,12 @@ abstract final class TravelService {
     final itemId = row['id'] as String;
 
     if (linkedDocIds.isNotEmpty) {
-      await supabase.from('document_links').insert(
-        linkedDocIds
-            .map((docId) => {
-                  'document_id': docId,
-                  'linked_type': 'travel_item',
-                  'linked_id':   itemId,
-                  'created_by':  createdBy,
-                })
-            .toList(),
+      await DocService.attach(
+        tripId:     tripId,
+        userId:     createdBy,
+        docIds:     linkedDocIds,
+        entityType: EntityType.travel,
+        entityId:   itemId,
       );
     }
 
@@ -265,36 +254,6 @@ abstract final class TravelService {
       'seat':                item.seat,
       'boarding_time':       item.boardingTime,
     }).eq('id', item.id);
-  }
-
-  /// Syncs document links for a travel item: deletes removed, inserts new.
-  static Future<void> syncDocLinks(
-    String itemId,
-    List<String> oldDocIds,
-    List<String> newDocIds,
-    String userId,
-  ) async {
-    final toRemove = oldDocIds.toSet().difference(newDocIds.toSet());
-    final toAdd    = newDocIds.toSet().difference(oldDocIds.toSet());
-
-    if (toRemove.isNotEmpty) {
-      await supabase
-          .from('document_links')
-          .delete()
-          .eq('linked_type', 'travel_item')
-          .eq('linked_id', itemId)
-          .inFilter('document_id', toRemove.toList());
-    }
-    if (toAdd.isNotEmpty) {
-      await supabase.from('document_links').insert(
-        toAdd.map((docId) => {
-          'document_id': docId,
-          'linked_type': 'travel_item',
-          'linked_id':   itemId,
-          'created_by':  userId,
-        }).toList(),
-      );
-    }
   }
 
   static Future<void> linkToDay(

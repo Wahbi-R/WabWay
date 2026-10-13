@@ -198,7 +198,7 @@ class DocListRow extends StatelessWidget {
                       doc.type.label,
                       style: kStyleCaption.copyWith(color: doc.type.color, fontSize: 12),
                     ),
-                    if (doc.links.isNotEmpty) ...[
+                    if (doc.attachedCount > 0) ...[
                       Text(
                         ' · ',
                         style: kStyleCaption.copyWith(color: kColorInkSoft, fontSize: 12),
@@ -206,7 +206,7 @@ class DocListRow extends StatelessWidget {
                       const Icon(Icons.link_rounded, size: 11, color: kColorInkSoft),
                       const SizedBox(width: 2),
                       Text(
-                        '${doc.links.length}',
+                        '${doc.attachedCount}',
                         style: kStyleCaption.copyWith(color: kColorInkSoft, fontSize: 12),
                       ),
                     ],

@@ -193,6 +193,8 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection>
     }));
   }
 
+  bool get _showsDocs => widget.entityType == EntityType.doc;
+
   bool _canNavigate(EntityType type) => type == EntityType.stay;
 
   Future<void> _navigate(BuildContext context, ResolvedConnection r) async {
@@ -227,7 +229,7 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection>
     // Remove by identity to be safe; skip revert insert if c was already gone.
     setState(() => _connections.remove(c));
     try {
-      await ConnectionService.remove(c.id);
+      await ConnectionService.remove(c);
     } catch (_) {
       if (!mounted) return;
       if (idx >= 0) {
@@ -301,7 +303,11 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection>
       );
     }
 
-    final resolved = _connections.map((c) {
+    // Documents get their own section (AttachedDocsSection) on every other
+    // detail screen; only a document's own page lists them here.
+    final resolved = _connections
+        .where((c) => _showsDocs || c.peerType(widget.entityId) != EntityType.doc)
+        .map((c) {
       final peerId   = c.peerId(widget.entityId);
       final peerType = c.peerType(widget.entityId);
       final name     = _nameCache[peerId] ?? '…';
@@ -338,7 +344,7 @@ class _ConnectionsSectionState extends ConsumerState<ConnectionsSection>
         const SizedBox(height: kSpace2),
         if (resolved.isEmpty)
           Text(
-            'No connections yet. Tap Add to link this to a spot, document, travel item, or more.',
+            'No connections yet. Tap Add to link this to a spot, travel item, stay, or more.',
             style: kStyleCaption.copyWith(color: kColorInkSoft),
           )
         else
@@ -464,8 +470,10 @@ class _ConnectionPickerSheetState
   List<CashWithdrawal> _cash    = [];
 
   // Tab order — exclude self-type to reduce noise.
+  // Documents are attached through AttachedDocsSection instead.
   List<EntityType> get _tabTypes => EntityType.values
       .where((t) => t != widget.myEntityType)
+      .where((t) => widget.myEntityType == EntityType.doc || t != EntityType.doc)
       .toList();
 
   @override

@@ -108,7 +108,7 @@ class ItineraryItem {
 
   static const _unset = Object();
 
-  ItineraryItem copyWith({bool? isDone, double? plannedCost, String? currency, Object? linkedSpotId = _unset, Object? linkedStayId = _unset}) =>
+  ItineraryItem copyWith({List<String>? linkedDocIds, bool? isDone, double? plannedCost, String? currency, Object? linkedSpotId = _unset, Object? linkedStayId = _unset}) =>
       ItineraryItem(
         id:              id,
         dayId:           dayId,
@@ -123,7 +123,7 @@ class ItineraryItem {
         notes:           notes,
         linkedSpotId:    identical(linkedSpotId, _unset) ? this.linkedSpotId : linkedSpotId as String?,
         linkedStayId:    identical(linkedStayId, _unset) ? this.linkedStayId : linkedStayId as String?,
-        linkedDocIds:    linkedDocIds,
+        linkedDocIds:    linkedDocIds ?? this.linkedDocIds,
         sortOrder:       sortOrder,
         isDone:          isDone ?? this.isDone,
         plannedCost:     plannedCost ?? this.plannedCost,

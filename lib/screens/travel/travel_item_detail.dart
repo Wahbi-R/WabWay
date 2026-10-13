@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/supabase/client.dart';
-import '../../core/supabase/doc_service.dart';
 import '../../core/supabase/plan_service.dart';
 import '../../core/supabase/travel_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,8 +16,8 @@ import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 import 'add_travel_sheet.dart';
 import '../plan/day_picker_sheet.dart';
-import '../plan/doc_attach_sheet.dart';
 import '../../data/connection_data.dart';
+import '../shared/attached_docs_section.dart';
 import '../shared/connections_section.dart';
 import '../../core/text_utils.dart';
 
@@ -88,11 +87,6 @@ class TravelItemDetailContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final linkedDocs = item.linkedDocIds
-        .map((id) => docs.where((d) => d.id == id).firstOrNull)
-        .whereType<TripDocument>()
-        .toList();
-
     ItineraryItem? linkedPlanItem;
     TripDay? linkedDay;
     if (item.linkedItineraryItemId != null) {
@@ -115,10 +109,21 @@ class TravelItemDetailContent extends StatelessWidget {
             children: [
               _MetaCard(item: item),
 
-              if (linkedDocs.isNotEmpty) ...[
-                const SizedBox(height: kSpace4),
-                _DocsSection(docs: linkedDocs),
-              ],
+              const SizedBox(height: kSpace4),
+              Consumer(
+                builder: (context, ref, _) => AttachedDocsSection(
+                  entityType: EntityType.travel,
+                  entityId:   item.id,
+                  tripId:     ref.watch(activeTripIdProvider),
+                  entityName: item.title,
+                  uploadType: switch (item.type) {
+                    TravelItemType.flight => DocType.flight,
+                    TravelItemType.train  => DocType.train,
+                    _                     => DocType.reservation,
+                  },
+                  onChanged: (ids) => onUpdated?.call(item.withDocIds(ids)),
+                ),
+              ),
 
               if (linkedPlanItem != null && linkedDay != null) ...[
                 const SizedBox(height: kSpace4),
@@ -418,69 +423,7 @@ class _MetaRow extends StatelessWidget {
   }
 }
 
-// ─── Linked documents ─────────────────────────────────────────────────────────
 
-class _DocsSection extends StatelessWidget {
-  const _DocsSection({required this.docs});
-  final List<TripDocument> docs;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Documents', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
-        const SizedBox(height: kSpace2),
-        ...docs.map((d) => _DocTile(doc: d)),
-      ],
-    );
-  }
-}
-
-class _DocTile extends StatelessWidget {
-  const _DocTile({required this.doc});
-  final TripDocument doc;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: kSpace2),
-      child: WabwayCard(
-        hoverable: true,
-        padding: const EdgeInsets.all(kSpace3),
-        onTap: () => _openDoc(context, doc),
-        child: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: doc.type.softColor,
-                borderRadius: kRadiusMd,
-              ),
-              child: Icon(doc.type.icon, size: 18, color: doc.type.color),
-            ),
-            const SizedBox(width: kSpace3),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(doc.title, style: kStyleBodyMedium),
-                  Text(
-                    '${doc.type.label} · ${doc.extUpper}',
-                    style: kStyleCaption.copyWith(color: kColorInkSoft, fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.open_in_new_rounded, size: 16, color: kColorInkSoft),
-          ],
-        ),
-      ),
-    );
-  }
-
-}
 
 // ─── Linked plan item ─────────────────────────────────────────────────────────
 
@@ -731,63 +674,8 @@ class _ActionsSectionState extends ConsumerState<_ActionsSection> {
     }
   }
 
-  Future<void> _attachDoc() async {
-    if (widget.docs.isEmpty) {
-      showWabwaySnack(context, 'No documents in this trip yet.');
-      return;
-    }
-
-    final newIds = await showDocAttachSheet(
-      context,
-      docs: widget.docs,
-      initialSelectedIds: widget.item.linkedDocIds.toSet(),
-    );
-    if (newIds == null || !mounted) return;
-
-    final userId = supabase.auth.currentUser?.id ?? '';
-    try {
-      await TravelService.syncDocLinks(
-        widget.item.id,
-        widget.item.linkedDocIds,
-        newIds,
-        userId,
-      );
-      if (!mounted) return;
-      final updated = TravelItem(
-        id: widget.item.id,
-        title: widget.item.title,
-        type: widget.item.type,
-        status: widget.item.status,
-        date: widget.item.date,
-        endDate: widget.item.endDate,
-        time: widget.item.time,
-        endTime: widget.item.endTime,
-        location: widget.item.location,
-        destination: widget.item.destination,
-        confirmationNumber: widget.item.confirmationNumber,
-        url: widget.item.url,
-        address: widget.item.address,
-        notes: widget.item.notes,
-        linkedDocIds: newIds,
-        linkedItineraryItemId: widget.item.linkedItineraryItemId,
-        linkedDayId: widget.item.linkedDayId,
-      );
-      widget.onUpdated?.call(updated);
-      showWabwaySnack(context,
-          newIds.isEmpty ? 'Documents unlinked.' : 'Documents updated.');
-    } catch (e) {
-      if (!mounted) return;
-      showWabwaySnack(context, 'Could not update documents: $e');
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final linkedDocs = widget.item.linkedDocIds
-        .map((id) => widget.docs.where((d) => d.id == id).firstOrNull)
-        .whereType<TripDocument>()
-        .toList();
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -809,20 +697,6 @@ class _ActionsSectionState extends ConsumerState<_ActionsSection> {
                   }
                 },
               ),
-            if (linkedDocs.isNotEmpty)
-              WabwayButton(
-                label: 'Open document',
-                icon: Icons.open_in_new_rounded,
-                size: WabwayButtonSize.sm,
-                onPressed: () => _openDoc(context, linkedDocs.first),
-              ),
-            WabwayButton(
-              label: 'Attach document',
-              icon: Icons.attach_file_rounded,
-              variant: WabwayButtonVariant.ghost,
-              size: WabwayButtonSize.sm,
-              onPressed: _attachDoc,
-            ),
             WabwayButton(
               label: _itineraryLoading ? 'Adding…' : 'Add to itinerary',
               icon: Icons.event_note_rounded,
@@ -869,31 +743,6 @@ class _ActionsSectionState extends ConsumerState<_ActionsSection> {
   }
 }
 
-// ─── Shared helpers ───────────────────────────────────────────────────────────
-
-Future<void> _openDoc(BuildContext context, TripDocument doc) async {
-  final String? url;
-  if (doc.ext == 'url') {
-    url = doc.notes;
-  } else if (doc.storagePath != null) {
-    url = await DocService.getSignedUrl(doc.storagePath!);
-  } else {
-    url = null;
-  }
-  if (url == null || url.isEmpty) {
-    if (context.mounted) {
-      showWabwaySnack(context, 'Could not open document.');
-    }
-    return;
-  }
-  final uri = Uri.parse(url);
-  if (await canLaunchUrl(uri)) {
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
-  } else if (context.mounted) {
-    showWabwaySnack(context, 'Could not open document.');
-  }
-}
-
 // ─── Mobile actions sheet ─────────────────────────────────────────────────────
 
 void _showActionsSheet(
@@ -919,48 +768,6 @@ void _showActionsSheet(
               decoration: const BoxDecoration(
                   color: kColorBorder, borderRadius: kRadiusPill),
             ),
-          ),
-          if (item.linkedDocIds.isNotEmpty)
-            _SheetTile(
-              icon: Icons.open_in_new_rounded,
-              label: 'Open document',
-              onTap: () {
-                Navigator.pop(ctx);
-                final linkedDoc = docs
-                    .where((d) => item.linkedDocIds.contains(d.id))
-                    .firstOrNull;
-                if (linkedDoc != null) _openDoc(context, linkedDoc);
-              },
-            ),
-          _SheetTile(
-            icon: Icons.attach_file_rounded,
-            label: 'Attach document',
-            onTap: () async {
-              Navigator.pop(ctx);
-              if (docs.isEmpty) return;
-              final newIds = await showDocAttachSheet(
-                context,
-                docs: docs,
-                initialSelectedIds: item.linkedDocIds.toSet(),
-              );
-              if (newIds == null || !context.mounted) return;
-              final userId = supabase.auth.currentUser?.id ?? '';
-              await TravelService.syncDocLinks(
-                  item.id, item.linkedDocIds, newIds, userId);
-              if (context.mounted) {
-                onUpdated?.call(TravelItem(
-                  id: item.id, title: item.title, type: item.type,
-                  status: item.status, date: item.date, endDate: item.endDate,
-                  time: item.time, endTime: item.endTime, location: item.location,
-                  destination: item.destination,
-                  confirmationNumber: item.confirmationNumber, url: item.url,
-                  address: item.address, notes: item.notes,
-                  linkedDocIds: newIds,
-                  linkedItineraryItemId: item.linkedItineraryItemId,
-                  linkedDayId: item.linkedDayId,
-                ));
-              }
-            },
           ),
           _SheetTile(
             icon: Icons.event_note_rounded,

@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../core/supabase/client.dart';
-import '../../core/supabase/doc_service.dart';
 import '../../data/docs_data.dart';
 import '../../data/money_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
+import '../../data/connection_data.dart';
+import '../shared/attached_docs_section.dart';
 import 'add_receipt_sheet.dart';
 
 // ─── Confirmation helper ──────────────────────────────────────────────────────
@@ -267,7 +267,15 @@ class ReceiptDetailContent extends StatelessWidget {
               const Divider(height: 1),
               const SizedBox(height: kSpace5),
 
-              _LinkedDocsSection(key: ValueKey(receipt.hashCode), receiptId: receipt.id),
+              AttachedDocsSection(
+                entityType: EntityType.receipt,
+                entityId:   receipt.id,
+                tripId:     tripId,
+                entityName: receipt.title,
+                uploadType: DocType.receipt,
+                emptyText:  'Nothing attached yet. Attach the receipt photo, invoice or booking.',
+              ),
+              const SizedBox(height: kSpace5),
 
 
               if (onUpdated != null) ...[
@@ -313,105 +321,8 @@ class ReceiptDetailContent extends StatelessWidget {
   }
 }
 
-// ─── Linked documents section ────────────────────────────────────────────────
 
-class _LinkedDocsSection extends StatefulWidget {
-  const _LinkedDocsSection({super.key, required this.receiptId});
-  final String receiptId;
 
-  @override
-  State<_LinkedDocsSection> createState() => _LinkedDocsSectionState();
-}
-
-class _LinkedDocsSectionState extends State<_LinkedDocsSection> {
-  List<TripDocument>? _docs;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    try {
-      final docs = await DocService.loadLinkedDocuments(
-        linkedType: DocLinkedType.receipt,
-        linkedId:   widget.receiptId,
-      );
-      if (mounted) setState(() => _docs = docs);
-    } catch (_) {
-      if (mounted) setState(() => _docs = []);
-    }
-  }
-
-  Future<void> _open(TripDocument doc) async {
-    String? url;
-    if (doc.ext == 'url') {
-      url = doc.notes;
-    } else if (doc.storagePath != null) {
-      url = await DocService.getSignedUrl(doc.storagePath!);
-    }
-    if (url == null || url.isEmpty) return;
-    final uri = Uri.tryParse(url);
-    if (uri == null) return;
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
-  }
-
-  bool _canOpen(TripDocument doc) =>
-      (doc.ext == 'url' && doc.notes != null) || doc.storagePath != null;
-
-  @override
-  Widget build(BuildContext context) {
-    if (_docs == null || _docs!.isEmpty) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Documents', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
-        const SizedBox(height: kSpace3),
-        ..._docs!.map((doc) => Padding(
-          padding: const EdgeInsets.only(bottom: kSpace2),
-          child: _DocRow(doc: doc, canOpen: _canOpen(doc), onTap: () => _open(doc)),
-        )),
-        const SizedBox(height: kSpace3),
-      ],
-    );
-  }
-}
-
-class _DocRow extends StatelessWidget {
-  const _DocRow({required this.doc, required this.onTap, this.canOpen = false});
-  final TripDocument doc;
-  final VoidCallback onTap;
-  final bool canOpen;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: canOpen ? onTap : null,
-      borderRadius: kRadiusMd,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: kSpace3, vertical: kSpace3),
-        decoration: BoxDecoration(
-          color: kColorSurfaceSunken,
-          borderRadius: kRadiusMd,
-          border: Border.all(color: kColorBorder),
-        ),
-        child: Row(
-          children: [
-            Icon(doc.type.icon, size: 18, color: kColorInkSoft),
-            const SizedBox(width: kSpace3),
-            Expanded(
-              child: Text(doc.title, style: kStyleBodyMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
-            ),
-            if (canOpen)
-              const Icon(Icons.open_in_new_rounded, size: 16, color: kColorInkSoft),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 // ─── Info row ─────────────────────────────────────────────────────────────────
 

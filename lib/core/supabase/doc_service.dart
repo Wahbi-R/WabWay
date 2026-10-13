@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../data/connection_data.dart';
 import '../../data/docs_data.dart';
 import '../offline_cache.dart';
 import 'client.dart';
@@ -44,16 +45,6 @@ abstract final class DocService {
         _                 => DocLinkedType.trip,
       };
 
-  static String _linkedTypeToDb(DocLinkedType t) => switch (t) {
-        DocLinkedType.spot            => 'spot',
-        DocLinkedType.travelItem      => 'travel_item',
-        DocLinkedType.receipt         => 'receipt',
-        DocLinkedType.cashWithdrawal  => 'cash_withdrawal',
-        DocLinkedType.itineraryItem   => 'itinerary_item',
-        DocLinkedType.itineraryDay    => 'itinerary_day',
-        DocLinkedType.trip            => 'trip',
-      };
-
   // ── Row → model ──────────────────────────────────────────────────────────────
 
   static TripDocument _docFromRow(Map<String, dynamic> row) {
@@ -93,7 +84,23 @@ abstract final class DocService {
         .isFilter('link_category', null)
         .order('created_at', ascending: false);
     await OfflineCache.write(OfflineCache.docsKey(tripId), data);
-    return data.map<TripDocument>((r) => _docFromRow(r)).toList();
+    final docs = data.map<TripDocument>((r) => _docFromRow(r)).toList();
+    // Attachment counts for the cards: trip_connections + legacy links.
+    try {
+      final counts = await attachedPeerCounts(tripId, docs);
+      return [
+        for (final d in docs)
+          TripDocument(
+            id: d.id, title: d.title, type: d.type, ext: d.ext,
+            uploadedById: d.uploadedById, uploadedAt: d.uploadedAt,
+            storagePath: d.storagePath, fileSizeKb: d.fileSizeKb,
+            amount: d.amount, currency: d.currency, notes: d.notes,
+            url: d.url, links: d.links, connectedCount: counts[d.id] ?? 0,
+          ),
+      ];
+    } catch (_) {
+      return docs;
+    }
   }
 
   static Future<List<TripDocument>?> loadDocumentsFromCache(String tripId) =>
@@ -133,69 +140,137 @@ abstract final class DocService {
     return _docFromRow(inserted);
   }
 
-  static Future<void> addLink({
-    required String documentId,
-    required DocLinkedType linkedType,
-    required String linkedId,
-    required String createdBy,
-  }) async {
-    await supabase.from('document_links').insert({
-      'document_id': documentId,
-      'linked_type': _linkedTypeToDb(linkedType),
-      'linked_id':   linkedId,
-      'created_by':  createdBy,
-    });
-  }
+  // ── Attachments (a document attached to a spot / travel / stay / plan item /
+  // receipt / cash withdrawal) ────────────────────────────────────────────────
+  //
+  // Since build 418 every attachment is a `trip_connections` row (doc ↔ entity).
+  // Legacy `document_links` rows (copied in migration 047, possibly still
+  // written by older installed builds) are read alongside and removed on
+  // [detach], but never written.
 
-  static Future<List<TripDocument>> loadLinkedDocuments({
-    required DocLinkedType linkedType,
-    required String linkedId,
-  }) async {
-    // Documents can be linked two ways: legacy document_links rows and the
-    // shared trip_connections ("Connected" picker). Read both.
-    final results = await Future.wait([
-      supabase
-          .from('document_links')
-          .select('document_id')
-          .eq('linked_type', _linkedTypeToDb(linkedType))
-          .eq('linked_id', linkedId),
-      supabase
+  /// entityId → attached document ids, for many entities in one go
+  /// (list badges such as "2 docs").
+  static Future<Map<String, List<String>>> attachedDocIds(
+      List<String> entityIds) async {
+    final out = <String, Set<String>>{};
+    if (entityIds.isEmpty) return {};
+    const chunkSize = 50;
+    final futures = <Future<void>>[];
+    for (var i = 0; i < entityIds.length; i += chunkSize) {
+      final chunk = entityIds.sublist(i, min(i + chunkSize, entityIds.length));
+      final ids = chunk.toSet();
+      final inList = chunk.join(',');
+      futures.add(supabase
           .from('trip_connections')
           .select('entity_a_id, entity_a_type, entity_b_id, entity_b_type')
-          .or('entity_a_id.eq.$linkedId,entity_b_id.eq.$linkedId'),
-    ]);
-    final ids = <String>{
-      for (final l in results[0]) l['document_id'] as String,
-      for (final c in results[1])
-        if (c['entity_a_id'] == linkedId && c['entity_b_type'] == 'doc')
-          c['entity_b_id'] as String
-        else if (c['entity_b_id'] == linkedId && c['entity_a_type'] == 'doc')
-          c['entity_a_id'] as String,
-    }.toList();
+          .or('entity_a_id.in.($inList),entity_b_id.in.($inList)')
+          .then((rows) {
+        for (final r in rows) {
+          if (r['entity_a_type'] == 'doc' && ids.contains(r['entity_b_id'])) {
+            (out[r['entity_b_id'] as String] ??= {}).add(r['entity_a_id'] as String);
+          } else if (r['entity_b_type'] == 'doc' && ids.contains(r['entity_a_id'])) {
+            (out[r['entity_a_id'] as String] ??= {}).add(r['entity_b_id'] as String);
+          }
+        }
+      }));
+      futures.add(supabase
+          .from('document_links')
+          .select('linked_id, document_id')
+          .inFilter('linked_id', chunk)
+          .then((rows) {
+        for (final r in rows) {
+          (out[r['linked_id'] as String] ??= {}).add(r['document_id'] as String);
+        }
+      }));
+    }
+    await Future.wait(futures);
+    return {for (final e in out.entries) e.key: e.value.toList()};
+  }
+
+  /// docId → number of distinct items it's attached to, across
+  /// trip_connections and the legacy links already on [docs].
+  static Future<Map<String, int>> attachedPeerCounts(
+      String tripId, List<TripDocument> docs) async {
+    final rows = await supabase
+        .from('trip_connections')
+        .select('entity_a_id, entity_a_type, entity_b_id, entity_b_type')
+        .eq('trip_id', tripId)
+        .or('entity_a_type.eq.doc,entity_b_type.eq.doc');
+    final peers = <String, Set<String>>{
+      for (final d in docs)
+        d.id: {
+          for (final l in d.links)
+            if (l.type != DocLinkedType.trip &&
+                l.type != DocLinkedType.itineraryDay)
+              l.linkedId,
+        },
+    };
+    for (final r in rows) {
+      if (r['entity_a_type'] == 'doc') {
+        peers[r['entity_a_id'] as String]?.add(r['entity_b_id'] as String);
+      }
+      if (r['entity_b_type'] == 'doc') {
+        peers[r['entity_b_id'] as String]?.add(r['entity_a_id'] as String);
+      }
+    }
+    return {for (final e in peers.entries) e.key: e.value.length};
+  }
+
+  /// Documents attached to [entityId], oldest first.
+  static Future<List<TripDocument>> loadAttached(String entityId) async {
+    final ids = (await attachedDocIds([entityId]))[entityId] ?? const [];
     if (ids.isEmpty) return [];
     final docs = await supabase
         .from('documents')
         .select('*, document_links(*)')
-        .inFilter('id', ids);
+        .inFilter('id', ids)
+        .order('created_at');
     return docs.map<TripDocument>((r) => _docFromRow(r)).toList();
   }
 
-  static Future<void> deleteLink({
-    required String documentId,
-    required DocLinkedType linkedType,
-    required String linkedId,
+  /// Attach [docIds] to an entity. Already-attached ids are skipped.
+  static Future<void> attach({
+    required String tripId,
+    required String userId,
+    required Iterable<String> docIds,
+    required EntityType entityType,
+    required String entityId,
   }) async {
-    await supabase
-        .from('document_links')
-        .delete()
-        .eq('document_id', documentId)
-        .eq('linked_type', _linkedTypeToDb(linkedType))
-        .eq('linked_id', linkedId);
-    // …and the same pair in trip_connections (either direction).
-    await supabase.from('trip_connections').delete()
-        .eq('entity_a_id', documentId).eq('entity_b_id', linkedId);
-    await supabase.from('trip_connections').delete()
-        .eq('entity_a_id', linkedId).eq('entity_b_id', documentId);
+    final existing =
+        ((await attachedDocIds([entityId]))[entityId] ?? const []).toSet();
+    final toAdd = docIds.toSet().difference(existing);
+    if (toAdd.isEmpty) return;
+    await supabase.from('trip_connections').upsert(
+      [
+        for (final id in toAdd)
+          {
+            'trip_id':       tripId,
+            'created_by':    userId,
+            'entity_a_type': EntityType.doc.dbValue,
+            'entity_a_id':   id,
+            'entity_b_type': entityType.dbValue,
+            'entity_b_id':   entityId,
+          },
+      ],
+      onConflict: 'entity_a_id,entity_b_id',
+      ignoreDuplicates: true,
+    );
+  }
+
+  /// Detach a document from an entity (both tables, either direction).
+  /// The document itself is kept.
+  static Future<void> detach({
+    required String docId,
+    required String entityId,
+  }) async {
+    await Future.wait([
+      supabase.from('trip_connections').delete()
+          .eq('entity_a_id', docId).eq('entity_b_id', entityId),
+      supabase.from('trip_connections').delete()
+          .eq('entity_a_id', entityId).eq('entity_b_id', docId),
+      supabase.from('document_links').delete()
+          .eq('document_id', docId).eq('linked_id', entityId),
+    ]);
   }
 
   static Future<void> renameDocument(String docId, String newTitle) async {
@@ -214,6 +289,14 @@ abstract final class DocService {
         .eq('id', docId)
         .select();
     if (rows.isEmpty) throw Exception('Could not delete document');
+    // trip_connections is polymorphic (no FK cascade) — drop this doc's
+    // attachments so they don't linger as phantom "1 doc" counts.
+    try {
+      await supabase
+          .from('trip_connections')
+          .delete()
+          .or('entity_a_id.eq.$docId,entity_b_id.eq.$docId');
+    } catch (_) {}
   }
 
   // ── File upload + document creation (safe ordered flow) ─────────────────────

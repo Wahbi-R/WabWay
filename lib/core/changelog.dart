@@ -11,6 +11,18 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 418,
+    label: "One Documents section everywhere",
+    changes: [
+      "Every travel item, stay, plan item, spot, receipt and cash withdrawal now has the same Documents section with an Attach button",
+      "Attach lets you upload a file (or take a photo on your phone), pick something already in your Library, or paste a booking link — the upload form is filled in with the item's name for you",
+      "Tap an attached document to open it; the × removes it from that item without deleting it",
+      "Saved booking links attached to items open correctly again",
+      "Link-only documents no longer show Open and Download buttons that did nothing",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 417,
     label: "Library",
     changes: [

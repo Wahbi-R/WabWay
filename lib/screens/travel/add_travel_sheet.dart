@@ -591,6 +591,8 @@ class _AddTravelContentState extends State<_AddTravelContent> {
                   ),
                   const SizedBox(height: kSpace4),
 
+                  // Editing: documents are managed on the item's page.
+                  if (widget.initialItem == null)
                   DocMultiPicker(
                     docs: widget.docs,
                     selectedIds: _linkedDocIds,

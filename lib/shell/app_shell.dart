@@ -17,7 +17,6 @@ import '../screens/money_screen.dart';
 import '../screens/docs_screen.dart';
 import '../screens/more_screen.dart';
 import '../screens/home_screen.dart';
-import '../screens/members_screen.dart';
 import '../screens/travel_screen.dart';
 import '../screens/map_screen.dart';
 import '../screens/links_screen.dart';
@@ -176,13 +175,6 @@ const _desktopDestinations = [
     builder: _buildShopping,
   ),
   _NavDest(
-    key: 'members',
-    label: 'Members',
-    icon: Icons.group_outlined,
-    selectedIcon: Icons.group_rounded,
-    builder: _buildMembers,
-  ),
-  _NavDest(
     key: 'settings',
     label: 'Settings',
     icon: Icons.settings_outlined,
@@ -203,7 +195,6 @@ Widget _buildTravel(BuildContext _)  => const TravelScreen();
 Widget _buildStays(BuildContext _)   => const AccommodationsScreen();
 Widget _buildMoney(BuildContext _)   => const MoneyScreen();
 Widget _buildDocs(BuildContext _)    => const DocsScreen();
-Widget _buildMembers(BuildContext _) => const MembersScreen();
 Widget _buildPacking(BuildContext _)   => const PackingScreen();
 Widget _buildShopping(BuildContext _)  => const ShoppingScreen();
 Widget _buildMore(BuildContext _)      => const MoreScreen();
@@ -245,16 +236,21 @@ class _AppShellState extends ConsumerState<AppShell> {
     // crew/travel/docs/links/shopping live under More on mobile — open More tab.
     'crew': 4, 'travel': 4, 'docs': 4, 'shopping': 4,
   };
-  static const _desktopKeyToIndex = {
-    'home': 0, 'crew': 1, 'spots': 2, 'links': 3, 'plan': 5,
-    'travel': 6, 'money': 8, 'docs': 9, 'shopping': 11,
-  };
+  // Desktop indices come from the destination list itself, so adding or
+  // removing a destination can't silently shift them. Notification keys that
+  // differ from destination keys are aliased here.
+  static const _keyAliases = {'docs': 'documents', 'members': 'crew'};
+  static int? _desktopIndexFor(String key) {
+    final k = _keyAliases[key] ?? key;
+    final i = _desktopDestinations.indexWhere((d) => d.key == k);
+    return i < 0 ? null : i;
+  }
 
   void _switchTab(String screenKey) {
     if (!mounted) return;
     final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
     if (isDesktop) {
-      final idx = _desktopKeyToIndex[screenKey];
+      final idx = _desktopIndexFor(screenKey);
       if (idx != null) setState(() => _desktopIndex = idx);
     } else {
       final idx = _mobileKeyToIndex[screenKey];

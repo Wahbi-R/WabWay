@@ -26,6 +26,7 @@ import '../theme/app_text_theme.dart';
 import '../widgets/wabway_avatar.dart';
 import '../widgets/wabway_confirm_dialog.dart';
 import '../widgets/widgets.dart';
+import 'members_screen.dart' show MembersList;
 
 class CrewScreen extends ConsumerStatefulWidget {
   const CrewScreen({super.key});
@@ -57,7 +58,7 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 2, vsync: this);
+    _tabs = TabController(length: 3, vsync: this);
     LocationSharingManager.instance.isSharing.addListener(_onSharingChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -537,6 +538,7 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
           tabs: const [
             Tab(text: 'Chat'),
             Tab(text: 'Live Map'),
+            Tab(text: 'Members'),
           ],
           labelColor: kColorPrimary,
           unselectedLabelColor: kColorInkSoft,
@@ -575,6 +577,7 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
             currentUserId: _userId ?? '',
             onSetMeetupPoint: _onSetMeetupPoint,
           ),
+          const MembersList(),
         ],
       ),
     );

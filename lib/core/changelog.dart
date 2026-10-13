@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 409,
+    label: "Crew",
+    changes: [
+      "Crew now has three tabs — Chat, Live Map and Members — so everything about the people on your trip is in one place",
+      "Invite people or add members right from the Crew → Members tab",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 408,
     label: "UI consistency",
     changes: [

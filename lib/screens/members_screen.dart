@@ -12,9 +12,12 @@ import '../theme/app_decorations.dart';
 import '../widgets/widgets.dart';
 import 'members/add_member_sheet.dart';
 import 'members/invite_sheet.dart';
+import '../core/text_utils.dart';
 
-class MembersScreen extends ConsumerWidget {
-  const MembersScreen({super.key});
+/// The member list with the invite / add-member action on top. Lives in
+/// Crew → Members — the one "people" screen (chat, live map, members).
+class MembersList extends ConsumerWidget {
+  const MembersList({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -24,55 +27,54 @@ class MembersScreen extends ConsumerWidget {
     final currentUserId = ref.watch(profileProvider)?.id;
     final isOwner = ref.watch(isOrganiserProvider);
 
-    return Scaffold(
-      backgroundColor: kColorCream,
-      appBar: AppBar(
-        title: Text('Members', style: kStyleTitle),
-        actions: [
-          if (trip.groupChatUrl != null && trip.groupChatUrl!.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.chat_bubble_outline_rounded),
-              color: kColorPrimary,
-              tooltip: 'Open group chat',
-              onPressed: () => launchUrl(
-                Uri.parse(trip.groupChatUrl!),
-                mode: LaunchMode.externalApplication,
+    return ListView(
+      padding: const EdgeInsets.all(kSpace4),
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(pluralize(members.length, 'member'), style: kStyleCaptionMedium),
+            ),
+            if (trip.groupChatUrl != null && trip.groupChatUrl!.isNotEmpty) ...[
+              WabwayButton(
+                label: 'Group chat',
+                icon: Icons.chat_bubble_outline_rounded,
+                size: WabwayButtonSize.sm,
+                variant: WabwayButtonVariant.ghost,
+                onPressed: () => launchUrl(
+                  Uri.parse(trip.groupChatUrl!),
+                  mode: LaunchMode.externalApplication,
+                ),
               ),
+              const SizedBox(width: kSpace2),
+            ],
+            // Everyone can invite (codes); only the organiser can add an
+            // existing user directly (RLS: trip_members insert is owner-only).
+            WabwayButton(
+              label: isOwner ? 'Add member' : 'Invite',
+              icon: Icons.person_add_rounded,
+              size: WabwayButtonSize.sm,
+              onPressed: () => isOwner
+                  ? showAddMemberSheet(
+                      context,
+                      tripId: trip.id,
+                      existingMemberIds: members.map((m) => m.userId).toSet(),
+                      onMemberAdded: () => ref.read(tripNotifierProvider.notifier).load(),
+                    )
+                  : showInviteSheet(context, tripId: trip.id),
             ),
-          // Everyone can invite (codes); only the organiser can add an
-          // existing user directly (RLS: trip_members insert is owner-only).
-          WabwayButton(
-            label: isOwner ? 'Add member' : 'Invite',
-            icon: Icons.person_add_rounded,
-            size: WabwayButtonSize.sm,
-            onPressed: () => isOwner
-                ? showAddMemberSheet(
-                    context,
-                    tripId: trip.id,
-                    existingMemberIds: members.map((m) => m.userId).toSet(),
-                    onMemberAdded: () => ref.read(tripNotifierProvider.notifier).load(),
-                  )
-                : showInviteSheet(context, tripId: trip.id),
+          ],
+        ),
+        const SizedBox(height: kSpace3),
+        for (final member in members) ...[
+          _MemberCard(
+            member: member,
+            isMe: member.userId == currentUserId,
+            tripId: trip.id,
           ),
-          const SizedBox(width: kSpace4),
+          const SizedBox(height: kSpace3),
         ],
-      ),
-      body: members.isEmpty
-          ? const Center(child: Text('No members yet.'))
-          : ListView.separated(
-              padding: const EdgeInsets.all(kSpace4),
-              itemCount: members.length,
-              separatorBuilder: (_, __) => const SizedBox(height: kSpace3),
-              itemBuilder: (context, i) {
-                final member = members[i];
-                final isMe = member.userId == currentUserId;
-                return _MemberCard(
-                  member: member,
-                  isMe: isMe,
-                  tripId: trip.id,
-                );
-              },
-            ),
+      ],
     );
   }
 }

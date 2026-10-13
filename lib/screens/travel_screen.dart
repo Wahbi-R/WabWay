@@ -25,6 +25,11 @@ import 'travel/travel_item_card.dart';
 import 'travel/travel_item_detail.dart';
 import 'travel/add_travel_sheet.dart';
 import '../core/text_utils.dart';
+import 'accommodations/add_accommodation_sheet.dart';
+import '../core/places/listing_parser.dart';
+import '../data/accommodation_data.dart' show AccommodationSource;
+import '../core/supabase/connection_service.dart';
+import '../data/connection_data.dart';
 
 class TravelScreen extends ConsumerStatefulWidget {
   const TravelScreen({super.key});
@@ -259,7 +264,7 @@ class _TravelScreenState extends ConsumerState<TravelScreen> with AsyncScreenMix
         data: {'screen': 'travel', 'trip_id': _activeTripId},
         prefKey: kPrefNotifItinerary,
       );
-
+      _offerStayAfter(created);
     } catch (e) {
       if (!mounted) return;
       messenger.showSnackBar(SnackBar(
@@ -271,6 +276,49 @@ class _TravelScreenState extends ConsumerState<TravelScreen> with AsyncScreenMix
         behavior: SnackBarBehavior.floating,
       ));
     }
+  }
+
+  /// After a flight/train/bus/ferry, offer the stay at the other end —
+  /// check-in pre-filled from the arrival date, and the new stay linked to
+  /// this travel item through the shared trip_connections ("Connected").
+  void _offerStayAfter(TravelItem t) {
+    const legs = {TravelItemType.flight, TravelItemType.train, TravelItemType.bus, TravelItemType.ferry};
+    final arrival = t.endDate ?? t.date;
+    if (!legs.contains(t.type) || arrival == null || !mounted) return;
+    showWabwaySnack(
+      context,
+      'Where are you staying after ${t.title}?',
+      duration: const Duration(seconds: 6),
+      action: SnackBarAction(
+        label: 'Add stay',
+        textColor: Colors.white,
+        onPressed: () async {
+          final r = await showAddStaySheet(
+            context,
+            tripId: _activeTripId,
+            userId: _userId,
+            prefilled: ListingResult(
+              name: '',
+              source: AccommodationSource.other,
+              checkIn: arrival,
+            ),
+          );
+          final stay = r?.accommodation;
+          if (stay == null) return;
+          try {
+            await ConnectionService.add(
+              tripId: _activeTripId,
+              userId: _userId,
+              typeA: EntityType.travel,
+              idA: t.id,
+              typeB: EntityType.stay,
+              idB: stay.id,
+            );
+            if (mounted) showWabwaySnack(context, 'Stay added and linked to ${t.title}');
+          } catch (_) {}
+        },
+      ),
+    );
   }
 
   void _exportCsv() {

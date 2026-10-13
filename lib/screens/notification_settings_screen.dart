@@ -123,7 +123,7 @@ class _NotificationSettingsScreenState
                 _NotifRow(
                   icon: Icons.flight_rounded,
                   label: 'Travel',
-                  description: 'New flights, hotels, and bookings',
+                  description: 'New flights, trains and other bookings',
                   value: _itinerary,
                   onChanged: (v) { setState(() => _itinerary = v); _save(); },
                 ),

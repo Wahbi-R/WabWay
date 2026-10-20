@@ -432,7 +432,7 @@ class _ReceiptDetailContentState extends ConsumerState<ReceiptDetailContent> {
               if (receipt.isForeignCurrency) ...[
                 const SizedBox(height: kSpace1),
                 Text(
-                  '≈ ${fmtAmount(receipt.homeAmount, ref.watch(activeTripProvider)?.homeCurrency ?? 'CAD')}'
+                  '≈ ${fmtAmount(receipt.homeAmount, _homeCurrency ?? 'CAD')}'
                   '${receipt.transactionFeePct > 0 ? ' incl. ${receipt.transactionFeePct.toStringAsFixed(1)}% card fee' : ''}',
                   style: GoogleFonts.ibmPlexMono(
                     fontSize: kTextBase,
@@ -463,7 +463,10 @@ class _ReceiptDetailContentState extends ConsumerState<ReceiptDetailContent> {
                 _InfoRow(
                   icon: net > 0 ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
                   label: net > 0 ? 'You are still owed' : 'You still owe',
-                  value: fmtAmount(net.abs(), receipt.currency),
+                  value: joinNonEmpty([
+                    fmtAmount(net.abs(), receipt.currency),
+                    if (receipt.isForeignCurrency) '≈ ${fmtAmount(net.abs() * receipt.homeRate, _homeCurrency ?? 'CAD')}',
+                  ], '  '),
                   valueColor: net > 0 ? kColorSuccess : kColorDanger,
                 ),
               ],
@@ -494,6 +497,10 @@ class _ReceiptDetailContentState extends ConsumerState<ReceiptDetailContent> {
                     paidById: receipt.paidById,
                     members:  widget.members,
                     total:    receipt.amount,
+                    // What each share comes to at home (so everyone knows
+                    // what to send) — at the rate actually paid.
+                    homeCurrency: receipt.isForeignCurrency ? _homeCurrency : null,
+                    homeRate: receipt.homeRate,
                     busy:     _busyShares.contains(s.memberId),
                     onToggle: s.memberId != receipt.paidById && _canSettle(s)
                         ? () => _toggleShare(s)
@@ -654,12 +661,18 @@ class _SplitRow extends StatelessWidget {
     required this.paidById,
     required this.members,
     this.total = 0,
+    this.homeCurrency,
+    this.homeRate = 1,
     this.busy = false,
     this.onToggle,
   });
 
   final ReceiptSplit split;
   final String currency;
+
+  /// Set for a foreign-currency receipt: the share is also shown in it.
+  final String? homeCurrency;
+  final double homeRate;
   final String paidById;
   final List<TripMember> members;
   final double total;
@@ -708,6 +721,11 @@ class _SplitRow extends StatelessWidget {
                   decoration: split.isSettled ? TextDecoration.lineThrough : null,
                 ),
               ),
+              if (homeCurrency != null)
+                Text(
+                  '≈ ${fmtAmount(split.amount * homeRate, homeCurrency!)}',
+                  style: GoogleFonts.ibmPlexMono(fontSize: 12, color: kColorInkSoft),
+                ),
               if (total > 0)
                 Text(
                   '${(split.amount / total * 100).toStringAsFixed(0)}%',

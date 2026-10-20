@@ -170,6 +170,11 @@ class Receipt {
   /// True when the receipt was entered in a foreign currency and a real rate was applied.
   bool get isForeignCurrency => exchangeRate != 1.0;
 
+  /// Home currency per unit of [currency] as actually paid: the home amount
+  /// ÷ the amount, so it includes a typed-in override and any card fee.
+  /// Converts a share: `share * homeRate`.
+  double get homeRate => amount > 0 ? homeAmount / amount : exchangeRate;
+
   double get myShare => myShareFor(kYouId);
   double get myNet   => myNetFor(kYouId);
 

@@ -109,7 +109,7 @@ abstract final class ReceiptsLinkService {
         'currency': receipt.currency,
         if (homeCurrency != null && homeCurrency != receipt.currency && receipt.amount > 0) ...{
           'home_currency': homeCurrency,
-          'home_rate':     receipt.homeAmount / receipt.amount,
+          'home_rate':     receipt.homeRate,
         },
         'items':    [for (final i in items.items) i.toJson()],
         'subtotal': items.itemsTotal,

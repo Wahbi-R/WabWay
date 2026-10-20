@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 422,
+    label: "Same settings everywhere",
+    changes: [
+      "Emergency info and Pinboard are now in More on your phone — you can post the first pin even when the board is empty",
+      "Photos is in the desktop sidebar",
+      "Desktop Settings now has Transfer ownership, Notifications, Import, What's new and Diagnostics, just like the phone",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 421,
     label: "AI access on desktop",
     changes: [

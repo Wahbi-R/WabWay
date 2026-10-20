@@ -70,7 +70,8 @@ The app's main UX debt came from the same element being rebuilt per screen (6 co
 | Pick docs inside a create form | `DocMultiPicker`, then `DocService.attach` after save | `lib/widgets/doc_multi_picker.dart` |
 | Link any two entities | `ConnectionsSection` + `ConnectionService` (`trip_connections`) | `lib/screens/shared/connections_section.dart` |
 | Organiser / edit permission | `isOrganiserProvider`, `canManageItem(createdById, isOrganiser:)` | `lib/core/providers/trip_provider.dart` |
-| Trip delete / leave / remove member | `confirmDeleteTrip`, `confirmLeaveTrip`, `confirmRemoveMember` | `lib/screens/trips/trip_actions.dart` |
+| Trip delete / leave / remove member / transfer ownership | `confirmDeleteTrip`, `confirmLeaveTrip`, `confirmRemoveMember`, `showTransferOwnershipSheet` | `lib/screens/trips/trip_actions.dart` |
+| Settings rows (mobile More + desktop Settings) | `SettingsRow`, `SettingsCard`, `AccountSettingsCard`, `TripSettingsCard`, `AppSettingsSections` — add new settings HERE so both screens get them (`test/settings_parity_test.dart` checks) | `lib/screens/shared/settings_sections.dart` |
 
 Entity Add sheets (`showAddSpotSheet`, `showAddTravelSheet`, `showAddLinkSheet`, `showAddStaySheet`, …) are the ONLY create forms for their entity — other flows (Import, quick-add, search) must call them with prefill values, never rebuild the fields.
 

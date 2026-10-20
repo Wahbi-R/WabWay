@@ -74,7 +74,7 @@ includes attached PDFs, which covers **Create link** on any receipt with an
 attached PDF. `runReceiptFollowups` uses attached documents when a new receipt
 has no photos, and takes `linkPhotos` for pictures that are only for the link.
 
-## Server (`/booking/parse`, wabway-server build 427)
+## Server (`/booking/parse`, wabway-server build 433)
 
 New fields per booking:
 

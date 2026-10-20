@@ -224,6 +224,10 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
       if (ex.exchangeRate != 1.0) {
         _rateCtrl.text    = ex.exchangeRate.toStringAsFixed(6);
         _feePctCtrl.text  = ex.transactionFeePct.toStringAsFixed(2);
+        if (ex.homeAmountSet) {
+          _homeOverride = true;
+          _homeAmountCtrl.text = ex.homeAmount.toStringAsFixed(2);
+        }
       }
     } else {
       final pre = widget.prefill;
@@ -348,6 +352,8 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
     final feePct = _needsConversion
         ? (double.tryParse(_feePctCtrl.text.trim()) ?? 0.0)
         : 0.0;
+    // A typed home amount is what was really charged: settle it in that.
+    final homeAmountSet = _needsConversion && _homeOverride;
 
     final items = _splitMode == _SplitMode.items ? _items : null;
     final splits = switch (_splitMode) {
@@ -381,6 +387,7 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
         date:              DateTime.now(),
         notes:             notes,
         items:             items,
+        homeAmountSet:     homeAmountSet,
       ));
       return;
     }
@@ -404,6 +411,7 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
           notes:             notes,
           items:             items,
           previousSplits:    widget.existingReceipt!.splits,
+          homeAmountSet:     homeAmountSet,
         );
       } else {
         receipt = await MoneyService.createReceipt(
@@ -420,6 +428,7 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
           splits:            splits,
           notes:             notes,
           items:             items,
+          homeAmountSet:     homeAmountSet,
         );
       }
       // Photos → attached Receipt documents; picked docs attached; Receipts
@@ -487,6 +496,7 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
               photos:            _photos,
               docIds:            _docIds,
               createLink:        _createLink,
+              homeAmountSet:     homeAmountSet,
             );
             if (mounted) {
               Navigator.of(context).pop();

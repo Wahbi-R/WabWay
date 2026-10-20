@@ -174,7 +174,9 @@ class _BookingReviewScreenState extends ConsumerState<BookingReviewScreen>
     r.receipt = receiptForBooking(r.booking, payerId: widget.userId, memberIds: _memberIds);
     r.existingReceipt =
         r.receipt == null ? null : findExistingReceipt(r.receipt!, _receipts);
-    r.addReceipt = r.receipt != null && r.existingReceipt == null;
+    // On when the booking says it's paid; offered switched off when it
+    // doesn't say ("Total cost" only).
+    r.addReceipt = r.receipt != null && r.existingReceipt == null && (r.booking.price?.isPaid ?? false);
   }
 
   List<_Row> get _toSave =>
@@ -760,7 +762,9 @@ class _BookingCard extends ConsumerWidget {
           if (item.confirmationNumber != null)
             (Icons.confirmation_number_outlined, 'Ref ${item.confirmationNumber}'),
         ];
-      case ParsedStay(:final stay):
+      case ParsedStay(:final stay, :final guests):
+        final who = travellersSummary(
+            guests, ref.watch(tripMembersProvider), ref.watch(profileProvider)?.id);
         return [
           if (stay.checkIn != null)
             (
@@ -772,8 +776,12 @@ class _BookingCard extends ConsumerWidget {
             ),
           if (stay.address != null || stay.city.isNotEmpty)
             (Icons.place_rounded, stay.address ?? stay.city),
+          if (who != null) (Icons.people_alt_rounded, who),
           if (stay.pricePerNight != null)
-            (Icons.payments_outlined, '${fmtAmount(stay.pricePerNight!, stay.currency)} / night'),
+            (Icons.payments_outlined, [
+              if (stay.totalPrice != null) '${fmtAmount(stay.totalPrice!, stay.currency)} total',
+              '${fmtAmount(stay.pricePerNight!, stay.currency)} / night',
+            ].join(' · ')),
           if (stay.confirmationNumber != null)
             (Icons.confirmation_number_outlined, 'Ref ${stay.confirmationNumber}'),
         ];
@@ -886,6 +894,8 @@ class _ReceiptRow extends StatelessWidget {
           subtitle: Text(
             existing != null && !row.addReceipt
                 ? 'Already in Money: ${existing.title} — it\'ll be linked instead'
+                : !row.addReceipt && !(row.booking.price?.isPaid ?? false)
+                ? "The booking doesn't say it's paid — turn on if it is"
                 : joinNonEmpty([
                     fmtAmount(d.amount, d.currency),
                     'paid by you',

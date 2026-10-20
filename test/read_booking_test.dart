@@ -105,7 +105,7 @@ void main() {
     final merged = mergeTravel(existing, (train as ParsedTravel).item);
     expect(merged.id, 'x');
     expect(merged.endTime, '13:04', reason: 'missing fields are filled');
-    expect(merged.notes, 'Added by Claude', reason: "the group's own fields are kept");
+    expect(merged.notes, startsWith('Added by Claude'), reason: "the group's own fields are kept");
     expect(merged.travellers, hasLength(3));
 
     final other = TravelItem(id: 'y', title: 'Nozomi 1', type: TravelItemType.train, date: DateTime(2026, 11, 18), time: '06:00');
@@ -124,7 +124,7 @@ void main() {
     expect(merged.status, AccommodationStatus.booked);
     expect(merged.city, 'Atami');
     expect(merged.checkInTime, '15:00');
-    expect(merged.notes, 'Sam found this');
+    expect(merged.notes, startsWith('Sam found this'));
   });
 
   test('a shared email is text, a shared link is still a link', () {

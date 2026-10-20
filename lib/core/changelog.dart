@@ -11,6 +11,47 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 436,
+    label: "Stay totals",
+    changes: [
+      "Stays show the total as well as the price per night — ¥88,509 total · ¥22,127/night",
+      "Stays priced in another currency show roughly what that is in your home currency — ≈ C\$794",
+      "Enter a stay's price as a total or per night — switch between them and the other is worked out",
+      "Fixed the yen, pound and euro signs showing as garbled characters on stays",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 435,
+    label: "Settle up in your currency",
+    changes: [
+      "Receipts where you typed in the C\$ amount are now settled in C\$, so people pay back exactly what your card was charged",
+      "Balances in other currencies show roughly what that is in your home currency — ¥24,860 ≈ C\$223",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 434,
+    label: "Better booking imports",
+    changes: [
+      "A booking that doesn't say it's paid still offers a receipt — just switch it on if it is",
+      "Updating a booking you already have adds new details like the host's phone number to its notes, without touching what you wrote",
+      "Stay receipts are split between the guests named on the booking",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 433,
+    label: "Smoother updates",
+    changes: [
+      "New versions show up when you come back to the app — no need to close and reopen it",
+      "Settings → Check for updates shows your version and checks right away",
+      "Downloaded updates are cleaned up after you install them, so they don't take up space",
+      "Important updates can now be required before the app can be used",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 432,
     label: "Shares in your currency",
     changes: [

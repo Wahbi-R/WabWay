@@ -120,3 +120,23 @@ and the review screen.
 - **Receipts links showed `$8570.00` for a yen receipt.** WabWay now sends
   `receipt.currency`, and receipts.wabble.ca formats every amount with it
   (`src/lib/money.ts`). Links without a currency stay in dollars.
+
+## Fixes (build 434)
+
+- **Paid status unknown** (e.g. an Airbnb itinerary that shows the total but
+  not "paid"): the receipt is still offered, switched off, with "The booking
+  doesn't say it's paid — turn on if it is". Only "to pay" bookings get none.
+- **Updating an existing booking** adds new note lines (the host's phone,
+  door codes) to its notes instead of leaving them out (`mergeNotes`).
+- **Stays split by their guests**: the server lists the guests named on a
+  stay, matched to members; the receipt is split between them when they're
+  all members and the count matches, else between everyone.
+
+## Settling in the home currency (build 435)
+
+A receipt whose home amount was typed in (Override, "what my card charged")
+is marked `home_amount_set` (migration 053). Settle Up counts its shares in the
+home currency at that receipt's rate, so they appear in the CAD section and
+Mark settled there clears them. Every other currency's section shows
+`≈ C$…` under each balance and total (each receipt's own rate; cash uses the
+average rate of the receipts in its currency).

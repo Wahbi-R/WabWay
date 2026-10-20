@@ -17,6 +17,7 @@ import '../../data/docs_data.dart';
 import '../shared/connections_section.dart';
 import '../../data/date_utils.dart';
 import '../../data/currencies.dart';
+import '../../data/money_data.dart' show fmtAmount;
 import '../../widgets/place_search_field.dart';
 
 /// Add / edit a stay. Pops with an [AccommodationSheetResult].
@@ -91,6 +92,9 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
   bool   _deleting  = false;
 
   String _currency = 'USD';
+  /// The price field holds the whole stay's total (only offered once the
+  /// dates give a number of nights); saved as total ÷ nights.
+  bool _priceIsTotal = false;
   AccommodationStatus _status = AccommodationStatus.brainstorming;
   AccommodationSource? _source;
   DateTime? _checkIn;
@@ -113,10 +117,13 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
       _nameCtrl.text = e.name;
       _cityCtrl.text = e.city;
       _urlCtrl.text  = e.url ?? '';
-      if (e.pricePerNight != null) {
-        _priceCtrl.text = e.pricePerNight! % 1 == 0
-            ? '${e.pricePerNight!.toInt()}'
-            : e.pricePerNight!.toStringAsFixed(2);
+      // Bookings are paid as a total, so show that when the nights are known.
+      final total = e.totalPrice;
+      if (total != null) {
+        _priceIsTotal   = true;
+        _priceCtrl.text = _priceText(total);
+      } else if (e.pricePerNight != null) {
+        _priceCtrl.text = _priceText(e.pricePerNight!);
       }
       _notesCtrl.text    = e.notes ?? '';
       _confirmCtrl.text  = e.confirmationNumber ?? '';
@@ -146,14 +153,43 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
     _imageUrl      = r.imageUrl;
     _source        = r.source;
     if (r.pricePerNight != null) {
-      _priceCtrl.text = r.pricePerNight! % 1 == 0
-          ? '${r.pricePerNight!.toInt()}'
-          : r.pricePerNight!.toStringAsFixed(2);
+      _priceCtrl.text = _priceText(r.pricePerNight!);
     }
     if (r.currency != null) _currency = r.currency!;
     if (r.checkIn != null) _checkIn = r.checkIn;
     if (r.checkOut != null) _checkOut = r.checkOut;
     if (r.confirmationNumber != null) _confirmCtrl.text = r.confirmationNumber!;
+  }
+
+  static String _priceText(double v) =>
+      v % 1 == 0 ? '${v.toInt()}' : v.toStringAsFixed(2);
+
+  int? get _nights {
+    if (_checkIn == null || _checkOut == null) return null;
+    final n = _checkOut!.difference(_checkIn!).inDays;
+    return n > 0 ? n : null;
+  }
+
+  bool get _isTotal => _priceIsTotal && _nights != null;
+
+  /// What the price field means per night.
+  double? get _pricePerNight {
+    final v = double.tryParse(_priceCtrl.text.trim());
+    if (v == null) return null;
+    return _isTotal ? v / _nights! : v;
+  }
+
+  /// Switch the field between per night and total, converting what's typed.
+  void _setPriceIsTotal(bool total) {
+    if (total == _isTotal) return;
+    final v = double.tryParse(_priceCtrl.text.trim());
+    final n = _nights;
+    setState(() {
+      if (v != null && n != null) {
+        _priceCtrl.text = _priceText(total ? v * n : double.parse((v / n).toStringAsFixed(2)));
+      }
+      _priceIsTotal = total;
+    });
   }
 
   @override
@@ -199,7 +235,7 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
     if (name.isEmpty) return;
     setState(() => _saving = true);
     try {
-      final price   = double.tryParse(_priceCtrl.text.trim());
+      final price   = _pricePerNight;
       final url     = _urlCtrl.text.trim();
       final city    = _cityCtrl.text.trim();
       final notes   = _notesCtrl.text.trim();
@@ -452,14 +488,24 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
           ),
           const SizedBox(height: kSpace3),
 
+          if (_nights != null) ...[
+            WabwayChoiceChips<bool>(
+              label: 'Price',
+              choices: const [WabwayChoice(false, 'Per night'), WabwayChoice(true, 'Total')],
+              selected: _isTotal,
+              onChanged: _setPriceIsTotal,
+            ),
+            const SizedBox(height: kSpace2),
+          ],
           Row(
             children: [
               Expanded(
                 child: WabwayTextField(
-                  label: 'Price per night',
+                  label: _isTotal ? 'Total for ${_nights == 1 ? '1 night' : '$_nights nights'}' : 'Price per night',
                   controller: _priceCtrl,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   textInputAction: TextInputAction.next,
+                  onChanged: (_) => setState(() {}),
                 ),
               ),
               const SizedBox(width: kSpace3),
@@ -472,6 +518,15 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
               ),
             ],
           ),
+          if (_nights != null && _pricePerNight != null) ...[
+            const SizedBox(height: kSpace1),
+            Text(
+              _isTotal
+                  ? '${fmtAmount(_pricePerNight!, _currency)} / night'
+                  : '${fmtAmount(_pricePerNight! * _nights!, _currency)} total',
+              style: kStyleCaption,
+            ),
+          ],
           const SizedBox(height: kSpace3),
 
           Row(

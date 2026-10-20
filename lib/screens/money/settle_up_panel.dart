@@ -22,6 +22,7 @@ class SettleUpPanel extends StatefulWidget {
     this.existingSettlements = const [],
     this.scrollController,
     this.onSettled,
+    this.homeCurrency,
   });
 
   final Map<String, List<MemberBalance>> balancesByCurrency;
@@ -36,6 +37,9 @@ class SettleUpPanel extends StatefulWidget {
   final List<Settlement> existingSettlements;
   final ScrollController? scrollController;
   final VoidCallback? onSettled;
+  /// Receipts with a typed-in home amount settle in it; other currencies
+  /// show a ≈ home amount.
+  final String? homeCurrency;
 
   @override
   State<SettleUpPanel> createState() => _SettleUpPanelState();
@@ -79,6 +83,7 @@ class _SettleUpPanelState extends State<SettleUpPanel> {
     final shares = openSharesBetween(
       widget.receipts, widget.withdrawals,
       a: s.fromMemberId, b: s.toMemberId, currency: s.currency,
+      homeCurrency: widget.homeCurrency,
     );
     final count = shares.receiptShares.length + shares.cashShares.length;
     final from = _name(s.fromMemberId);
@@ -222,6 +227,7 @@ class _SettleUpPanelState extends State<SettleUpPanel> {
               currency: currency,
               balances: widget.balancesByCurrency[currency] ?? [],
               suggestions: _groupedSuggestions[currency] ?? [],
+              homeCurrency: widget.homeCurrency,
               onSettle: _markSettled,
               showCurrencyLabel: currencies.length > 1,
             ),
@@ -254,9 +260,11 @@ class _CurrencyBalanceCard extends StatelessWidget {
     required this.suggestions,
     required this.onSettle,
     required this.showCurrencyLabel,
+    this.homeCurrency,
   });
 
   final String currency;
+  final String? homeCurrency;
   final List<MemberBalance> balances;
   final List<SettlementSuggestion> suggestions;
   final ValueChanged<SettlementSuggestion> onSettle;
@@ -268,6 +276,13 @@ class _CurrencyBalanceCard extends StatelessWidget {
         .fold(0.0, (a, b) => a + b.net);
     final totalYouOwe = balances.where((b) => b.net < 0)
         .fold(0.0, (a, b) => a + b.net.abs());
+    // ≈ in the home currency, when every balance has one.
+    final showHome = balances.isNotEmpty && balances.every((b) => b.homeNet != null);
+    double? homeTotal(bool Function(MemberBalance) where) => showHome
+        ? balances.where(where).fold<double>(0.0, (a, b) => a + b.homeNet!.abs())
+        : null;
+    final homeOwedToYou = homeTotal((b) => b.net > 0);
+    final homeYouOwe    = homeTotal((b) => b.net < 0);
     final owedToYou = balances.where((b) => b.net > 0.5).toList();
     final youOwe    = balances.where((b) => b.net < -0.5).toList();
 
@@ -296,6 +311,8 @@ class _CurrencyBalanceCard extends StatelessWidget {
                   label: 'Owed to you',
                   amount: totalOwedToYou,
                   currency: currency,
+                  homeAmount: homeOwedToYou,
+                  homeCurrency: homeCurrency,
                   color: kColorSuccess,
                   softColor: kColorSuccessSoft,
                 ),
@@ -306,6 +323,8 @@ class _CurrencyBalanceCard extends StatelessWidget {
                   label: 'You owe',
                   amount: totalYouOwe,
                   currency: currency,
+                  homeAmount: homeYouOwe,
+                  homeCurrency: homeCurrency,
                   color: kColorDanger,
                   softColor: kColorDangerSoft,
                 ),
@@ -342,6 +361,7 @@ class _CurrencyBalanceCard extends StatelessWidget {
             ...owedToYou.map((b) => _BalanceRow(
                   balance: b,
                   currency: currency,
+                  homeCurrency: homeCurrency,
                   onSettle: () {
                     final s = suggestions.where((s) =>
                         s.fromMemberId == b.member.id).firstOrNull;
@@ -356,6 +376,7 @@ class _CurrencyBalanceCard extends StatelessWidget {
             ...youOwe.map((b) => _BalanceRow(
                   balance: b,
                   currency: currency,
+                  homeCurrency: homeCurrency,
                   isYouOwe: true,
                   onSettle: () {
                     final s = suggestions.where((s) =>
@@ -377,11 +398,15 @@ class _BalanceTile extends StatelessWidget {
     required this.currency,
     required this.color,
     required this.softColor,
+    this.homeAmount,
+    this.homeCurrency,
   });
 
   final String label;
   final double amount;
   final String currency;
+  final double? homeAmount;
+  final String? homeCurrency;
   final Color color;
   final Color softColor;
 
@@ -406,6 +431,8 @@ class _BalanceTile extends StatelessWidget {
               color: color,
             ),
           ),
+          if (homeAmount != null && homeCurrency != null && amount > 0)
+            Text('≈ ${fmtAmount(homeAmount!, homeCurrency!)}', style: kStyleCaption),
         ],
       ),
     );
@@ -419,10 +446,12 @@ class _BalanceRow extends StatelessWidget {
     this.isYouOwe = false,
     required this.onSettle,
     this.isSettled = false,
+    this.homeCurrency,
   });
 
   final MemberBalance balance;
   final String currency;
+  final String? homeCurrency;
   final bool isYouOwe;
   final VoidCallback onSettle;
   final bool isSettled;
@@ -454,13 +483,22 @@ class _BalanceRow extends StatelessWidget {
                 ],
               ),
             ),
-            Text(
-              fmtAmount(amount, currency),
-              style: GoogleFonts.ibmPlexMono(
-                fontSize: kTextBase,
-                fontWeight: FontWeight.w600,
-                color: color,
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  fmtAmount(amount, currency),
+                  style: GoogleFonts.ibmPlexMono(
+                    fontSize: kTextBase,
+                    fontWeight: FontWeight.w600,
+                    color: color,
+                  ),
+                ),
+                // Roughly what to send in the home currency.
+                if (balance.homeNet != null && homeCurrency != null)
+                  Text('≈ ${fmtAmount(balance.homeNet!.abs(), homeCurrency!)}',
+                      style: kStyleCaption),
+              ],
             ),
             const SizedBox(width: kSpace3),
             if (isSettled)

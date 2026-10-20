@@ -2,6 +2,18 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 abstract final class ExchangeRateService {
+  static final Map<String, Future<double?>> _today = {};
+
+  /// Today's [from] → [to] rate, fetched once per app session (for ≈
+  /// amounts on lists). A failed fetch is retried next time.
+  static Future<double?> latestCached(String from, String to) {
+    final key = '$from>$to';
+    return _today[key] ??= fetch(from, to).then((r) {
+      if (r == null) _today.remove(key);
+      return r;
+    });
+  }
+
   /// Fetches the exchange rate for [from] → [to] on [date] from Frankfurter
   /// (ECB-backed, free, no API key). Returns null on any error or timeout.
   ///

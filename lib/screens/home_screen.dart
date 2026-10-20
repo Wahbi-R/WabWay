@@ -292,6 +292,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with AsyncScreenMixin {
         withdrawals.cast(),
         myId: myId,
         members: tripMembers,
+        homeCurrency: trip?.homeCurrency,
       );
 
       commitLoad(gen, () {

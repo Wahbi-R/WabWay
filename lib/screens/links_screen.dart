@@ -152,7 +152,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin
         autoLinks = {};
       }
       commitLoad(gen, () {
-        _links     = links;
+        _links     = withoutPendingDeletes(links, (l) => l.id);
         _autoLinks = autoLinks;
       });
     } catch (_) {
@@ -188,18 +188,19 @@ class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin
     }
   }
 
-  Future<void> _deleteLinkDirect(BuildContext context, TripLink link) async {
-    setState(() => _links = _links.where((l) => l.id != link.id).toList());
-    try {
-      await LinksService.deleteLink(link);
-    } catch (_) {
-      if (!mounted) return;
-      _load();
-      showWabwaySnack(this.context, 'Could not delete "${link.title}". Try again.');
-      return;
-    }
-    if (!mounted) return;
-    showWabwaySnack(this.context, '"${link.title}" deleted.');
+  Future<void> _deleteLinkDirect(BuildContext context, TripLink link) {
+    final at = _links.indexWhere((l) => l.id == link.id);
+    return deleteWithUndo(
+      context,
+      id: link.id,
+      message: '"${link.title}" deleted.',
+      hide: () => setState(() => _links = _links.where((l) => l.id != link.id).toList()),
+      restore: () {
+        if (mounted) setState(() => _links = [..._links]..insert(at.clamp(0, _links.length), link));
+      },
+      commit: () => LinksService.deleteLink(link),
+      failMessage: 'Could not delete "${link.title}" — it\'s back.',
+    );
   }
 
   Future<void> _deleteLink(TripLink link) async {
@@ -374,7 +375,7 @@ class _LinksScreenState extends ConsumerState<LinksScreen> with AsyncScreenMixin
                                           key: ValueKey('link_${link.id}'),
                                           direction: DismissDirection.endToStart,
                                           confirmDismiss: (_) async {
-                                            await _deleteLinkDirect(ctx, link);
+                                            unawaited(_deleteLinkDirect(ctx, link));
                                             return false;
                                           },
                                           background: Container(

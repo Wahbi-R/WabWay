@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 438,
+    label: "Undo a swipe",
+    changes: [
+      "Swiped something away by accident? Tap Undo on the message to bring it back — receipts, travel, stays, links and shopping items",
+      "Nothing is actually deleted until the message goes away, so Undo puts it back exactly as it was",
+      "Messages with a button (like \"Add stay\" after a flight) now go away on their own",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 437,
     label: "Stay and receipt prices stay in step",
     changes: [

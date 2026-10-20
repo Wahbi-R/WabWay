@@ -54,6 +54,7 @@ The app's main UX debt came from the same element being rebuilt per screen (6 co
 | Delete / confirm | `showWabwayDeleteConfirm(entity:, name:)`, `showWabwayConfirm(...)` | `lib/widgets/wabway_confirm_dialog.dart` |
 | Single-field prompt (rename, quick add) | `showWabwayTextPrompt` | `lib/widgets/wabway_confirm_dialog.dart` |
 | Toast / feedback | `showWabwaySnack(context, msg, error:)` | `lib/widgets/wabway_snack.dart` |
+| Swipe-to-delete | `deleteWithUndo(context, id:, message:, hide:, restore:, commit:)` — never delete straight from a swipe; filter loads with `withoutPendingDeletes` | `lib/widgets/wabway_snack.dart` |
 | Create/edit form presentation | `showWabwayFormSheet` (draggable) / `showWabwayAutoSheet` (content-sized) — dialog on desktop, sheet + drag handle on mobile | `lib/widgets/wabway_form_sheet.dart` |
 | Date / time / range field | `WabwayDateField`, `WabwayTimeField`, `WabwayPickerField` (custom picker e.g. ranges) | `lib/widgets/wabway_date_field.dart` |
 | Date formatting | `fmtDate`, `fmtDateLong`, `fmtDateRange`, `fmtTimeOfDay`, `isoDate` | `lib/data/date_utils.dart` |

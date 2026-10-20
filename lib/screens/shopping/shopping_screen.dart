@@ -63,7 +63,7 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> with AsyncScree
       final cached = await ShoppingService.loadFromCache(_tripId);
       if (isStale(gen)) return;
       if (cached != null) {
-        commitLoad(gen, () => _items = cached);
+        commitLoad(gen, () => _items = withoutPendingDeletes(cached, (i) => i.id));
         if (!isStale(gen)) unawaited(_load(silent: true));
         return;
       }
@@ -71,7 +71,7 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> with AsyncScree
 
     try {
       final items = await ShoppingService.loadAll(_tripId);
-      commitLoad(gen, () => _items = items);
+      commitLoad(gen, () => _items = withoutPendingDeletes(items, (i) => i.id));
     } catch (_) {
       failLoad(gen, silent: silent || _items.isNotEmpty);
     }
@@ -178,6 +178,21 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> with AsyncScree
     }
   }
 
+  /// Swiped away: gone now, deleted once the Undo toast closes.
+  void _swipeDelete(ShoppingItem item) {
+    final at = _items.indexWhere((i) => i.id == item.id);
+    unawaited(deleteWithUndo(
+      context,
+      id: item.id,
+      message: '"${item.name}" removed.',
+      hide: () => setState(() => _items.removeWhere((i) => i.id == item.id)),
+      restore: () {
+        if (mounted) setState(() => _items.insert(at.clamp(0, _items.length), item));
+      },
+      commit: () => ShoppingService.delete(item.id),
+    ));
+  }
+
   Future<void> _clearChecked() async {
     if (_checked.isEmpty) return;
     final count = _checked.length;
@@ -279,7 +294,7 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> with AsyncScree
               item: item,
               onToggle: () => _toggleCheck(item),
               onTap: () => _openEditSheet(item),
-              onDelete: () => _deleteItem(item.id),
+              onDelete: () => _swipeDelete(item),
             )),
         if (checked.isNotEmpty) ...[
           Padding(
@@ -302,7 +317,7 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> with AsyncScree
                 item: item,
                 onToggle: () => _toggleCheck(item),
                 onTap: () => _openEditSheet(item),
-                onDelete: () => _deleteItem(item.id),
+                onDelete: () => _swipeDelete(item),
               )),
         ],
       ],

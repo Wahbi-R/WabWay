@@ -778,7 +778,10 @@ class _BookingCard extends ConsumerWidget {
             (Icons.place_rounded, stay.address ?? stay.city),
           if (who != null) (Icons.people_alt_rounded, who),
           if (stay.pricePerNight != null)
-            (Icons.payments_outlined, '${fmtAmount(stay.pricePerNight!, stay.currency)} / night'),
+            (Icons.payments_outlined, [
+              if (stay.totalPrice != null) '${fmtAmount(stay.totalPrice!, stay.currency)} total',
+              '${fmtAmount(stay.pricePerNight!, stay.currency)} / night',
+            ].join(' · ')),
           if (stay.confirmationNumber != null)
             (Icons.confirmation_number_outlined, 'Ref ${stay.confirmationNumber}'),
         ];

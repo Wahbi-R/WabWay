@@ -11,6 +11,17 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 436,
+    label: "Stay totals",
+    changes: [
+      "Stays show the total as well as the price per night — ¥88,509 total · ¥22,127/night",
+      "Stays priced in another currency show roughly what that is in your home currency — ≈ C\$794",
+      "Enter a stay's price as a total or per night — switch between them and the other is worked out",
+      "Fixed the yen, pound and euro signs showing as garbled characters on stays",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 435,
     label: "Settle up in your currency",
     changes: [

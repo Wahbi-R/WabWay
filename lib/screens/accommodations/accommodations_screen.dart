@@ -13,6 +13,8 @@ import 'package:supabase_flutter/supabase_flutter.dart'
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers/trip_provider.dart';
 import '../../core/supabase/accommodation_service.dart';
+import '../../core/supabase/exchange_rate_service.dart';
+import '../../data/money_data.dart' show fmtAmount;
 import '../../core/supabase/client.dart';
 import '../../data/accommodation_data.dart';
 import '../../data/date_utils.dart';
@@ -35,6 +37,8 @@ class AccommodationsScreen extends ConsumerStatefulWidget {
 class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen>
     with AsyncScreenMixin {
   List<Accommodation> _items = [];
+  /// currency → home-currency rate, for the ≈ on each card.
+  final Map<String, double> _rates = {};
 
   String _activeTripId = '';
   AccommodationStatus? _filterStatus;
@@ -111,8 +115,21 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen>
     try {
       final items = await AccommodationService.loadAll(tripId);
       commitLoad(gen, () => _items = items);
+      _loadRates();
     } catch (_) {
       failLoad(gen, silent: silent || _items.isNotEmpty);
+    }
+  }
+
+  String? get _homeCurrency => ref.read(activeTripProvider)?.homeCurrency;
+
+  Future<void> _loadRates() async {
+    final home = _homeCurrency;
+    if (home == null || home.isEmpty) return;
+    for (final c in {for (final a in _items) if (a.pricePerNight != null) a.currency}) {
+      if (c == home || _rates.containsKey(c)) continue;
+      final rate = await ExchangeRateService.latestCached(c, home);
+      if (rate != null && mounted) setState(() => _rates[c] = rate);
     }
   }
 
@@ -349,6 +366,8 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen>
                         ),
                         child: _AccommodationCard(
                           item: item,
+                          homeCurrency: _homeCurrency,
+                          homeRate: _rates[item.currency],
                           onTap: () => _openAdd(context, editing: item),
                         ),
                       );
@@ -376,10 +395,18 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen>
 // â"€â"€â"€ Accommodation card â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 class _AccommodationCard extends StatelessWidget {
-  const _AccommodationCard({required this.item, required this.onTap});
+  const _AccommodationCard({
+    required this.item,
+    required this.onTap,
+    this.homeCurrency,
+    this.homeRate,
+  });
 
   final Accommodation item;
   final VoidCallback onTap;
+  /// For "≈ C$794" when the stay is priced in another currency.
+  final String? homeCurrency;
+  final double? homeRate;
 
   // Returns a short countdown string based on today's date, or null if there
   // are no dates or the stay is already over.
@@ -410,13 +437,15 @@ class _AccommodationCard extends StatelessWidget {
     final nightStr = item.nights != null ? "${item.nights} night${item.nights == 1 ? "" : "s"}" : null;
     final countdown = _countdownLabel();
 
+    // "¥88,509 total · ¥22,127/night ≈ C$794"
     String? priceStr;
     if (item.pricePerNight != null) {
-      final sym = _currencySymbol(item.currency);
-      final formatted = item.pricePerNight! % 1 == 0
-          ? '${item.pricePerNight!.toInt()}'
-          : item.pricePerNight!.toStringAsFixed(2);
-      priceStr = '$sym$formatted/night';
+      final perNight = '${fmtAmount(item.pricePerNight!, item.currency)}/night';
+      final total = item.totalPrice;
+      priceStr = total != null ? '${fmtAmount(total, item.currency)} total · $perNight' : perNight;
+      if (homeRate != null && homeCurrency != null && homeCurrency != item.currency) {
+        priceStr = '$priceStr ≈ ${fmtAmount((total ?? item.pricePerNight!) * homeRate!, homeCurrency!)}';
+      }
     }
 
     String? dateStr;
@@ -565,16 +594,6 @@ class _AccommodationCard extends StatelessWidget {
       ),
     );
   }
-
-  static String _currencySymbol(String code) => switch (code) {
-        'USD' => '\$',
-        'EUR' => 'â‚¬',
-        'GBP' => 'Â£',
-        'JPY' => 'Â¥',
-        'CAD' => 'CA\$',
-        'AUD' => 'A\$',
-        _     => '$code ',
-      };
 }
 
 class _ImagePlaceholder extends StatelessWidget {

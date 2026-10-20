@@ -71,6 +71,7 @@ abstract final class SyncQueue {
     List<ScanImage> photos = const [],
     Iterable<String> docIds = const [],
     bool createLink = false,
+    bool homeAmountSet = false,
   }) async {
     // Photos go to files (not prefs) so they survive a restart.
     final stamp = DateTime.now().microsecondsSinceEpoch;
@@ -90,6 +91,7 @@ abstract final class SyncQueue {
       'homeAmount': homeAmount,
       'exchangeRate': exchangeRate,
       'transactionFeePct': transactionFeePct,
+      if (homeAmountSet) 'homeAmountSet': true,
       'category': category.name,
       'date': date.toIso8601String(),
       'notes': notes,
@@ -124,6 +126,7 @@ abstract final class SyncQueue {
           homeAmount:        (item['homeAmount'] as num?)?.toDouble() ?? amount,
           exchangeRate:      (item['exchangeRate'] as num?)?.toDouble() ?? 1.0,
           transactionFeePct: (item['transactionFeePct'] as num?)?.toDouble() ?? 0.0,
+          homeAmountSet:     item['homeAmountSet'] as bool? ?? false,
           paidById:          paidBy,
           category:          ReceiptCategory.values.firstWhere(
             (c) => c.name == item['category'],
@@ -331,6 +334,7 @@ abstract final class SyncQueue {
           splits:            rawSplits,
           notes:             item['notes'] as String?,
           items:             ReceiptItemization.fromJsonOrNull(item['items']),
+          homeAmountSet:     item['homeAmountSet'] as bool? ?? false,
         );
       } catch (_) {
         continue; // stays queued

@@ -60,6 +60,7 @@ abstract final class MoneyService {
           .toList(),
       splitLinkHash:     row['split_link_hash'] as String?,
       createdById:       row['created_by'] as String?,
+      homeAmountSet:     row['home_amount_set'] as bool? ?? false,
     );
   }
 
@@ -159,6 +160,7 @@ abstract final class MoneyService {
     required List<ReceiptSplit> splits,
     String? notes,
     ReceiptItemization? items,
+    bool homeAmountSet = false,
   }) async {
     final receipt = await supabase.from('receipts').insert({
       'trip_id':              tripId,
@@ -168,6 +170,7 @@ abstract final class MoneyService {
       'home_amount':          homeAmount,
       'exchange_rate':        exchangeRate,
       'transaction_fee_pct':  transactionFeePct,
+      if (homeAmountSet) 'home_amount_set': true,
       'paid_by':              paidBy,
       'category':             _catToDb(category),
       'date':                 isoDate(date),
@@ -250,6 +253,7 @@ abstract final class MoneyService {
     String? notes,
     ReceiptItemization? items,
     List<ReceiptSplit> previousSplits = const [],
+    bool? homeAmountSet,
   }) async {
     await supabase.from('receipts').update({
       'title':               title.trim(),
@@ -258,6 +262,7 @@ abstract final class MoneyService {
       'home_amount':         homeAmount,
       'exchange_rate':       exchangeRate,
       'transaction_fee_pct': transactionFeePct,
+      if (homeAmountSet != null) 'home_amount_set': homeAmountSet,
       'paid_by':             paidBy,
       'category':            _catToDb(category),
       'date':                isoDate(date),

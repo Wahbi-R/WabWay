@@ -96,6 +96,7 @@ class Receipt {
     this.splitLinkMembers = const [],
     this.splitLinkHash,
     this.createdById,
+    this.homeAmountSet = false,
   });
 
   final String id;
@@ -105,6 +106,9 @@ class Receipt {
   final String currency;
   /// Locked equivalent in the trip's home currency. Set at creation time.
   final double homeAmount;
+  /// [homeAmount] was typed in (what the card actually charged) rather than
+  /// worked out from a rate, so the shares are settled in the home currency.
+  final bool homeAmountSet;
   /// 1 unit of [currency] expressed in home currency (stored for auditability).
   final double exchangeRate;
   /// Card foreign transaction fee % applied on top of the exchange rate.
@@ -158,7 +162,19 @@ class Receipt {
         splitLinkMembers:  splitLinkMembers ?? this.splitLinkMembers,
         splitLinkHash:     splitLinkHash ?? this.splitLinkHash,
         createdById:       createdById,
+        homeAmountSet:     homeAmountSet,
       );
+
+  /// The currency its shares are paid back in: the home currency when the
+  /// home amount was typed in, else the receipt's own.
+  String settleCurrency(String? homeCurrency) =>
+      homeAmountSet && homeCurrency != null && currency != homeCurrency && amount > 0
+          ? homeCurrency
+          : currency;
+
+  /// [share] (in [currency]) in [settleCurrency].
+  double settleAmount(double share, String? homeCurrency) =>
+      settleCurrency(homeCurrency) == currency ? share : share * homeRate;
 
   /// Open (unsettled) shares owed to the payer by other people.
   Iterable<ReceiptSplit> get openDebts =>
@@ -246,9 +262,12 @@ class CashWithdrawal {
 // ─── Balances ─────────────────────────────────────────────────────────────────
 
 class MemberBalance {
-  const MemberBalance({required this.member, required this.net});
+  const MemberBalance({required this.member, required this.net, this.homeNet});
   final TripMember member;
   final double net; // positive = they owe you, negative = you owe them
+  /// [net] in the trip's home currency (≈, at each receipt's rate). Null in
+  /// the home currency's own section, or when no rate is known.
+  final double? homeNet;
 }
 
 /// Computes per-member net balances relative to the current user.
@@ -308,37 +327,59 @@ Map<String, List<MemberBalance>> calculateBalancesGrouped(
   List<CashWithdrawal> withdrawals, {
   String? myId,
   List<TripMember>? members,
+  String? homeCurrency,
 }) {
   final me = myId ?? kYouId;
   final peers = members ?? kMockMembers;
 
   // net[currency][memberId] = amount they owe you (positive) / you owe them (negative)
   final Map<String, Map<String, double>> net = {};
+  // The same in the home currency, for the ≈ next to foreign balances.
+  final Map<String, Map<String, double>> home = {};
 
-  void add(String currency, String memberId, double delta) {
+  // Cash has no rate of its own: use what the receipts in that currency came to.
+  final rateSums = <String, (double, double)>{};
+  for (final r in receipts) {
+    if (!r.isForeignCurrency || r.amount <= 0) continue;
+    final (a, h) = rateSums[r.currency] ?? (0.0, 0.0);
+    rateSums[r.currency] = (a + r.amount, h + r.homeAmount);
+  }
+  double? cashRate(String currency) {
+    final sums = rateSums[currency];
+    return sums == null || sums.$1 <= 0 ? null : sums.$2 / sums.$1;
+  }
+
+  void add(String currency, String memberId, double delta, double? rate) {
     net.putIfAbsent(currency, () => {})[memberId] =
         (net[currency]![memberId] ?? 0) + delta;
+    final h = home.putIfAbsent(currency, () => {});
+    // One share without a rate makes the whole ≈ unknown (NaN).
+    h[memberId] = (h[memberId] ?? 0) + (rate == null ? double.nan : delta * rate);
   }
 
   for (final r in receipts) {
+    final currency = r.settleCurrency(homeCurrency);
+    final rate = currency == r.currency && r.isForeignCurrency ? r.homeRate : null;
     for (final split in r.splits) {
       if (split.isSettled) continue;
+      final amount = r.settleAmount(split.amount, homeCurrency);
       if (r.paidById == me && split.memberId != me) {
-        add(r.currency, split.memberId, split.amount);
+        add(currency, split.memberId, amount, rate);
       } else if (r.paidById != me && split.memberId == me) {
-        add(r.currency, r.paidById, -split.amount);
+        add(currency, r.paidById, -amount, rate);
       }
     }
   }
 
   for (final w in withdrawals) {
+    final rate = cashRate(w.currency);
     if (w.withdrawnById == me) {
       for (final d in w.distributions) {
-        if (d.memberId != me && !d.isSettled) add(w.currency, d.memberId, d.amount);
+        if (d.memberId != me && !d.isSettled) add(w.currency, d.memberId, d.amount, rate);
       }
     } else {
       for (final d in w.distributions) {
-        if (d.memberId == me && !d.isSettled) add(w.currency, w.withdrawnById, -d.amount);
+        if (d.memberId == me && !d.isSettled) add(w.currency, w.withdrawnById, -d.amount, rate);
       }
     }
   }
@@ -347,9 +388,17 @@ Map<String, List<MemberBalance>> calculateBalancesGrouped(
   for (final entry in net.entries) {
     final currency = entry.key;
     final byMember = entry.value;
+    final showHome = homeCurrency != null && currency != homeCurrency;
     result[currency] = peers
         .where((m) => m.id != me && (byMember[m.id] ?? 0).abs() > 0.01)
-        .map((m) => MemberBalance(member: m, net: byMember[m.id] ?? 0))
+        .map((m) {
+          final h = home[currency]?[m.id];
+          return MemberBalance(
+            member: m,
+            net: byMember[m.id] ?? 0,
+            homeNet: showHome && h != null && !h.isNaN ? h : null,
+          );
+        })
         .toList();
   }
   return result;
@@ -398,13 +447,14 @@ OpenShares openSharesBetween(
   required String a,
   required String b,
   required String currency,
+  String? homeCurrency,
 }) {
   bool pair(String payer, String debtor) =>
       (payer == a && debtor == b) || (payer == b && debtor == a);
   return OpenShares(
     receiptShares: [
       for (final r in receipts)
-        if (r.currency == currency)
+        if (r.settleCurrency(homeCurrency) == currency)
           for (final s in r.splits)
             if (!s.isSettled && pair(r.paidById, s.memberId)) (r.id, s.memberId),
     ],

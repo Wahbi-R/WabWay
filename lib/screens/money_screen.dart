@@ -542,7 +542,9 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
   }
 
   Map<String, List<MemberBalance>> get _balancesByCurrency =>
-      calculateBalancesGrouped(_receipts, _withdrawals, myId: _userId, members: _members);
+      calculateBalancesGrouped(_receipts, _withdrawals,
+          myId: _userId, members: _members,
+          homeCurrency: _homeCurrency.isEmpty ? null : _homeCurrency);
   Map<String, List<SettlementSuggestion>> get _suggestionsByCurrency {
     final grouped = _balancesByCurrency;
     return {
@@ -746,6 +748,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
           Expanded(
             child: _tab == _MoneyTab.settleUp
                 ? SettleUpPanel(
+                    homeCurrency:          _homeCurrency.isEmpty ? null : _homeCurrency,
                     balancesByCurrency:    _balancesByCurrency,
                     suggestionsByCurrency: _suggestionsByCurrency,
                     members:               _members,
@@ -954,6 +957,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
 
     // Settle up: full content in left panel
     return SettleUpPanel(
+      homeCurrency:          _homeCurrency.isEmpty ? null : _homeCurrency,
       balancesByCurrency:    _balancesByCurrency,
       suggestionsByCurrency: _suggestionsByCurrency,
       members:               _members,
@@ -1355,6 +1359,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
 
             // Settle Up tab
             SettleUpPanel(
+              homeCurrency:          _homeCurrency.isEmpty ? null : _homeCurrency,
               balancesByCurrency:    _balancesByCurrency,
               suggestionsByCurrency: _suggestionsByCurrency,
               members:               _members,

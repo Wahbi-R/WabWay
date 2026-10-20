@@ -11,6 +11,25 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 435,
+    label: "Settle up in your currency",
+    changes: [
+      "Receipts where you typed in the C\$ amount are now settled in C\$, so people pay back exactly what your card was charged",
+      "Balances in other currencies show roughly what that is in your home currency — ¥24,860 ≈ C\$223",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 434,
+    label: "Better booking imports",
+    changes: [
+      "A booking that doesn't say it's paid still offers a receipt — just switch it on if it is",
+      "Updating a booking you already have adds new details like the host's phone number to its notes, without touching what you wrote",
+      "Stay receipts are split between the guests named on the booking",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 433,
     label: "Smoother updates",
     changes: [

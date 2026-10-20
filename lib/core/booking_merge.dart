@@ -60,7 +60,7 @@ TravelItem mergeTravel(TravelItem existing, TravelItem parsed) => TravelItem(
       confirmationNumber: existing.confirmationNumber ?? parsed.confirmationNumber,
       url: existing.url ?? parsed.url,
       address: existing.address ?? parsed.address,
-      notes: existing.notes ?? parsed.notes,
+      notes: mergeNotes(existing.notes, parsed.notes),
       departureTerminal: existing.departureTerminal ?? parsed.departureTerminal,
       arrivalTerminal: existing.arrivalTerminal ?? parsed.arrivalTerminal,
       gate: existing.gate ?? parsed.gate,
@@ -85,6 +85,21 @@ Accommodation mergeStay(Accommodation existing, Accommodation parsed) => existin
       checkInTime: existing.checkInTime ?? parsed.checkInTime,
       checkOutTime: existing.checkOutTime ?? parsed.checkOutTime,
       confirmationNumber: existing.confirmationNumber ?? parsed.confirmationNumber,
-      notes: existing.notes ?? parsed.notes,
+      notes: mergeNotes(existing.notes, parsed.notes),
       status: parsed.status == AccommodationStatus.booked ? AccommodationStatus.booked : null,
     );
+
+/// [existing] notes plus any line of [parsed] they don't already contain
+/// (e.g. the host's phone number from the booking), so updating a booking
+/// adds what's new without rewriting what the group wrote.
+String? mergeNotes(String? existing, String? parsed) {
+  if (existing == null || existing.trim().isEmpty) return parsed;
+  if (parsed == null) return existing;
+  final have = foldForSearch(existing);
+  final added = parsed
+      .split('\n')
+      .map((l) => l.trim())
+      .where((l) => l.isNotEmpty && !have.contains(foldForSearch(l)))
+      .toList();
+  return added.isEmpty ? existing : '${existing.trimRight()}\n${added.join('\n')}';
+}

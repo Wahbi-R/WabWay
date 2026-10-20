@@ -57,13 +57,22 @@ final class ParsedTravel extends ParsedBooking {
 
 final class ParsedStay extends ParsedBooking {
   const ParsedStay(this.stay,
-      {required super.parsedBy, super.price, super.pages, super.originalLanguage, super.passengerCount});
+      {required super.parsedBy,
+      this.guests = const [],
+      super.price,
+      super.pages,
+      super.originalLanguage,
+      super.passengerCount});
 
   /// Draft with a temporary id, trip and creator.
   final Accommodation stay;
 
+  /// Guests named on the booking, matched to trip members where possible.
+  /// Not stored on the stay — they decide who shares its receipt.
+  final List<TravelTraveller> guests;
+
   ParsedStay withStay(Accommodation s) => ParsedStay(s,
-      parsedBy: parsedBy, price: price, pages: pages,
+      parsedBy: parsedBy, guests: guests, price: price, pages: pages,
       originalLanguage: originalLanguage, passengerCount: passengerCount);
 
   @override

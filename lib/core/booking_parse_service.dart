@@ -208,19 +208,22 @@ abstract final class BookingParseService {
     ]);
   }
 
+  /// Passengers / guests, matched to trip members by the server.
+  static List<TravelTraveller> _travellers(Map b) => [
+        for (final t in (b['travellers'] as List? ?? const []))
+          if (t is Map)
+            TravelTraveller(
+              userId: t['member_id'] as String?,
+              // Keep the printed name only when it isn't matched to a member.
+              name: t['member_id'] == null ? t['name'] as String? : null,
+              seat: t['seat'] as String?,
+            ),
+      ];
+
   static ParsedTravel? _travel(String id, Map<String, dynamic> b, _Common c) {
     final title = _s(b, 'title');
     if (title == null) return null;
-    final travellers = [
-      for (final t in (b['travellers'] as List? ?? const []))
-        if (t is Map)
-          TravelTraveller(
-            userId: t['member_id'] as String?,
-            // Keep the printed name only when it isn't matched to a member.
-            name: t['member_id'] == null ? t['name'] as String? : null,
-            seat: t['seat'] as String?,
-          ),
-    ];
+    final travellers = _travellers(b);
     final date = _d(b, 'date');
     final endDate = _d(b, 'end_date');
     return ParsedTravel(
@@ -294,6 +297,7 @@ abstract final class BookingParseService {
         createdAt: DateTime.now(),
       ),
       parsedBy: 'ai',
+      guests: _travellers(b),
       price: c.price,
       pages: c.pages,
       originalLanguage: c.language,

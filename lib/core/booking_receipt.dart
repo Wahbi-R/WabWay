@@ -54,11 +54,13 @@ class BookingReceiptDraft {
   }
 }
 
-/// The receipt a paid [booking] should make, or null when there's nothing
-/// to put in Money (no price, not paid yet, or free).
+/// The receipt a [booking] would make, or null when there's nothing to put
+/// in Money (no price, nothing paid yet, or free). Also returned when the
+/// booking doesn't say whether it's paid (a bare "Total cost") — the review
+/// screen then offers it switched off ([BookingPrice.isPaid] decides).
 ///
 /// Paid by [payerId] (whoever shared it). Split between the booking's
-/// travellers when every seat is assigned to a member, else between
+/// travellers / guests when every one is a trip member, else between
 /// [memberIds] (everyone in the trip).
 BookingReceiptDraft? receiptForBooking(
   ParsedBooking booking, {
@@ -66,11 +68,12 @@ BookingReceiptDraft? receiptForBooking(
   required List<String> memberIds,
 }) {
   final price = booking.price;
-  if (price == null || !price.isPaid || price.paidAmount <= 0) return null;
+  if (price == null || price.status == PaidStatus.due || price.paidAmount <= 0) return null;
 
   final travellers = switch (booking) {
     ParsedTravel(:final item) => item.travellers,
-    _ => const <TravelTraveller>[],
+    ParsedStay(:final guests) => guests,
+    ParsedPlan() => const <TravelTraveller>[],
   };
   final assigned = travellers.map((t) => t.userId).nonNulls.toSet().toList();
   final people = booking.passengerCount ?? travellers.length;

@@ -8,6 +8,16 @@ import 'package:wabway/screens/money/add_receipt_sheet.dart';
 void main() {
   setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
+  test("each share's home amount uses the rate actually paid", () {
+    final r = Receipt(
+      id: 'r', title: 'Shinkansen', amount: 34280, currency: 'JPY', homeAmount: 307.76,
+      exchangeRate: 0.00889, transactionFeePct: 0, paidById: 'me', splits: const [],
+      category: ReceiptCategory.transport, date: DateTime(2026, 10, 20),
+    );
+    // C$307.76 over ¥34,280 (overridden), not the fetched 0.00889.
+    expect(fmtAmount(8570 * r.homeRate, 'CAD'), r'C$76.94');
+  });
+
   testWidgets('typing the CAD amount works out the exchange rate', (tester) async {
     tester.view.physicalSize = const Size(1000, 3000);
     tester.view.devicePixelRatio = 1;

@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 432,
+    label: "Shares in your currency",
+    changes: [
+      "On a receipt in another currency, each person's share now also shows in your home currency — ¥8,570 ≈ C\$76.94 — so everyone knows what to send",
+      "What you're still owed (or still owe) shows both currencies too",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 431,
     label: "Receipts links in your currency",
     changes: [

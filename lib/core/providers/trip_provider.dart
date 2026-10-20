@@ -6,7 +6,6 @@ import '../supabase/client.dart';
 import 'profile_provider.dart';
 import '../supabase/trip_service.dart';
 import '../sync_queue.dart';
-import '../../data/member_data.dart';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -81,6 +80,7 @@ class TripNotifier extends StateNotifier<TripData> {
       // Keep the selectedIndex and members from switchTrip; just update the trips list.
       if (state.selectedIndex != idx) {
         state = state.copyWith(trips: trips, loading: false, offline: false);
+        _drainQueues();
         return;
       }
       state = state.copyWith(
@@ -90,6 +90,7 @@ class TripNotifier extends StateNotifier<TripData> {
         loading:      false,
         offline:      false,
       );
+      _drainQueues();
     } catch (_) {
       if (silent) {
         state = state.copyWith(loading: false, offline: true);
@@ -129,16 +130,17 @@ class TripNotifier extends StateNotifier<TripData> {
     }
   }
 
-  /// Called when connectivity is restored. Reloads silently and drains queues.
+  /// Online with trips loaded: upload anything saved offline, for every
+  /// trip — also when the app was closed offline and reopened with signal.
+  void _drainQueues() {
+    final userId = supabase.auth.currentUser?.id;
+    if (userId != null) SyncQueue.drainAll(userId);
+  }
+
+  /// Called when connectivity is restored. Reloads silently, which drains
+  /// every trip's offline queue once the reload succeeds.
   Future<void> onReconnect(String userId) async {
     await load(silent: true);
-    final tripId = state.activeTrip?.id;
-    if (tripId != null) {
-      await SyncQueue.drain(tripId, userId, members: [
-        for (final m in state.members)
-          TripMember(id: m.userId, name: m.profile.displayName, isMe: m.userId == userId),
-      ]);
-    }
   }
 
   bool _switching = false;

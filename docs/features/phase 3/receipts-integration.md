@@ -68,6 +68,7 @@ open shares only.
   (member ids in person-id order) and `split_link_hash` via the
   `set_receipt_split_link` RPC (any trip member). Receipts split by amount are
   published as one line with weights that reproduce the shares exactly.
+- **Offline (build 423):** receipts saved offline show in the Money list as "Waiting to sync" (tap → Discard) and count in balances. Every trip's queue uploads whenever trips load online (app start or reconnect), each receipt sends the normal "New receipt added" push, and leaves the queue as soon as it's uploaded.
 - **Offline:** link creation is queued (`SyncQueue.enqueueLink`), and receipts
   saved offline keep `createLink`, items, photos (written to app files) and
   picked docs. The queue drains on reconnect and after the Money screen's next

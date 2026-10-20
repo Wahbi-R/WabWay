@@ -1,10 +1,15 @@
+import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../screens/notification_settings_screen.dart' show kPrefNotifMoney;
+import 'notifications/push_notifier.dart';
 import 'platform/platform_file.dart';
 import 'receipt_followups.dart';
 import 'receipt_scan_service.dart';
 import 'receipts_link_service.dart';
 import 'supabase/money_service.dart';
+import 'supabase/trip_service.dart';
 import '../data/money_data.dart';
 
 /// Offline queue for money: receipts created without a connection (with their
@@ -14,6 +19,14 @@ abstract final class SyncQueue {
   static const _prefix = 'sync_queue_receipts_';
   static const _opsPrefix = 'sync_queue_money_ops_';
   static final Set<String> _drainingTrips = {};
+
+  /// Bumped whenever the queue changes (something queued, synced or
+  /// discarded) so screens showing queued receipts can refresh.
+  static final ValueNotifier<int> changes = ValueNotifier(0);
+  static void _changed() => changes.value++;
+
+  /// Id prefix of queued (not yet uploaded) receipts — see [pendingReceipts].
+  static const pendingIdPrefix = 'pending-';
 
   static String _key(String tripId) => '$_prefix$tripId';
   static String _opsKey(String tripId) => '$_opsPrefix$tripId';
@@ -69,6 +82,7 @@ abstract final class SyncQueue {
     }
     final list = await _pending(tripId);
     list.add({
+      'localId': '$stamp',
       'paidBy': paidBy,
       'title': title,
       'amount': amount,
@@ -86,6 +100,65 @@ abstract final class SyncQueue {
       'createLink': createLink,
     });
     await _write(_key(tripId), list);
+    _changed();
+  }
+
+  static String _localIdOf(Map<String, dynamic> item, int index) =>
+      item['localId'] as String? ?? 'legacy$index';
+
+  /// Receipts saved offline on this phone, as [Receipt]s for the list (ids
+  /// start with [pendingIdPrefix]). They count in balances straight away.
+  static Future<List<Receipt>> pendingReceipts(String tripId) async {
+    final list = await _pending(tripId);
+    final out = <Receipt>[];
+    for (var i = 0; i < list.length; i++) {
+      final item = list[i];
+      try {
+        final paidBy = item['paidBy'] as String? ?? '';
+        final amount = (item['amount'] as num).toDouble();
+        out.add(Receipt(
+          id:                '$pendingIdPrefix${_localIdOf(item, i)}',
+          title:             item['title'] as String? ?? 'Receipt',
+          amount:            amount,
+          currency:          item['currency'] as String? ?? 'USD',
+          homeAmount:        (item['homeAmount'] as num?)?.toDouble() ?? amount,
+          exchangeRate:      (item['exchangeRate'] as num?)?.toDouble() ?? 1.0,
+          transactionFeePct: (item['transactionFeePct'] as num?)?.toDouble() ?? 0.0,
+          paidById:          paidBy,
+          category:          ReceiptCategory.values.firstWhere(
+            (c) => c.name == item['category'],
+            orElse: () => ReceiptCategory.other,
+          ),
+          date:              DateTime.tryParse(item['date'] as String? ?? '') ?? DateTime.now(),
+          notes:             item['notes'] as String?,
+          items:             ReceiptItemization.fromJsonOrNull(item['items']),
+          splits: [
+            for (final s in (item['splits'] as List?) ?? const [])
+              if (((s as Map)['amount'] as num) > 0)
+                ReceiptSplit(memberId: s['memberId'] as String, amount: (s['amount'] as num).toDouble()),
+          ],
+        ));
+      } catch (_) {}
+    }
+    return out;
+  }
+
+  /// Throw away a receipt that was saved offline and hasn't synced yet.
+  static Future<void> discardPending(String tripId, String receiptId) async {
+    final localId = receiptId.replaceFirst(pendingIdPrefix, '');
+    final list = await _pending(tripId);
+    final keep = <Map<String, dynamic>>[];
+    for (var i = 0; i < list.length; i++) {
+      if (_localIdOf(list[i], i) == localId) {
+        for (final p in (list[i]['photos'] as List?) ?? const []) {
+          await deleteAppFile((p as Map)['path'] as String);
+        }
+      } else {
+        keep.add(list[i]);
+      }
+    }
+    await _write(_key(tripId), keep);
+    _changed();
   }
 
   /// Publish a Receipts link for an already-saved receipt when back online.
@@ -94,6 +167,7 @@ abstract final class SyncQueue {
     if (ops.any((o) => o['op'] == 'link' && o['receiptId'] == receiptId)) return;
     ops.add({'op': 'link', 'receiptId': receiptId});
     await _write(_opsKey(tripId), ops);
+    _changed();
   }
 
   /// Mark a share paid / open again when back online. A later toggle of the
@@ -113,6 +187,7 @@ abstract final class SyncQueue {
       'at': DateTime.now().toUtc().toIso8601String(),
     });
     await _write(_opsKey(tripId), ops);
+    _changed();
   }
 
   /// Receipt ids waiting for a Receipts link.
@@ -164,6 +239,41 @@ abstract final class SyncQueue {
       await _drainOps(tripId, members);
     } finally {
       _drainingTrips.remove(tripId);
+      _changed();
+    }
+  }
+
+  /// Trips with anything queued on this phone.
+  static Future<Set<String>> pendingTripIds() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return {
+        for (final key in prefs.getKeys())
+          if (key.startsWith(_prefix) && (prefs.getString(key) ?? '[]') != '[]')
+            key.substring(_prefix.length)
+          else if (key.startsWith(_opsPrefix) && (prefs.getString(key) ?? '[]') != '[]')
+            key.substring(_opsPrefix.length),
+      };
+    } catch (_) {
+      return {};
+    }
+  }
+
+  /// Replay the queues of EVERY trip (not just the open one) — called when
+  /// the app starts with a connection and whenever it comes back online.
+  static Future<void> drainAll(String userId) async {
+    if (userId.isEmpty) return;
+    for (final tripId in await pendingTripIds()) {
+      var members = const <TripMember>[];
+      try {
+        members = [
+          for (final m in await TripService.loadTripMembers(tripId))
+            TripMember(id: m.userId, name: m.profile.displayName, isMe: m.userId == userId),
+        ];
+      } catch (_) {
+        continue; // still offline (or not a member any more) — try next time
+      }
+      await drain(tripId, userId, members: members);
     }
   }
 
@@ -171,7 +281,6 @@ abstract final class SyncQueue {
     final list = await _pending(tripId);
     if (list.isEmpty) return;
 
-    final failed = <Map<String, dynamic>>[];
     for (final item in list) {
       final Receipt receipt;
       try {
@@ -209,9 +318,23 @@ abstract final class SyncQueue {
           items:             ReceiptItemization.fromJsonOrNull(item['items']),
         );
       } catch (_) {
-        failed.add(item);
-        continue;
+        continue; // stays queued
       }
+      // Uploaded: take it off the queue right away (not after the whole
+      // batch) so the list never shows it twice and a crash can't re-upload it.
+      final remaining = (await _pending(tripId))
+        ..removeWhere((q) => jsonEncode(q) == jsonEncode(item));
+      await _write(_key(tripId), remaining);
+      _changed();
+      // Same notification the form sends when a receipt is added online.
+      unawaited(pushNotify(
+        tripId: tripId,
+        title: 'New receipt added',
+        body: '${receipt.title} · ${receipt.currency} ${receipt.amount.toStringAsFixed(2)}',
+        excludeUserId: userId,
+        data: {'screen': 'money', 'trip_id': tripId},
+        prefKey: kPrefNotifMoney,
+      ));
       // The receipt exists now — follow-ups are best-effort and never re-create it.
       final photoFiles = ((item['photos'] as List?) ?? const [])
           .map((p) => Map<String, dynamic>.from(p as Map))
@@ -239,7 +362,6 @@ abstract final class SyncQueue {
         await deleteAppFile(p['path'] as String);
       }
     }
-    await _write(_key(tripId), failed);
   }
 
   static Future<void> _drainOps(String tripId, List<TripMember> members) async {

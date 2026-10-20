@@ -118,10 +118,15 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
       _loadAll();
       if (_activeTripId.isNotEmpty) _subscribeRealtime(_activeTripId);
     });
+    SyncQueue.changes.addListener(_onQueueChanged);
   }
+
+  /// Something was queued offline, uploaded or discarded — refresh the list.
+  void _onQueueChanged() => _scheduleReload();
 
   @override
   void dispose() {
+    SyncQueue.changes.removeListener(_onQueueChanged);
     _debounce?.cancel();
     _realtimeChannel?.unsubscribe();
     _searchCtrl.dispose();
@@ -357,7 +362,10 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
         ]);
         final cachedReceipts    = cached[0] == null
             ? null
-            : await SyncQueue.withPendingSettles(tripId, cached[0] as List<Receipt>);
+            : [
+                ...await SyncQueue.pendingReceipts(tripId),
+                ...await SyncQueue.withPendingSettles(tripId, cached[0] as List<Receipt>),
+              ];
         final cachedWithdrawals = cached[1] as List<CashWithdrawal>?;
         final pending           = cached[2] as int;
         if (isStale(gen)) return;
@@ -388,8 +396,11 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
       ]);
       if (isStale(gen)) return;
       final pending = await SyncQueue.pendingCountFor(tripId);
-      final receipts = await SyncQueue.withPendingSettles(
-          tripId, List<Receipt>.from(futures[0] as List));
+      // Receipts saved offline on this phone show (and count) until uploaded.
+      final receipts = [
+        ...await SyncQueue.pendingReceipts(tripId),
+        ...await SyncQueue.withPendingSettles(tripId, List<Receipt>.from(futures[0] as List)),
+      ];
       if (isStale(gen)) return;
       // We're online — flush anything queued while offline (marked-paid
       // shares, Receipts links still to create).
@@ -632,7 +643,25 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
     }
   }
 
+  /// A receipt saved offline: explain, and offer to discard it.
+  Future<void> _openPending(Receipt r) async {
+    final discard = await showWabwayConfirm(
+      context,
+      title: 'Waiting to sync',
+      message: '"${r.title}" is saved on this phone and uploads automatically when '
+          "you're back online — then everyone in the trip gets it.",
+      confirmLabel: 'Discard',
+      cancelLabel: 'Keep',
+    );
+    if (discard && mounted) _deleteReceipt(r.id);
+  }
+
   void _deleteReceipt(String id) {
+    if (id.startsWith(SyncQueue.pendingIdPrefix)) {
+      setState(() => _receipts.removeWhere((r) => r.id == id));
+      SyncQueue.discardPending(_activeTripId, id);
+      return;
+    }
     setState(() {
       _receipts.removeWhere((r) => r.id == id);
       if (_selectedReceiptId == id) _selectedReceiptId = null;
@@ -843,7 +872,9 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
                           members:      _members,
                           homeCurrency: _homeCurrency,
                           selected:     _selectedReceiptId == r.id,
-                          onTap: () => setState(() => _selectedReceiptId = r.id),
+                          onTap: r.isPending
+                              ? () => _openPending(r)
+                              : () => setState(() => _selectedReceiptId = r.id),
                         ),
                       );
                     },
@@ -1205,7 +1236,9 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
                                   direction: DismissDirection.endToStart,
                                   confirmDismiss: (_) async {
                                     _deleteReceipt(r.id);
-                                    showWabwaySnack(ctx, '"${r.title}" deleted.');
+                                    showWabwaySnack(ctx, r.isPending
+                                        ? '"${r.title}" discarded — it was never uploaded.'
+                                        : '"${r.title}" deleted.');
                                     return false;
                                   },
                                   background: Container(
@@ -1222,7 +1255,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
                                       myId:         _userId,
                                       members:      _members,
                                       homeCurrency: _homeCurrency,
-                                      onTap: () => Navigator.push(
+                                      onTap: r.isPending ? () => _openPending(r) : () => Navigator.push(
                                         ctx,
                                         MaterialPageRoute(
                                           builder: (_) => ReceiptDetailScreen(

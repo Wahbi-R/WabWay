@@ -4,6 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/async_screen_mixin.dart';
 import '../../core/booking_merge.dart';
+import '../../core/booking_receipt.dart';
+import '../../core/pdf_pages.dart';
+import '../../core/receipt_followups.dart';
+import '../../core/receipt_scan_service.dart';
+import '../../core/receipts_link_service.dart';
+import '../../core/supabase/connection_service.dart';
+import '../../core/supabase/exchange_rate_service.dart';
+import '../../core/supabase/money_service.dart';
 import '../../core/ocr/parsed_booking.dart';
 import '../../core/providers/profile_provider.dart';
 import '../../core/providers/trip_provider.dart';
@@ -15,7 +23,8 @@ import '../../core/text_utils.dart';
 import '../../data/accommodation_data.dart';
 import '../../data/connection_data.dart' show EntityType;
 import '../../data/docs_data.dart';
-import '../../data/money_data.dart' show fmtAmount;
+import '../../data/money_data.dart';
+import '../../data/share_data.dart' show ImportPrefill;
 import '../../data/plan_data.dart';
 import '../../data/travel_data.dart';
 import '../../theme/app_colors.dart';
@@ -23,6 +32,7 @@ import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 import '../accommodations/add_accommodation_sheet.dart';
+import '../money/add_receipt_sheet.dart';
 import '../plan/add_item_sheet.dart';
 import '../plan/day_picker_sheet.dart';
 import '../travel/add_travel_sheet.dart';
@@ -76,6 +86,18 @@ class _Row {
 
   /// Set once saved (an Edit sheet that saves itself, or a partial Save).
   String? savedId;
+
+  /// The receipt this booking's payment becomes in Money (null: not paid,
+  /// or no price shown).
+  BookingReceiptDraft? receipt;
+  bool addReceipt = false;
+
+  /// A receipt already in Money for this payment — linked instead.
+  Receipt? existingReceipt;
+
+  /// Receipt made from Edit receipt, or by a (partial) save.
+  String? receiptId;
+  bool receiptLinked = false;
 }
 
 class _BookingReviewScreenState extends ConsumerState<BookingReviewScreen>
@@ -84,7 +106,12 @@ class _BookingReviewScreenState extends ConsumerState<BookingReviewScreen>
   List<TravelItem> _travel = [];
   List<Accommodation> _stays = [];
   List<TripDay> _days = [];
+  List<Receipt> _receipts = [];
   bool _saving = false;
+
+  /// Receipts made here follow the Add receipt "Share as a Receipts link"
+  /// choice.
+  bool _createLink = true;
 
   /// The uploaded source file — kept so a retry after a failed save doesn't
   /// upload it twice.
@@ -93,7 +120,13 @@ class _BookingReviewScreenState extends ConsumerState<BookingReviewScreen>
   @override
   void initState() {
     super.initState();
+    for (final r in _rows) {
+      _matchReceipt(r);
+    }
     _load();
+    ReceiptsLinkService.defaultCreateLink().then((v) {
+      if (v != null && mounted) setState(() => _createLink = v);
+    });
   }
 
   Future<void> _load() async {
@@ -103,13 +136,16 @@ class _BookingReviewScreenState extends ConsumerState<BookingReviewScreen>
         TravelService.loadItems(widget.tripId),
         AccommodationService.loadAll(widget.tripId),
         PlanService.loadAll(widget.tripId),
+        MoneyService.loadReceipts(widget.tripId).catchError((_) => <Receipt>[]),
       ]);
       commitLoad(gen, () {
         _travel = results[0] as List<TravelItem>;
         _stays = results[1] as List<Accommodation>;
         _days = results[2] as List<TripDay>;
+        _receipts = results[3] as List<Receipt>;
         for (final r in _rows) {
           _match(r);
+          _matchReceipt(r);
         }
       });
     } catch (_) {
@@ -126,6 +162,20 @@ class _BookingReviewScreenState extends ConsumerState<BookingReviewScreen>
         : r.booking is ParsedPlan ? _Action.skip : _Action.update;
   }
 
+  List<String> get _memberIds => [
+        for (final m in ref.read(tripMembersProvider)) m.userId,
+        if (ref.read(tripMembersProvider).isEmpty) widget.userId,
+      ];
+
+  /// What the booking's receipt would be, and whether Money already has it.
+  void _matchReceipt(_Row r) {
+    if (r.receiptId != null) return;
+    r.receipt = receiptForBooking(r.booking, payerId: widget.userId, memberIds: _memberIds);
+    r.existingReceipt =
+        r.receipt == null ? null : findExistingReceipt(r.receipt!, _receipts);
+    r.addReceipt = r.receipt != null && r.existingReceipt == null;
+  }
+
   List<_Row> get _toSave =>
       _rows.where((r) => r.action != _Action.skip && r.savedId == null && _canSave(r)).toList();
 
@@ -135,12 +185,14 @@ class _BookingReviewScreenState extends ConsumerState<BookingReviewScreen>
 
   Future<void> _edit(_Row r) async {
     switch (r.booking) {
-      case ParsedTravel(:final item, :final parsedBy):
+      case ParsedTravel(:final item):
+        final b = r.booking as ParsedTravel;
         final draft = await showAddTravelSheet(context, prefillItem: item);
         if (draft == null || !mounted) return;
         setState(() {
-          r.booking = ParsedTravel(draft, parsedBy: parsedBy);
+          r.booking = b.withItem(draft);
           _match(r);
+          _matchReceipt(r); // travellers decide the split
         });
       case ParsedStay(:final stay):
         final result = await showAddStaySheet(context,
@@ -148,11 +200,11 @@ class _BookingReviewScreenState extends ConsumerState<BookingReviewScreen>
         final saved = result?.accommodation;
         if (saved == null || !mounted) return;
         setState(() {
-          r.booking = ParsedStay(saved, parsedBy: r.booking.parsedBy);
+          r.booking = (r.booking as ParsedStay).withStay(saved);
           r.savedId = saved.id; // the sheet saved it; Save only attaches the file
           r.action = _Action.add;
         });
-      case ParsedPlan(:final item, :final day, :final parsedBy):
+      case ParsedPlan(:final item, :final day):
         var date = day;
         if (date == null || _dayOn(date) == null) {
           if (_days.isEmpty) {
@@ -170,10 +222,115 @@ class _BookingReviewScreenState extends ConsumerState<BookingReviewScreen>
             prefillItem: item);
         if (draft == null || !mounted) return;
         setState(() {
-          r.booking = ParsedPlan(draft, day: date, parsedBy: parsedBy);
+          r.booking = (r.booking as ParsedPlan).withItem(draft, day: date);
           _match(r);
         });
     }
+  }
+
+  // ─── Receipt ────────────────────────────────────────────────────────────────
+
+  List<TripMember> get _tripMembers => [
+        for (final m in ref.read(tripMembersProvider))
+          TripMember(id: m.userId, name: m.profile.displayName, isMe: m.userId == widget.userId),
+      ];
+
+  /// Change payer / split / amount in the normal Add receipt sheet — it saves
+  /// the receipt (and its Receipts link) itself; Save then links it.
+  Future<void> _editReceipt(_Row r) async {
+    final draft = r.receipt;
+    if (draft == null) return;
+    final trip = ref.read(activeTripProvider);
+    String? docId;
+    try {
+      docId = _docId ??= await _uploadSource();
+    } catch (_) {} // the receipt can still be made without the file
+    if (!mounted) return;
+    final saved = await showAddReceiptSheet(
+      context,
+      tripId: widget.tripId,
+      userId: widget.userId,
+      members: _tripMembers,
+      homeCurrency: trip?.homeCurrency ?? 'CAD',
+      defaultCurrency: draft.currency,
+      prefill: ImportPrefill(
+        title: draft.title,
+        notes: draft.notes,
+        amount: draft.amount,
+        currency: draft.currency,
+        linkedDocIds: [if (docId != null) docId],
+      ),
+    );
+    if (saved == null || !mounted) return;
+    setState(() {
+      r.receiptId = saved.id;
+      r.addReceipt = false;
+    });
+  }
+
+  /// Pictures for the Receipts link: the booking's own PDF pages, or the
+  /// shared photo.
+  Future<List<ScanImage>> _linkPhotos(_Row r) async {
+    final bytes = widget.sourceBytes;
+    final ext = widget.sourceExt?.toLowerCase();
+    if (bytes == null || ext == null) return const [];
+    if (ext == 'pdf') return pdfPageImages(bytes, pages: r.booking.pages, maxPages: 3);
+    final photo = ScanImage(bytes, ext);
+    return photo.isScannable ? [photo] : const [];
+  }
+
+  /// Creates the receipt for a saved booking (exchange rate from the day's
+  /// rate, file attached, Receipts link per the usual setting). Returns
+  /// false when the exchange rate couldn't be fetched.
+  Future<bool> _makeReceipt(_Row r, String? docId) async {
+    final d = r.receipt!;
+    final home = ref.read(activeTripProvider)?.homeCurrency ?? d.currency;
+    final rate = await ExchangeRateService.fetch(d.currency, home);
+    if (rate == null) return false;
+    var receipt = await MoneyService.createReceipt(
+      tripId: widget.tripId,
+      paidBy: d.paidById,
+      title: d.title,
+      amount: d.amount,
+      currency: d.currency,
+      homeAmount: d.amount * rate,
+      exchangeRate: rate,
+      transactionFeePct: 0,
+      category: d.category,
+      date: DateTime.now(),
+      splits: d.splits,
+      notes: d.notes,
+      items: d.items,
+    );
+    r.receiptId = receipt.id;
+    receipt = (await runReceiptFollowups(
+      tripId: widget.tripId,
+      userId: widget.userId,
+      receipt: receipt,
+      members: _tripMembers,
+      docIds: [if (docId != null) docId],
+      createLink: _createLink,
+      linkPhotos: _createLink ? await _linkPhotos(r) : const [],
+    )).receipt;
+    return true;
+  }
+
+  /// The booking and its receipt open each other (Connections).
+  Future<void> _linkReceipt(_Row r, String receiptId) async {
+    final (type, id) = switch (r.booking) {
+      ParsedTravel() => (EntityType.travel, r.savedId!),
+      ParsedStay() => (EntityType.stay, r.savedId!),
+      ParsedPlan() => (EntityType.planItem, r.savedId!),
+    };
+    await ConnectionService.add(
+      tripId: widget.tripId,
+      userId: widget.userId,
+      typeA: EntityType.receipt,
+      idA: receiptId,
+      typeB: type,
+      idB: id,
+    );
+    r.receiptLinked = true;
   }
 
   // ─── Save ───────────────────────────────────────────────────────────────────
@@ -303,12 +460,15 @@ class _BookingReviewScreenState extends ConsumerState<BookingReviewScreen>
       ..._toSave,
       ..._rows.where((r) => r.savedId != null && r.booking is ParsedStay && r.action != _Action.skip),
     ];
-    if (rows.isEmpty) {
+    final receiptsOwed = _rows.any((r) =>
+        r.action != _Action.skip && r.savedId != null && !r.receiptLinked &&
+        (r.addReceipt || r.receiptId != null || r.existingReceipt != null));
+    if (rows.isEmpty && !receiptsOwed) {
       widget.onDone?.call();
       return;
     }
     setState(() => _saving = true);
-    var added = 0, updated = 0;
+    var added = 0, updated = 0, receipts = 0, noRate = 0;
     try {
       final docId = _docId ??= await _uploadSource();
       for (final r in rows) {
@@ -321,13 +481,31 @@ class _BookingReviewScreenState extends ConsumerState<BookingReviewScreen>
           added++;
         }
       }
+      // Receipts after the bookings, so a retry finishes the ones still owed.
+      for (final r in _rows) {
+        if (r.action == _Action.skip || r.savedId == null || r.receiptLinked) continue;
+        if (r.receiptId == null && r.addReceipt && r.receipt != null) {
+          if (await _makeReceipt(r, docId)) {
+            receipts++;
+          } else {
+            noRate++;
+            continue;
+          }
+        }
+        final receiptId = r.receiptId ?? (r.addReceipt ? null : r.existingReceipt?.id);
+        if (receiptId != null) await _linkReceipt(r, receiptId);
+      }
       if (!mounted) return;
       showWabwaySnack(
           context,
           joinNonEmpty([
             if (added > 0) 'Added ${pluralize(added, 'booking')}',
             if (updated > 0) 'updated $updated',
-          ], ', ').ifEmpty('Saved'));
+            if (receipts > 0) '${pluralize(receipts, 'receipt')} in Money',
+            if (noRate > 0)
+              "couldn't get today's exchange rate for ${pluralize(noRate, 'receipt')} — add it from Money",
+          ], ', ').ifEmpty('Saved'),
+          duration: Duration(seconds: noRate > 0 ? 6 : 3));
       widget.onDone?.call();
     } catch (_) {
       if (!mounted) return;
@@ -379,6 +557,9 @@ class _BookingReviewScreenState extends ConsumerState<BookingReviewScreen>
                 onAction: (a) => setState(() => _rows[i].action = a),
                 onPlanToggle: (v) => setState(() => _rows[i].addToPlan = v),
                 onEdit: () => _edit(_rows[i]),
+                createLink: _createLink,
+                onReceiptToggle: (v) => setState(() => _rows[i].addReceipt = v),
+                onEditReceipt: () => _editReceipt(_rows[i]),
               ),
             ),
           ),
@@ -414,10 +595,16 @@ class _BookingCard extends ConsumerWidget {
     required this.onAction,
     required this.onPlanToggle,
     required this.onEdit,
+    required this.createLink,
+    required this.onReceiptToggle,
+    required this.onEditReceipt,
   });
 
   final _Row row;
   final bool checkingDuplicates;
+  final bool createLink;
+  final ValueChanged<bool> onReceiptToggle;
+  final VoidCallback onEditReceipt;
   final ValueChanged<_Action> onAction;
   final ValueChanged<bool> onPlanToggle;
   final VoidCallback onEdit;
@@ -482,6 +669,23 @@ class _BookingCard extends ConsumerWidget {
           if (b is ParsedPlan && b.day == null)
             Text('No date found — tap Edit to pick a day.',
                 style: kStyleCaption.copyWith(color: kColorDanger)),
+          if (b.originalLanguage != null)
+            Padding(
+              padding: const EdgeInsets.only(top: kSpace1),
+              child: Text('Translated from ${b.originalLanguage}',
+                  style: kStyleCaption.copyWith(color: kColorInkSoft, fontStyle: FontStyle.italic)),
+            ),
+          if (b.price case final price?) ...[
+            const SizedBox(height: kSpace2),
+            _PriceLine(price: price, people: b.passengerCount),
+          ],
+          if (row.action != _Action.skip && !row.receiptLinked)
+            _ReceiptRow(
+              row: row,
+              createLink: createLink,
+              onToggle: onReceiptToggle,
+              onEdit: onEditReceipt,
+            ),
           if (existingTitle != null && !saved) ...[
             const SizedBox(height: kSpace2),
             Text('Already in your trip: $existingTitle',
@@ -574,5 +778,132 @@ class _BookingCard extends ConsumerWidget {
             (Icons.payments_outlined, fmtAmount(item.plannedCost!, item.currency ?? '')),
         ];
     }
+  }
+}
+
+// ─── Price and receipt ────────────────────────────────────────────────────────
+
+class _PriceLine extends StatelessWidget {
+  const _PriceLine({required this.price, this.people});
+
+  final BookingPrice price;
+  final int? people;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = price;
+    final main = joinNonEmpty([
+      switch (p.status) {
+        PaidStatus.paid => 'Paid ${fmtAmount(p.total, p.currency)}',
+        PaidStatus.due => '${fmtAmount(p.total, p.currency)} to pay',
+        PaidStatus.partPaid =>
+          'Paid ${fmtAmount(p.paidAmount, p.currency)} of ${fmtAmount(p.total, p.currency)}',
+        PaidStatus.unknown => fmtAmount(p.total, p.currency),
+      },
+      if (people != null && people! > 1) '${fmtAmount(p.total / people!, p.currency)} each',
+      if (p.amountDue != null && p.amountDue! > 0 && p.status != PaidStatus.due)
+        '${fmtAmount(p.amountDue!, p.currency)} still due',
+      p.points,
+    ]);
+    final warn = kStyleCaption.copyWith(color: kColorDanger, fontWeight: FontWeight.w600);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.payments_outlined, size: 14, color: kColorInkSoft),
+            const SizedBox(width: kSpace2),
+            Expanded(child: Text(main, style: kStyleCaption.copyWith(color: kColorInk))),
+          ],
+        ),
+        for (final l in p.lines)
+          Padding(
+            padding: const EdgeInsets.only(left: 22, top: 2),
+            child: Text(
+              '${l.quantity != 1 ? '${l.quantity % 1 == 0 ? l.quantity.toInt() : l.quantity} × ' : ''}'
+              '${l.label} · ${fmtAmount(l.amount, p.currency)}',
+              style: kStyleCaption.copyWith(color: kColorInkSoft),
+            ),
+          ),
+        if (p.currencyGuessed)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text('Check the currency — the booking didn\'t say clearly (${p.currency}?)',
+                style: warn),
+          ),
+        if (p.linesMismatch)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text("The price lines don't add up to the total — check before saving.",
+                style: warn),
+          ),
+      ],
+    );
+  }
+}
+
+class _ReceiptRow extends StatelessWidget {
+  const _ReceiptRow({
+    required this.row,
+    required this.createLink,
+    required this.onToggle,
+    required this.onEdit,
+  });
+
+  final _Row row;
+  final bool createLink;
+  final ValueChanged<bool> onToggle;
+  final VoidCallback onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    if (row.receiptId != null) {
+      return Padding(
+        padding: const EdgeInsets.only(top: kSpace2),
+        child: Text('Receipt added to Money — it\'ll be linked to this booking.',
+            style: kStyleCaption.copyWith(color: kColorSuccess, fontWeight: FontWeight.w600)),
+      );
+    }
+    final d = row.receipt;
+    if (d == null) return const SizedBox.shrink();
+    final existing = row.existingReceipt;
+    final people = d.splitWith.length;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          title: Text('Add receipt to Money', style: kStyleCaption.copyWith(color: kColorInk)),
+          subtitle: Text(
+            existing != null && !row.addReceipt
+                ? 'Already in Money: ${existing.title} — it\'ll be linked instead'
+                : joinNonEmpty([
+                    fmtAmount(d.amount, d.currency),
+                    'paid by you',
+                    people == 1 ? 'just you' : 'split $people ways',
+                    if (d.items != null) 'itemised',
+                    if (createLink) 'Receipts link',
+                  ]),
+            style: kStyleCaption.copyWith(color: kColorInkSoft),
+          ),
+          value: row.addReceipt,
+          activeThumbColor: kColorPrimary,
+          onChanged: onToggle,
+        ),
+        if (row.addReceipt)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: WabwayButton(
+              label: 'Change payer or split',
+              icon: Icons.receipt_long_rounded,
+              variant: WabwayButtonVariant.ghost,
+              size: WabwayButtonSize.sm,
+              onPressed: onEdit,
+            ),
+          ),
+      ],
+    );
   }
 }

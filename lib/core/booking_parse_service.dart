@@ -47,6 +47,7 @@ abstract final class BookingParseService {
     BookingSource source, {
     required String tripId,
     required String userId,
+    String tripCurrency = 'USD',
   }) async {
     if (source.isEmpty) {
       return const BookingParseOutcome.failed('Share a PDF, screenshot, email or link first.');
@@ -82,7 +83,8 @@ abstract final class BookingParseService {
         return BookingParseOutcome.failed(_messageFor(response));
       }
       final raw = (jsonDecode(response.body) as Map)['bookings'] as List? ?? const [];
-      final bookings = fromServer(raw, tripId: tripId, userId: userId);
+      final bookings =
+          fromServer(raw, tripId: tripId, userId: userId, tripCurrency: tripCurrency);
       if (bookings.isEmpty) {
         return const BookingParseOutcome.failed(
             "Couldn't find a booking in that — add it by hand instead.");
@@ -126,19 +128,27 @@ abstract final class BookingParseService {
   // ─── Server JSON → drafts ───────────────────────────────────────────────────
 
   /// Maps the server's bookings to drafts. Public for tests.
+  /// [tripCurrency] fills in a booking that shows no currency.
   static List<ParsedBooking> fromServer(
     List raw, {
     required String tripId,
     required String userId,
+    String tripCurrency = 'USD',
   }) {
     final out = <ParsedBooking>[];
     for (var i = 0; i < raw.length; i++) {
       final b = Map<String, dynamic>.from(raw[i] as Map);
       final id = 'parsed_$i';
+      final common = (
+        price: _priceOf(b, tripCurrency),
+        pages: [for (final p in (b['source_pages'] as List? ?? const [])) if (p is int) p],
+        language: _s(b, 'original_language'),
+        passengers: b['passenger_count'] as int?,
+      );
       final booking = switch (b['kind']) {
-        'travel' => _travel(id, b),
-        'stay'   => _stay(id, b, tripId: tripId, userId: userId),
-        'plan'   => _plan(id, b),
+        'travel' => _travel(id, b, common),
+        'stay'   => _stay(id, b, common, tripId: tripId, userId: userId),
+        'plan'   => _plan(id, b, common),
         _        => null,
       };
       if (booking != null) out.add(booking);
@@ -155,12 +165,50 @@ abstract final class BookingParseService {
 
   static double? _n(Map b, String k) => (b[k] as num?)?.toDouble();
 
-  static String? _price(Map b) {
+  static BookingPrice? _priceOf(Map b, String tripCurrency) {
     final total = _n(b, 'price_total');
-    return total == null ? null : 'Total ${fmtAmount(total, _s(b, 'currency') ?? '')}';
+    if (total == null || total <= 0) return null;
+    final currency = _s(b, 'currency');
+    return BookingPrice(
+      total: total,
+      currency: currency ?? tripCurrency,
+      currencyGuessed: currency == null || b['currency_guessed'] == true,
+      lines: [
+        for (final l in (b['price_lines'] as List? ?? const []))
+          if (l is Map && l['amount'] is num)
+            (
+              label: (l['label'] as String?) ?? 'Item',
+              quantity: (l['quantity'] as num?)?.toDouble() ?? 1,
+              amount: (l['amount'] as num).toDouble(),
+            ),
+      ],
+      status: switch (b['paid_status']) {
+        'paid'      => PaidStatus.paid,
+        'due'       => PaidStatus.due,
+        'part_paid' => PaidStatus.partPaid,
+        _           => PaidStatus.unknown,
+      },
+      amountDue: _n(b, 'amount_due'),
+      points: _s(b, 'points'),
+    );
   }
 
-  static ParsedTravel? _travel(String id, Map<String, dynamic> b) {
+  /// "Total ¥49,720 · ¥12,430 each", plus what's still due and any points —
+  /// kept in the item's notes so it's visible on the booking itself.
+  static String? priceNote(BookingPrice? p, int? people) {
+    if (p == null) return null;
+    final each = people != null && people > 1
+        ? '${fmtAmount(p.total / people, p.currency)} each'
+        : null;
+    return joinNonEmpty([
+      '${p.status == PaidStatus.paid ? 'Paid' : 'Total'} ${fmtAmount(p.total, p.currency)}',
+      each,
+      if (p.amountDue != null && p.amountDue! > 0) '${fmtAmount(p.amountDue!, p.currency)} still due',
+      p.points,
+    ]);
+  }
+
+  static ParsedTravel? _travel(String id, Map<String, dynamic> b, _Common c) {
     final title = _s(b, 'title');
     if (title == null) return null;
     final travellers = [
@@ -198,21 +246,25 @@ abstract final class BookingParseService {
         travellers: travellers,
         notes: _notes([
           joinNonEmpty([_s(b, 'operator'), _s(b, 'cabin_class')]),
-          _price(b),
+          priceNote(c.price, c.passengers ?? (travellers.length > 1 ? travellers.length : null)),
           _s(b, 'notes'),
         ]),
       ),
       parsedBy: 'ai',
+      price: c.price,
+      pages: c.pages,
+      originalLanguage: c.language,
+      passengerCount: c.passengers,
     );
   }
 
-  static ParsedStay? _stay(String id, Map<String, dynamic> b,
+  static ParsedStay? _stay(String id, Map<String, dynamic> b, _Common c,
       {required String tripId, required String userId}) {
     final name = _s(b, 'title');
     if (name == null) return null;
     final checkIn = _d(b, 'date');
     final checkOut = _d(b, 'end_date');
-    final total = _n(b, 'price_total');
+    final total = c.price?.total;
     final nights = checkIn != null && checkOut != null ? checkOut.difference(checkIn).inDays : 0;
     final perNight = _n(b, 'price_per_night') ??
         (total != null && nights > 0 ? (total / nights * 100).round() / 100 : null);
@@ -227,7 +279,7 @@ abstract final class BookingParseService {
         address: _s(b, 'address'),
         url: url,
         pricePerNight: perNight,
-        currency: _s(b, 'currency') ?? 'USD',
+        currency: c.price?.currency ?? 'USD',
         checkIn: checkIn,
         checkOut: checkOut,
         checkInTime: _s(b, 'check_in_time'),
@@ -237,15 +289,19 @@ abstract final class BookingParseService {
             : AccommodationStatus.shortlisted,
         source: url == null ? null : AccommodationSource.fromUrl(url),
         confirmationNumber: confirmation,
-        notes: _notes([_price(b), _s(b, 'notes')]),
+        notes: _notes([priceNote(c.price, null), _s(b, 'notes')]),
         createdBy: userId,
         createdAt: DateTime.now(),
       ),
       parsedBy: 'ai',
+      price: c.price,
+      pages: c.pages,
+      originalLanguage: c.language,
+      passengerCount: c.passengers,
     );
   }
 
-  static ParsedPlan? _plan(String id, Map<String, dynamic> b) {
+  static ParsedPlan? _plan(String id, Map<String, dynamic> b, _Common c) {
     final title = _s(b, 'title');
     if (title == null) return null;
     final confirmation = _s(b, 'confirmation_number');
@@ -267,11 +323,15 @@ abstract final class BookingParseService {
           if (confirmation != null) 'Confirmation: $confirmation',
           _s(b, 'notes'),
         ]),
-        plannedCost: _n(b, 'price_total'),
-        currency: _s(b, 'currency'),
+        plannedCost: c.price?.total,
+        currency: c.price?.currency,
       ),
       day: _d(b, 'date'),
       parsedBy: 'ai',
+      price: c.price,
+      pages: c.pages,
+      originalLanguage: c.language,
+      passengerCount: c.passengers,
     );
   }
 
@@ -280,3 +340,5 @@ abstract final class BookingParseService {
     return text.isEmpty ? null : text;
   }
 }
+
+typedef _Common = ({BookingPrice? price, List<int> pages, String? language, int? passengers});

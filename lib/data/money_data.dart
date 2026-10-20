@@ -460,14 +460,28 @@ List<SettlementSuggestion> suggestSettlements(
 
 String fmtAmount(double amount, String currency) {
   return switch (currency) {
-    'JPY' || 'KRW' || 'IDR' || 'VND' => '${_currencySymbol(currency)}${amount.toStringAsFixed(0)}',
-    'USD' => '\$${amount.toStringAsFixed(2)}',
-    'EUR' => '€${amount.toStringAsFixed(2)}',
-    'GBP' => '£${amount.toStringAsFixed(2)}',
-    'CAD' => 'C\$${amount.toStringAsFixed(2)}',
-    'AUD' => 'A\$${amount.toStringAsFixed(2)}',
-    _     => '$currency ${amount.toStringAsFixed(2)}',
+    'JPY' || 'KRW' || 'IDR' || 'VND' => '${_currencySymbol(currency)}${_grouped(amount, 0)}',
+    'USD' => '\$${_grouped(amount, 2)}',
+    'EUR' => '€${_grouped(amount, 2)}',
+    'GBP' => '£${_grouped(amount, 2)}',
+    'CAD' => 'C\$${_grouped(amount, 2)}',
+    'AUD' => 'A\$${_grouped(amount, 2)}',
+    _     => '$currency ${_grouped(amount, 2)}'.trim(),
   };
+}
+
+/// 49720 → "49,720"; 1234.5 (2 decimals) → "1,234.50".
+String _grouped(double amount, int decimals) {
+  final fixed = amount.abs().toStringAsFixed(decimals);
+  final dot = fixed.indexOf('.');
+  final whole = dot < 0 ? fixed : fixed.substring(0, dot);
+  final buf = StringBuffer(amount < 0 ? '-' : '');
+  for (var i = 0; i < whole.length; i++) {
+    if (i > 0 && (whole.length - i) % 3 == 0) buf.write(',');
+    buf.write(whole[i]);
+  }
+  if (dot >= 0) buf.write(fixed.substring(dot));
+  return buf.toString();
 }
 
 String _currencySymbol(String code) => switch (code) {

@@ -19,7 +19,8 @@ class ReceiptFollowupResult {
 /// Receipt form and the offline queue so both behave the same:
 /// photos become Receipt documents attached to it, picked documents are
 /// attached, and (if asked) a Receipts link is published, or queued for
-/// later when that fails.
+/// later when that fails. [linkPhotos] only go to the link (not saved as
+/// documents) — e.g. the pages of an already-attached booking PDF.
 Future<ReceiptFollowupResult> runReceiptFollowups({
   required String tripId,
   required String userId,
@@ -28,6 +29,7 @@ Future<ReceiptFollowupResult> runReceiptFollowups({
   List<ScanImage> photos = const [],
   Iterable<String> docIds = const [],
   bool createLink = false,
+  List<ScanImage> linkPhotos = const [],
 }) async {
   var docsFailed = false;
   for (var i = 0; i < photos.length; i++) {
@@ -64,7 +66,13 @@ Future<ReceiptFollowupResult> runReceiptFollowups({
   var linkQueued = false;
   if (createLink && receipt.splitLinkId == null) {
     try {
-      updated = await ReceiptsLinkService.create(receipt, members, photos: photos);
+      // Pictures for the link: new photos, images made for it (e.g. a
+      // booking's PDF pages), else whatever is attached (PDFs as pages).
+      var shown = [...photos, ...linkPhotos];
+      if (shown.isEmpty && docIds.isNotEmpty) {
+        shown = await ReceiptsLinkService.attachedPhotos(receipt.id);
+      }
+      updated = await ReceiptsLinkService.create(receipt, members, photos: shown);
     } catch (_) {
       await SyncQueue.enqueueLink(tripId, receipt.id);
       linkQueued = true;

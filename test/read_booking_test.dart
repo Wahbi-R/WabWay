@@ -77,7 +77,7 @@ void main() {
       (null, null, 'Car 14 19-D'),
     ]);
     expect(train.notes, contains('JR Central · Ordinary'));
-    expect(train.notes, contains('Total ¥49720'));
+    expect(train.notes, contains('Total ¥49,720'));
 
     final stay = (b[1] as ParsedStay).stay;
     expect((stay.checkInTime, stay.checkOutTime), ('15:00', '11:00'));

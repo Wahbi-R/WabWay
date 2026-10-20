@@ -425,6 +425,7 @@ class _IncomingShareScreenState extends ConsumerState<IncomingShareScreen> {
         ),
         tripId: widget.tripId,
         userId: widget.userId,
+        tripCurrency: ref.read(activeTripProvider)?.defaultCurrency ?? widget.homeCurrency,
       );
       if (!mounted) return;
       if (outcome.error != null) {

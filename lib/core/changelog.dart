@@ -11,6 +11,21 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 428,
+    label: "Bookings go straight into Money",
+    changes: [
+      "Share a paid booking and it becomes a receipt in Money — paid by you, split between the people on it, ready to settle up",
+      "One PDF with several bookings (like a Shinkansen email thread) becomes one train and one receipt for each",
+      "Receipts from bookings get a Receipts link like any other receipt, showing that booking's page of the PDF",
+      "PDFs now show on Receipts links for any receipt, not just photos",
+      "Already logged it in Money? It spots the match and links it instead of adding it twice",
+      "Bookings in other languages are translated, keeping the original station and hotel names in brackets",
+      "Prices show what's paid, what's still due and the cost each — and warn you when the currency or the price lines look wrong",
+      "Amounts now have thousands separators: ¥49,720",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 427,
     label: "Share a booking, it files itself",
     changes: [

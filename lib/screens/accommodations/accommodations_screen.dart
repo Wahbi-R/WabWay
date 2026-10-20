@@ -109,12 +109,12 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen>
     if (!silent) {
       final cached = await AccommodationService.loadFromCache(tripId);
       if (isStale(gen)) return;
-      if (cached != null) commitLoad(gen, () => _items = cached);
+      if (cached != null) commitLoad(gen, () => _items = withoutPendingDeletes(cached, (a) => a.id));
     }
 
     try {
       final items = await AccommodationService.loadAll(tripId);
-      commitLoad(gen, () => _items = items);
+      commitLoad(gen, () => _items = withoutPendingDeletes(items, (a) => a.id));
       _loadRates();
     } catch (_) {
       failLoad(gen, silent: silent || _items.isNotEmpty);
@@ -194,18 +194,19 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen>
 
   static String _c(String v) => '"${v.replaceAll('"', '""')}"';
 
-  Future<void> _deleteItem(BuildContext context, Accommodation item) async {
-    setState(() => _items.removeWhere((a) => a.id == item.id));
-    try {
-      await AccommodationService.delete(item.id);
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _items.insert(0, item));
-      showWabwaySnack(this.context, 'Could not delete "${item.name}". Try again.');
-      return;
-    }
-    if (!mounted) return;
-    showWabwaySnack(this.context, '"${item.name}" deleted.');
+  Future<void> _deleteItem(BuildContext context, Accommodation item) {
+    final at = _items.indexWhere((a) => a.id == item.id);
+    return deleteWithUndo(
+      context,
+      id: item.id,
+      message: '"${item.name}" deleted.',
+      hide: () => setState(() => _items.removeWhere((a) => a.id == item.id)),
+      restore: () {
+        if (mounted) setState(() => _items.insert(at.clamp(0, _items.length), item));
+      },
+      commit: () => AccommodationService.delete(item.id),
+      failMessage: 'Could not delete "${item.name}" — it\'s back.',
+    );
   }
 
   Future<void> _openAdd(BuildContext context, {Accommodation? editing}) async {
@@ -351,7 +352,7 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen>
                         key: ValueKey('stay_${item.id}'),
                         direction: DismissDirection.endToStart,
                         confirmDismiss: (_) async {
-                          await _deleteItem(ctx, item);
+                          unawaited(_deleteItem(ctx, item));
                           return false;
                         },
                         background: Container(

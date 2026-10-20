@@ -165,7 +165,7 @@ class _TravelScreenState extends ConsumerState<TravelScreen> with AsyncScreenMix
       if (isStale(gen)) return;
       if (cachedItems != null) {
         commitLoad(gen, () {
-          _items..clear()..addAll(cachedItems);
+          _items..clear()..addAll(withoutPendingDeletes(cachedItems, (i) => i.id));
           _docs..clear()..addAll(cachedDocs ?? []);
           _days..clear()..addAll(cachedDays ?? []);
         });
@@ -185,7 +185,7 @@ class _TravelScreenState extends ConsumerState<TravelScreen> with AsyncScreenMix
       final docs  = results[1] as List<TripDocument>;
       final days  = results[2] as List<TripDay>;
       commitLoad(gen, () {
-        _items..clear()..addAll(items);
+        _items..clear()..addAll(withoutPendingDeletes(items, (i) => i.id));
         _docs..clear()..addAll(docs);
         _days..clear()..addAll(days);
       });
@@ -638,8 +638,20 @@ class _TravelScreenState extends ConsumerState<TravelScreen> with AsyncScreenMix
           key: ValueKey('travel_${item.id}'),
           direction: DismissDirection.endToStart,
           confirmDismiss: (_) async {
-            _delete(item.id);
-            showWabwaySnack(ctx, '"${item.title}" removed.');
+            final at = _items.indexWhere((x) => x.id == item.id);
+            unawaited(deleteWithUndo(
+              ctx,
+              id: item.id,
+              message: '"${item.title}" removed.',
+              hide: () => setState(() {
+                _items.removeWhere((x) => x.id == item.id);
+                if (_selectedId == item.id) _selectedId = null;
+              }),
+              restore: () {
+                if (mounted) setState(() => _items.insert(at.clamp(0, _items.length), item));
+              },
+              commit: () => TravelService.deleteItem(item.id),
+            ));
             return false;
           },
           background: Container(

@@ -378,7 +378,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
           // silent network refresh. Using commitLoad (rather than mutating
           // loading directly) preserves the mixin's silent-load preemption guard.
           commitLoad(gen, () {
-            _receipts         = cachedReceipts;
+            _receipts         = withoutPendingDeletes(cachedReceipts, (r) => r.id);
             _withdrawals      = cachedWithdrawals ?? [];
             if (_lastTripId != tripId) _persistedSettlements = [];
             _lastTripId       = tripId;
@@ -412,7 +412,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
         unawaited(SyncQueue.drain(tripId, _userId, members: _members));
       }
       commitLoad(gen, () {
-        _receipts             = receipts;
+        _receipts             = withoutPendingDeletes(receipts, (r) => r.id);
         _withdrawals          = List<CashWithdrawal>.from(futures[1] as List);
         _persistedSettlements = List<Settlement>.from(futures[2] as List);
         _lastTripId           = tripId;
@@ -1243,10 +1243,25 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
                                   key: ValueKey('receipt_${r.id}'),
                                   direction: DismissDirection.endToStart,
                                   confirmDismiss: (_) async {
-                                    _deleteReceipt(r.id);
-                                    showWabwaySnack(ctx, r.isPending
-                                        ? '"${r.title}" discarded — it was never uploaded.'
-                                        : '"${r.title}" deleted.');
+                                    final at = _receipts.indexWhere((x) => x.id == r.id);
+                                    final tripId = _activeTripId;
+                                    unawaited(deleteWithUndo(
+                                      ctx,
+                                      id: r.id,
+                                      message: r.isPending
+                                          ? '"${r.title}" discarded — it was never uploaded.'
+                                          : '"${r.title}" deleted.',
+                                      hide: () => setState(() {
+                                        _receipts.removeWhere((x) => x.id == r.id);
+                                        if (_selectedReceiptId == r.id) _selectedReceiptId = null;
+                                      }),
+                                      restore: () {
+                                        if (mounted) setState(() => _receipts.insert(at.clamp(0, _receipts.length), r));
+                                      },
+                                      commit: () => r.isPending
+                                          ? SyncQueue.discardPending(tripId, r.id)
+                                          : MoneyService.deleteReceipt(r.id),
+                                    ));
                                     return false;
                                   },
                                   background: Container(

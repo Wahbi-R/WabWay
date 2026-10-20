@@ -423,6 +423,19 @@ class _ReceiptDetailContentState extends ConsumerState<ReceiptDetailContent> {
                   color: kColorInk,
                 ),
               ),
+              // What it came to in the trip's home currency (same as the list).
+              if (receipt.isForeignCurrency) ...[
+                const SizedBox(height: kSpace1),
+                Text(
+                  '≈ ${fmtAmount(receipt.homeAmount, ref.watch(activeTripProvider)?.homeCurrency ?? 'CAD')}'
+                  '${receipt.transactionFeePct > 0 ? ' incl. ${receipt.transactionFeePct.toStringAsFixed(1)}% card fee' : ''}',
+                  style: GoogleFonts.ibmPlexMono(
+                    fontSize: kTextBase,
+                    fontWeight: FontWeight.w500,
+                    color: kColorInkSoft,
+                  ),
+                ),
+              ],
             ],
           ),
         ),

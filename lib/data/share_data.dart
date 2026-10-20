@@ -14,7 +14,8 @@ enum ShareContentType {
   receiptPhoto,
   screenshot,
   accommodationLink,
-  csvFile;
+  csvFile,
+  text;
 
   String get label => switch (this) {
         ShareContentType.googleMapsLink => 'Google Maps link',
@@ -28,6 +29,7 @@ enum ShareContentType {
         ShareContentType.screenshot        => 'Screenshot',
         ShareContentType.accommodationLink => 'Accommodation listing',
         ShareContentType.csvFile           => 'CSV file',
+        ShareContentType.text              => 'Text or email',
       };
 
   String get sourceName => switch (this) {
@@ -42,6 +44,7 @@ enum ShareContentType {
         ShareContentType.screenshot        => 'Photos',
         ShareContentType.accommodationLink => 'Web',
         ShareContentType.csvFile           => 'Files',
+        ShareContentType.text              => 'Text',
       };
 
   IconData get icon => switch (this) {
@@ -56,6 +59,7 @@ enum ShareContentType {
         ShareContentType.screenshot        => Icons.screenshot_monitor_rounded,
         ShareContentType.accommodationLink => Icons.hotel_rounded,
         ShareContentType.csvFile           => Icons.table_chart_rounded,
+        ShareContentType.text              => Icons.notes_rounded,
       };
 
   Color get color => switch (this) {
@@ -70,6 +74,7 @@ enum ShareContentType {
         ShareContentType.screenshot        => const Color(0xFF6F665D),
         ShareContentType.accommodationLink => const Color(0xFF4A9B8A),
         ShareContentType.csvFile           => const Color(0xFF4A7AB5),
+        ShareContentType.text              => const Color(0xFF6F665D),
       };
 
   Color get softColor => switch (this) {
@@ -84,6 +89,7 @@ enum ShareContentType {
         ShareContentType.screenshot        => const Color(0xFFEEEAE3),
         ShareContentType.accommodationLink => const Color(0xFFE8F3F1),
         ShareContentType.csvFile           => const Color(0xFFE8EEF6),
+        ShareContentType.text              => const Color(0xFFEEEAE3),
       };
 
   List<ShareDestination> get suggestedDestinations => switch (this) {
@@ -113,6 +119,11 @@ enum ShareContentType {
         ShareContentType.screenshot        => [ShareDestination.document],
         ShareContentType.accommodationLink => [ShareDestination.stay, ShareDestination.link],
         ShareContentType.csvFile           => [ShareDestination.spot],
+        ShareContentType.text              => [
+            ShareDestination.travelItem,
+            ShareDestination.stay,
+            ShareDestination.planItem,
+          ],
       };
 }
 
@@ -205,6 +216,15 @@ class IncomingShare {
 
 ShareContentType detectContentType(String rawContent) {
   final lower = rawContent.toLowerCase();
+  // A shared email / note (Gmail "Share", copied text) rather than one link:
+  // checked first so a booking email mentioning booking.com isn't a listing.
+  final trimmed = lower.trim();
+  if (RegExp(r'\s').hasMatch(trimmed) &&
+      !trimmed.startsWith('http') &&
+      !trimmed.startsWith('receipt:') &&
+      !trimmed.startsWith('screenshot:')) {
+    return ShareContentType.text;
+  }
   if (lower.contains('maps.google.com') ||
       lower.contains('goo.gl/maps') ||
       lower.contains('maps.app.goo.gl')) {

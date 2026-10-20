@@ -127,6 +127,30 @@ abstract final class AccommodationService {
             .toList(),
       );
 
+  /// Persists a complete draft (Read booking's review screen).
+  static Future<Accommodation> createFromDraft(Accommodation d) => create(
+        tripId:             d.tripId,
+        userId:             d.createdBy,
+        name:               d.name,
+        city:               d.city,
+        url:                d.url,
+        address:            d.address,
+        lat:                d.latitude,
+        lon:                d.longitude,
+        pricePerNight:      d.pricePerNight,
+        currency:           d.currency,
+        checkIn:            d.checkIn,
+        checkOut:           d.checkOut,
+        checkInTime:        d.checkInTime,
+        checkOutTime:       d.checkOutTime,
+        status:             d.status,
+        source:             d.source,
+        notes:              d.notes,
+        imageUrl:           d.imageUrl,
+        confirmationNumber: d.confirmationNumber,
+        spotId:             d.spotId,
+      );
+
   static Future<Accommodation> create({
     required String tripId,
     required String userId,

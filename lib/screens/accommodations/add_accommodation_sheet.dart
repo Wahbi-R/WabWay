@@ -25,6 +25,7 @@ Future<AccommodationSheetResult?> showAddStaySheet(
   required String tripId,
   required String userId,
   Accommodation? editing,
+  Accommodation? draft,
   ListingResult? prefilled,
   String? initialUrl,
 }) =>
@@ -38,6 +39,7 @@ Future<AccommodationSheetResult?> showAddStaySheet(
         tripId: tripId,
         userId: userId,
         editing: editing,
+        draft: draft,
         prefilled: prefilled,
         initialUrl: initialUrl,
         scrollController: scroll,
@@ -51,6 +53,7 @@ class AddAccommodationSheet extends StatefulWidget {
     required this.tripId,
     required this.userId,
     this.editing,
+    this.draft,
     this.prefilled,
     this.initialUrl,
     this.scrollController,
@@ -60,6 +63,10 @@ class AddAccommodationSheet extends StatefulWidget {
   final String tripId;
   final String userId;
   final Accommodation? editing;
+
+  /// A complete new stay to start from (Read booking's review screen):
+  /// fills every field like [editing] but saving creates a new stay.
+  final Accommodation? draft;
   final ListingResult? prefilled;
   final String? initialUrl;
   final ScrollController? scrollController;
@@ -91,6 +98,7 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
   TimeOfDay? _checkInTime;
   TimeOfDay? _checkOutTime;
   String? _imageUrl;
+  String? _address;
   String? _parseError;
 
   String? _linkedSpotId;
@@ -99,7 +107,7 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
   @override
   void initState() {
     super.initState();
-    final e = widget.editing;
+    final e = widget.editing ?? widget.draft;
     if (e != null) {
       _step        = 1;
       _nameCtrl.text = e.name;
@@ -120,6 +128,7 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
       _checkInTime  = parseTimeOfDay(e.checkInTime);
       _checkOutTime = parseTimeOfDay(e.checkOutTime);
       _imageUrl        = e.imageUrl;
+      _address         = e.address;
       _linkedSpotId    = e.spotId;
       if (e.spotId != null) _loadLinkedSpot(e.spotId!);
     } else if (widget.prefilled != null) {
@@ -225,6 +234,7 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
           name:               name,
           city:               city,
           url:                url.isEmpty ? null : url,
+          address:            _address,
           pricePerNight:      price,
           currency:           _currency,
           checkIn:            _checkIn,

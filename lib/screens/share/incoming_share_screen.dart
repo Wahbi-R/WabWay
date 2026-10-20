@@ -3,8 +3,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../core/ocr/gemini_parser.dart';
+import '../../core/booking_parse_service.dart';
 import '../../core/ocr/itinerary_scanner.dart';
+import '../../core/ocr/parsed_booking.dart';
 import '../../core/places/google_maps_parser.dart';
 import '../../core/places/social_place_extractor.dart';
 import '../../core/platform/platform_file.dart';
@@ -23,7 +24,7 @@ import 'content_preview_card.dart';
 import 'destination_selector.dart';
 import 'extracted_spots_screen.dart';
 import 'maps_import_screen.dart';
-import 'parsed_itinerary_screen.dart';
+import 'booking_review_screen.dart';
 import 'dart:typed_data';
 import '../../core/places/url_metadata_service.dart';
 import 'open_add_sheet.dart';
@@ -95,13 +96,19 @@ class _IncomingShareScreenState extends ConsumerState<IncomingShareScreen> {
   bool get _anyScan =>
       _scanningAi || _scanningOcr || _scanningPlaces || _scanningAudio || _scanningMaps || _scanningPasted;
 
-  bool get _canParseItinerary =>
-      !kIsWeb &&
-      _destination == ShareDestination.travelItem &&
-      (_activeShare?.filePath != null || _fileBytes != null) &&
-      (_activeShare?.contentType == ShareContentType.screenshot ||
-          _activeShare?.contentType == ShareContentType.pdfFile ||
-          _activeShare?.contentType == ShareContentType.receiptPhoto);
+  bool get _hasFile => _activeShare?.filePath != null || _fileBytes != null;
+
+  /// Anything that could be a booking: a PDF / screenshot, shared email
+  /// text, or a web link (confirmation page). Offered before picking a
+  /// destination — the reader decides where each booking goes.
+  bool get _canReadBooking => switch (_activeShare?.contentType) {
+        ShareContentType.pdfFile || ShareContentType.screenshot => _hasFile,
+        ShareContentType.text => true,
+        ShareContentType.accommodationLink ||
+        ShareContentType.blogArticle ||
+        ShareContentType.restaurantWebsite => _sourceUrl != null,
+        _ => false,
+      };
 
   bool get _canFindPlaces =>
       _activeShare?.contentType == ShareContentType.tiktokLink ||
@@ -197,19 +204,22 @@ class _IncomingShareScreenState extends ConsumerState<IncomingShareScreen> {
   }
 
   void _applyUrl() {
-    final url = _urlCtrl.text.trim();
-    if (url.isEmpty) return;
+    final raw = _urlCtrl.text.trim();
+    if (raw.isEmpty) return;
     final id = DateTime.now().millisecondsSinceEpoch.toString();
-    final title = _titleFromUrl(url);
+    final type = detectContentType(raw);
+    final firstLine = raw.split('\n').first.trim();
     setState(() {
       _activeShare = IncomingShare(
         id: id,
-        contentType: detectContentType(url),
-        rawContent: url,
-        detectedTitle: title,
+        contentType: type,
+        rawContent: raw,
+        detectedTitle: type == ShareContentType.text
+            ? (firstLine.length > 80 ? '${firstLine.substring(0, 80)}…' : firstLine)
+            : _titleFromUrl(raw),
       );
     });
-    _fetchMeta(url);
+    if (type != ShareContentType.text) _fetchMeta(raw);
   }
 
   void _showImageSourceSheet() {
@@ -399,69 +409,65 @@ class _IncomingShareScreenState extends ConsumerState<IncomingShareScreen> {
     );
   }
 
-  Future<void> _parseWithAi() async {
-    final filePath = _activeShare?.filePath;
-    final inMemBytes = _fileBytes;
-    if ((filePath == null && inMemBytes == null) || _anyScan) return;
+  /// "Read booking": the shared file, email text or link goes to the server
+  /// reader; everything it finds is reviewed, then saved where it belongs.
+  Future<void> _readBooking() async {
+    if (_anyScan) return;
     setState(() => _scanningAi = true);
     try {
-      final bytes = inMemBytes ?? await readFileAsBytes(filePath!);
-      final ext = filePath != null
-          ? _extFromShare(filePath, _activeShare!.contentType)
-          : (_fileExt ?? 'jpg');
-      final result = await ItineraryScanner.scanWithAi(bytes, ext);
+      final file = await _fileForShare();
+      final share = _activeShare!;
+      final outcome = await BookingParseService.parse(
+        BookingSource(
+          files: [if (file != null) (bytes: file.$1, ext: file.$3)],
+          text: share.contentType == ShareContentType.text ? share.rawContent : null,
+          url: file == null ? _sourceUrl : null,
+        ),
+        tripId: widget.tripId,
+        userId: widget.userId,
+      );
       if (!mounted) return;
-      if (result.bookings.isEmpty) {
-        final aiStatus = GeminiParser.lastHttpStatus;
-        final msg = switch (aiStatus) {
-          429 => 'AI quota exceeded — try OCR instead',
-          0 => 'No AI key configured',
-          200 => 'AI read the file but found no bookings — try OCR',
-          _ => 'AI failed (HTTP $aiStatus) — try OCR instead',
-        };
-        showWabwaySnack(context, msg, duration: const Duration(seconds: 5));
+      if (outcome.error != null) {
+        showWabwaySnack(context, outcome.error!, error: true, duration: const Duration(seconds: 5));
         return;
       }
-      await _pushResults(result, bytes, ext, filePath ?? _fileName);
+      await _pushResults(outcome.bookings, file?.$1, file?.$3, file?.$2);
     } finally {
       if (mounted) setState(() => _scanningAi = false);
     }
   }
 
+  /// Offline fallback: on-device text recognition, flights only.
   Future<void> _parseWithOcr() async {
-    final filePath = _activeShare?.filePath;
-    final inMemBytes = _fileBytes;
-    if ((filePath == null && inMemBytes == null) || _anyScan) return;
+    if (_anyScan) return;
     setState(() => _scanningOcr = true);
     try {
-      final bytes = inMemBytes ?? await readFileAsBytes(filePath!);
-      final ext = filePath != null
-          ? _extFromShare(filePath, _activeShare!.contentType)
-          : (_fileExt ?? 'jpg');
-      final result = await ItineraryScanner.scanWithOcr(bytes, ext);
+      final file = await _fileForShare();
+      if (file == null) return;
+      final bookings = await ItineraryScanner.scanWithOcr(file.$1, file.$3);
       if (!mounted) return;
-      if (result.bookings.isEmpty) {
-        showWabwaySnack(context, 'No booking patterns found — fill in manually', duration: Duration(seconds: 4));
+      if (bookings.isEmpty) {
+        showWabwaySnack(context, 'No flights found on your phone — use Read booking when online, or add it by hand.',
+            duration: const Duration(seconds: 4));
         return;
       }
-      await _pushResults(result, bytes, ext, filePath ?? _fileName);
+      await _pushResults(bookings, file.$1, file.$3, file.$2);
     } finally {
       if (mounted) setState(() => _scanningOcr = false);
     }
   }
 
   Future<void> _pushResults(
-    ScanResult result,
-    Uint8List bytes,
-    String ext,
-    String? filePath,
+    List<ParsedBooking> bookings,
+    Uint8List? bytes,
+    String? ext,
+    String? fileName,
   ) async {
-    final fileName = filePath?.split('/').last;
     await Navigator.push<void>(
       context,
       MaterialPageRoute(
-        builder: (_) => ParsedItineraryScreen(
-          bookings: result.bookings,
+        builder: (_) => BookingReviewScreen(
+          bookings: bookings,
           tripId: widget.tripId,
           userId: widget.userId,
           sourceBytes: bytes,
@@ -721,22 +727,22 @@ class _IncomingShareScreenState extends ConsumerState<IncomingShareScreen> {
             Expanded(child: Divider()),
             Padding(
               padding: EdgeInsets.symmetric(horizontal: kSpace3),
-              child: Text('or paste a link', style: TextStyle(fontSize: 12, color: kColorInkSoft)),
+              child: Text('or paste a link or email', style: TextStyle(fontSize: 12, color: kColorInkSoft)),
             ),
             Expanded(child: Divider()),
           ]),
           const SizedBox(height: kSpace4),
           WabwayTextField(
-            label: 'URL or link',
-            hint: 'https://…',
+            label: 'Link or booking email',
+            hint: 'https://… or paste a confirmation email',
             controller: _urlCtrl,
-            keyboardType: TextInputType.url,
-            textInputAction: TextInputAction.done,
-            onSubmitted: (_) => _applyUrl(),
+            keyboardType: TextInputType.multiline,
+            textInputAction: TextInputAction.newline,
+            maxLines: 4,
           ),
           const SizedBox(height: kSpace3),
           WabwayButton(
-            label: 'Continue with link',
+            label: 'Continue',
             variant: WabwayButtonVariant.secondary,
             fullWidth: true,
             onPressed: _applyUrl,
@@ -748,29 +754,38 @@ class _IncomingShareScreenState extends ConsumerState<IncomingShareScreen> {
 
   // ─── Plan item form ───────────────────────────────────────────────────────
 
+  /// "Read booking" — first thing offered for anything that could be one.
+  List<Widget> _buildReadBooking() => [
+        if (_canReadBooking) ...[
+          _ParseItineraryBanner(
+            icon: Icons.auto_awesome_rounded,
+            label: 'Read booking',
+            subtitle: 'Finds flights, trains, ferries, stays & reservations — '
+                'with seats and who\'s travelling — and puts each in the right place',
+            scanning: _scanningAi,
+            disabled: _anyScan,
+            onTap: _readBooking,
+          ),
+          if (!kIsWeb && _hasFile) ...[
+            const SizedBox(height: kSpace2),
+            _ParseItineraryBanner(
+              icon: Icons.document_scanner_rounded,
+              label: 'No signal? Read flights on this phone',
+              subtitle: 'On-device text recognition · flights only',
+              scanning: _scanningOcr,
+              disabled: _anyScan,
+              onTap: _parseWithOcr,
+            ),
+          ],
+          const SizedBox(height: kSpace4),
+          Text('Or choose where to save it yourself',
+              style: kStyleCaption.copyWith(color: kColorInkSoft)),
+          const SizedBox(height: kSpace2),
+        ],
+      ];
+
   /// Smart extractors offered for the shared content (both layouts).
   List<Widget> _buildActions() => [
-            if (_canParseItinerary) ...[
-              if (GeminiParser.isAvailable)
-                _ParseItineraryBanner(
-                  icon: Icons.auto_awesome_rounded,
-                  label: 'Parse with AI',
-                  subtitle: 'Reads flights, hotels & trains via Gemini',
-                  scanning: _scanningAi,
-                  disabled: _anyScan,
-                  onTap: _parseWithAi,
-                ),
-              if (GeminiParser.isAvailable) const SizedBox(height: kSpace2),
-              _ParseItineraryBanner(
-                icon: Icons.document_scanner_rounded,
-                label: 'Read text / PDF',
-                subtitle: 'On-device OCR · no AI required',
-                scanning: _scanningOcr,
-                disabled: _anyScan,
-                onTap: _parseWithOcr,
-              ),
-              const SizedBox(height: kSpace4),
-            ],
             if (_isCsvShare) ...[
               _ParseItineraryBanner(
                 icon: Icons.table_chart_rounded,
@@ -860,6 +875,7 @@ class _IncomingShareScreenState extends ConsumerState<IncomingShareScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                ..._buildReadBooking(),
                 DestinationSelector(
                   contentType: share.contentType,
                   selected: _destination,
@@ -891,6 +907,7 @@ class _IncomingShareScreenState extends ConsumerState<IncomingShareScreen> {
         children: [
           ContentPreviewCard(share: share),
           const SizedBox(height: kSpace5),
+          ..._buildReadBooking(),
           DestinationSelector(
             contentType: share.contentType,
             selected: _destination,
@@ -1289,5 +1306,7 @@ class _ContentTypeInfoCard extends StatelessWidget {
           'Accommodation links can be saved as stays — tap "Save as stay" to parse the listing details automatically.',
         ShareContentType.csvFile =>
           'CSV files from Google Takeout contain your saved places — tap "Import spots from CSV" to add them all.',
+        ShareContentType.text =>
+          'Booking emails can be read automatically — tap "Read booking" and each flight, train, stay or reservation goes in the right place.',
       };
 }

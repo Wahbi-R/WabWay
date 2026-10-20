@@ -54,6 +54,7 @@ abstract final class TravelService {
       gate:                   row['gate'] as String?,
       seat:                   row['seat'] as String?,
       boardingTime:           hhmmFromDb(rawBoardingTime),
+      travellers:             TravelTraveller.listFrom(row['travellers']),
       linkedDocIds:           docIds,
       linkedItineraryItemId:  row['linked_itinerary_item_id'] as String?,
       linkedDayId:            row['linked_day_id'] as String?,
@@ -90,6 +91,7 @@ abstract final class TravelService {
     'address': i.address, 'notes': i.notes,
     'departure_terminal': i.departureTerminal, 'arrival_terminal': i.arrivalTerminal,
     'gate': i.gate, 'seat': i.seat, 'boarding_time': i.boardingTime,
+    'travellers': [for (final t in i.travellers) t.toJson()],
     'linked_doc_ids': i.linkedDocIds,
     'linked_itinerary_item_id': i.linkedItineraryItemId,
     'linked_day_id': i.linkedDayId,
@@ -117,6 +119,7 @@ abstract final class TravelService {
     gate:                  j['gate'] as String?,
     seat:                  j['seat'] as String?,
     boardingTime:          j['boarding_time'] as String?,
+    travellers:            TravelTraveller.listFrom(j['travellers']),
     linkedDocIds:          (j['linked_doc_ids'] as List?)?.cast<String>() ?? [],
     linkedItineraryItemId: j['linked_itinerary_item_id'] as String?,
     linkedDayId:           j['linked_day_id'] as String?,
@@ -152,6 +155,7 @@ abstract final class TravelService {
         location:           d.location,
         destination:        d.destination,
         confirmationNumber: d.confirmationNumber,
+        url:                d.url,
         address:            d.address,
         notes:              d.notes,
         departureTerminal:  d.departureTerminal,
@@ -159,6 +163,7 @@ abstract final class TravelService {
         gate:               d.gate,
         seat:               d.seat,
         boardingTime:       d.boardingTime,
+        travellers:         d.travellers,
         linkedDocIds:       d.linkedDocIds,
       );
 
@@ -183,6 +188,7 @@ abstract final class TravelService {
     String? gate,
     String? seat,
     String? boardingTime,
+    List<TravelTraveller> travellers = const [],
     String? linkedItineraryItemId,
     String? linkedDayId,
     List<String> linkedDocIds = const [],
@@ -213,6 +219,8 @@ abstract final class TravelService {
       if (gate != null && gate.trim().isNotEmpty) 'gate': gate.trim(),
       if (seat != null && seat.trim().isNotEmpty) 'seat': seat.trim(),
       if (boardingTime != null) 'boarding_time': boardingTime,
+      if (travellers.isNotEmpty)
+        'travellers': [for (final t in travellers) t.toJson()],
       if (linkedItineraryItemId != null)
         'linked_itinerary_item_id': linkedItineraryItemId,
       if (linkedDayId != null) 'linked_day_id': linkedDayId,
@@ -253,6 +261,7 @@ abstract final class TravelService {
       'gate':                item.gate,
       'seat':                item.seat,
       'boarding_time':       item.boardingTime,
+      'travellers':          [for (final t in item.travellers) t.toJson()],
     }).eq('id', item.id);
   }
 

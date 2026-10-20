@@ -11,6 +11,7 @@ import '../../widgets/widgets.dart';
 import '../../data/date_utils.dart';
 import '../../widgets/place_search_field.dart';
 import '../../data/share_data.dart';
+import 'travellers_section.dart';
 
 // ─── Entry point ──────────────────────────────────────────────────────────────
 
@@ -18,6 +19,7 @@ Future<TravelItem?> showAddTravelSheet(
   BuildContext context, {
   List<TripDocument> docs = const [],
   TravelItem? initialItem,
+  TravelItem? prefillItem,
   ImportPrefill? prefill,
 }) {
   return showWabwayFormSheet<TravelItem>(
@@ -29,6 +31,7 @@ Future<TravelItem?> showAddTravelSheet(
     builder: (ctx, scroll, handle, close) => _AddTravelContent(
       docs: docs,
       initialItem: initialItem,
+      prefillItem: prefillItem,
       prefill: prefill,
       scrollController: scroll,
       showDragHandle: handle,
@@ -44,6 +47,7 @@ class _AddTravelContent extends StatefulWidget {
     this.scrollController,
     this.showDragHandle = false,
     this.initialItem,
+    this.prefillItem,
     this.prefill,
   });
 
@@ -52,6 +56,10 @@ class _AddTravelContent extends StatefulWidget {
   final ScrollController? scrollController;
   final bool showDragHandle;
   final TravelItem? initialItem;
+
+  /// A complete new item to start from (Read booking's review screen):
+  /// fills every field like [initialItem] but stays in "Add" mode.
+  final TravelItem? prefillItem;
 
   /// New-item prefill (Import). Never switches the sheet into edit mode.
   final ImportPrefill? prefill;
@@ -82,6 +90,7 @@ class _AddTravelContentState extends State<_AddTravelContent> {
   TimeOfDay? _endTime;
   TimeOfDay? _boardingTime;
   final Set<String> _linkedDocIds = {};
+  List<TravelTraveller> _travellers = const [];
 
   bool _scanningPass = false;
   Uint8List? _boardingPassBytes;
@@ -89,7 +98,7 @@ class _AddTravelContentState extends State<_AddTravelContent> {
   @override
   void initState() {
     super.initState();
-    final item = widget.initialItem;
+    final item = widget.initialItem ?? widget.prefillItem;
     if (item != null) {
       _titleCtrl.text       = item.title;
       _locationCtrl.text    = item.location ?? '';
@@ -109,6 +118,7 @@ class _AddTravelContentState extends State<_AddTravelContent> {
       _time         = parseTimeOfDay(item.time);
       _endTime      = parseTimeOfDay(item.endTime);
       _boardingTime = parseTimeOfDay(item.boardingTime);
+      _travellers   = item.travellers;
       _linkedDocIds.addAll(item.linkedDocIds);
     } else if (widget.prefill != null) {
       final pre = widget.prefill!;
@@ -162,6 +172,7 @@ class _AddTravelContentState extends State<_AddTravelContent> {
       arrivalTerminal:    _nz(_arrTerminalCtrl.text),
       gate:               _nz(_gateCtrl.text),
       seat:               _nz(_seatCtrl.text),
+      travellers:         _travellers,
       linkedDocIds:       _linkedDocIds.toList(),
     ));
   }
@@ -562,6 +573,12 @@ class _AddTravelContentState extends State<_AddTravelContent> {
                       ),
                     if (_type == TravelItemType.flight) const SizedBox(height: kSpace4),
                   ],
+
+                  TravellersEditor(
+                    travellers: _travellers,
+                    onChanged: (list) => _travellers = list,
+                  ),
+                  const SizedBox(height: kSpace4),
 
                   WabwayTextField(
                     label: 'Booking URL (optional)',

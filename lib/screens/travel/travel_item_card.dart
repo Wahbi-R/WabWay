@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../core/providers/profile_provider.dart';
+import '../../core/providers/trip_provider.dart';
 import '../../data/travel_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
+import 'travellers_section.dart';
 
 // Returns a short countdown label relative to today. Upcoming items show
 // "Today!", "Tomorrow", or "In N days". Past items show how long ago they
@@ -144,6 +148,27 @@ class _TravelItemCardState extends State<TravelItemCard> {
                           const SizedBox(height: kSpace2),
                           _DateRow(item: item),
                         ],
+                        if (item.travellers.isNotEmpty)
+                          Consumer(builder: (context, ref, _) {
+                            final who = travellersSummary(item.travellers,
+                                ref.watch(tripMembersProvider), ref.watch(profileProvider)?.id);
+                            if (who == null) return const SizedBox.shrink();
+                            return Padding(
+                              padding: const EdgeInsets.only(top: kSpace1),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.people_alt_rounded, size: 13, color: kColorInkSoft),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(who,
+                                        style: kStyleCaption.copyWith(color: kColorInkSoft),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
                         Builder(builder: (_) {
                           final cd = _countdownLabel(item);
                           if (cd.label.isEmpty) return const SizedBox.shrink();

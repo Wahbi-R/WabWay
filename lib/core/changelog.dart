@@ -11,6 +11,19 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 427,
+    label: "Share a booking, it files itself",
+    changes: [
+      "Share a ticket PDF, screenshot, confirmation email or link to WabWay and tap Read booking — flights, trains, ferries, buses, car hire, hotels, tickets and restaurant bookings each go in the right place",
+      "It fills in everything: times, stations, terminals, seats, booking reference, check-in and check-out times",
+      "It works out who's travelling — names on the ticket are matched to your crew, each with their seat",
+      "Already added it? It spots the duplicate and fills in what's missing instead of adding it twice",
+      "Travel items now show who's on them and their seats, and you can set this yourself in Add / Edit travel",
+      "You can paste a whole confirmation email into Import, not just a link",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 426,
     label: "Check-in & check-out times",
     changes: [

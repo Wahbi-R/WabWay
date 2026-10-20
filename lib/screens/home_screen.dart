@@ -178,11 +178,9 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> with AsyncScreenMixin {
   _HomeData? _data;
 
-  // Home lives in the shell's IndexedStack, so initState runs once. The shell
-  // wraps each tab in TickerMode(enabled: selected) — use that to refresh
-  // silently whenever Home becomes visible again, so stats made on other tabs
-  // (a new plan day, a receipt) show up without pull-to-refresh.
-  bool _visible = true;
+  // Home lives in the shell's IndexedStack, so initState runs once;
+  // reloadWhenShown refreshes it silently whenever it becomes visible again,
+  // so stats made on other tabs (a new plan day, a receipt) show up.
 
   // Activity inbox "unread" marker — last time this device opened the inbox
   // for the active trip.
@@ -231,9 +229,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with AsyncScreenMixin {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final visible = TickerMode.of(context);
-    if (visible && !_visible && _data != null) _load(silent: true);
-    _visible = visible;
+    reloadWhenShown(() {
+      if (_data != null) _load(silent: true);
+    });
   }
 
   @override

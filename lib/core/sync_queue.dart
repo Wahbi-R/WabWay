@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../screens/notification_settings_screen.dart' show kPrefNotifMoney;
 import 'notifications/push_notifier.dart';
@@ -10,6 +9,8 @@ import 'receipt_scan_service.dart';
 import 'receipts_link_service.dart';
 import 'supabase/money_service.dart';
 import 'supabase/trip_service.dart';
+import 'trip_data_changes.dart';
+import '../data/connection_data.dart' show EntityType;
 import '../data/money_data.dart';
 
 /// Offline queue for money: receipts created without a connection (with their
@@ -20,10 +21,9 @@ abstract final class SyncQueue {
   static const _opsPrefix = 'sync_queue_money_ops_';
   static final Set<String> _drainingTrips = {};
 
-  /// Bumped whenever the queue changes (something queued, synced or
-  /// discarded) so screens showing queued receipts can refresh.
-  static final ValueNotifier<int> changes = ValueNotifier(0);
-  static void _changed() => changes.value++;
+  /// The queue changed (something queued, synced or discarded): screens
+  /// showing queued receipts refresh via [TripDataChanges].
+  static void _changed() => TripDataChanges.touch(const [EntityType.receipt]);
 
   /// Id prefix of queued (not yet uploaded) receipts — see [pendingReceipts].
   static const pendingIdPrefix = 'pending-';

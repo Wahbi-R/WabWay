@@ -8,6 +8,8 @@ import '../../core/supabase/doc_service.dart';
 import '../../core/supabase/plan_service.dart';
 import '../../core/supabase/spot_service.dart';
 import '../../core/supabase/travel_service.dart';
+import '../../core/trip_data_changes.dart';
+import '../../data/connection_data.dart' show EntityType;
 import '../../data/accommodation_data.dart' show Accommodation;
 import '../../data/docs_data.dart';
 import '../../data/money_data.dart';
@@ -66,10 +68,10 @@ Future<bool> openAddSheet(
     case ShareDestination.stay:
       final listing = sourceUrl == null ? null : await ListingParser.parse(sourceUrl);
       if (!context.mounted) return false;
-      return await showAddStaySheet(context,
-              tripId: tripId, userId: userId,
-              prefilled: listing, initialUrl: sourceUrl) !=
-          null;
+      final stay = await showAddStaySheet(context,
+          tripId: tripId, userId: userId, prefilled: listing, initialUrl: sourceUrl);
+      if (stay != null) TripDataChanges.touch(const [EntityType.stay]);
+      return stay != null;
 
     case ShareDestination.document:
       return await showAddDocSheet(context,
@@ -85,14 +87,15 @@ Future<bool> openAddSheet(
           .read(tripMembersProvider)
           .map((m) => TripMember(id: m.userId, name: m.profile.displayName))
           .toList();
-      return await showAddReceiptSheet(context,
+      final receipt = await showAddReceiptSheet(context,
               tripId: tripId,
               userId: userId,
               members: members,
               homeCurrency: trip?.homeCurrency ?? 'CAD',
               defaultCurrency: trip?.defaultCurrency,
-              prefill: pre) !=
-          null;
+              prefill: pre);
+      if (receipt != null) TripDataChanges.touch(const [EntityType.receipt]);
+      return receipt != null;
 
     case ShareDestination.travelItem:
       final doc = await uploadFile?.call();
@@ -105,6 +108,7 @@ Future<bool> openAddSheet(
         return false;
       }
       await TravelService.createFromDraft(draft, tripId: tripId, createdBy: userId);
+      TripDataChanges.touch(const [EntityType.travel]);
       return true;
 
     case ShareDestination.planItem:
@@ -137,6 +141,7 @@ Future<bool> openAddSheet(
       }
       await PlanService.createItemFromDraft(draft,
           tripId: tripId, dayId: day.id, createdBy: userId, sortOrder: day.items.length);
+      TripDataChanges.touch(const [EntityType.planItem]);
       return true;
   }
 }

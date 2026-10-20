@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:cached_network_image_ce/cached_network_image.dart';
+import '../../data/connection_data.dart' show EntityType;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../../core/async_screen_mixin.dart';
@@ -47,12 +48,20 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen>
   @override
   void initState() {
     super.initState();
+    // Saved elsewhere (Read booking, Import) while this tab stayed alive.
+    reloadOnChanges(const [EntityType.stay], () => _load(silent: true));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _activeTripId = ref.read(activeTripIdProvider);
       _load();
       if (_activeTripId.isNotEmpty) _subscribe(_activeTripId);
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    reloadWhenShown(() => _load(silent: true));
   }
 
   @override

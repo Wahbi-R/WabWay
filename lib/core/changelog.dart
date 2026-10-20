@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 429,
+    label: "Fixes for shared bookings",
+    changes: [
+      "Receipts, trains and stays you save from a shared booking now show up right away — no need to close and reopen the app",
+      "Money, Travel, Stays and Plan also refresh when you switch back to them",
+      "Receipts links show the receipt's own currency — ¥8,570 instead of \$8570.00",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 428,
     label: "Bookings go straight into Money",
     changes: [

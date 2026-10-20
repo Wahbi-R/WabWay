@@ -158,6 +158,8 @@ void main() {
       final payload = ReceiptsLinkService.buildPayload(receipt: rc, members: members, order: order);
       expect((payload['people'] as List).length, 3);
       expect(payload['paid'], {'0': true, '2': true}); // payer + settled share
+      // The Receipts site formats amounts in it (¥8,570, not $8570.00).
+      expect((payload['receipt'] as Map)['currency'], rc.currency);
       final linked = rc.copyWith(splitLinkId: 'x', splitLinkMembers: order,
           splitLinkHash: ReceiptsLinkService.hashOf(payload));
       final remote = ReceiptsLinkService.parseRemote(payload, linked, members);

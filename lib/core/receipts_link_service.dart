@@ -101,6 +101,8 @@ abstract final class ReceiptsLinkService {
     return {
       'receipt': {
         'title':    receipt.title,
+        // The site shows dollars unless told otherwise (¥8,570, not $8570.00).
+        'currency': receipt.currency,
         'items':    [for (final i in items.items) i.toJson()],
         'subtotal': items.itemsTotal,
         'discount': items.discount,

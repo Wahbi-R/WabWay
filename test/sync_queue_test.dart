@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wabway/core/sync_queue.dart';
+import 'package:wabway/core/trip_data_changes.dart';
+import 'package:wabway/data/connection_data.dart' show EntityType;
 import 'package:wabway/data/money_data.dart';
 
 void main() {
@@ -25,10 +27,13 @@ void main() {
       );
 
   test('receipts saved offline are listed, count in balances, and can be discarded', () async {
-    final before = SyncQueue.changes.value;
+    var changes = 0;
+    void count() => changes++;
+    TripDataChanges.of(EntityType.receipt).addListener(count);
+    addTearDown(() => TripDataChanges.of(EntityType.receipt).removeListener(count));
     await queue('Ramen');
     await queue('Taxi');
-    expect(SyncQueue.changes.value, greaterThan(before));
+    expect(changes, greaterThan(0), reason: 'Money refreshes when something is queued');
 
     final pending = await SyncQueue.pendingReceipts('trip1');
     expect(pending.map((r) => r.title), ['Ramen', 'Taxi']);

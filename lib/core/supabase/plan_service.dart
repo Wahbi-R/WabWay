@@ -42,7 +42,7 @@ abstract final class PlanService {
   }) {
     // Postgres returns time as "HH:MM:SS"; the model uses "HH:MM".
     final rawTime = row['time'] as String?;
-    final time = (rawTime != null && rawTime.length >= 5) ? rawTime.substring(0, 5) : rawTime;
+    final time = hhmmFromDb(rawTime);
     return ItineraryItem(
       id:              row['id'] as String,
       dayId:           row['day_id'] as String,

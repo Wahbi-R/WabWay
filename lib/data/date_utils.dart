@@ -1,5 +1,7 @@
 // Shared date formatting helpers used across UI and service layers.
 
+import 'package:flutter/material.dart' show TimeOfDay;
+
 const _months = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
@@ -28,3 +30,24 @@ String fmtDateRange(DateTime start, DateTime end) {
 // Returns "09:30" — 24h time for form fields.
 String fmtTimeOfDay(int hour, int minute) =>
     '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
+
+// Returns "Jan 7" or "Jan 7, 15:00" when an "HH:MM" time is known.
+String fmtDateTime(DateTime d, String? time) =>
+    time == null ? fmtDate(d) : '${fmtDate(d)}, $time';
+
+// "HH:MM" (or Postgres "HH:MM:SS") → TimeOfDay; null when missing or malformed.
+TimeOfDay? parseTimeOfDay(String? hhmm) {
+  if (hhmm == null) return null;
+  final parts = hhmm.split(':');
+  if (parts.length < 2) return null;
+  final h = int.tryParse(parts[0]);
+  final m = int.tryParse(parts[1]);
+  if (h == null || m == null || h > 23 || m > 59) return null;
+  return TimeOfDay(hour: h, minute: m);
+}
+
+// Postgres `time` columns come back as "15:00:00" — trim to "15:00".
+String? hhmmFromDb(Object? raw) {
+  final s = raw as String?;
+  return (s != null && s.length >= 5) ? s.substring(0, 5) : s;
+}

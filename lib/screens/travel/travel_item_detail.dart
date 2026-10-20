@@ -20,6 +20,7 @@ import '../../data/connection_data.dart';
 import '../shared/attached_docs_section.dart';
 import '../shared/connections_section.dart';
 import '../../core/text_utils.dart';
+import '../../data/date_utils.dart' show parseTimeOfDay;
 
 // ─── Mobile screen ────────────────────────────────────────────────────────────
 
@@ -594,16 +595,6 @@ class _ActionsSectionState extends ConsumerState<_ActionsSection> {
     _                     => ItineraryItemType.other,
   };
 
-  TimeOfDay? _parseTime(String? t) {
-    if (t == null) return null;
-    final parts = t.split(':');
-    if (parts.length < 2) return null;
-    final h = int.tryParse(parts[0]);
-    final m = int.tryParse(parts[1]);
-    if (h == null || m == null) return null;
-    return TimeOfDay(hour: h, minute: m);
-  }
-
   Future<void> _addToItinerary() async {
     if (_itineraryLoading) return;
     if (widget.days.isEmpty) {
@@ -614,7 +605,7 @@ class _ActionsSectionState extends ConsumerState<_ActionsSection> {
     final suggestedDay = widget.item.date != null
         ? widget.days.where((d) => d.date == widget.item.date).firstOrNull
         : null;
-    final suggestedTime = _parseTime(widget.item.time);
+    final suggestedTime = parseTimeOfDay(widget.item.time);
 
     final result = await showDayPickerSheet(
       context,

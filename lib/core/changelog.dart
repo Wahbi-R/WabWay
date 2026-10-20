@@ -11,6 +11,17 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 426,
+    label: "Check-in & check-out times",
+    changes: [
+      "Stays now have \"Check-in from\" and \"Check-out by\" times as well as dates, so the hotel's times aren't buried in the notes",
+      "Your stays list shows them with the dates, e.g. Nov 11, 15:00 → Nov 14, 11:00",
+      "On the day, the stay card tells you \"Check-in today from 15:00\" or \"Check-out today by 11:00\"",
+      "AI assistants with add & edit access can fill them in from your booking confirmation",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 425,
     label: "Easier AI connecting",
     changes: [

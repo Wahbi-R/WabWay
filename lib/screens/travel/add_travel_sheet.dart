@@ -106,9 +106,9 @@ class _AddTravelContentState extends State<_AddTravelContent> {
       _status       = item.status;
       _date         = item.date;
       _endDate      = item.endDate;
-      _time         = _parseTime(item.time);
-      _endTime      = _parseTime(item.endTime);
-      _boardingTime = _parseTime(item.boardingTime);
+      _time         = parseTimeOfDay(item.time);
+      _endTime      = parseTimeOfDay(item.endTime);
+      _boardingTime = parseTimeOfDay(item.boardingTime);
       _linkedDocIds.addAll(item.linkedDocIds);
     } else if (widget.prefill != null) {
       final pre = widget.prefill!;
@@ -122,16 +122,6 @@ class _AddTravelContentState extends State<_AddTravelContent> {
       _endDate              = pre.endDate;
       _linkedDocIds.addAll(pre.linkedDocIds);
     }
-  }
-
-  static TimeOfDay? _parseTime(String? s) {
-    if (s == null) return null;
-    final parts = s.split(':');
-    if (parts.length != 2) return null;
-    return TimeOfDay(
-      hour: int.tryParse(parts[0]) ?? 0,
-      minute: int.tryParse(parts[1]) ?? 0,
-    );
   }
 
   @override
@@ -253,11 +243,11 @@ class _AddTravelContentState extends State<_AddTravelContent> {
           _seatCtrl.text = data.seat!;
         if (data.date != null && _date == null) _date = data.date;
         if (data.departureTime != null && _time == null)
-          _time = _parseTime(data.departureTime);
+          _time = parseTimeOfDay(data.departureTime);
         if (data.arrivalTime != null && _endTime == null)
-          _endTime = _parseTime(data.arrivalTime);
+          _endTime = parseTimeOfDay(data.arrivalTime);
         if (data.boardingTime != null && _boardingTime == null)
-          _boardingTime = _parseTime(data.boardingTime);
+          _boardingTime = parseTimeOfDay(data.boardingTime);
         if (data.cabinClass != null && _notesCtrl.text.isEmpty)
           _notesCtrl.text = data.cabinClass!;
         _type = TravelItemType.flight;

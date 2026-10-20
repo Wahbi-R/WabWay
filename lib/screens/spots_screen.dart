@@ -29,6 +29,7 @@ import 'spots/spot_detail.dart';
 import 'spots/add_spot_sheet.dart';
 import 'map_screen.dart';
 import '../core/text_utils.dart';
+import '../data/date_utils.dart';
 
 // Sort modes available on the spots list. Applied after filters and search.
 enum _SpotSort {
@@ -1834,9 +1835,6 @@ class _StayMiniSheet extends StatelessWidget {
   final String tripId;
   final Spot? linkedSpot;
 
-  String _fmt(DateTime dt) =>
-      '${dt.month}/${dt.day}/${dt.year}';
-
   @override
   Widget build(BuildContext context) {
     final nights = stay.nights;
@@ -1914,7 +1912,10 @@ class _StayMiniSheet extends StatelessWidget {
                               style:
                                   kStyleCaption.copyWith(color: kColorInkSoft)),
                           const SizedBox(height: 2),
-                          Text(_fmt(stay.checkIn!), style: kStyleBodyMedium),
+                          Text(fmtDate(stay.checkIn!), style: kStyleBodyMedium),
+                          if (stay.checkInTime != null)
+                            Text('from ${stay.checkInTime}',
+                                style: kStyleCaption.copyWith(color: kColorInkSoft)),
                         ],
                       ),
                     ),
@@ -1927,7 +1928,10 @@ class _StayMiniSheet extends StatelessWidget {
                               style:
                                   kStyleCaption.copyWith(color: kColorInkSoft)),
                           const SizedBox(height: 2),
-                          Text(_fmt(stay.checkOut!), style: kStyleBodyMedium),
+                          Text(fmtDate(stay.checkOut!), style: kStyleBodyMedium),
+                          if (stay.checkOutTime != null)
+                            Text('by ${stay.checkOutTime}',
+                                style: kStyleCaption.copyWith(color: kColorInkSoft)),
                         ],
                       ),
                     ),

@@ -12,6 +12,7 @@ import '../../theme/app_text_theme.dart';
 import '../../widgets/place_search_field.dart';
 import '../../widgets/widgets.dart';
 import '../../core/text_utils.dart';
+import '../../data/date_utils.dart' show parseTimeOfDay;
 import '../../data/currencies.dart';
 import '../../data/share_data.dart';
 
@@ -139,15 +140,7 @@ class _AddItemContentState extends State<_AddItemContent> {
         );
       }
       if (item.currency != null) _currency = item.currency!;
-      if (item.time != null) {
-        final parts = item.time!.split(':');
-        if (parts.length == 2) {
-          _time = TimeOfDay(
-            hour:   int.tryParse(parts[0]) ?? 0,
-            minute: int.tryParse(parts[1]) ?? 0,
-          );
-        }
-      }
+      _time = parseTimeOfDay(item.time);
       if (item.mapsUrl != null || item.confirmationUrl != null) {
         _showAdvanced = true;
       }

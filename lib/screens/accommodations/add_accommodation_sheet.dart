@@ -88,6 +88,8 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
   AccommodationSource? _source;
   DateTime? _checkIn;
   DateTime? _checkOut;
+  TimeOfDay? _checkInTime;
+  TimeOfDay? _checkOutTime;
   String? _imageUrl;
   String? _parseError;
 
@@ -115,6 +117,8 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
       _source     = e.source;
       _checkIn    = e.checkIn;
       _checkOut   = e.checkOut;
+      _checkInTime  = parseTimeOfDay(e.checkInTime);
+      _checkOutTime = parseTimeOfDay(e.checkOutTime);
       _imageUrl        = e.imageUrl;
       _linkedSpotId    = e.spotId;
       if (e.spotId != null) _loadLinkedSpot(e.spotId!);
@@ -191,6 +195,8 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
       final city    = _cityCtrl.text.trim();
       final notes   = _notesCtrl.text.trim();
       final confirm = _confirmCtrl.text.trim();
+      final inTime  = _fmtTime(_checkInTime);
+      final outTime = _fmtTime(_checkOutTime);
 
       Accommodation result;
       if (widget.editing != null) {
@@ -202,6 +208,8 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
           currency:           _currency,
           checkIn:            _checkIn,
           checkOut:           _checkOut,
+          checkInTime:        inTime,
+          checkOutTime:       outTime,
           status:             _status,
           source:             _source,
           notes:              notes.isEmpty ? null : notes,
@@ -221,6 +229,8 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
           currency:           _currency,
           checkIn:            _checkIn,
           checkOut:           _checkOut,
+          checkInTime:        inTime,
+          checkOutTime:       outTime,
           status:             _status,
           source:             _source ?? (url.isNotEmpty ? AccommodationSource.fromUrl(url) : null),
           notes:              notes.isEmpty ? null : notes,
@@ -237,6 +247,9 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
       showWabwaySnack(context, 'Could not save stay.', error: true);
     }
   }
+
+  static String? _fmtTime(TimeOfDay? t) =>
+      t == null ? null : fmtTimeOfDay(t.hour, t.minute);
 
   Future<void> _delete() async {
     final id = widget.editing?.id;
@@ -466,6 +479,30 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
                   label: 'Check-out',
                   value: _checkOut == null ? null : fmtDateLong(_checkOut!),
                   onTap: _pickDateRange,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: kSpace3),
+
+          // Hotel policy times, e.g. "check-in from 15:00, check-out by 11:00".
+          Row(
+            children: [
+              Expanded(
+                child: WabwayTimeField(
+                  label: 'Check-in from',
+                  value: _checkInTime,
+                  initialPickerTime: const TimeOfDay(hour: 15, minute: 0),
+                  onChanged: (t) => setState(() => _checkInTime = t),
+                ),
+              ),
+              const SizedBox(width: kSpace3),
+              Expanded(
+                child: WabwayTimeField(
+                  label: 'Check-out by',
+                  value: _checkOutTime,
+                  initialPickerTime: const TimeOfDay(hour: 11, minute: 0),
+                  onChanged: (t) => setState(() => _checkOutTime = t),
                 ),
               ),
             ],

@@ -142,6 +142,7 @@ class WabwayTimeField extends StatelessWidget {
     required this.value,
     required this.onChanged,
     this.placeholder = 'Not set',
+    this.initialPickerTime = const TimeOfDay(hour: 9, minute: 0),
     this.clearable = true,
   });
 
@@ -149,12 +150,15 @@ class WabwayTimeField extends StatelessWidget {
   final TimeOfDay? value;
   final ValueChanged<TimeOfDay?> onChanged;
   final String placeholder;
+
+  /// Where the picker opens when [value] is null (e.g. 15:00 for check-in).
+  final TimeOfDay initialPickerTime;
   final bool clearable;
 
   Future<void> _pick(BuildContext context) async {
     final picked = await showTimePicker(
       context: context,
-      initialTime: value ?? const TimeOfDay(hour: 9, minute: 0),
+      initialTime: value ?? initialPickerTime,
       builder: (ctx, child) => MediaQuery(
         data: MediaQuery.of(ctx).copyWith(alwaysUse24HourFormat: true),
         child: child!,

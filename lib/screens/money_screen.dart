@@ -355,7 +355,9 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
           MoneyService.loadWithdrawalsFromCache(tripId),
           SyncQueue.pendingCountFor(tripId),
         ]);
-        final cachedReceipts    = cached[0] as List<Receipt>?;
+        final cachedReceipts    = cached[0] == null
+            ? null
+            : await SyncQueue.withPendingSettles(tripId, cached[0] as List<Receipt>);
         final cachedWithdrawals = cached[1] as List<CashWithdrawal>?;
         final pending           = cached[2] as int;
         if (isStale(gen)) return;
@@ -386,8 +388,16 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
       ]);
       if (isStale(gen)) return;
       final pending = await SyncQueue.pendingCountFor(tripId);
+      final receipts = await SyncQueue.withPendingSettles(
+          tripId, List<Receipt>.from(futures[0] as List));
+      if (isStale(gen)) return;
+      // We're online — flush anything queued while offline (marked-paid
+      // shares, Receipts links still to create).
+      if (pending > 0 || await SyncQueue.hasPendingOps(tripId)) {
+        unawaited(SyncQueue.drain(tripId, _userId, members: _members));
+      }
       commitLoad(gen, () {
-        _receipts             = List<Receipt>.from(futures[0] as List);
+        _receipts             = receipts;
         _withdrawals          = List<CashWithdrawal>.from(futures[1] as List);
         _persistedSettlements = List<Settlement>.from(futures[2] as List);
         _lastTripId           = tripId;
@@ -709,6 +719,9 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
                     tripId:                _activeTripId,
                     myId:                  _userId,
                     existingSettlements:   _persistedSettlements,
+                    receipts:              _receipts,
+                    withdrawals:           _withdrawals,
+                    isOrganiser:           ref.read(isOrganiserProvider),
                     onSettled:             () => _loadAll(silent: true),
                   )
                 : Row(
@@ -912,6 +925,9 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
       tripId:                _activeTripId,
       myId:                  _userId,
       existingSettlements:   _persistedSettlements,
+                    receipts:              _receipts,
+                    withdrawals:           _withdrawals,
+                    isOrganiser:           ref.read(isOrganiserProvider),
       onSettled:             () => _loadAll(silent: true),
     );
   }
@@ -1308,6 +1324,9 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
               tripId:                _activeTripId,
               myId:                  _userId,
               existingSettlements:   _persistedSettlements,
+                    receipts:              _receipts,
+                    withdrawals:           _withdrawals,
+                    isOrganiser:           ref.read(isOrganiserProvider),
               onSettled:             () => _loadAll(silent: true),
             ),
           ],

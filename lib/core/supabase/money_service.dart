@@ -31,9 +31,11 @@ abstract final class MoneyService {
     final splits = splitsRaw.map((s) {
       final split = s as Map<String, dynamic>;
       return ReceiptSplit(
-        memberId:  split['user_id'] as String,
-        amount:    (split['amount'] as num).toDouble(),
-        isSettled: split['is_settled'] as bool? ?? false,
+        memberId:     split['user_id'] as String,
+        amount:       (split['amount'] as num).toDouble(),
+        isSettled:    split['is_settled'] as bool? ?? false,
+        settledAt:    DateTime.tryParse(split['settled_at'] as String? ?? ''),
+        settlementId: split['settlement_id'] as String?,
       );
     }).toList();
     final rawAmount = (row['amount'] as num).toDouble();
@@ -51,6 +53,13 @@ abstract final class MoneyService {
       notes:             row['notes'] as String?,
       storagePath:       row['storage_path'] as String?,
       splits:            splits,
+      items:             ReceiptItemization.fromJsonOrNull(row['items']),
+      splitLinkId:       row['split_link_id'] as String?,
+      splitLinkMembers:  ((row['split_link_members'] as List?) ?? const [])
+          .map((e) => e as String)
+          .toList(),
+      splitLinkHash:     row['split_link_hash'] as String?,
+      createdById:       row['created_by'] as String?,
     );
   }
 
@@ -59,8 +68,10 @@ abstract final class MoneyService {
     final dists = distsRaw.map((d) {
       final dist = d as Map<String, dynamic>;
       return CashDistribution(
-        memberId: dist['user_id'] as String,
-        amount:   (dist['amount'] as num).toDouble(),
+        memberId:     dist['user_id'] as String,
+        amount:       (dist['amount'] as num).toDouble(),
+        isSettled:    dist['is_settled'] as bool? ?? false,
+        settlementId: dist['settlement_id'] as String?,
       );
     }).toList();
     return CashWithdrawal(
@@ -89,6 +100,15 @@ abstract final class MoneyService {
       data,
     );
     return receipts;
+  }
+
+  static Future<Receipt?> loadReceipt(String receiptId) async {
+    final row = await supabase
+        .from('receipts')
+        .select('*, receipt_splits(*)')
+        .eq('id', receiptId)
+        .maybeSingle();
+    return row == null ? null : _receiptFromRow(row);
   }
 
   static Future<List<Receipt>?> loadReceiptsFromCache(String tripId) {
@@ -138,6 +158,7 @@ abstract final class MoneyService {
     required DateTime date,
     required List<ReceiptSplit> splits,
     String? notes,
+    ReceiptItemization? items,
   }) async {
     final receipt = await supabase.from('receipts').insert({
       'trip_id':              tripId,
@@ -151,6 +172,7 @@ abstract final class MoneyService {
       'category':             _catToDb(category),
       'date':                 isoDate(date),
       if (notes != null && notes.isNotEmpty) 'notes': notes,
+      if (items != null && !items.isEmpty) 'items': items.toJson(),
     }).select().single();
 
     final receiptId = receipt['id'] as String;
@@ -226,6 +248,8 @@ abstract final class MoneyService {
     required DateTime date,
     required List<ReceiptSplit> splits,
     String? notes,
+    ReceiptItemization? items,
+    List<ReceiptSplit> previousSplits = const [],
   }) async {
     await supabase.from('receipts').update({
       'title':               title.trim(),
@@ -238,13 +262,32 @@ abstract final class MoneyService {
       'category':            _catToDb(category),
       'date':                isoDate(date),
       'notes':               (notes != null && notes.isNotEmpty) ? notes : null,
+      'items':               (items != null && !items.isEmpty) ? items.toJson() : null,
     }).eq('id', receiptId);
 
+    // A share that was already paid stays paid if its amount didn't change.
+    final paidBefore = {
+      for (final p in previousSplits)
+        if (p.isSettled) p.memberId: p,
+    };
     await supabase.from('receipt_splits').delete().eq('receipt_id', receiptId);
     final nonZero = splits.where((s) => s.amount > 0).toList();
     if (nonZero.isNotEmpty) {
       await supabase.from('receipt_splits').insert(
-        nonZero.map((s) => {'receipt_id': receiptId, 'user_id': s.memberId, 'amount': s.amount}).toList(),
+        nonZero.map((s) {
+          final prev = paidBefore[s.memberId];
+          final keep = prev != null && (prev.amount - s.amount).abs() < 0.005;
+          return {
+            'receipt_id': receiptId,
+            'user_id':    s.memberId,
+            'amount':     s.amount,
+            if (keep) ...{
+              'is_settled':    true,
+              'settled_at':    (prev.settledAt ?? DateTime.now()).toUtc().toIso8601String(),
+              'settlement_id': prev.settlementId,
+            },
+          };
+        }).toList(),
       );
     }
 
@@ -265,5 +308,48 @@ abstract final class MoneyService {
     await supabase.from('cash_distributions').delete().eq('withdrawal_id', withdrawalId);
     await supabase.from('cash_withdrawals').delete().eq('id', withdrawalId);
   }
+
+  // ── Settling shares ──────────────────────────────────────────────────────────
+
+  /// Mark one person's share of a receipt paid (or open again).
+  /// Allowed for that person, the payer, and the trip owner (RLS).
+  static Future<void> setShareSettled({
+    required String receiptId,
+    required String memberId,
+    required bool settled,
+    DateTime? at,
+  }) async {
+    await supabase.from('receipt_splits').update({
+      'is_settled':    settled,
+      'settled_at':    settled ? (at ?? DateTime.now()).toUtc().toIso8601String() : null,
+      if (!settled) 'settlement_id': null,
+    }).eq('receipt_id', receiptId).eq('user_id', memberId);
+  }
+
+  /// Save the receipt's itemization only (e.g. after pulling claims from its
+  /// Receipts link) together with the splits it produces.
+  static Future<Receipt> updateItemsAndSplits(
+    Receipt receipt,
+    ReceiptItemization items,
+    List<ReceiptSplit> splits,
+  ) =>
+      updateReceipt(
+        receiptId:         receipt.id,
+        title:             receipt.title,
+        amount:            items.total > 0 ? items.total : receipt.amount,
+        currency:          receipt.currency,
+        homeAmount:        items.total > 0 && receipt.amount > 0
+            ? receipt.homeAmount * items.total / receipt.amount
+            : receipt.homeAmount,
+        exchangeRate:      receipt.exchangeRate,
+        transactionFeePct: receipt.transactionFeePct,
+        category:          receipt.category,
+        paidBy:            receipt.paidById,
+        date:              receipt.date,
+        splits:            splits,
+        notes:             receipt.notes,
+        items:             items,
+        previousSplits:    receipt.splits,
+      );
 
 }

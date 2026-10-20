@@ -75,8 +75,11 @@ class ReceiptListTile extends StatelessWidget {
                     [
                       '${payer.label} paid',
                       fmtDate(receipt.date),
-                      if (receipt.splits.length > 1) 'split ${receipt.splits.length} ways'
+                      if (receipt.isFullySettled) 'all paid'
+                      else if (receipt.isItemized) 'by item'
+                      else if (receipt.splits.length > 1) 'split ${receipt.splits.length} ways'
                       else if (receipt.splits.isEmpty) 'not split',
+                      if (receipt.splitLinkId != null) 'link',
                     ].join(' · '),
                     style: kStyleCaption,
                     maxLines: 1,
@@ -123,7 +126,7 @@ class ReceiptListTile extends StatelessWidget {
                 const SizedBox(height: 2),
                 if (net.abs() > 0.01)
                   Text(
-                    '${isPositive ? '+' : ''}${fmtAmount(net, homeCurrency)}',
+                    '${isPositive ? '+' : ''}${fmtAmount(net, receipt.currency)}',
                     style: GoogleFonts.ibmPlexMono(
                       fontSize: kTextXs,
                       fontWeight: FontWeight.w500,

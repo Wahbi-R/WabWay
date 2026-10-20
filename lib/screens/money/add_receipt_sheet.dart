@@ -1,22 +1,25 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/notifications/push_notifier.dart';
+import '../../core/receipt_followups.dart';
 import '../../core/receipt_scan_service.dart';
+import '../../core/receipts_link_service.dart';
 import '../../core/supabase/client.dart';
 import '../../core/sync_queue.dart';
 import '../../core/supabase/doc_service.dart';
 import '../../core/supabase/exchange_rate_service.dart';
 import '../../core/supabase/money_service.dart';
-import '../../data/connection_data.dart';
 import '../../data/docs_data.dart';
+import 'receipt_items_editor.dart';
 import '../notification_settings_screen.dart';
 import '../../data/money_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
+import '../../core/text_utils.dart';
 import '../../widgets/widgets.dart';
 import '../../data/currencies.dart';
 import '../../data/share_data.dart';
@@ -66,7 +69,10 @@ Future<Receipt?> showAddReceiptSheet(
   );
 }
 
-enum _SplitMode { equal, custom }
+enum _SplitMode { equal, custom, items }
+
+/// Remembers whether new receipts are shared as a Receipts link.
+const _kPrefReceiptsLink = 'pref_receipts_link_default';
 
 class _AddReceiptContent extends StatefulWidget {
   const _AddReceiptContent({
@@ -126,7 +132,9 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
   bool            _showFee      = false;
   bool            _homeOverride = false; // user typed home amount directly
   bool            _scanning     = false;
-  ReceiptScanResult? _scanResult;
+  bool            _createLink   = true;
+  /// The itemized bill when splitting by item.
+  ReceiptItemization? _items;
   String?         _error;
 
   bool get _needsConversion => _currency != widget.homeCurrency;
@@ -167,8 +175,8 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
     });
   }
 
-  Uint8List? _photoBytes;
-  String?    _photoExt;
+  /// New photos (several for a long receipt, top to bottom).
+  final List<ScanImage> _photos = [];
   String?    _existingStoragePath;
 
   // Documents to attach to a NEW receipt (an existing receipt manages its
@@ -196,10 +204,11 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
           text: ex.splits
               .where((s) => s.memberId == m.id)
               .fold(0.0, (a, s) => a + s.amount)
-              .toStringAsFixed(2),
+              .toStringAsFixed(currencyDecimals(ex.currency)),
         ),
       };
-      _splitMode = _SplitMode.custom;
+      _items     = ex.items;
+      _splitMode = ex.isItemized ? _SplitMode.items : _SplitMode.custom;
       // Pre-fill conversion fields
       if (ex.exchangeRate != 1.0) {
         _rateCtrl.text    = ex.exchangeRate.toStringAsFixed(6);
@@ -216,8 +225,7 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
         }
         if (pre.currency != null) _currency = pre.currency!;
         if (pre.fileBytes != null) {
-          _photoBytes = pre.fileBytes;
-          _photoExt   = pre.fileExt ?? 'jpg';
+          _photos.add(ScanImage(pre.fileBytes!, pre.fileExt ?? 'jpg'));
         }
         _docIds.addAll(pre.linkedDocIds);
       }
@@ -233,7 +241,18 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
       };
       // Fetch the rate for the default currency on first open.
       WidgetsBinding.instance.addPostFrameCallback((_) => _fetchRate());
+      SharedPreferences.getInstance().then((prefs) {
+        final v = prefs.getBool(_kPrefReceiptsLink);
+        if (v != null && mounted) setState(() => _createLink = v);
+      }).catchError((_) {});
     }
+  }
+
+  void _setCreateLink(bool v) {
+    setState(() => _createLink = v);
+    SharedPreferences.getInstance()
+        .then((prefs) => prefs.setBool(_kPrefReceiptsLink, v))
+        .catchError((_) => false);
   }
 
   @override
@@ -250,53 +269,37 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
     super.dispose();
   }
 
-  Future<void> _scanAndSplit() async {
-    if (_photoBytes == null) return;
+  /// Scan the photos and open the item split with what was read.
+  Future<void> _scan() async {
+    if (_photos.isEmpty || _scanning) return;
     setState(() => _scanning = true);
-
-    final mt = 'image/${_photoExt ?? 'jpeg'}';
-    final result = await ReceiptScanService.scan(_photoBytes!, mt);
+    final outcome = await ReceiptScanService.scan(_photos);
     if (!mounted) return;
     setState(() => _scanning = false);
-
-    if (result == null || result.items.isEmpty) {
-      showWabwaySnack(context, 'Scan unavailable — fill in manually');
+    if (!outcome.ok) {
+      showWabwaySnack(context, outcome.error!, error: true, duration: const Duration(seconds: 5));
       return;
     }
-
-    // Show item-level split sheet
-    final fractions = await showModalBottomSheet<Map<String, double>>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => _ItemSplitSheet(
-        result:   result,
-        members:  widget.members,
-        currency: _currency,
-      ),
-    );
-    if (fractions == null || !mounted) return;
-
-    // Pre-fill amount from scan total (local currency)
-    if (result.total > 0) {
-      final decimals = (_currency == 'JPY' || _currency == 'KRW') ? 0 : 2;
-      _amountCtrl.text = result.total.toStringAsFixed(decimals);
-      _recomputeHome();
+    final scanned = outcome.itemization!;
+    if (_titleCtrl.text.trim().isEmpty && (scanned.title?.isNotEmpty ?? false)) {
+      _titleCtrl.text = scanned.title!;
     }
+    await _editItems(scanned);
+  }
 
-    // Apply per-person splits as fractions of the effective home total
-    final homeTotal = _effectiveHomeAmount;
+  /// Open the item split (works offline — items can be typed in by hand).
+  Future<void> _editItems([ReceiptItemization? start]) async {
+    final result = await showReceiptItemsEditor(
+      context,
+      initial:  start ?? _items ?? ReceiptItemization.empty,
+      members:  widget.members,
+      currency: _currency,
+    );
+    if (result == null || !mounted) return;
     setState(() {
-      _scanResult = result;
-      _splitMode  = _SplitMode.custom;
-      for (final m in widget.members) {
-        final frac   = fractions[m.id] ?? 0;
-        final amount = homeTotal * frac;
-        _customCtrls[m.id]?.text = amount > 0.005
-            ? amount.toStringAsFixed(2)
-            : '';
-      }
+      _items     = result;
+      _splitMode = _SplitMode.items;
+      _amountCtrl.text = result.total.toStringAsFixed(currencyDecimals(_currency));
     });
   }
 
@@ -317,12 +320,19 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
       return;
     }
 
-    final total = double.tryParse(_amountCtrl.text.trim()) ?? 0;
+    if (_splitMode == _SplitMode.items && (_items == null || _items!.isEmpty)) {
+      setState(() => _error = 'Add the items (scan or by hand), or pick Equal / Custom.');
+      return;
+    }
+    final total = _splitMode == _SplitMode.items
+        ? _items!.total
+        : double.tryParse(_amountCtrl.text.trim()) ?? 0;
     final title = _titleCtrl.text.trim();
     final notes =
         _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim();
 
-    // Compute home-currency amounts for splits.
+    // The home-currency equivalent of the whole receipt (for totals). Shares
+    // themselves are in the receipt's currency.
     final homeTotal    = _effectiveHomeAmount;
     final exchangeRate = _needsConversion
         ? (double.tryParse(_rateCtrl.text.trim()) ?? 1.0)
@@ -331,19 +341,21 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
         ? (double.tryParse(_feePctCtrl.text.trim()) ?? 0.0)
         : 0.0;
 
-    List<ReceiptSplit> splits;
-    if (_splitMode == _SplitMode.equal) {
-      // Splits are stored in home currency.
-      final share = _splitWith.isEmpty ? 0.0 : homeTotal / _splitWith.length;
-      splits = _splitWith
-          .map((id) => ReceiptSplit(memberId: id, amount: share))
-          .toList();
-    } else {
-      splits = widget.members.map((m) {
-        final v = double.tryParse(_customCtrls[m.id]?.text.trim() ?? '') ?? 0;
-        return ReceiptSplit(memberId: m.id, amount: v);
-      }).toList();
-    }
+    final items = _splitMode == _SplitMode.items ? _items : null;
+    final splits = switch (_splitMode) {
+      _SplitMode.equal => [
+          for (final id in _splitWith)
+            ReceiptSplit(memberId: id, amount: total / _splitWith.length),
+        ],
+      _SplitMode.custom => [
+          for (final m in widget.members)
+            ReceiptSplit(
+              memberId: m.id,
+              amount: double.tryParse(_customCtrls[m.id]?.text.trim() ?? '') ?? 0,
+            ),
+        ],
+      _SplitMode.items => items!.toSplits(widget.members.map((m) => m.id), _currency),
+    };
 
     // Local-only mode when tripId was not provided.
     if (widget.tripId == null) {
@@ -360,6 +372,7 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
         category:          _category,
         date:              DateTime.now(),
         notes:             notes,
+        items:             items,
       ));
       return;
     }
@@ -381,6 +394,8 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
           date:              widget.existingReceipt!.date,
           splits:            splits,
           notes:             notes,
+          items:             items,
+          previousSplits:    widget.existingReceipt!.splits,
         );
       } else {
         receipt = await MoneyService.createReceipt(
@@ -396,48 +411,36 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
           date:              DateTime.now(),
           splits:            splits,
           notes:             notes,
+          items:             items,
         );
       }
-      // Upload photo as a linked document (non-fatal — receipt already saved).
-      if (_photoBytes != null && widget.tripId != null) {
-        try {
-          final userId = supabase.auth.currentUser?.id ?? '';
-          final doc = await DocService.uploadAndCreate(
-            tripId:    widget.tripId!,
-            userId:    userId,
-            title:     title,
-            type:      DocType.receipt,
-            ext:       _photoExt ?? 'jpg',
-            bytes:     _photoBytes!,
-            fileSizeKb: (_photoBytes!.lengthInBytes / 1024).round(),
-          );
-          await DocService.attach(
-            tripId:     widget.tripId!,
-            userId:     userId,
-            docIds:     [doc.id],
-            entityType: EntityType.receipt,
-            entityId:   receipt.id,
-          );
-        } catch (_) {}
-      }
-      // Attach documents picked for a new receipt (non-fatal).
-      bool anyLinkFailed = false;
-      if (!_isEditing && _docIds.isNotEmpty && widget.tripId != null) {
-        try {
-          await DocService.attach(
-            tripId:     widget.tripId!,
-            userId:     supabase.auth.currentUser?.id ?? '',
-            docIds:     _docIds,
-            entityType: EntityType.receipt,
-            entityId:   receipt.id,
-          );
-        } catch (_) {
-          anyLinkFailed = true;
-        }
+      // Photos → attached Receipt documents; picked docs attached; Receipts
+      // link published (or queued). All non-fatal — the receipt is saved.
+      final followups = await runReceiptFollowups(
+        tripId:     widget.tripId!,
+        userId:     supabase.auth.currentUser?.id ?? widget.userId,
+        receipt:    receipt,
+        members:    widget.members,
+        photos:     _photos,
+        docIds:     _isEditing ? const [] : _docIds,
+        createLink: !_isEditing && _createLink,
+      );
+      receipt = followups.receipt;
+      var linkChangedRemotely = false;
+      if (_isEditing && receipt.splitLinkId != null) {
+        final (result, pushed) = await ReceiptsLinkService.push(receipt, widget.members);
+        receipt = pushed;
+        linkChangedRemotely = result == LinkPushResult.remoteChanged;
       }
       if (!mounted) return;
-      if (anyLinkFailed) {
-        showWabwaySnack(context, 'Receipt saved, but some document links could not be synced.');
+      if (followups.docsFailed) {
+        showWabwaySnack(context, 'Receipt saved, but some photos or documents could not be attached.');
+      } else if (followups.linkQueued) {
+        showWabwaySnack(context, "Receipt saved — the Receipts link will be created when you're back online.");
+      } else if (linkChangedRemotely) {
+        showWabwaySnack(context,
+            'Saved. People changed the Receipts link too — open the receipt to review their changes.',
+            duration: const Duration(seconds: 5));
       }
       widget.onSubmit(receipt);
       if (!_isEditing && widget.tripId != null) {
@@ -470,6 +473,10 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
               date:              DateTime.now(),
               splits:            splits,
               notes:             notes,
+              items:             items,
+              photos:            _photos,
+              docIds:            _docIds,
+              createLink:        _createLink,
             );
             if (mounted) {
               Navigator.of(context).pop();
@@ -541,6 +548,8 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
                           label: 'Amount',
                           hint: '0',
                           controller: _amountCtrl,
+                          readOnly: _splitMode == _SplitMode.items,
+                          helpText: _splitMode == _SplitMode.items ? 'From the items' : null,
                           keyboardType: const TextInputType.numberWithOptions(
                               decimal: true),
                           textInputAction: TextInputAction.next,
@@ -565,6 +574,10 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
                               _currency     = v ?? widget.homeCurrency;
                               _homeOverride = false;
                               _rateCtrl.clear();
+                              if (_splitMode == _SplitMode.items && _items != null) {
+                                _amountCtrl.text = _items!.total
+                                    .toStringAsFixed(currencyDecimals(_currency));
+                              }
                             });
                             _fetchRate();
                           },
@@ -629,17 +642,21 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
                   ),
                   const SizedBox(height: kSpace4),
 
-                  // Split method
+                  // Split method — shares are in the receipt's currency.
                   Text(
-                    _needsConversion
-                        ? 'Split method  ·  amounts in ${widget.homeCurrency}'
-                        : 'Split method',
+                    'Split method  ·  amounts in $_currency',
                     style: kStyleCaptionMedium.copyWith(color: kColorInk),
                   ),
                   const SizedBox(height: kSpace2),
                   _SplitToggle(
                     mode: _splitMode,
-                    onChanged: (m) => setState(() => _splitMode = m),
+                    onChanged: (m) {
+                      if (m == _SplitMode.items && (_items == null || _items!.isEmpty)) {
+                        _photos.isNotEmpty ? _scan() : _editItems();
+                        return;
+                      }
+                      setState(() => _splitMode = m);
+                    },
                   ),
                   const SizedBox(height: kSpace3),
 
@@ -658,7 +675,23 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
 
                   if (_splitMode == _SplitMode.custom)
                     _CustomSplitPicker(
-                        members: widget.members, controllers: _customCtrls),
+                      members: widget.members,
+                      controllers: _customCtrls,
+                      currency: _currency,
+                      total: double.tryParse(_amountCtrl.text.trim()) ?? 0,
+                      onChanged: () => setState(() {}),
+                    ),
+
+                  if (_splitMode == _SplitMode.items && _items != null)
+                    _ItemsSummary(
+                      items: _items!,
+                      members: widget.members,
+                      currency: _currency,
+                      canScan: _photos.isNotEmpty,
+                      scanning: _scanning,
+                      onEdit: () => _editItems(),
+                      onRescan: _scan,
+                    ),
 
                   const SizedBox(height: kSpace4),
 
@@ -671,30 +704,28 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
                   ),
                   const SizedBox(height: kSpace4),
 
-                  _PhotoUploadZone(
-                    photoBytes:          _photoBytes,
+                  _PhotoStrip(
+                    photos:              _photos,
                     existingStoragePath: _existingStoragePath,
-                    onPicked: (bytes, ext) => setState(() {
-                      _photoBytes  = bytes;
-                      _photoExt    = ext;
-                      _scanResult  = null; // reset if photo replaced
-                    }),
-                    onRemoved: () => setState(() {
-                      _photoBytes          = null;
-                      _photoExt            = null;
-                      _existingStoragePath = null;
-                      _scanResult          = null;
-                    }),
+                    onPicked: (img) => setState(() => _photos.add(img)),
+                    onRemoved: (i) => setState(() => _photos.removeAt(i)),
+                    onRemoveExisting: () => setState(() => _existingStoragePath = null),
                   ),
-                  if (_photoBytes != null) ...[
+                  if (_photos.isNotEmpty) ...[
                     const SizedBox(height: kSpace2),
                     _ScanItemsButton(
-                      scanning:      _scanning,
-                      hasResult:     _scanResult != null,
-                      onScan:        _scanAndSplit,
+                      scanning:  _scanning,
+                      hasResult: _items != null && !_items!.isEmpty,
+                      photoCount: _photos.length,
+                      onScan:    _scan,
                     ),
                   ],
                   const SizedBox(height: kSpace4),
+
+                  if (!_isEditing && widget.tripId != null) ...[
+                    _LinkSwitch(value: _createLink, onChanged: _setCreateLink),
+                    const SizedBox(height: kSpace4),
+                  ],
 
                   if (!_isEditing)
                     DocMultiPicker(
@@ -912,37 +943,39 @@ class _ConversionSection extends StatelessWidget {
   }
 }
 
-// ─── Photo upload zone ────────────────────────────────────────────────────────
+// ─── Photos ───────────────────────────────────────────────────────────────────
 
-class _PhotoUploadZone extends StatelessWidget {
-  const _PhotoUploadZone({
+class _PhotoStrip extends StatelessWidget {
+  const _PhotoStrip({
+    required this.photos,
     required this.onPicked,
     required this.onRemoved,
-    this.photoBytes,
+    required this.onRemoveExisting,
     this.existingStoragePath,
   });
 
-  final Uint8List? photoBytes;
+  final List<ScanImage> photos;
   final String? existingStoragePath;
-  final void Function(Uint8List bytes, String ext) onPicked;
-  final VoidCallback onRemoved;
+  final ValueChanged<ScanImage> onPicked;
+  final ValueChanged<int> onRemoved;
+  final VoidCallback onRemoveExisting;
 
-  bool get _hasPhoto => photoBytes != null || existingStoragePath != null;
-
-  Future<void> _pick(BuildContext context, ImageSource source) async {
+  Future<void> _pick(ImageSource source) async {
     final picker = ImagePicker();
-    final file = await picker.pickImage(
-      source: source,
-      imageQuality: 85,
-      maxWidth: 2048,
-    );
+    if (source == ImageSource.gallery) {
+      final files = await picker.pickMultiImage(imageQuality: 85, maxWidth: 2048);
+      for (final f in files) {
+        onPicked(ScanImage(await f.readAsBytes(), _ext(f.name)));
+      }
+      return;
+    }
+    final file = await picker.pickImage(source: source, imageQuality: 85, maxWidth: 2048);
     if (file == null) return;
-    final bytes = await file.readAsBytes();
-    final ext   = file.name.contains('.')
-        ? file.name.split('.').last.toLowerCase()
-        : 'jpg';
-    onPicked(bytes, ext);
+    onPicked(ScanImage(await file.readAsBytes(), _ext(file.name)));
   }
+
+  static String _ext(String name) =>
+      name.contains('.') ? name.split('.').last.toLowerCase() : 'jpg';
 
   void _showSourcePicker(BuildContext context) {
     showModalBottomSheet<void>(
@@ -957,18 +990,18 @@ class _PhotoUploadZone extends StatelessWidget {
             ListTile(
               leading: const Icon(Icons.camera_alt_rounded),
               title: const Text('Take photo'),
-              onTap: () { Navigator.pop(ctx); _pick(context, ImageSource.camera); },
+              onTap: () { Navigator.pop(ctx); _pick(ImageSource.camera); },
             ),
             ListTile(
               leading: const Icon(Icons.photo_library_rounded),
               title: const Text('Choose from gallery'),
-              onTap: () { Navigator.pop(ctx); _pick(context, ImageSource.gallery); },
+              onTap: () { Navigator.pop(ctx); _pick(ImageSource.gallery); },
             ),
-            if (_hasPhoto)
+            if (existingStoragePath != null)
               ListTile(
                 leading: const Icon(Icons.delete_outline_rounded, color: kColorDanger),
-                title: const Text('Remove photo', style: TextStyle(color: kColorDanger)),
-                onTap: () { Navigator.pop(ctx); onRemoved(); },
+                title: const Text('Remove attached photo', style: TextStyle(color: kColorDanger)),
+                onTap: () { Navigator.pop(ctx); onRemoveExisting(); },
               ),
             const SizedBox(height: kSpace2),
           ],
@@ -979,88 +1012,144 @@ class _PhotoUploadZone extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final empty = photos.isEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Photo', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
+        Text(photos.length > 1 ? 'Photos · top to bottom' : 'Photo',
+            style: kStyleCaptionMedium.copyWith(color: kColorInk)),
         const SizedBox(height: kSpace2),
-        GestureDetector(
-          onTap: () => _showSourcePicker(context),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            width: double.infinity,
-            clipBehavior: Clip.antiAlias,
-            decoration: BoxDecoration(
-              color: _hasPhoto ? kColorPrimarySoft : kColorSurfaceSunken,
-              borderRadius: kRadiusMd,
-              border: Border.all(
-                color: _hasPhoto ? kColorPrimary : kColorBorder,
+        if (empty)
+          GestureDetector(
+            onTap: () => _showSourcePicker(context),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: kSpace5),
+              decoration: BoxDecoration(
+                color: existingStoragePath != null ? kColorPrimarySoft : kColorSurfaceSunken,
+                borderRadius: kRadiusMd,
+                border: Border.all(
+                    color: existingStoragePath != null ? kColorPrimary : kColorBorder),
+              ),
+              child: Column(
+                children: [
+                  Icon(
+                    existingStoragePath != null
+                        ? Icons.check_circle_outline_rounded
+                        : Icons.add_photo_alternate_rounded,
+                    size: 32,
+                    color: existingStoragePath != null ? kColorPrimary : kColorInkSoft,
+                  ),
+                  const SizedBox(height: kSpace2),
+                  Text(
+                    existingStoragePath != null
+                        ? 'Photo attached — tap to add more'
+                        : 'Tap to add a photo',
+                    style: kStyleBodyMedium.copyWith(
+                        color: existingStoragePath != null ? kColorPrimary : kColorInkSoft),
+                  ),
+                  const SizedBox(height: kSpace1),
+                  Text('Long receipt? Add several overlapping photos', style: kStyleCaption),
+                ],
               ),
             ),
-            child: photoBytes != null
-                // New photo picked — show thumbnail with remove ✕
-                ? Stack(
-                    alignment: Alignment.topRight,
-                    children: [
-                      Image.memory(
-                        photoBytes!,
-                        height: 180,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
+          )
+        else
+          SizedBox(
+            height: 128,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: photos.length + 1,
+              separatorBuilder: (_, __) => const SizedBox(width: kSpace2),
+              itemBuilder: (_, i) {
+                if (i == photos.length) {
+                  return GestureDetector(
+                    onTap: () => _showSourcePicker(context),
+                    child: Container(
+                      width: 96,
+                      decoration: BoxDecoration(
+                        color: kColorSurfaceSunken,
+                        borderRadius: kRadiusMd,
+                        border: Border.all(color: kColorBorder),
                       ),
-                      Padding(
-                        padding: const EdgeInsets.all(kSpace2),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.add_a_photo_rounded, color: kColorInkSoft),
+                          const SizedBox(height: kSpace1),
+                          Text('Add', style: kStyleCaption),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+                return ClipRRect(
+                  borderRadius: kRadiusMd,
+                  child: Stack(
+                    children: [
+                      Image.memory(photos[i].bytes, width: 96, height: 128, fit: BoxFit.cover),
+                      Positioned(
+                        top: 4,
+                        right: 4,
                         child: Material(
                           color: Colors.black54,
                           borderRadius: kRadiusPill,
                           child: InkWell(
                             borderRadius: kRadiusPill,
-                            onTap: onRemoved,
+                            onTap: () => onRemoved(i),
                             child: const Padding(
                               padding: EdgeInsets.all(4),
-                              child: Icon(Icons.close_rounded, size: 16, color: Colors.white),
+                              child: Icon(Icons.close_rounded, size: 14, color: Colors.white),
                             ),
                           ),
                         ),
                       ),
+                      if (photos.length > 1)
+                        Positioned(
+                          left: 4,
+                          bottom: 4,
+                          child: WabwayBadge(label: '${i + 1}', tone: WabwayBadgeTone.neutral),
+                        ),
                     ],
-                  )
-                // No new photo — show icon + label (existing or empty)
-                : Padding(
-                    padding: const EdgeInsets.symmetric(vertical: kSpace5),
-                    child: Column(
-                      children: [
-                        Icon(
-                          _hasPhoto
-                              ? Icons.check_circle_outline_rounded
-                              : Icons.add_photo_alternate_rounded,
-                          size: 32,
-                          color: _hasPhoto ? kColorPrimary : kColorInkSoft,
-                        ),
-                        const SizedBox(height: kSpace2),
-                        Text(
-                          _hasPhoto
-                              ? 'Photo attached — tap to replace'
-                              : 'Tap to add a photo',
-                          style: kStyleBodyMedium.copyWith(
-                            color: _hasPhoto ? kColorPrimary : kColorInkSoft,
-                          ),
-                        ),
-                        if (!_hasPhoto) ...[
-                          const SizedBox(height: kSpace1),
-                          Text('Camera or gallery', style: kStyleCaption),
-                        ],
-                      ],
-                    ),
                   ),
+                );
+              },
+            ),
           ),
-        ),
       ],
     );
   }
 }
 
+class _LinkSwitch extends StatelessWidget {
+  const _LinkSwitch({required this.value, required this.onChanged});
+  final bool value;
+  final ValueChanged<bool> onChanged;
 
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: kColorSurfaceSunken,
+        borderRadius: kRadiusMd,
+        border: Border.all(color: kColorBorder),
+      ),
+      child: SwitchListTile(
+        value: value,
+        onChanged: onChanged,
+        activeThumbColor: kColorPrimary,
+        dense: true,
+        secondary: const Icon(Icons.link_rounded, color: kColorInkSoft),
+        title: Text('Share as a Receipts link', style: kStyleBodyMedium),
+        subtitle: Text(
+          'Anyone with the link can claim items and mark paid on receipts.wabble.ca. '
+          'Made when you are online; you can also do it later.',
+          style: kStyleCaption,
+        ),
+      ),
+    );
+  }
+}
 
 // ─── Split controls ───────────────────────────────────────────────────────────
 
@@ -1077,7 +1166,11 @@ class _SplitToggle extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(right: kSpace2),
             child: _ToggleChip(
-              label: m == _SplitMode.equal ? 'Equal' : 'Custom',
+              label: switch (m) {
+                _SplitMode.equal  => 'Equal',
+                _SplitMode.custom => 'Custom',
+                _SplitMode.items  => 'By item',
+              },
               selected: mode == m,
               onTap: () => onChanged(m),
             ),
@@ -1148,41 +1241,144 @@ class _EqualSplitPicker extends StatelessWidget {
 }
 
 class _CustomSplitPicker extends StatelessWidget {
-  const _CustomSplitPicker(
-      {required this.members, required this.controllers});
+  const _CustomSplitPicker({
+    required this.members,
+    required this.controllers,
+    required this.currency,
+    required this.total,
+    required this.onChanged,
+  });
   final List<TripMember> members;
   final Map<String, TextEditingController> controllers;
+  final String currency;
+  final double total;
+  final VoidCallback onChanged;
 
   @override
   Widget build(BuildContext context) {
+    final assigned = members.fold(
+        0.0, (a, m) => a + (double.tryParse(controllers[m.id]?.text.trim() ?? '') ?? 0));
+    final left = total - assigned;
     return Column(
-      children: members.map((m) {
-        return Padding(
-          padding: const EdgeInsets.only(bottom: kSpace3),
-          child: Row(
-            children: [
-              WabwayAvatar(
-                  name: m.name, size: WabwayAvatarSize.sm),
-              const SizedBox(width: kSpace3),
-              Expanded(
-                child:
-                    Text(m.isYou ? 'You' : m.name, style: kStyleBodyMedium),
-              ),
-              const SizedBox(width: kSpace3),
-              SizedBox(
-                width: 120,
-                child: WabwayTextField(
-                  hint: '0',
-                  controller: controllers[m.id],
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  textInputAction: TextInputAction.next,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ...members.map((m) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: kSpace3),
+            child: Row(
+              children: [
+                WabwayAvatar(
+                    name: m.name, size: WabwayAvatarSize.sm),
+                const SizedBox(width: kSpace3),
+                Expanded(
+                  child:
+                      Text(m.isYou ? 'You' : m.name, style: kStyleBodyMedium),
+                ),
+                const SizedBox(width: kSpace3),
+                SizedBox(
+                  width: 120,
+                  child: WabwayTextField(
+                    hint: '0',
+                    controller: controllers[m.id],
+                    onChanged: (_) => onChanged(),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    textInputAction: TextInputAction.next,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+        if (total > 0)
+          Text(
+            left.abs() < 0.01
+                ? 'All ${fmtAmount(total, currency)} assigned'
+                : left > 0
+                    ? '${fmtAmount(left, currency)} not assigned — the payer covers it'
+                    : 'Assigned ${fmtAmount(-left, currency)} more than the total',
+            style: kStyleCaption.copyWith(
+                color: left.abs() < 0.01 ? kColorInkSoft : kColorWarning),
+          ),
+      ],
+    );
+  }
+}
+
+class _ItemsSummary extends StatelessWidget {
+  const _ItemsSummary({
+    required this.items,
+    required this.members,
+    required this.currency,
+    required this.canScan,
+    required this.scanning,
+    required this.onEdit,
+    required this.onRescan,
+  });
+
+  final ReceiptItemization items;
+  final List<TripMember> members;
+  final String currency;
+  final bool canScan;
+  final bool scanning;
+  final VoidCallback onEdit;
+  final VoidCallback onRescan;
+
+  @override
+  Widget build(BuildContext context) {
+    final totals = items.personTotals(members.map((m) => m.id));
+    final unclaimed = items.unclaimedTotal;
+    return WabwayCard(
+      padding: const EdgeInsets.all(kSpace3),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('${pluralize(items.items.length, 'item')} · ${fmtAmount(items.total, currency)}',
+              style: kStyleBodySemibold),
+          const SizedBox(height: kSpace2),
+          for (final m in members)
+            if ((totals[m.id] ?? 0) > 0.005)
+              Padding(
+                padding: const EdgeInsets.only(bottom: kSpace1),
+                child: Row(
+                  children: [
+                    WabwayAvatar(name: m.name, size: WabwayAvatarSize.xs),
+                    const SizedBox(width: kSpace2),
+                    Expanded(child: Text(m.label, style: kStyleBody)),
+                    Text(fmtAmount(totals[m.id]!, currency), style: kStyleBodyMedium),
+                  ],
                 ),
               ),
+          if (unclaimed > 0.005)
+            Padding(
+              padding: const EdgeInsets.only(top: kSpace1),
+              child: Text('${fmtAmount(unclaimed, currency)} not claimed — the payer covers it',
+                  style: kStyleCaption.copyWith(color: kColorWarning)),
+            ),
+          const SizedBox(height: kSpace2),
+          Wrap(
+            spacing: kSpace2,
+            children: [
+              WabwayButton(
+                label: 'Edit items & who had what',
+                icon: Icons.edit_note_rounded,
+                size: WabwayButtonSize.sm,
+                variant: WabwayButtonVariant.secondary,
+                onPressed: onEdit,
+              ),
+              if (canScan)
+                WabwayButton(
+                  label: 'Re-scan',
+                  icon: Icons.document_scanner_rounded,
+                  size: WabwayButtonSize.sm,
+                  variant: WabwayButtonVariant.ghost,
+                  loading: scanning,
+                  onPressed: onRescan,
+                ),
             ],
           ),
-        );
-      }).toList(),
+        ],
+      ),
     );
   }
 }
@@ -1193,10 +1389,12 @@ class _ScanItemsButton extends StatelessWidget {
   const _ScanItemsButton({
     required this.scanning,
     required this.hasResult,
+    required this.photoCount,
     required this.onScan,
   });
   final bool scanning;
   final bool hasResult;
+  final int photoCount;
   final VoidCallback onScan;
 
   @override
@@ -1232,279 +1430,11 @@ class _ScanItemsButton extends StatelessWidget {
             const SizedBox(width: kSpace2),
             Text(
               scanning
-                  ? 'Scanning…'
+                  ? 'Scanning${photoCount > 1 ? ' $photoCount photos' : ''}… (up to a minute)'
                   : hasResult
                       ? 'Re-scan & re-split'
-                      : 'Scan receipt & split items',
+                      : 'Scan receipt & split by item',
               style: kStyleCaptionMedium.copyWith(color: kColorPrimary),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Item split sheet ─────────────────────────────────────────────────────────
-
-class _ItemSplitSheet extends StatefulWidget {
-  const _ItemSplitSheet({
-    required this.result,
-    required this.members,
-    required this.currency,
-  });
-  final ReceiptScanResult result;
-  final List<TripMember> members;
-  final String currency;
-
-  @override
-  State<_ItemSplitSheet> createState() => _ItemSplitSheetState();
-}
-
-class _ItemSplitSheetState extends State<_ItemSplitSheet> {
-  late final Map<int, Set<String>> _assignments;
-
-  @override
-  void initState() {
-    super.initState();
-    final allIds = {for (final m in widget.members) m.id};
-    _assignments = {
-      for (var i = 0; i < widget.result.items.length; i++) i: Set.of(allIds),
-    };
-  }
-
-  /// Per-person amounts in receipt currency (proportional to total incl. tax/tip).
-  Map<String, double> get _personAmounts {
-    final subtotals = <String, double>{
-      for (final m in widget.members) m.id: 0.0,
-    };
-
-    for (var i = 0; i < widget.result.items.length; i++) {
-      final item     = widget.result.items[i];
-      final assigned = _assignments[i]!;
-      final pool     = assigned.isEmpty
-          ? {for (final m in widget.members) m.id}
-          : assigned;
-      final share    = item.totalPrice / pool.length;
-      for (final id in pool) {
-        subtotals[id] = (subtotals[id] ?? 0) + share;
-      }
-    }
-
-    // Scale up proportionally to include tax/tip/discount
-    final itemsTotal = widget.result.itemsTotal;
-    final scanTotal  = widget.result.total > 0
-        ? widget.result.total
-        : itemsTotal;
-
-    if (itemsTotal > 0 && scanTotal != itemsTotal) {
-      final scale = scanTotal / itemsTotal;
-      for (final id in subtotals.keys) {
-        subtotals[id] = subtotals[id]! * scale;
-      }
-    }
-    return subtotals;
-  }
-
-  /// Per-person fractions of the total (0.0–1.0).
-  Map<String, double> get _fractions {
-    final amounts   = _personAmounts;
-    final scanTotal = widget.result.total > 0 ? widget.result.total : 1;
-    return {for (final e in amounts.entries) e.key: e.value / scanTotal};
-  }
-
-  String _fmt(double amount) => fmtAmount(amount, widget.currency);
-
-  @override
-  Widget build(BuildContext context) {
-    final amounts    = _personAmounts;
-    final navBarPad  = MediaQuery.paddingOf(context).bottom;
-    final adjustment = widget.result.tax + widget.result.tip - widget.result.discount;
-
-    return DraggableScrollableSheet(
-      initialChildSize: 0.87,
-      minChildSize: 0.5,
-      maxChildSize: 0.97,
-      builder: (_, ctrl) => DecoratedBox(
-        decoration: const BoxDecoration(
-          color: kColorPaper,
-          borderRadius: kRadiusSheet,
-        ),
-        child: Column(
-          children: [
-            const WabwayDragHandle(),
-            Padding(
-              padding:
-                  const EdgeInsets.fromLTRB(kSpace4, 0, kSpace4, kSpace3),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Split items', style: kStyleTitle),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Tap to toggle who had each item',
-                          style: kStyleCaption,
-                        ),
-                      ],
-                    ),
-                  ),
-                  WabwayIconButton(
-                    icon: Icons.close_rounded,
-                    label: 'Cancel',
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1),
-
-            Expanded(
-              child: ListView.separated(
-                controller: ctrl,
-                padding: const EdgeInsets.symmetric(vertical: kSpace2),
-                itemCount: widget.result.items.length,
-                separatorBuilder: (_, __) =>
-                    const Divider(height: 1, indent: kSpace4, endIndent: kSpace4),
-                itemBuilder: (_, i) {
-                  final item     = widget.result.items[i];
-                  final assigned = _assignments[i]!;
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: kSpace4, vertical: kSpace3),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                item.quantity > 1
-                                    ? '${item.quantity}× ${item.name}'
-                                    : item.name,
-                                style: kStyleBodyMedium,
-                              ),
-                            ),
-                            const SizedBox(width: kSpace3),
-                            Text(
-                              _fmt(item.totalPrice),
-                              style: kStyleBodySemibold,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: kSpace2),
-                        Wrap(
-                          spacing: kSpace2,
-                          runSpacing: kSpace2,
-                          children: widget.members.map((m) {
-                            final sel = assigned.contains(m.id);
-                            return GestureDetector(
-                              onTap: () => setState(() {
-                                if (sel) {
-                                  assigned.remove(m.id);
-                                } else {
-                                  assigned.add(m.id);
-                                }
-                              }),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 120),
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: kSpace2, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: sel
-                                      ? kColorPrimary
-                                      : kColorSurfaceSunken,
-                                  borderRadius: kRadiusPill,
-                                  border: Border.all(
-                                    color: sel ? kColorPrimary : kColorBorder,
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    WabwayAvatar(
-                                      name: m.name,
-                                      size: WabwayAvatarSize.xs,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      m.isYou
-                                          ? 'You'
-                                          : m.name.split(' ').first,
-                                      style: kStyleCaption.copyWith(
-                                        color: sel
-                                            ? kColorTextOnPrimary
-                                            : kColorInk,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-
-            const Divider(height: 1),
-            Padding(
-              padding: EdgeInsets.fromLTRB(
-                  kSpace4, kSpace3, kSpace4, kSpace3 + navBarPad),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Each person owes',
-                    style: kStyleCaptionMedium.copyWith(color: kColorInk),
-                  ),
-                  const SizedBox(height: kSpace2),
-                  ...widget.members.map((m) => Padding(
-                    padding: const EdgeInsets.only(bottom: kSpace2),
-                    child: Row(
-                      children: [
-                        WabwayAvatar(
-                          name: m.name,
-                          size: WabwayAvatarSize.sm,
-                        ),
-                        const SizedBox(width: kSpace2),
-                        Expanded(
-                          child: Text(
-                            m.isYou ? 'You' : m.name,
-                            style: kStyleBodyMedium,
-                          ),
-                        ),
-                        Text(
-                          _fmt(amounts[m.id] ?? 0),
-                          style: kStyleBodySemibold.copyWith(
-                              color: kColorPrimary),
-                        ),
-                      ],
-                    ),
-                  )),
-                  if (adjustment.abs() > 0.01)
-                    Padding(
-                      padding: const EdgeInsets.only(top: kSpace1, bottom: kSpace2),
-                      child: Text(
-                        'Incl. ${_fmt(adjustment)} tax/tip distributed proportionally',
-                        style: kStyleCaption.copyWith(color: kColorInkSoft),
-                      ),
-                    ),
-                  const SizedBox(height: kSpace2),
-                  WabwayButton(
-                    label: 'Apply splits',
-                    icon: Icons.check_rounded,
-                    fullWidth: true,
-                    size: WabwayButtonSize.lg,
-                    onPressed: () => Navigator.pop(context, _fractions),
-                  ),
-                ],
-              ),
             ),
           ],
         ),

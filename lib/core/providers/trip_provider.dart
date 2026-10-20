@@ -6,6 +6,7 @@ import '../supabase/client.dart';
 import 'profile_provider.dart';
 import '../supabase/trip_service.dart';
 import '../sync_queue.dart';
+import '../../data/member_data.dart';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -132,7 +133,12 @@ class TripNotifier extends StateNotifier<TripData> {
   Future<void> onReconnect(String userId) async {
     await load(silent: true);
     final tripId = state.activeTrip?.id;
-    if (tripId != null) await SyncQueue.drain(tripId, userId);
+    if (tripId != null) {
+      await SyncQueue.drain(tripId, userId, members: [
+        for (final m in state.members)
+          TripMember(id: m.userId, name: m.profile.displayName, isMe: m.userId == userId),
+      ]);
+    }
   }
 
   bool _switching = false;

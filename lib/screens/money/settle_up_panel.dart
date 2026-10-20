@@ -4,6 +4,7 @@ import '../../core/supabase/settlement_service.dart';
 import '../../data/money_data.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
+import '../../core/text_utils.dart';
 import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 
@@ -15,6 +16,9 @@ class SettleUpPanel extends StatefulWidget {
     required this.members,
     required this.tripId,
     required this.myId,
+    this.receipts = const [],
+    this.withdrawals = const [],
+    this.isOrganiser = false,
     this.existingSettlements = const [],
     this.scrollController,
     this.onSettled,
@@ -25,6 +29,10 @@ class SettleUpPanel extends StatefulWidget {
   final List<TripMember> members;
   final String tripId;
   final String myId;
+  /// Needed to find the open shares a payment clears.
+  final List<Receipt> receipts;
+  final List<CashWithdrawal> withdrawals;
+  final bool isOrganiser;
   final List<Settlement> existingSettlements;
   final ScrollController? scrollController;
   final VoidCallback? onSettled;
@@ -53,47 +61,123 @@ class _SettleUpPanelState extends State<SettleUpPanel> {
     }
   }
 
+  // Balances only count open shares, so a settled pair simply drops out of
+  // the suggestions — no "already settled" bookkeeping needed here.
   void _initSuggestions() {
-    _groupedSuggestions = {};
-    for (final entry in widget.suggestionsByCurrency.entries) {
-      _groupedSuggestions[entry.key] = entry.value.map((s) {
-        final alreadySettled = widget.existingSettlements
-            .any((e) => e.matches(s.fromMemberId, s.toMemberId));
-        return SettlementSuggestion(
-          fromMemberId: s.fromMemberId,
-          toMemberId:   s.toMemberId,
-          amount:       s.amount,
-          currency:     s.currency,
-          isSettled:    alreadySettled,
-        );
-      }).toList();
-    }
+    _groupedSuggestions = {
+      for (final e in widget.suggestionsByCurrency.entries) e.key: e.value,
+    };
+  }
+
+  String _name(String id) {
+    final m = memberById(id, widget.members);
+    return m.isYou ? 'You' : m.name;
   }
 
   Future<void> _markSettled(SettlementSuggestion s) async {
-    if (_saving || s.isSettled) return;
-    setState(() { _saving = true; s.isSettled = true; });
+    if (_saving) return;
+    final shares = openSharesBetween(
+      widget.receipts, widget.withdrawals,
+      a: s.fromMemberId, b: s.toMemberId, currency: s.currency,
+    );
+    final count = shares.receiptShares.length + shares.cashShares.length;
+    final from = _name(s.fromMemberId);
+    final to = _name(s.toMemberId);
+    final ok = await showWabwayConfirm(
+      context,
+      title: 'Mark settled?',
+      message: '$from paid ${to == 'You' ? 'you' : to} ${fmtAmount(s.amount, s.currency)}. '
+          'This marks ${pluralize(count, 'open share')} between you as paid. You can undo it.',
+      confirmLabel: 'Mark settled',
+      destructive: false,
+    );
+    if (!ok || !mounted) return;
+    setState(() => _saving = true);
     try {
-      await SettlementService.createSettlement(
-        tripId:         widget.tripId,
-        fromMemberId:   s.fromMemberId,
-        toMemberId:     s.toMemberId,
-        amount:         s.amount,
-        currency:       s.currency,
-        settledBy:      widget.myId,
+      await SettlementService.settleAll(
+        tripId:       widget.tripId,
+        fromMemberId: s.fromMemberId,
+        toMemberId:   s.toMemberId,
+        amount:       s.amount,
+        currency:     s.currency,
+        settledBy:    widget.myId,
+        shares:       shares,
       );
       widget.onSettled?.call();
       if (mounted) {
-        showWabwaySnack(context, 'Settlement saved', duration: const Duration(seconds: 2));
+        showWabwaySnack(context, 'Settled', duration: const Duration(seconds: 2));
       }
     } catch (_) {
-      if (mounted) {
-        setState(() => s.isSettled = false);
-        showWabwaySnack(context, 'Could not save. Try again.', error: true);
-      }
+      if (mounted) showWabwaySnack(context, 'Could not save. Try again.', error: true);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  Future<void> _undo(Settlement st) async {
+    if (_saving) return;
+    final ok = await showWabwayConfirm(
+      context,
+      title: 'Undo this payment?',
+      message: 'The shares it settled become unpaid again.',
+      confirmLabel: 'Undo',
+    );
+    if (!ok || !mounted) return;
+    setState(() => _saving = true);
+    try {
+      await SettlementService.undoSettlement(st.id);
+      widget.onSettled?.call();
+    } catch (_) {
+      if (mounted) showWabwaySnack(context, 'Could not undo. Try again.', error: true);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Widget _history() {
+    final mine = widget.existingSettlements
+        .where((st) => st.fromMemberId == widget.myId || st.toMemberId == widget.myId ||
+            widget.isOrganiser)
+        .take(10)
+        .toList();
+    if (mine.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: kSpace4),
+        Text('Payments', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
+        const SizedBox(height: kSpace2),
+        for (final st in mine)
+          Padding(
+            padding: const EdgeInsets.only(bottom: kSpace2),
+            child: WabwayCard(
+              padding: const EdgeInsets.symmetric(horizontal: kSpace4, vertical: kSpace2),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle_rounded, size: 16, color: kColorSuccess),
+                  const SizedBox(width: kSpace2),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('${_name(st.fromMemberId)} → ${_name(st.toMemberId)}',
+                            style: kStyleBodyMedium),
+                        Text(fmtDate(st.settledAt), style: kStyleCaption),
+                      ],
+                    ),
+                  ),
+                  Text(fmtAmount(st.amount, st.currency), style: kStyleBodyMedium),
+                  if (st.settledBy == widget.myId || widget.isOrganiser)
+                    TextButton(
+                      onPressed: _saving ? null : () => _undo(st),
+                      child: const Text('Undo'),
+                    ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
   }
 
   @override
@@ -109,11 +193,19 @@ class _SettleUpPanelState extends State<SettleUpPanel> {
     final anyBalance = allBalances.any((b) => b.net.abs() > 0.5);
 
     if (!anyBalance) {
-      return const Center(
-        child: WabwayEmptyState(
-          icon: Icons.check_circle_rounded,
-          title: 'All settled up',
-          description: 'No outstanding balances.',
+      return SingleChildScrollView(
+        controller: widget.scrollController,
+        padding: const EdgeInsets.all(kSpace4),
+        child: Column(
+          children: [
+            const SizedBox(height: kSpace8),
+            const WabwayEmptyState(
+              icon: Icons.check_circle_rounded,
+              title: 'All settled up',
+              description: 'No outstanding balances.',
+            ),
+            _history(),
+          ],
         ),
       );
     }
@@ -148,6 +240,7 @@ class _SettleUpPanelState extends State<SettleUpPanel> {
                   onMark:     () => _markSettled(s),
                 )),
           ],
+          _history(),
         ],
       ),
     );
@@ -251,11 +344,9 @@ class _CurrencyBalanceCard extends StatelessWidget {
                   currency: currency,
                   onSettle: () {
                     final s = suggestions.where((s) =>
-                        s.fromMemberId == b.member.id && !s.isSettled).firstOrNull;
+                        s.fromMemberId == b.member.id).firstOrNull;
                     if (s != null) onSettle(s);
                   },
-                  isSettled: suggestions.where((s) => s.fromMemberId == b.member.id)
-                      .any((s) => s.isSettled),
                 )),
           ],
           if (youOwe.isNotEmpty) ...[
@@ -268,11 +359,9 @@ class _CurrencyBalanceCard extends StatelessWidget {
                   isYouOwe: true,
                   onSettle: () {
                     final s = suggestions.where((s) =>
-                        s.toMemberId == b.member.id && !s.isSettled).firstOrNull;
+                        s.toMemberId == b.member.id).firstOrNull;
                     if (s != null) onSettle(s);
                   },
-                  isSettled: suggestions.where((s) => s.toMemberId == b.member.id)
-                      .any((s) => s.isSettled),
                 )),
           ],
         ],

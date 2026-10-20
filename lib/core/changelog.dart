@@ -11,6 +11,20 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 419,
+    label: "Split receipts by item",
+    changes: [
+      "New \"By item\" split: tap who had each dish, set portions on shared plates, and tax and tip are shared fairly by what each person had",
+      "Scan several photos of a long receipt at once — or type the items in by hand, even offline",
+      "Scanning waits long enough for big receipts and tells you what went wrong if it can't read one; it also fills in the restaurant name",
+      "Mark someone's share of a receipt as paid — works offline and syncs later",
+      "Settle Up now actually clears what's owed, shows past payments, and lets you undo one",
+      "Share any receipt as a receipts.wabble.ca link so friends can claim their items and mark themselves paid — then pull their changes back into WabWay with one tap",
+      "Fixed: editing a receipt's split, logging a receipt someone else paid for, and foreign-currency amounts in balances",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 418,
     label: "One Documents section everywhere",
     changes: [

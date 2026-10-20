@@ -1,6 +1,17 @@
+import 'dart:async';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../core/providers/trip_provider.dart';
+import '../../core/receipts_link_service.dart';
 import '../../core/supabase/client.dart';
+import '../../core/supabase/money_service.dart';
+import '../../core/sync_queue.dart';
+import '../../core/text_utils.dart';
 import '../../data/docs_data.dart';
 import '../../data/money_data.dart';
 import '../../theme/app_colors.dart';
@@ -17,9 +28,33 @@ Future<bool> _confirmDelete(BuildContext context, String title) =>
     showWabwayDeleteConfirm(context, entity: 'receipt', name: title,
         detail: 'for everyone in the trip');
 
+/// Opens the edit form with the active trip's currencies (the form's
+/// conversion needs the real home currency, not the 'CAD' default).
+Future<Receipt?> _openEditor(
+  BuildContext context,
+  WidgetRef ref, {
+  required Receipt receipt,
+  required String tripId,
+  required String myId,
+  required List<TripMember> members,
+  bool duplicate = false,
+}) {
+  final trip = ref.read(activeTripProvider);
+  return showAddReceiptSheet(
+    context,
+    tripId:          tripId,
+    userId:          supabase.auth.currentUser?.id ?? myId,
+    members:         members,
+    existingReceipt: receipt,
+    isDuplicate:     duplicate,
+    homeCurrency:    trip?.homeCurrency ?? 'CAD',
+    defaultCurrency: trip?.defaultCurrency,
+  );
+}
+
 // ─── Mobile full-screen route ─────────────────────────────────────────────────
 
-class ReceiptDetailScreen extends StatefulWidget {
+class ReceiptDetailScreen extends ConsumerStatefulWidget {
   const ReceiptDetailScreen({
     super.key,
     required this.receipt,
@@ -38,10 +73,10 @@ class ReceiptDetailScreen extends StatefulWidget {
   final ValueChanged<Receipt>? onUpdated;
 
   @override
-  State<ReceiptDetailScreen> createState() => _ReceiptDetailScreenState();
+  ConsumerState<ReceiptDetailScreen> createState() => _ReceiptDetailScreenState();
 }
 
-class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
+class _ReceiptDetailScreenState extends ConsumerState<ReceiptDetailScreen> {
   late Receipt _receipt;
 
   @override
@@ -50,29 +85,21 @@ class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
     _receipt = widget.receipt;
   }
 
+  void _updated(Receipt r) {
+    setState(() => _receipt = r);
+    widget.onUpdated?.call(r);
+  }
+
   Future<void> _editReceipt() async {
-    final updated = await showAddReceiptSheet(
-      context,
-      tripId:          widget.tripId,
-      userId:          widget.myId,
-      members:         widget.members,
-      existingReceipt: _receipt,
-    );
-    if (updated != null && mounted) {
-      setState(() => _receipt = updated);
-      widget.onUpdated?.call(updated);
-    }
+    final updated = await _openEditor(context, ref,
+        receipt: _receipt, tripId: widget.tripId, myId: widget.myId, members: widget.members);
+    if (updated != null && mounted) _updated(updated);
   }
 
   Future<void> _duplicateReceipt() async {
-    await showAddReceiptSheet(
-      context,
-      tripId:          widget.tripId,
-      userId:          widget.myId,
-      members:         widget.members,
-      existingReceipt: _receipt,
-      isDuplicate:     true,
-    );
+    await _openEditor(context, ref,
+        receipt: _receipt, tripId: widget.tripId, myId: widget.myId,
+        members: widget.members, duplicate: true);
     // The caller (money screen) refreshes on its own via its realtime channel.
   }
 
@@ -130,10 +157,7 @@ class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
                   Navigator.pop(context);
                   widget.onDelete!();
                 },
-          onUpdated: (r) {
-            setState(() => _receipt = r);
-            widget.onUpdated?.call(r);
-          },
+          onUpdated: _updated,
         ),
       ),
     );
@@ -142,7 +166,7 @@ class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
 
 // ─── Shared detail content ────────────────────────────────────────────────────
 
-class ReceiptDetailContent extends StatelessWidget {
+class ReceiptDetailContent extends ConsumerStatefulWidget {
   const ReceiptDetailContent({
     super.key,
     required this.receipt,
@@ -161,9 +185,196 @@ class ReceiptDetailContent extends StatelessWidget {
   final ValueChanged<Receipt>? onUpdated;
 
   @override
+  ConsumerState<ReceiptDetailContent> createState() => _ReceiptDetailContentState();
+}
+
+class _ReceiptDetailContentState extends ConsumerState<ReceiptDetailContent> {
+  late Receipt _receipt = widget.receipt;
+  RemoteSplit? _remote;
+  bool _checkingLink = false;
+  bool _linkBusy = false;
+  bool _linkQueued = false;
+  final Set<String> _busyShares = {};
+
+  @override
+  void initState() {
+    super.initState();
+    SyncQueue.pendingLinkIds(widget.tripId).then((ids) {
+      if (mounted && ids.contains(_receipt.id)) setState(() => _linkQueued = true);
+    });
+    _checkLink();
+  }
+
+  @override
+  void didUpdateWidget(ReceiptDetailContent old) {
+    super.didUpdateWidget(old);
+    if (!identical(old.receipt, widget.receipt)) {
+      _receipt = widget.receipt;
+      if (old.receipt.splitLinkId != widget.receipt.splitLinkId) _checkLink();
+    }
+  }
+
+  String get _me => supabase.auth.currentUser?.id ?? widget.myId;
+  bool get _isOrganiser => ref.read(isOrganiserProvider);
+  /// Can change the split itself (RLS: payer, creator or trip owner).
+  bool get _canEdit =>
+      _me == _receipt.paidById || _me == _receipt.createdById || _isOrganiser;
+  /// Can mark this share paid (RLS: that person, the payer or the owner).
+  bool _canSettle(ReceiptSplit s) =>
+      s.memberId == _me || _me == _receipt.paidById || _isOrganiser;
+
+  void _update(Receipt r) {
+    setState(() => _receipt = r);
+    widget.onUpdated?.call(r);
+  }
+
+  Future<bool> _offline() async {
+    final c = await Connectivity().checkConnectivity();
+    return c.every((r) => r == ConnectivityResult.none);
+  }
+
+  // ── Shares ────────────────────────────────────────────────────────────────
+
+  Future<void> _toggleShare(ReceiptSplit split) async {
+    if (_busyShares.contains(split.memberId)) return;
+    final settled = !split.isSettled;
+    final before = _receipt;
+    setState(() => _busyShares.add(split.memberId));
+    _update(_receipt.copyWith(splits: [
+      for (final s in _receipt.splits)
+        s.memberId == split.memberId
+            ? s.copyWith(isSettled: settled, settledAt: DateTime.now())
+            : s,
+    ]));
+    try {
+      await MoneyService.setShareSettled(
+          receiptId: _receipt.id, memberId: split.memberId, settled: settled);
+      unawaited(_pushLinkQuietly());
+    } catch (_) {
+      if (await _offline()) {
+        await SyncQueue.enqueueSettleShare(widget.tripId,
+            receiptId: _receipt.id, memberId: split.memberId, settled: settled);
+        if (mounted) showWabwaySnack(context, 'Saved offline — will sync when you reconnect');
+      } else {
+        _update(before);
+        if (mounted) showWabwaySnack(context, 'Could not update. Try again.', error: true);
+      }
+    } finally {
+      if (mounted) setState(() => _busyShares.remove(split.memberId));
+    }
+  }
+
+  // ── Receipts link ─────────────────────────────────────────────────────────
+
+  Future<void> _checkLink() async {
+    if (_receipt.splitLinkId == null) {
+      if (_remote != null) setState(() => _remote = null);
+      return;
+    }
+    setState(() => _checkingLink = true);
+    try {
+      final remote = await ReceiptsLinkService.fetch(_receipt, widget.members);
+      if (mounted) setState(() => _remote = remote);
+    } catch (_) {
+      // Offline or the site is down — just don't show remote changes.
+    } finally {
+      if (mounted) setState(() => _checkingLink = false);
+    }
+  }
+
+  bool get _remoteChanged =>
+      _remote != null && _receipt.splitLinkHash != null && _remote!.hash != _receipt.splitLinkHash;
+
+  /// Keep the link in step after a WabWay change (e.g. a share marked paid),
+  /// unless someone changed the link in the meantime.
+  Future<void> _pushLinkQuietly() async {
+    if (_receipt.splitLinkId == null) return;
+    final (result, updated) = await ReceiptsLinkService.push(_receipt, widget.members);
+    if (!mounted) return;
+    if (result == LinkPushResult.pushed) {
+      _update(updated);
+    } else if (result == LinkPushResult.remoteChanged) {
+      unawaited(_checkLink());
+    }
+  }
+
+  Future<void> _createLink() async {
+    setState(() => _linkBusy = true);
+    try {
+      final photos = await ReceiptsLinkService.attachedPhotos(_receipt.id);
+      final updated = await ReceiptsLinkService.create(_receipt, widget.members, photos: photos);
+      if (!mounted) return;
+      _update(updated);
+      _shareLink();
+    } catch (_) {
+      if (await _offline()) {
+        await SyncQueue.enqueueLink(widget.tripId, _receipt.id);
+        if (mounted) {
+          setState(() => _linkQueued = true);
+          showWabwaySnack(context, "You're offline — the link will be created when you reconnect.");
+        }
+      } else if (mounted) {
+        showWabwaySnack(context, "Couldn't create the link. Try again.", error: true);
+      }
+    } finally {
+      if (mounted) setState(() => _linkBusy = false);
+    }
+  }
+
+  void _shareLink() {
+    final id = _receipt.splitLinkId;
+    if (id == null) return;
+    Share.share('Claim what you had from "${_receipt.title}": ${receiptsLinkUrl(id)}',
+        subject: _receipt.title);
+  }
+
+  Future<void> _applyRemote() async {
+    final remote = _remote;
+    if (remote == null) return;
+    setState(() => _linkBusy = true);
+    try {
+      final updated = await ReceiptsLinkService.apply(_receipt, remote, widget.members);
+      if (!mounted) return;
+      _update(updated);
+      setState(() => _remote = null);
+      showWabwaySnack(context, 'Updated from the Receipts link');
+      unawaited(_checkLink());
+    } catch (_) {
+      if (mounted) showWabwaySnack(context, "Couldn't apply the link's changes.", error: true);
+    } finally {
+      if (mounted) setState(() => _linkBusy = false);
+    }
+  }
+
+  Future<void> _overwriteRemote() async {
+    final ok = await showWabwayConfirm(
+      context,
+      title: "Replace the link's changes?",
+      message: 'The link will show the split as it is in WabWay. Claims and paid marks '
+          'made on the link since will be lost.',
+      confirmLabel: 'Replace',
+    );
+    if (!ok || !mounted) return;
+    setState(() => _linkBusy = true);
+    try {
+      final updated = await ReceiptsLinkService.overwrite(_receipt, widget.members);
+      if (!mounted) return;
+      _update(updated);
+      unawaited(_checkLink());
+    } catch (_) {
+      if (mounted) showWabwaySnack(context, "Couldn't update the link.", error: true);
+    } finally {
+      if (mounted) setState(() => _linkBusy = false);
+    }
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
+
+  @override
   Widget build(BuildContext context) {
-    final payer = memberById(receipt.paidById, members);
-    final net   = receipt.myNetFor(myId);
+    final receipt = _receipt;
+    final payer = memberById(receipt.paidById, widget.members);
+    final net   = receipt.myNetFor(widget.myId);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -190,6 +401,10 @@ class ReceiptDetailContent extends StatelessWidget {
                   ),
                   const SizedBox(width: kSpace3),
                   WabwayTag(label: receipt.category.label),
+                  if (receipt.isFullySettled) ...[
+                    const SizedBox(width: kSpace2),
+                    const WabwayBadge(label: 'All paid', tone: WabwayBadgeTone.success),
+                  ],
                 ],
               ),
               const SizedBox(height: kSpace3),
@@ -224,12 +439,12 @@ class ReceiptDetailContent extends StatelessWidget {
                 value: payer.label,
               ),
 
-              // Net for you
+              // Still outstanding for you
               if (net.abs() > 0.01) ...[
                 const SizedBox(height: kSpace3),
                 _InfoRow(
                   icon: net > 0 ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
-                  label: net > 0 ? 'You are owed' : 'You owe',
+                  label: net > 0 ? 'You are still owed' : 'You still owe',
                   value: fmtAmount(net.abs(), receipt.currency),
                   valueColor: net > 0 ? kColorSuccess : kColorDanger,
                 ),
@@ -259,9 +474,39 @@ class ReceiptDetailContent extends StatelessWidget {
                     split:    s,
                     currency: receipt.currency,
                     paidById: receipt.paidById,
-                    members:  members,
+                    members:  widget.members,
                     total:    receipt.amount,
+                    busy:     _busyShares.contains(s.memberId),
+                    onToggle: s.memberId != receipt.paidById && _canSettle(s)
+                        ? () => _toggleShare(s)
+                        : null,
                   )),
+
+              if (receipt.isItemized) ...[
+                const SizedBox(height: kSpace3),
+                _ItemBreakdown(
+                  items: receipt.items!,
+                  members: widget.members,
+                  currency: receipt.currency,
+                ),
+              ],
+
+              const SizedBox(height: kSpace5),
+              _LinkCard(
+                receipt:      receipt,
+                members:      widget.members,
+                remote:       _remote,
+                remoteChanged: _remoteChanged,
+                checking:     _checkingLink,
+                busy:         _linkBusy,
+                queued:       _linkQueued,
+                canEdit:      _canEdit,
+                onCreate:     _createLink,
+                onShare:      _shareLink,
+                onRefresh:    _checkLink,
+                onApply:      _applyRemote,
+                onOverwrite:  _overwriteRemote,
+              ),
 
               const SizedBox(height: kSpace5),
               const Divider(height: 1),
@@ -270,7 +515,7 @@ class ReceiptDetailContent extends StatelessWidget {
               AttachedDocsSection(
                 entityType: EntityType.receipt,
                 entityId:   receipt.id,
-                tripId:     tripId,
+                tripId:     widget.tripId,
                 entityName: receipt.title,
                 uploadType: DocType.receipt,
                 emptyText:  'Nothing attached yet. Attach the receipt photo, invoice or booking.',
@@ -278,30 +523,23 @@ class ReceiptDetailContent extends StatelessWidget {
               const SizedBox(height: kSpace5),
 
 
-              if (onUpdated != null) ...[
+              if (widget.onUpdated != null) ...[
                 WabwayButton(
                   label: 'Edit receipt',
                   icon: Icons.edit_rounded,
                   variant: WabwayButtonVariant.ghost,
                   fullWidth: true,
                   onPressed: () async {
-                    final myId = supabase.auth.currentUser?.id ?? this.myId;
-                    final updated = await showAddReceiptSheet(
-                      context,
-                      tripId:          tripId,
-                      userId:          myId,
-                      members:         members,
-                      existingReceipt: receipt,
-                    );
-                    if (updated != null && context.mounted) {
-                      onUpdated!(updated);
-                    }
+                    final updated = await _openEditor(context, ref,
+                        receipt: receipt, tripId: widget.tripId,
+                        myId: widget.myId, members: widget.members);
+                    if (updated != null && mounted) _update(updated);
                   },
                 ),
                 const SizedBox(height: kSpace3),
               ],
 
-              if (onDelete != null) ...[
+              if (widget.onDelete != null) ...[
                 WabwayButton(
                   label: 'Delete receipt',
                   icon: Icons.delete_outline_rounded,
@@ -309,7 +547,7 @@ class ReceiptDetailContent extends StatelessWidget {
                   fullWidth: true,
                   onPressed: () async {
                     final ok = await _confirmDelete(context, receipt.title);
-                    if (ok && context.mounted) onDelete!();
+                    if (ok && mounted) widget.onDelete!();
                   },
                 ),
               ],
@@ -320,9 +558,6 @@ class ReceiptDetailContent extends StatelessWidget {
     );
   }
 }
-
-
-
 
 // ─── Info row ─────────────────────────────────────────────────────────────────
 
@@ -401,6 +636,8 @@ class _SplitRow extends StatelessWidget {
     required this.paidById,
     required this.members,
     this.total = 0,
+    this.busy = false,
+    this.onToggle,
   });
 
   final ReceiptSplit split;
@@ -408,6 +645,9 @@ class _SplitRow extends StatelessWidget {
   final String paidById;
   final List<TripMember> members;
   final double total;
+  final bool busy;
+  /// Null when you can't change this share (or it's the payer's own).
+  final VoidCallback? onToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -425,19 +665,19 @@ class _SplitRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  member.name,
+                  member.label,
                   style: kStyleBodyMedium,
                 ),
                 if (isPayer)
-                  Text('paid', style: kStyleCaption),
+                  Text('paid the bill', style: kStyleCaption)
+                else if (split.isSettled)
+                  Text(
+                    split.settledAt != null ? 'paid · ${fmtDate(split.settledAt!)}' : 'paid',
+                    style: kStyleCaption.copyWith(color: kColorSuccess),
+                  ),
               ],
             ),
           ),
-          if (split.isSettled)
-            const Padding(
-              padding: EdgeInsets.only(right: kSpace2),
-              child: Icon(Icons.check_circle_rounded, size: 14, color: kColorSuccess),
-            ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -457,9 +697,309 @@ class _SplitRow extends StatelessWidget {
                 ),
             ],
           ),
+          if (!isPayer) ...[
+            const SizedBox(width: kSpace2),
+            SizedBox(
+              width: 92,
+              child: busy
+                  ? const Center(
+                      child: SizedBox(
+                        width: 16, height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: kColorPrimary),
+                      ),
+                    )
+                  : split.isSettled
+                      ? TextButton.icon(
+                          onPressed: onToggle,
+                          icon: const Icon(Icons.check_circle_rounded, size: 16, color: kColorSuccess),
+                          label: Text('Paid', style: kStyleCaptionMedium.copyWith(color: kColorSuccess)),
+                        )
+                      : onToggle == null
+                          ? const SizedBox.shrink()
+                          : WabwayButton(
+                              label: 'Mark paid',
+                              size: WabwayButtonSize.sm,
+                              variant: WabwayButtonVariant.ghost,
+                              onPressed: onToggle,
+                            ),
+            ),
+          ],
         ],
       ),
     );
   }
 }
 
+// ─── Item breakdown ───────────────────────────────────────────────────────────
+
+class _ItemBreakdown extends StatelessWidget {
+  const _ItemBreakdown({required this.items, required this.members, required this.currency});
+  final ReceiptItemization items;
+  final List<TripMember> members;
+  final String currency;
+
+  @override
+  Widget build(BuildContext context) {
+    final shares = items.itemSharesByMember();
+    final totals = items.personTotals(members.map((m) => m.id));
+    final unclaimed = items.unclaimed;
+    return Container(
+      decoration: BoxDecoration(
+        color: kColorPaper,
+        borderRadius: kRadiusMd,
+        border: Border.all(color: kColorBorder),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          leading: const Icon(Icons.receipt_long_rounded, color: kColorInkSoft),
+          title: Text('Who had what', style: kStyleBodyMedium),
+          subtitle: Text(
+            '${pluralize(items.items.length, 'item')}'
+            '${items.extras.abs() > 0.005 ? ' · tax & tip shared by what each had' : ''}',
+            style: kStyleCaption,
+          ),
+          childrenPadding: const EdgeInsets.fromLTRB(kSpace4, 0, kSpace4, kSpace3),
+          children: [
+            for (final m in members)
+              if (shares[m.id]?.isNotEmpty ?? false) ...[
+                Padding(
+                  padding: const EdgeInsets.only(top: kSpace2, bottom: kSpace1),
+                  child: Row(
+                    children: [
+                      WabwayAvatar(name: m.name, size: WabwayAvatarSize.xs),
+                      const SizedBox(width: kSpace2),
+                      Expanded(child: Text(m.label, style: kStyleBodySemibold)),
+                      Text(fmtAmount(totals[m.id] ?? 0, currency), style: kStyleBodySemibold),
+                    ],
+                  ),
+                ),
+                for (final sh in shares[m.id]!)
+                  _Line(sh.item.quantity > 1 ? '${fmtQty(sh.item.quantity)}× ${sh.item.name}' : sh.item.name,
+                      fmtAmount(sh.share, currency)),
+                if (items.extras.abs() > 0.005)
+                  _Line('Tax / tip share',
+                      fmtAmount((totals[m.id] ?? 0) - shares[m.id]!.fold(0.0, (a, s) => a + s.share), currency)),
+              ],
+            if (unclaimed.isNotEmpty) ...[
+              const SizedBox(height: kSpace2),
+              Text('Not claimed (payer covers)', style: kStyleCaptionMedium.copyWith(color: kColorWarning)),
+              for (final u in unclaimed) _Line(u.item.name, fmtAmount(u.amount, currency)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Line extends StatelessWidget {
+  const _Line(this.label, this.value);
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: kSpace6, bottom: 2),
+      child: Row(
+        children: [
+          Expanded(child: Text(label, style: kStyleCaption.copyWith(color: kColorInk))),
+          Text(value, style: kStyleCaption.copyWith(color: kColorInk)),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Receipts link card ───────────────────────────────────────────────────────
+
+class _LinkCard extends StatelessWidget {
+  const _LinkCard({
+    required this.receipt,
+    required this.members,
+    required this.remote,
+    required this.remoteChanged,
+    required this.checking,
+    required this.busy,
+    required this.queued,
+    required this.canEdit,
+    required this.onCreate,
+    required this.onShare,
+    required this.onRefresh,
+    required this.onApply,
+    required this.onOverwrite,
+  });
+
+  final Receipt receipt;
+  final List<TripMember> members;
+  final RemoteSplit? remote;
+  final bool remoteChanged;
+  final bool checking;
+  final bool busy;
+  final bool queued;
+  final bool canEdit;
+  final VoidCallback onCreate;
+  final VoidCallback onShare;
+  final VoidCallback onRefresh;
+  final VoidCallback onApply;
+  final VoidCallback onOverwrite;
+
+  /// What differs between the link and WabWay, per person.
+  List<String> _changes() {
+    final r = remote;
+    if (r == null) return const [];
+    final ids = members.map((m) => m.id);
+    final now = {for (final s in receipt.splits) s.memberId: s};
+    final remoteTotals = r.items.personTotals(ids);
+    final out = <String>[];
+    for (final m in members) {
+      final before = now[m.id]?.amount ?? 0;
+      final after = remoteTotals[m.id] ?? 0;
+      if ((before - after).abs() >= 0.01) {
+        out.add('${m.label}: ${fmtAmount(before, receipt.currency)} → ${fmtAmount(after, receipt.currency)}');
+      }
+      if (m.id != receipt.paidById && r.paidMemberIds.contains(m.id) && !(now[m.id]?.isSettled ?? false)) {
+        out.add('${m.label} marked paid');
+      }
+    }
+    if (r.unknownPeople.isNotEmpty) {
+      out.add('Not in the trip: ${r.unknownPeople.join(', ')} (their part stays with the payer)');
+    }
+    return out;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final id = receipt.splitLinkId;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(kSpace3),
+      decoration: BoxDecoration(
+        color: kColorSurfaceSunken,
+        borderRadius: kRadiusMd,
+        border: Border.all(color: kColorBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.link_rounded, size: 18, color: kColorInkSoft),
+              const SizedBox(width: kSpace2),
+              Expanded(child: Text('Receipts link', style: kStyleBodyMedium)),
+              if (id != null)
+                checking
+                    ? const SizedBox(
+                        width: 16, height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: kColorInkSoft),
+                      )
+                    : IconButton(
+                        icon: const Icon(Icons.refresh_rounded, size: 18),
+                        color: kColorInkSoft,
+                        tooltip: 'Check for changes',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: onRefresh,
+                      ),
+            ],
+          ),
+          const SizedBox(height: kSpace1),
+          if (id == null && queued)
+            Text("Will be created when you're back online.", style: kStyleCaption)
+          else if (id == null) ...[
+            Text('Let people claim items and mark themselves paid on receipts.wabble.ca — '
+                'no account needed.', style: kStyleCaption),
+            const SizedBox(height: kSpace2),
+            WabwayButton(
+              label: 'Create link',
+              icon: Icons.add_link_rounded,
+              size: WabwayButtonSize.sm,
+              variant: WabwayButtonVariant.secondary,
+              loading: busy,
+              onPressed: busy ? null : onCreate,
+            ),
+          ] else ...[
+            SelectableText(receiptsLinkUrl(id),
+                style: kStyleCaption.copyWith(color: kColorPrimary)),
+            const SizedBox(height: kSpace2),
+            Wrap(
+              spacing: kSpace2,
+              runSpacing: kSpace2,
+              children: [
+                WabwayButton(
+                  label: 'Share',
+                  icon: Icons.ios_share_rounded,
+                  size: WabwayButtonSize.sm,
+                  variant: WabwayButtonVariant.secondary,
+                  onPressed: onShare,
+                ),
+                WabwayButton(
+                  label: 'Copy',
+                  icon: Icons.copy_rounded,
+                  size: WabwayButtonSize.sm,
+                  variant: WabwayButtonVariant.ghost,
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: receiptsLinkUrl(id)));
+                    showWabwaySnack(context, 'Link copied');
+                  },
+                ),
+                WabwayButton(
+                  label: 'Open',
+                  icon: Icons.open_in_new_rounded,
+                  size: WabwayButtonSize.sm,
+                  variant: WabwayButtonVariant.ghost,
+                  onPressed: () => launchUrl(Uri.parse(receiptsLinkUrl(id)),
+                      mode: LaunchMode.externalApplication),
+                ),
+              ],
+            ),
+            if (remoteChanged) ...[
+              const SizedBox(height: kSpace3),
+              Container(
+                padding: const EdgeInsets.all(kSpace3),
+                decoration: const BoxDecoration(color: kColorWarningSoft, borderRadius: kRadiusMd),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Changes on the link', style: kStyleBodySemibold),
+                    const SizedBox(height: kSpace1),
+                    for (final c in _changes()) Text('• $c', style: kStyleCaption.copyWith(color: kColorInk)),
+                    if (_changes().isEmpty)
+                      Text('Items or claims were edited on the link.', style: kStyleCaption),
+                    const SizedBox(height: kSpace2),
+                    if (canEdit)
+                      Wrap(
+                        spacing: kSpace2,
+                        runSpacing: kSpace2,
+                        children: [
+                          WabwayButton(
+                            label: 'Apply to WabWay',
+                            icon: Icons.download_rounded,
+                            size: WabwayButtonSize.sm,
+                            loading: busy,
+                            onPressed: busy ? null : onApply,
+                          ),
+                          WabwayButton(
+                            label: "Keep WabWay's",
+                            size: WabwayButtonSize.sm,
+                            variant: WabwayButtonVariant.ghost,
+                            onPressed: busy ? null : onOverwrite,
+                          ),
+                        ],
+                      )
+                    else
+                      Text(
+                        'Only ${memberById(receipt.paidById, members).label} (who paid) '
+                        'or the organiser can apply these.',
+                        style: kStyleCaption,
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+}

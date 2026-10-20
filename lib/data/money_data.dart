@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'member_data.dart';
+import 'receipt_items.dart';
 export 'member_data.dart';
+export 'receipt_items.dart';
 export 'date_utils.dart' show fmtDate;
 
 // ─── Receipt ──────────────────────────────────────────────────────────────────
@@ -45,15 +47,33 @@ enum ReceiptCategory {
   };
 }
 
+/// One person's share of a receipt, in the receipt's currency.
+///
+/// Shares are the source of truth for who owes whom: an open share counts in
+/// balances, a settled one doesn't. [settlementId] is set when the share was
+/// settled as part of a Settle Up payment (undoing that payment reopens it).
 class ReceiptSplit {
   const ReceiptSplit({
     required this.memberId,
     required this.amount,
     this.isSettled = false,
+    this.settledAt,
+    this.settlementId,
   });
   final String memberId;
   final double amount;
   final bool isSettled;
+  final DateTime? settledAt;
+  final String? settlementId;
+
+  ReceiptSplit copyWith({bool? isSettled, DateTime? settledAt, String? settlementId}) =>
+      ReceiptSplit(
+        memberId:     memberId,
+        amount:       amount,
+        isSettled:    isSettled ?? this.isSettled,
+        settledAt:    (isSettled ?? this.isSettled) ? (settledAt ?? this.settledAt) : null,
+        settlementId: (isSettled ?? this.isSettled) ? (settlementId ?? this.settlementId) : null,
+      );
 }
 
 class Receipt {
@@ -71,6 +91,11 @@ class Receipt {
     required this.date,
     this.notes,
     this.storagePath,
+    this.items,
+    this.splitLinkId,
+    this.splitLinkMembers = const [],
+    this.splitLinkHash,
+    this.createdById,
   });
 
   final String id;
@@ -85,12 +110,59 @@ class Receipt {
   /// Card foreign transaction fee % applied on top of the exchange rate.
   final double transactionFeePct;
   final String paidById;
-  /// Split amounts are in home currency.
+  /// Split amounts are in the receipt's [currency] (like [amount]).
   final List<ReceiptSplit> splits;
   final ReceiptCategory category;
   final DateTime date;
   final String? notes;
   final String? storagePath;
+  /// The itemized bill and who had what — null when split by amount.
+  final ReceiptItemization? items;
+  /// The receipts.wabble.ca split published from this receipt.
+  final String? splitLinkId;
+  /// Member ids in the link's person order (person id = index).
+  final List<String> splitLinkMembers;
+  /// Hash of the link's content when WabWay last wrote or read it — a
+  /// different hash on the link means someone changed it there.
+  final String? splitLinkHash;
+  final String? createdById;
+
+  bool get isItemized => items != null && !items!.isEmpty;
+
+  Receipt copyWith({
+    List<ReceiptSplit>? splits,
+    ReceiptItemization? items,
+    String? splitLinkId,
+    List<String>? splitLinkMembers,
+    String? splitLinkHash,
+  }) =>
+      Receipt(
+        id:                id,
+        title:             title,
+        amount:            amount,
+        currency:          currency,
+        homeAmount:        homeAmount,
+        exchangeRate:      exchangeRate,
+        transactionFeePct: transactionFeePct,
+        paidById:          paidById,
+        splits:            splits ?? this.splits,
+        category:          category,
+        date:              date,
+        notes:             notes,
+        storagePath:       storagePath,
+        items:             items ?? this.items,
+        splitLinkId:       splitLinkId ?? this.splitLinkId,
+        splitLinkMembers:  splitLinkMembers ?? this.splitLinkMembers,
+        splitLinkHash:     splitLinkHash ?? this.splitLinkHash,
+        createdById:       createdById,
+      );
+
+  /// Open (unsettled) shares owed to the payer by other people.
+  Iterable<ReceiptSplit> get openDebts =>
+      splits.where((s) => s.memberId != paidById && !s.isSettled);
+
+  bool get isFullySettled =>
+      splits.any((s) => s.memberId != paidById) && openDebts.isEmpty;
 
   /// True when the receipt was entered in a foreign currency and a real rate was applied.
   bool get isForeignCurrency => exchangeRate != 1.0;
@@ -101,12 +173,12 @@ class Receipt {
   double myShareFor(String myId) =>
       splits.where((s) => s.memberId == myId).fold(0.0, (a, s) => a + s.amount);
 
-  // Positive = net owed to you, Negative = you owe someone.
+  // Still outstanding: positive = owed to you, negative = you owe someone.
   double myNetFor(String myId) {
     if (paidById == myId) {
-      return splits.where((s) => s.memberId != myId).fold(0.0, (a, s) => a + s.amount);
+      return openDebts.fold(0.0, (a, s) => a + s.amount);
     }
-    final yours = splits.where((s) => s.memberId == myId);
+    final yours = splits.where((s) => s.memberId == myId && !s.isSettled);
     return yours.isEmpty ? 0.0 : -yours.first.amount;
   }
 }
@@ -114,9 +186,16 @@ class Receipt {
 // ─── Cash withdrawal ──────────────────────────────────────────────────────────
 
 class CashDistribution {
-  const CashDistribution({required this.memberId, required this.amount});
+  const CashDistribution({
+    required this.memberId,
+    required this.amount,
+    this.isSettled = false,
+    this.settlementId,
+  });
   final String memberId;
   final double amount;
+  final bool isSettled;
+  final String? settlementId;
 }
 
 class CashWithdrawal {
@@ -147,9 +226,11 @@ class CashWithdrawal {
 
   double myNetFor(String myId) {
     if (withdrawnById == myId) {
-      return distributions.where((d) => d.memberId != myId).fold(0.0, (a, d) => a + d.amount);
+      return distributions
+          .where((d) => d.memberId != myId && !d.isSettled)
+          .fold(0.0, (a, d) => a + d.amount);
     }
-    final yours = distributions.where((d) => d.memberId == myId);
+    final yours = distributions.where((d) => d.memberId == myId && !d.isSettled);
     return yours.isEmpty ? 0.0 : -yours.first.amount;
   }
 }
@@ -178,6 +259,7 @@ List<MemberBalance> calculateBalances(
 
   for (final r in receipts) {
     for (final split in r.splits) {
+      if (split.isSettled) continue;
       if (r.paidById == me && split.memberId != me) {
         net[split.memberId] = (net[split.memberId] ?? 0) + split.amount;
       } else if (r.paidById != me && split.memberId == me) {
@@ -189,13 +271,13 @@ List<MemberBalance> calculateBalances(
   for (final w in withdrawals) {
     if (w.withdrawnById == me) {
       for (final d in w.distributions) {
-        if (d.memberId != me) {
+        if (d.memberId != me && !d.isSettled) {
           net[d.memberId] = (net[d.memberId] ?? 0) + d.amount;
         }
       }
     } else {
       for (final d in w.distributions) {
-        if (d.memberId == me) {
+        if (d.memberId == me && !d.isSettled) {
           net[w.withdrawnById] = (net[w.withdrawnById] ?? 0) - d.amount;
         }
       }
@@ -232,6 +314,7 @@ Map<String, List<MemberBalance>> calculateBalancesGrouped(
 
   for (final r in receipts) {
     for (final split in r.splits) {
+      if (split.isSettled) continue;
       if (r.paidById == me && split.memberId != me) {
         add(r.currency, split.memberId, split.amount);
       } else if (r.paidById != me && split.memberId == me) {
@@ -243,11 +326,11 @@ Map<String, List<MemberBalance>> calculateBalancesGrouped(
   for (final w in withdrawals) {
     if (w.withdrawnById == me) {
       for (final d in w.distributions) {
-        if (d.memberId != me) add(w.currency, d.memberId, d.amount);
+        if (d.memberId != me && !d.isSettled) add(w.currency, d.memberId, d.amount);
       }
     } else {
       for (final d in w.distributions) {
-        if (d.memberId == me) add(w.currency, w.withdrawnById, -d.amount);
+        if (d.memberId == me && !d.isSettled) add(w.currency, w.withdrawnById, -d.amount);
       }
     }
   }
@@ -288,9 +371,42 @@ class Settlement {
   final DateTime settledAt;
   final String settledBy;
   final String? note;
+}
 
-  bool matches(String fromId, String toId) =>
-      fromMemberId == fromId && toMemberId == toId;
+/// The open shares between two people in one currency, both directions —
+/// what a Settle Up payment between them clears.
+class OpenShares {
+  const OpenShares({this.receiptShares = const [], this.cashShares = const []});
+  /// (receiptId, memberId)
+  final List<(String, String)> receiptShares;
+  /// (withdrawalId, memberId)
+  final List<(String, String)> cashShares;
+  bool get isEmpty => receiptShares.isEmpty && cashShares.isEmpty;
+}
+
+OpenShares openSharesBetween(
+  List<Receipt> receipts,
+  List<CashWithdrawal> withdrawals, {
+  required String a,
+  required String b,
+  required String currency,
+}) {
+  bool pair(String payer, String debtor) =>
+      (payer == a && debtor == b) || (payer == b && debtor == a);
+  return OpenShares(
+    receiptShares: [
+      for (final r in receipts)
+        if (r.currency == currency)
+          for (final s in r.splits)
+            if (!s.isSettled && pair(r.paidById, s.memberId)) (r.id, s.memberId),
+    ],
+    cashShares: [
+      for (final w in withdrawals)
+        if (w.currency == currency)
+          for (final d in w.distributions)
+            if (!d.isSettled && pair(w.withdrawnById, d.memberId)) (w.id, d.memberId),
+    ],
+  );
 }
 
 // ─── Settlement suggestions ───────────────────────────────────────────────────

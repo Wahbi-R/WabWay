@@ -1,11 +1,13 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/changelog.dart';
 import '../../core/providers/profile_provider.dart';
 import '../../core/providers/trip_provider.dart';
 import '../../core/supabase/auth_service.dart';
+import '../../core/update_checker.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
@@ -19,6 +21,8 @@ import '../pins_screen.dart';
 import '../share/incoming_share_screen.dart';
 import '../trips/trip_actions.dart';
 import '../trips/trip_settings_sheet.dart';
+import '../../widgets/update_checker_banner.dart';
+import '../../widgets/widgets.dart';
 
 // Settings sections shared by mobile More and desktop Settings, so a row added
 // to one screen can't go missing from the other again (AI access, Pinboard,
@@ -32,11 +36,13 @@ class SettingsRow extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.color,
+    this.subtitle,
   });
   final IconData icon;
   final String label;
   final VoidCallback onTap;
   final Color? color;
+  final String? subtitle;
 
   @override
   Widget build(BuildContext context) {
@@ -52,6 +58,7 @@ class SettingsRow extends StatelessWidget {
         child: Icon(icon, size: 20, color: color ?? kColorInkSoft),
       ),
       title: Text(label, style: kStyleBodyMedium.copyWith(color: color ?? kColorInk)),
+      subtitle: subtitle == null ? null : Text(subtitle!, style: kStyleCaption),
       trailing: Icon(Icons.chevron_right_rounded, color: kColorTextTertiary(), size: 18),
       onTap: onTap,
     );
@@ -250,6 +257,7 @@ class AppSettingsSections extends ConsumerWidget {
                   mode: LaunchMode.externalApplication,
                 ),
               ),
+            if (UpdateChecker.supported) const _CheckForUpdatesRow(),
             SettingsRow(
               icon: Icons.new_releases_rounded,
               label: "What's new",
@@ -272,4 +280,63 @@ class AppSettingsSections extends ConsumerWidget {
       ],
     );
   }
+}
+
+/// Android: current version, and a manual check that shows the update (or
+/// says it's the latest) without restarting the app.
+class _CheckForUpdatesRow extends StatefulWidget {
+  const _CheckForUpdatesRow();
+
+  @override
+  State<_CheckForUpdatesRow> createState() => _CheckForUpdatesRowState();
+}
+
+class _CheckForUpdatesRowState extends State<_CheckForUpdatesRow> {
+  String? _version;
+  bool _checking = false;
+
+  @override
+  void initState() {
+    super.initState();
+    PackageInfo.fromPlatform().then((p) {
+      if (mounted) setState(() => _version = 'Version ${p.version} (build ${p.buildNumber})');
+    }).catchError((_) {});
+  }
+
+  Future<void> _check() async {
+    if (_checking) return;
+    setState(() => _checking = true);
+    final info = await UpdateChecker.check(force: true);
+    if (!mounted) return;
+    setState(() => _checking = false);
+    if (info == null) {
+      showWabwaySnack(context, "Couldn't check for updates — are you online?", error: true);
+    } else if (!info.hasUpdate) {
+      showWabwaySnack(context, "You're on the latest version.");
+    } else {
+      await showWabwayAutoSheet<void>(
+        context,
+        builder: (ctx, handle) => Padding(
+          padding: const EdgeInsets.fromLTRB(kSpace4, kSpace2, kSpace4, kSpace6),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (handle) const WabwayDragHandle(),
+              const SizedBox(height: kSpace2),
+              UpdateCard(info: info),
+            ],
+          ),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => SettingsRow(
+        icon: Icons.system_update_rounded,
+        label: _checking ? 'Checking…' : 'Check for updates',
+        subtitle: _version,
+        onTap: _check,
+      );
 }

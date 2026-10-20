@@ -11,6 +11,17 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 433,
+    label: "Smoother updates",
+    changes: [
+      "New versions show up when you come back to the app — no need to close and reopen it",
+      "Settings → Check for updates shows your version and checks right away",
+      "Downloaded updates are cleaned up after you install them, so they don't take up space",
+      "Important updates can now be required before the app can be used",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 432,
     label: "Shares in your currency",
     changes: [

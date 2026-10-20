@@ -9,6 +9,7 @@ import 'core/notifications/notification_service.dart';
 import 'core/share/share_handler.dart';
 import 'screens/auth/auth_gate.dart';
 import 'theme/wabway_theme.dart';
+import 'widgets/update_checker_banner.dart';
 
 // Injected at build time via --dart-define-from-file=.env
 // See .env.example for required keys.
@@ -53,6 +54,8 @@ class WabwayApp extends StatelessWidget {
       title: 'WabWay',
       debugShowCheckedModeBanner: false,
       theme: buildWabwayTheme(),
+      // Checks for updates on launch / return and blocks a too-old build.
+      builder: (context, child) => UpdateGate(child: child!),
       home: const AuthGate(),
     );
   }

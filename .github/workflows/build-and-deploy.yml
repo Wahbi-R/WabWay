@@ -21,6 +21,14 @@ on:
         options:
           - "false"
           - "true"
+      force_update:
+        description: "Make everyone on an older build update before using the app?"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
 
 jobs:
   # ── Web → GitHub Pages ────────────────────────────────────────────────────────
@@ -139,6 +147,32 @@ jobs:
           echo "name=WabWay v${BASE}" >> $GITHUB_OUTPUT
           echo "build=${BUILD}" >> $GITHUB_OUTPUT
 
+      # Forced updates: a push whose commit message (a merge commit carries
+      # the PR title) contains "[force update]", or a manual run with
+      # force_update, makes this build the minimum. Otherwise the previous
+      # release's minimum carries forward, so a later normal release doesn't
+      # let older builds off. The app reads <!-- min-build: N --> from the
+      # latest release (UpdateChecker) and blocks builds below it.
+      - name: Minimum build (forced updates)
+        id: minbuild
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+          FORCE_INPUT: ${{ github.event.inputs.force_update }}
+          BUILD: ${{ steps.version.outputs.build }}
+        run: |
+          PREV=$(gh api "repos/${{ github.repository }}/releases/latest" --jq '.body' 2>/dev/null \
+            | grep -oP 'min-build:\s*\K[0-9]+' | head -1 || true)
+          MIN=${PREV:-0}
+          NOTE=""
+          if [ "$FORCE_INPUT" = "true" ] || printf '%s' "$COMMIT_MSG" | grep -qi '\[force update\]'; then
+            MIN=$BUILD
+            NOTE="Required update: older versions ask to update before they can be used."
+          fi
+          echo "min=$MIN" >> "$GITHUB_OUTPUT"
+          echo "note=$NOTE" >> "$GITHUB_OUTPUT"
+          echo "Minimum build: $MIN"
+
       - name: Set up signing
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/wabway-release.jks
@@ -165,5 +199,7 @@ jobs:
           body: |
             Install on Android: download the APK below, tap it, and follow the prompts.
             Enable "Install from unknown sources" if prompted.
+            ${{ steps.minbuild.outputs.note }}
+            <!-- min-build: ${{ steps.minbuild.outputs.min }} -->
           files: build/app/outputs/flutter-apk/wabway-${{ steps.version.outputs.tag }}.apk
           make_latest: true

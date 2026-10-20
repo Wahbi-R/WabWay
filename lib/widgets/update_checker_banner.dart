@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../core/update_checker.dart';
 import '../core/updater/apk_installer.dart';
@@ -6,56 +5,146 @@ import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
 
-/// Self-contained banner that checks for an Android APK update and shows a
-/// dismissible card. Renders nothing on web or non-Android platforms and
-/// renders nothing if the app is already up to date.
+/// Dismissible "Update available" card for Home / sign-in / trip picker.
+/// Follows [UpdateChecker.latest], so it appears whenever a check finds a
+/// new build (launch, coming back to the app, Settings → Check for
+/// updates) — no restart needed. Renders nothing when up to date, on web,
+/// and in debug builds.
 class UpdateCheckerBanner extends StatefulWidget {
   const UpdateCheckerBanner({super.key});
+
+  /// Versions dismissed this session (the banner sits on several screens).
+  static final Set<String> _dismissed = {};
 
   @override
   State<UpdateCheckerBanner> createState() => _UpdateCheckerBannerState();
 }
 
 class _UpdateCheckerBannerState extends State<UpdateCheckerBanner> {
-  UpdateInfo? _info;
-  bool _dismissed = false;
-
   @override
   void initState() {
     super.initState();
-    if (!kIsWeb) _check();
-  }
-
-  Future<void> _check() async {
-    if (kDebugMode) return;
-    final info = await UpdateChecker.check();
-    if (mounted && info != null && info.hasUpdate) {
-      setState(() => _info = info);
-    }
+    UpdateChecker.check();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_info == null || _dismissed) return const SizedBox.shrink();
-    return _UpdateBannerContent(
-      info: _info!,
-      onDismiss: () => setState(() => _dismissed = true),
+    return ValueListenableBuilder<UpdateInfo?>(
+      valueListenable: UpdateChecker.latest,
+      builder: (context, info, _) {
+        if (info == null || !info.hasUpdate || UpdateCheckerBanner._dismissed.contains(info.latestTag)) {
+          return const SizedBox.shrink();
+        }
+        return UpdateCard(
+          info: info,
+          onDismiss: () => setState(() => UpdateCheckerBanner._dismissed.add(info.latestTag)),
+        );
+      },
     );
   }
 }
 
-// ─── Banner UI ────────────────────────────────────────────────────────────────
-
-class _UpdateBannerContent extends StatefulWidget {
-  const _UpdateBannerContent({required this.info, required this.onDismiss});
-  final UpdateInfo info;
-  final VoidCallback onDismiss;
+/// Keeps the app on a supported build: checks for updates on launch and
+/// whenever the app comes back to the foreground, and when a release says
+/// this build must update ([UpdateInfo.isRequired]), covers the app with
+/// [_UpdateRequiredScreen] until it's updated. Wraps the whole app
+/// (MaterialApp.builder).
+class UpdateGate extends StatefulWidget {
+  const UpdateGate({super.key, required this.child});
+  final Widget child;
 
   @override
-  State<_UpdateBannerContent> createState() => _UpdateBannerContentState();
+  State<UpdateGate> createState() => _UpdateGateState();
 }
 
-class _UpdateBannerContentState extends State<_UpdateBannerContent> {
+class _UpdateGateState extends State<UpdateGate> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    UpdateChecker.check();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) UpdateChecker.check();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<UpdateInfo?>(
+      valueListenable: UpdateChecker.latest,
+      builder: (context, info, child) => Stack(
+        children: [
+          child!,
+          if (info != null && info.isRequired) Positioned.fill(child: _UpdateRequiredScreen(info: info)),
+        ],
+      ),
+      child: widget.child,
+    );
+  }
+}
+
+class _UpdateRequiredScreen extends StatelessWidget {
+  const _UpdateRequiredScreen({required this.info});
+  final UpdateInfo info;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: kColorCream,
+      child: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(kSpace6),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Icon(Icons.system_update_rounded, size: 48, color: kColorPrimary),
+                  const SizedBox(height: kSpace4),
+                  Text('Update required', style: kStyleTitle, textAlign: TextAlign.center),
+                  const SizedBox(height: kSpace2),
+                  Text(
+                    'This version of WabWay is too old to keep using — install the update to carry on. '
+                    'Your trips are safe.',
+                    style: kStyleBody.copyWith(color: kColorInkSoft),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: kSpace5),
+                  UpdateCard(info: info),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Update card ──────────────────────────────────────────────────────────────
+
+/// "Update available — v1.1.0+188" with Download & install, progress and
+/// retry. [onDismiss] shows an ✕ (omit it where the update can't be skipped).
+class UpdateCard extends StatefulWidget {
+  const UpdateCard({super.key, required this.info, this.onDismiss});
+  final UpdateInfo info;
+  final VoidCallback? onDismiss;
+
+  @override
+  State<UpdateCard> createState() => _UpdateCardState();
+}
+
+class _UpdateCardState extends State<UpdateCard> {
   double? _progress;
   String? _error;
 
@@ -69,7 +158,8 @@ class _UpdateBannerContentState extends State<_UpdateBannerContent> {
       onProgress: (p) { if (mounted) setState(() => _progress = p); },
       onComplete: (err) {
         if (!mounted) return;
-        if (err != null) setState(() { _progress = null; _error = err; });
+        // Installer opened (or failed): let them tap again if they backed out.
+        setState(() { _progress = null; _error = err; });
       },
     );
   }
@@ -148,10 +238,11 @@ class _UpdateBannerContentState extends State<_UpdateBannerContent> {
                 ],
               ),
             ),
-            GestureDetector(
-              onTap: widget.onDismiss,
-              child: const Icon(Icons.close_rounded, size: 16, color: kColorInkSoft),
-            ),
+            if (widget.onDismiss != null)
+              GestureDetector(
+                onTap: widget.onDismiss,
+                child: const Icon(Icons.close_rounded, size: 16, color: kColorInkSoft),
+              ),
           ],
         ),
       ),

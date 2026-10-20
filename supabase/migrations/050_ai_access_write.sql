@@ -1,4 +1,4 @@
--- Build 423: AI access can add and edit (opt-in per token).
+-- Build 424: AI access can add and edit (opt-in per token).
 --
 -- ai_access_tokens.can_write: chosen when the token is created; existing tokens
 -- stay read-only. wabway-server performs writes AS THE USER (short-lived JWT),

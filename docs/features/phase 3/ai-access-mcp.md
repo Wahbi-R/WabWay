@@ -55,7 +55,7 @@ never have to screenshot a booking to ask an AI about it. Read-only.
   `trip` arguments accept a name, destination or id and default to the
   current/next trip.
 
-## Add & edit (build 423)
+## Add & edit (build 424; wabway-server build 423)
 
 Tokens are read only unless you choose **Add & edit** when creating one
 (`ai_access_tokens.can_write`, migration `050_ai_access_write.sql`). Those

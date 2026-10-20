@@ -64,11 +64,21 @@ class ReceiptListTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    receipt.title,
-                    style: kStyleBodySemibold,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          receipt.title,
+                          style: kStyleBodySemibold,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (receipt.isPending) ...[
+                        const SizedBox(width: kSpace2),
+                        const WabwayBadge(label: 'Waiting to sync', tone: WabwayBadgeTone.warning),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: 2),
                   Text(

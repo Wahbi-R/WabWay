@@ -129,6 +129,9 @@ class Receipt {
 
   bool get isItemized => items != null && !items!.isEmpty;
 
+  /// Saved offline on this phone and not uploaded yet (see SyncQueue).
+  bool get isPending => id.startsWith('pending-');
+
   Receipt copyWith({
     List<ReceiptSplit>? splits,
     ReceiptItemization? items,

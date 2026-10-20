@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import '../data/connection_data.dart' show EntityType;
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
@@ -118,15 +119,18 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
       _loadAll();
       if (_activeTripId.isNotEmpty) _subscribeRealtime(_activeTripId);
     });
-    SyncQueue.changes.addListener(_onQueueChanged);
+    // Receipts saved elsewhere (Read booking, the offline queue).
+    reloadOnChanges(const [EntityType.receipt], _scheduleReload);
   }
 
-  /// Something was queued offline, uploaded or discarded — refresh the list.
-  void _onQueueChanged() => _scheduleReload();
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    reloadWhenShown(_scheduleReload);
+  }
 
   @override
   void dispose() {
-    SyncQueue.changes.removeListener(_onQueueChanged);
     _debounce?.cancel();
     _realtimeChannel?.unsubscribe();
     _searchCtrl.dispose();

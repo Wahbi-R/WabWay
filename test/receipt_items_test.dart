@@ -158,6 +158,17 @@ void main() {
       final payload = ReceiptsLinkService.buildPayload(receipt: rc, members: members, order: order);
       expect((payload['people'] as List).length, 3);
       expect(payload['paid'], {'0': true, '2': true}); // payer + settled share
+      // The Receipts site formats amounts in it (¥8,570, not $8570.00).
+      expect((payload['receipt'] as Map)['currency'], rc.currency);
+      expect((payload['receipt'] as Map).containsKey('home_rate'), isFalse,
+          reason: 'no home currency given → one currency on the site');
+      final withHome = ReceiptsLinkService.buildPayload(
+          receipt: rc, members: members, order: order, homeCurrency: 'XYZ')['receipt'] as Map;
+      expect(withHome['home_currency'], 'XYZ');
+      expect(withHome['home_rate'], rc.homeAmount / rc.amount,
+          reason: 'the rate actually used, incl. override / card fee');
+      expect(ReceiptsLinkService.hashOf({...payload, 'receipt': withHome}), ReceiptsLinkService.hashOf(payload),
+          reason: "adding the currencies doesn't look like someone edited the link");
       final linked = rc.copyWith(splitLinkId: 'x', splitLinkMembers: order,
           splitLinkHash: ReceiptsLinkService.hashOf(payload));
       final remote = ReceiptsLinkService.parseRemote(payload, linked, members);

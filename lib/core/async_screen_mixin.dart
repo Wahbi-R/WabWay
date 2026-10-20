@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../data/connection_data.dart' show EntityType;
+import 'trip_data_changes.dart';
 
 /// Mixin for [State] subclasses that perform async data loads.
 ///
@@ -111,5 +113,38 @@ mixin AsyncScreenMixin<T extends StatefulWidget> on State<T> {
         errorMessage = message ?? '';
       }
     });
+  }
+
+  // ─── Staying current in a kept-alive tab ────────────────────────────────────
+
+  final List<(Listenable, VoidCallback)> _watched = [];
+  bool _shown = true;
+
+  /// Runs [reload] whenever one of [kinds] is saved elsewhere in the app
+  /// ([TripDataChanges.touch]). Call once, from initState; removed on dispose.
+  void reloadOnChanges(Iterable<EntityType> kinds, VoidCallback reload) {
+    for (final k in kinds) {
+      final l = TripDataChanges.of(k);
+      l.addListener(reload);
+      _watched.add((l, reload));
+    }
+  }
+
+  /// Runs [reload] when a tab kept alive by the shell is shown again (the
+  /// shell wraps each tab in `TickerMode(enabled: selected)`), so changes
+  /// made on other tabs show without pull-to-refresh. Call from
+  /// didChangeDependencies.
+  void reloadWhenShown(VoidCallback reload) {
+    final shown = TickerMode.of(context);
+    if (shown && !_shown && !loading) reload();
+    _shown = shown;
+  }
+
+  @override
+  void dispose() {
+    for (final (l, f) in _watched) {
+      l.removeListener(f);
+    }
+    super.dispose();
   }
 }

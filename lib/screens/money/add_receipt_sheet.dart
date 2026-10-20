@@ -154,7 +154,22 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
   }
 
   void _recomputeHome() {
-    if (!_homeOverride) setState(() {});
+    if (_homeOverride) {
+      _rateFromHome(); // the typed home amount stays; the rate follows it
+    } else {
+      setState(() {});
+    }
+  }
+
+  /// The home amount was typed (Override): work the exchange rate back out
+  /// of it — amount × rate × (1 + card fee) = home amount — so the rate on
+  /// the receipt matches what was actually charged.
+  void _rateFromHome() {
+    final home = double.tryParse(_homeAmountCtrl.text.trim());
+    final amount = double.tryParse(_amountCtrl.text.trim());
+    final feePct = double.tryParse(_feePctCtrl.text.trim()) ?? 0;
+    if (home == null || home <= 0 || amount == null || amount <= 0) return;
+    setState(() => _rateCtrl.text = (home / (amount * (1 + feePct / 100))).toStringAsFixed(6));
   }
 
   Future<void> _fetchRate() async {
@@ -417,11 +432,13 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
         photos:     _photos,
         docIds:     _isEditing ? const [] : _docIds,
         createLink: !_isEditing && _createLink,
+        homeCurrency: widget.homeCurrency,
       );
       receipt = followups.receipt;
       var linkChangedRemotely = false;
       if (_isEditing && receipt.splitLinkId != null) {
-        final (result, pushed) = await ReceiptsLinkService.push(receipt, widget.members);
+        final (result, pushed) = await ReceiptsLinkService.push(receipt, widget.members,
+            homeCurrency: widget.homeCurrency);
         receipt = pushed;
         linkChangedRemotely = result == LinkPushResult.remoteChanged;
       }
@@ -598,11 +615,12 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
                       onRefetchRate:    _fetchRate,
                       onRateChanged:    (_) => setState(() => _homeOverride = false),
                       onFeeToggle:      () => setState(() => _showFee = !_showFee),
-                      onFeeChanged:     (_) => setState(() {}),
+                      onFeeChanged:     (_) => _recomputeHome(),
                       onHomeOverride:   (v) => setState(() {
                         _homeOverride = true;
                         _homeAmountCtrl.text = v;
                       }),
+                      onHomeTyped:      (_) => _rateFromHome(),
                       onHomeOverrideClear: () => setState(() {
                         _homeOverride = false;
                         _homeAmountCtrl.clear();
@@ -773,6 +791,7 @@ class _ConversionSection extends StatelessWidget {
     required this.onFeeChanged,
     required this.onHomeOverride,
     required this.onHomeOverrideClear,
+    required this.onHomeTyped,
   });
 
   final String homeCurrency;
@@ -789,6 +808,7 @@ class _ConversionSection extends StatelessWidget {
   final ValueChanged<String> onFeeChanged;
   final ValueChanged<String> onHomeOverride;
   final VoidCallback onHomeOverrideClear;
+  final ValueChanged<String> onHomeTyped;
 
   @override
   Widget build(BuildContext context) {
@@ -916,12 +936,14 @@ class _ConversionSection extends StatelessWidget {
             ),
           ] else ...[
             WabwayTextField(
-              label: '$homeCurrency equivalent (overridden)',
+              label: '$homeCurrency equivalent',
               hint: '0.00',
+              helpText: 'What you were charged — the exchange rate above is worked out from it',
               controller: homeAmountCtrl,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               textInputAction: TextInputAction.next,
               inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
+              onChanged: onHomeTyped,
             ),
             const SizedBox(height: kSpace2),
             GestureDetector(

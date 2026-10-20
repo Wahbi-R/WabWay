@@ -282,6 +282,8 @@ class _ReceiptDetailContentState extends ConsumerState<ReceiptDetailContent> {
     }
   }
 
+  String? get _homeCurrency => ref.read(activeTripProvider)?.homeCurrency;
+
   bool get _remoteChanged =>
       _remote != null && _receipt.splitLinkHash != null && _remote!.hash != _receipt.splitLinkHash;
 
@@ -289,7 +291,8 @@ class _ReceiptDetailContentState extends ConsumerState<ReceiptDetailContent> {
   /// unless someone changed the link in the meantime.
   Future<void> _pushLinkQuietly() async {
     if (_receipt.splitLinkId == null) return;
-    final (result, updated) = await ReceiptsLinkService.push(_receipt, widget.members);
+    final (result, updated) =
+        await ReceiptsLinkService.push(_receipt, widget.members, homeCurrency: _homeCurrency);
     if (!mounted) return;
     if (result == LinkPushResult.pushed) {
       _update(updated);
@@ -302,7 +305,8 @@ class _ReceiptDetailContentState extends ConsumerState<ReceiptDetailContent> {
     setState(() => _linkBusy = true);
     try {
       final photos = await ReceiptsLinkService.attachedPhotos(_receipt.id);
-      final updated = await ReceiptsLinkService.create(_receipt, widget.members, photos: photos);
+      final updated = await ReceiptsLinkService.create(_receipt, widget.members,
+          photos: photos, homeCurrency: _homeCurrency);
       if (!mounted) return;
       _update(updated);
       _shareLink();
@@ -357,7 +361,8 @@ class _ReceiptDetailContentState extends ConsumerState<ReceiptDetailContent> {
     if (!ok || !mounted) return;
     setState(() => _linkBusy = true);
     try {
-      final updated = await ReceiptsLinkService.overwrite(_receipt, widget.members);
+      final updated =
+          await ReceiptsLinkService.overwrite(_receipt, widget.members, homeCurrency: _homeCurrency);
       if (!mounted) return;
       _update(updated);
       unawaited(_checkLink());
@@ -423,6 +428,19 @@ class _ReceiptDetailContentState extends ConsumerState<ReceiptDetailContent> {
                   color: kColorInk,
                 ),
               ),
+              // What it came to in the trip's home currency (same as the list).
+              if (receipt.isForeignCurrency) ...[
+                const SizedBox(height: kSpace1),
+                Text(
+                  '≈ ${fmtAmount(receipt.homeAmount, ref.watch(activeTripProvider)?.homeCurrency ?? 'CAD')}'
+                  '${receipt.transactionFeePct > 0 ? ' incl. ${receipt.transactionFeePct.toStringAsFixed(1)}% card fee' : ''}',
+                  style: GoogleFonts.ibmPlexMono(
+                    fontSize: kTextBase,
+                    fontWeight: FontWeight.w500,
+                    color: kColorInkSoft,
+                  ),
+                ),
+              ],
             ],
           ),
         ),

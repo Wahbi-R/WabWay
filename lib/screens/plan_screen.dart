@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import '../data/connection_data.dart' show EntityType;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
@@ -152,6 +153,8 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
   @override
   void initState() {
     super.initState();
+    // Saved elsewhere (Read booking, Import) while this tab stayed alive.
+    reloadOnChanges(const [EntityType.planItem, EntityType.travel, EntityType.stay], () => _loadAll(silent: true));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _userId = supabase.auth.currentUser?.id ?? '';
@@ -159,6 +162,12 @@ class _PlanScreenState extends ConsumerState<PlanScreen> with AsyncScreenMixin {
       _loadAll();
       if (_activeTripId.isNotEmpty) _subscribeRealtime(_activeTripId);
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    reloadWhenShown(() => _loadAll(silent: true));
   }
 
   @override

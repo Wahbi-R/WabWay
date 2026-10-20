@@ -19,6 +19,7 @@ import '../../core/supabase/accommodation_service.dart';
 import '../../core/supabase/doc_service.dart';
 import '../../core/supabase/plan_service.dart';
 import '../../core/supabase/travel_service.dart';
+import '../../core/trip_data_changes.dart';
 import '../../core/text_utils.dart';
 import '../../data/accommodation_data.dart';
 import '../../data/connection_data.dart' show EntityType;
@@ -311,6 +312,7 @@ class _BookingReviewScreenState extends ConsumerState<BookingReviewScreen>
       docIds: [if (docId != null) docId],
       createLink: _createLink,
       linkPhotos: _createLink ? await _linkPhotos(r) : const [],
+      homeCurrency: home,
     )).receipt;
     return true;
   }
@@ -495,6 +497,11 @@ class _BookingReviewScreenState extends ConsumerState<BookingReviewScreen>
         final receiptId = r.receiptId ?? (r.addReceipt ? null : r.existingReceipt?.id);
         if (receiptId != null) await _linkReceipt(r, receiptId);
       }
+      // Money / Travel / Stays / Plan tabs stay alive behind this screen.
+      TripDataChanges.touch(const [
+        EntityType.travel, EntityType.stay, EntityType.planItem,
+        EntityType.receipt, EntityType.doc,
+      ]);
       if (!mounted) return;
       showWabwaySnack(
           context,

@@ -108,3 +108,15 @@ Tests: `test/booking_receipts_test.dart`. It uses the real three-confirmation
 thread, and covers receipts per booking, splits, deposit/due/free, the
 currency fallback, matching receipts already in Money, thousands separators,
 and the review screen.
+
+## Fixes (build 429)
+
+- **Receipts appeared only after restarting the app.** The shell keeps tabs
+  alive and they refreshed only from realtime, which misses changes made while
+  its connection is down. Read booking, Import and the offline queue now bump
+  `TripDataChanges`. Money, Travel, Stays and Plan reload on it
+  (`AsyncScreenMixin.reloadOnChanges`), and also when their tab is shown again
+  (`reloadWhenShown`).
+- **Receipts links showed `$8570.00` for a yen receipt.** WabWay now sends
+  `receipt.currency`, and receipts.wabble.ca formats every amount with it
+  (`src/lib/money.ts`). Links without a currency stay in dollars.

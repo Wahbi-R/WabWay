@@ -140,3 +140,20 @@ home currency at that receipt's rate, so they appear in the CAD section and
 Mark settled there clears them. Every other currency's section shows
 `≈ C$…` under each balance and total (each receipt's own rate; cash uses the
 average rate of the receipts in its currency).
+
+## Stay ↔ receipt prices (build 437)
+
+Stays and receipts stay separate records (linked in Connections), but editing
+one's price offers to change the other:
+
+- **Stay total changed** → "Update the receipt too?" Shares are scaled to the
+  new amount (rounded to the currency, remainder on the first share), the home
+  amount keeps the same rate, and the Receipts link is pushed.
+- **Receipt amount changed** → "Update the stay too?" Per night = amount ÷ nights.
+- Offered only when the two **agreed before** the edit (same currency, same
+  total within rounding). A deposit, a refund, or a stay in another currency
+  is left alone.
+- A receipt with shares already paid back, or split by item, isn't changed;
+  a snack says to update it in Money.
+- Travel items have no price field (the price is in their notes), so tickets
+  aren't synced.

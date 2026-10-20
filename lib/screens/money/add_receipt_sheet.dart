@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import '../../core/stay_receipt_sync.dart';
 import '../../core/notifications/push_notifier.dart';
 import '../../core/receipt_followups.dart';
 import '../../core/receipt_scan_service.dart';
@@ -452,6 +453,11 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
         linkChangedRemotely = result == LinkPushResult.remoteChanged;
       }
       if (!mounted) return;
+      // Changed the amount: offer to change its stay's total to match.
+      if (_isEditing) {
+        await offerStayUpdateForReceipt(context, before: widget.existingReceipt!, after: receipt);
+        if (!mounted) return;
+      }
       if (followups.docsFailed) {
         showWabwaySnack(context, 'Receipt saved, but some photos or documents could not be attached.');
       } else if (followups.linkQueued) {

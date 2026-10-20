@@ -269,8 +269,9 @@ abstract final class BookingParseService {
     final checkOut = _d(b, 'end_date');
     final total = c.price?.total;
     final nights = checkIn != null && checkOut != null ? checkOut.difference(checkIn).inDays : 0;
-    final perNight = _n(b, 'price_per_night') ??
-        (total != null && nights > 0 ? (total / nights * 100).round() / 100 : null);
+    // Unrounded, so nights × per night gives back the exact total
+    // (C\$919.37 / 4 → 229.8425, not 229.84 → 919.36).
+    final perNight = total != null && nights > 0 ? total / nights : _n(b, 'price_per_night');
     final confirmation = _s(b, 'confirmation_number');
     final url = _s(b, 'url');
     return ParsedStay(

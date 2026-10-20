@@ -11,6 +11,17 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 419,
+    label: "AI access",
+    changes: [
+      "Connect Claude, ChatGPT or another AI assistant to WabWay so it can look up your bookings, plans, saved places and documents itself — no more screenshots",
+      "Ask things like \"What's my hotel confirmation number in Kyoto?\" or \"Show me my JR pass\" and it reads the real booking or file",
+      "Set it up in More → AI access: create a token and copy the ready-made setup for your assistant",
+      "AI assistants can only read your trips, never change them, and you can revoke a token any time",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 418,
     label: "One Documents section everywhere",
     changes: [

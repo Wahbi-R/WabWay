@@ -20,6 +20,7 @@ import '../screens/travel_screen.dart';
 import '../screens/map_screen.dart';
 import '../screens/accommodations/accommodations_screen.dart';
 import '../screens/packing_screen.dart';
+import '../screens/photos_screen.dart';
 import '../screens/shopping/shopping_screen.dart';
 import '../screens/crew_screen.dart';
 import '../screens/placeholder_screen.dart';
@@ -86,7 +87,7 @@ const _mobileDestinations = [
   ),
 ];
 
-// ─── Desktop — 10 sidebar destinations ───────────────────────────────────────
+// ─── Desktop — sidebar destinations ───────────────────────────────────────
 
 const _desktopDestinations = [
   _NavDest(
@@ -153,6 +154,13 @@ const _desktopDestinations = [
     builder: _buildDocs,
   ),
   _NavDest(
+    key: 'photos',
+    label: 'Photos',
+    icon: Icons.photo_library_outlined,
+    selectedIcon: Icons.photo_library_rounded,
+    builder: _buildPhotos,
+  ),
+  _NavDest(
     key: 'packing',
     label: 'Packing',
     icon: Icons.luggage_outlined,
@@ -186,6 +194,7 @@ Widget _buildTravel(BuildContext _)  => const TravelScreen();
 Widget _buildStays(BuildContext _)   => const AccommodationsScreen();
 Widget _buildMoney(BuildContext _)   => const MoneyScreen();
 Widget _buildDocs(BuildContext _)    => const LibraryScreen();
+Widget _buildPhotos(BuildContext _)    => const PhotosScreen();
 Widget _buildPacking(BuildContext _)   => const PackingScreen();
 Widget _buildShopping(BuildContext _)  => const ShoppingScreen();
 Widget _buildMore(BuildContext _)      => const MoreScreen();

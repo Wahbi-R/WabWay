@@ -274,24 +274,34 @@ class _NewTokenSheet extends StatelessWidget {
           const SizedBox(height: kSpace3),
           _CopyBlock(value: token, copiedMessage: 'Token copied'),
           if (mcpUrl.isNotEmpty) ...[
+            const SizedBox(height: kSpace2),
+            Text(
+              'You\'ll paste this token on a WabWay sign-in page when your assistant '
+              'connects.',
+              style: kStyleCaption,
+            ),
             const SizedBox(height: kSpace6),
             Text('Claude — web, desktop and phone', style: kStyleBodySemibold),
             const SizedBox(height: kSpace1),
             Text(
-              'Settings → Connectors → Add custom connector. Name it WabWay and '
-              'paste this as the URL:',
+              'Settings → Connectors → Add custom connector. Name it WabWay, use '
+              'this URL, then tap Connect and paste your token on the page that opens.',
               style: kStyleCaption,
             ),
             const SizedBox(height: kSpace2),
-            _CopyBlock(value: connectorUrl, copiedMessage: 'Connector URL copied'),
+            _CopyBlock(value: mcpUrl, copiedMessage: 'Connector URL copied'),
             const SizedBox(height: kSpace5),
-            Text('ChatGPT', style: kStyleBodySemibold),
+            Text('ChatGPT and other assistants', style: kStyleBodySemibold),
             const SizedBox(height: kSpace1),
             Text(
-              'Settings → Apps & Connectors → turn on Developer mode, then Create '
-              'a connector with the same URL as above and no authentication.',
+              'Add a connector (ChatGPT: Settings → Apps & Connectors → Developer '
+              'mode → Create) with the same URL and OAuth sign-in, then paste your '
+              'token on the WabWay page. If an app only takes a URL and never asks '
+              'you to sign in, use this one instead — it has the token built in:',
               style: kStyleCaption,
             ),
+            const SizedBox(height: kSpace2),
+            _CopyBlock(value: connectorUrl, copiedMessage: 'URL with token copied'),
             const SizedBox(height: kSpace5),
             Text('Claude Code', style: kStyleBodySemibold),
             const SizedBox(height: kSpace1),

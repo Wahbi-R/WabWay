@@ -17,8 +17,10 @@ never have to screenshot a booking to ask an AI about it. Read-only.
 - **Create access token** — name prompt (defaults to "Claude"), then a one-time
   sheet showing the token with copy buttons and ready-made setup for:
   - Claude (web / desktop / phone): Settings → Connectors → Add custom connector,
-    URL `https://audio.wabble.ca/mcp?token=wbw_…`
-  - ChatGPT: Developer mode connector, same URL, no authentication
+    URL `https://audio.wabble.ca/mcp` → Connect → paste the token on the WabWay
+    sign-in page (build 425; OAuth added in wabway-server build 424)
+  - ChatGPT and others: same URL with OAuth sign-in; apps that only take a URL
+    can use `https://audio.wabble.ca/mcp?token=wbw_…`
   - Claude Code: `claude mcp add --transport http wabway https://audio.wabble.ca/mcp --header "Authorization: Bearer wbw_…"`
 
 ## Implementation
@@ -37,8 +39,13 @@ never have to screenshot a booking to ask an AI about it. Read-only.
 - **Transport:** MCP Streamable HTTP, stateless, JSON responses (no SSE). Protocol
   versions 2024-11-05 → 2025-11-25. Written by hand because the `mcp` SDK needs
   pydantic 2, which doesn't build on Termux. `GET`/`DELETE /mcp` → 405.
-- **Auth:** `Authorization: Bearer wbw_…` or `?token=wbw_…` (claude.ai/ChatGPT
-  custom connectors can't send headers without OAuth). Hash looked up with the
+- **Auth:** `Authorization: Bearer wbw_…` or `?token=wbw_…`, or OAuth
+  (`wabway_oauth.py`, server build 424): Claude's connector connected with
+  `?token=` but still required an OAuth flow and failed on the 404s. The server
+  now serves protected-resource + authorization-server metadata, stateless
+  dynamic client registration, an authorize page where the user pastes their
+  WabWay token, and an authorization_code + PKCE token endpoint that returns
+  that same token (so revoking it in the app still disconnects). Hash looked up with the
   WabWay service role key, cached 60 s (so revocation applies within a minute);
   `last_used_at` written at most every 10 min. A logging filter redacts tokens
   from the uvicorn access log, which `/logs` serves.

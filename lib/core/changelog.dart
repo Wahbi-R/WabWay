@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 425,
+    label: "Easier AI connecting",
+    changes: [
+      "Connecting Claude or ChatGPT now works: add the WabWay URL, tap Connect, and paste your token on the WabWay page that opens",
+      "The setup sheet shows the new steps, plus a link with the token built in for apps that can't sign in",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 424,
     label: "AI can add to your trip",
     changes: [

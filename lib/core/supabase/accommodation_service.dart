@@ -119,6 +119,12 @@ abstract final class AccommodationService {
     }
   }
 
+  static Future<List<Accommodation>> loadByIds(List<String> ids) async {
+    if (ids.isEmpty) return [];
+    final data = await supabase.from('accommodations').select('*').inFilter('id', ids);
+    return data.map((r) => _fromRow(r)).toList();
+  }
+
   static Future<List<Accommodation>?> loadFromCache(String tripId) =>
       OfflineCache.read(
         OfflineCache.accommodationsKey(tripId),

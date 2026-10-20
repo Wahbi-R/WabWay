@@ -11,6 +11,17 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 437,
+    label: "Stay and receipt prices stay in step",
+    changes: [
+      "Change a stay's total and the app offers to update its receipt in Money too — everyone's share changes to match",
+      "Change a receipt's amount and it offers to update the stay's total",
+      "Only offered when the two matched before, so deposits, refunds and other currencies are left alone",
+      "Stays read from a booking keep the exact total (no more one-cent differences)",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 436,
     label: "Stay totals",
     changes: [

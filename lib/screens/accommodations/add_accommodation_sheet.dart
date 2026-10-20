@@ -17,7 +17,10 @@ import '../../data/docs_data.dart';
 import '../shared/connections_section.dart';
 import '../../data/date_utils.dart';
 import '../../data/currencies.dart';
-import '../../data/money_data.dart' show fmtAmount;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/providers/trip_provider.dart';
+import '../../core/stay_receipt_sync.dart';
+import '../../data/money_data.dart' show fmtAmount, TripMember;
 import '../../widgets/place_search_field.dart';
 
 /// Add / edit a stay. Pops with an [AccommodationSheetResult].
@@ -286,6 +289,21 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
         );
       }
       if (!mounted) return;
+      // Changed the total: offer to change its receipt in Money to match.
+      if (widget.editing != null) {
+        final container = ProviderScope.containerOf(context, listen: false);
+        await offerReceiptUpdateForStay(
+          context,
+          before: widget.editing!,
+          after: result,
+          members: [
+            for (final m in container.read(tripMembersProvider))
+              TripMember(id: m.userId, name: m.profile.displayName, isMe: m.userId == widget.userId),
+          ],
+          homeCurrency: container.read(activeTripProvider)?.homeCurrency,
+        );
+        if (!mounted) return;
+      }
       Navigator.pop(context, AccommodationSheetResult(accommodation: result));
     } catch (_) {
       if (!mounted) return;

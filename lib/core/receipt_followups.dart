@@ -30,6 +30,7 @@ Future<ReceiptFollowupResult> runReceiptFollowups({
   Iterable<String> docIds = const [],
   bool createLink = false,
   List<ScanImage> linkPhotos = const [],
+  String? homeCurrency,
 }) async {
   var docsFailed = false;
   for (var i = 0; i < photos.length; i++) {
@@ -72,7 +73,8 @@ Future<ReceiptFollowupResult> runReceiptFollowups({
       if (shown.isEmpty && docIds.isNotEmpty) {
         shown = await ReceiptsLinkService.attachedPhotos(receipt.id);
       }
-      updated = await ReceiptsLinkService.create(receipt, members, photos: shown);
+      updated = await ReceiptsLinkService.create(receipt, members,
+          photos: shown, homeCurrency: homeCurrency);
     } catch (_) {
       await SyncQueue.enqueueLink(tripId, receipt.id);
       linkQueued = true;

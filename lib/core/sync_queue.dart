@@ -235,11 +235,25 @@ abstract final class SyncQueue {
     if (_drainingTrips.contains(tripId)) return;
     _drainingTrips.add(tripId);
     try {
-      await _drainReceipts(tripId, userId, members);
-      await _drainOps(tripId, members);
+      final home = await _homeCurrency(tripId);
+      await _drainReceipts(tripId, userId, members, home);
+      await _drainOps(tripId, members, home);
     } finally {
       _drainingTrips.remove(tripId);
       _changed();
+    }
+  }
+
+  /// The trip's home currency, for the Receipts link's "≈ C\$…" (null if
+  /// it can't be looked up — the link then shows one currency).
+  static Future<String?> _homeCurrency(String tripId) async {
+    try {
+      return (await TripService.loadUserTrips())
+          .where((t) => t.id == tripId)
+          .firstOrNull
+          ?.homeCurrency;
+    } catch (_) {
+      return null;
     }
   }
 
@@ -277,7 +291,8 @@ abstract final class SyncQueue {
     }
   }
 
-  static Future<void> _drainReceipts(String tripId, String userId, List<TripMember> members) async {
+  static Future<void> _drainReceipts(
+      String tripId, String userId, List<TripMember> members, String? homeCurrency) async {
     final list = await _pending(tripId);
     if (list.isEmpty) return;
 
@@ -355,6 +370,7 @@ abstract final class SyncQueue {
           photos:     photos,
           docIds:     ((item['docIds'] as List?) ?? const []).cast<String>(),
           createLink: item['createLink'] == true && members.isNotEmpty,
+          homeCurrency: homeCurrency,
         );
         if (item['createLink'] == true && members.isEmpty) await enqueueLink(tripId, receipt.id);
       } catch (_) {}
@@ -364,7 +380,7 @@ abstract final class SyncQueue {
     }
   }
 
-  static Future<void> _drainOps(String tripId, List<TripMember> members) async {
+  static Future<void> _drainOps(String tripId, List<TripMember> members, String? homeCurrency) async {
     final ops = await _read(_opsKey(tripId));
     if (ops.isEmpty) return;
     final failed = <Map<String, dynamic>>[];
@@ -381,7 +397,9 @@ abstract final class SyncQueue {
           case 'link':
             if (members.isEmpty) { failed.add(o); continue; }
             final receipt = await MoneyService.loadReceipt(o['receiptId'] as String);
-            if (receipt != null) await ReceiptsLinkService.create(receipt, members);
+            if (receipt != null) {
+              await ReceiptsLinkService.create(receipt, members, homeCurrency: homeCurrency);
+            }
         }
       } catch (_) {
         failed.add(o);

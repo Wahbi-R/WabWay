@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 431,
+    label: "Receipts links in your currency",
+    changes: [
+      "Receipts links for foreign-currency receipts now show what everyone owes in your home currency too — ¥8,570 ≈ C\$76.18 — using the rate you actually paid",
+      "Anyone opening the link can tap \"Show in CAD\" to see everything in dollars first",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 430,
     label: "Exchange rates that add up",
     changes: [

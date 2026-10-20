@@ -84,10 +84,14 @@ abstract final class ReceiptsLinkService {
           if (!r.splitLinkMembers.contains(m.id)) m.id,
       ];
 
+  /// [homeCurrency]: the trip's home currency — sent with the rate that
+  /// was actually used (home amount ÷ amount, so it includes a typed-in
+  /// override and any card fee) so the site can show "¥8,570 ≈ C\$76.18".
   static Map<String, dynamic> buildPayload({
     required Receipt receipt,
     required List<TripMember> members,
     required List<String> order,
+    String? homeCurrency,
   }) {
     final items = itemsFor(receipt);
     final index = {for (var i = 0; i < order.length; i++) order[i]: i};
@@ -103,6 +107,10 @@ abstract final class ReceiptsLinkService {
         'title':    receipt.title,
         // The site shows dollars unless told otherwise (¥8,570, not $8570.00).
         'currency': receipt.currency,
+        if (homeCurrency != null && homeCurrency != receipt.currency && receipt.amount > 0) ...{
+          'home_currency': homeCurrency,
+          'home_rate':     receipt.homeAmount / receipt.amount,
+        },
         'items':    [for (final i in items.items) i.toJson()],
         'subtotal': items.itemsTotal,
         'discount': items.discount,
@@ -359,10 +367,12 @@ abstract final class ReceiptsLinkService {
     Receipt receipt,
     List<TripMember> members, {
     List<ScanImage> photos = const [],
+    String? homeCurrency,
   }) async {
     if (receipt.splitLinkId != null) return receipt;
     final order = memberOrder(receipt, members);
-    final payload = buildPayload(receipt: receipt, members: members, order: order);
+    final payload = buildPayload(
+        receipt: receipt, members: members, order: order, homeCurrency: homeCurrency);
     final id = await _save({
       ...payload,
       'history': [
@@ -378,7 +388,8 @@ abstract final class ReceiptsLinkService {
   /// After a WabWay edit: write the receipt to its link — unless someone
   /// changed the link since WabWay last synced, in which case nothing is
   /// overwritten and the detail screen offers to apply their changes.
-  static Future<(LinkPushResult, Receipt)> push(Receipt receipt, List<TripMember> members) async {
+  static Future<(LinkPushResult, Receipt)> push(Receipt receipt, List<TripMember> members,
+      {String? homeCurrency}) async {
     final id = receipt.splitLinkId;
     if (id == null) return (LinkPushResult.noLink, receipt);
     try {
@@ -386,16 +397,20 @@ abstract final class ReceiptsLinkService {
       if (raw != null && receipt.splitLinkHash != null && hashOf(raw) != receipt.splitLinkHash) {
         return (LinkPushResult.remoteChanged, receipt);
       }
-      return (LinkPushResult.pushed, await _overwrite(receipt, members, raw, 'Updated from WabWay'));
+      return (
+        LinkPushResult.pushed,
+        await _overwrite(receipt, members, raw, 'Updated from WabWay', homeCurrency),
+      );
     } catch (_) {
       return (LinkPushResult.failed, receipt);
     }
   }
 
   /// Overwrite the link with WabWay's version (discarding changes made there).
-  static Future<Receipt> overwrite(Receipt receipt, List<TripMember> members) async {
+  static Future<Receipt> overwrite(Receipt receipt, List<TripMember> members,
+      {String? homeCurrency}) async {
     final raw = receipt.splitLinkId == null ? null : await _fetchRaw(receipt.splitLinkId!);
-    return _overwrite(receipt, members, raw, 'Updated from WabWay');
+    return _overwrite(receipt, members, raw, 'Updated from WabWay', homeCurrency);
   }
 
   static Future<Receipt> _overwrite(
@@ -403,9 +418,11 @@ abstract final class ReceiptsLinkService {
     List<TripMember> members,
     Map<String, dynamic>? raw,
     String historyMsg,
+    String? homeCurrency,
   ) async {
     final order = memberOrder(receipt, members);
-    final payload = buildPayload(receipt: receipt, members: members, order: order);
+    final payload = buildPayload(
+        receipt: receipt, members: members, order: order, homeCurrency: homeCurrency);
     // Keep the link's own approvals and history; people added on the site
     // stay listed so their claims don't vanish from the link.
     final remotePeople = ((raw?['people'] as List?) ?? const [])

@@ -312,6 +312,7 @@ class _BookingReviewScreenState extends ConsumerState<BookingReviewScreen>
       docIds: [if (docId != null) docId],
       createLink: _createLink,
       linkPhotos: _createLink ? await _linkPhotos(r) : const [],
+      homeCurrency: home,
     )).receipt;
     return true;
   }

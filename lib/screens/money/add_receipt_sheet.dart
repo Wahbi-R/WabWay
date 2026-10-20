@@ -432,11 +432,13 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
         photos:     _photos,
         docIds:     _isEditing ? const [] : _docIds,
         createLink: !_isEditing && _createLink,
+        homeCurrency: widget.homeCurrency,
       );
       receipt = followups.receipt;
       var linkChangedRemotely = false;
       if (_isEditing && receipt.splitLinkId != null) {
-        final (result, pushed) = await ReceiptsLinkService.push(receipt, widget.members);
+        final (result, pushed) = await ReceiptsLinkService.push(receipt, widget.members,
+            homeCurrency: widget.homeCurrency);
         receipt = pushed;
         linkChangedRemotely = result == LinkPushResult.remoteChanged;
       }

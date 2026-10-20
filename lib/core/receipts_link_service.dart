@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../data/money_data.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'pdf_pages.dart';
 import 'receipt_scan_service.dart';
 import 'supabase/client.dart';
 import 'supabase/doc_service.dart';
@@ -240,21 +242,50 @@ abstract final class ReceiptsLinkService {
   }
 
   /// The receipt's attached photos (for a link created after saving).
-  /// Best-effort: skips anything it can't download.
+  /// Attached PDFs (tickets, booking confirmations) come as one image per
+  /// page, since the Receipts site shows pictures. Best-effort: skips
+  /// anything it can't download.
   static Future<List<ScanImage>> attachedPhotos(String receiptId) async {
     final out = <ScanImage>[];
     try {
       final docs = await DocService.loadAttached(receiptId);
       for (final d in docs) {
         final ext = d.ext.toLowerCase();
-        if (d.storagePath == null || !const {'jpg', 'jpeg', 'png', 'webp'}.contains(ext)) continue;
+        final isPdf = ext == 'pdf';
+        if (d.storagePath == null ||
+            !(isPdf || const {'jpg', 'jpeg', 'png', 'webp'}.contains(ext))) {
+          continue;
+        }
         final url = await DocService.getSignedUrl(d.storagePath!);
         if (url == null) continue;
         final res = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 20));
-        if (res.statusCode == 200) out.add(ScanImage(res.bodyBytes, ext));
+        if (res.statusCode != 200) continue;
+        if (isPdf) {
+          out.addAll(await pdfPageImages(res.bodyBytes));
+        } else {
+          out.add(ScanImage(res.bodyBytes, ext));
+        }
       }
     } catch (_) {}
     return out;
+  }
+
+  static const _kPrefLinkDefault = 'pref_receipts_link_default';
+
+  /// Whether new receipts are shared as a Receipts link — the choice last
+  /// made in Add receipt, also used for receipts made from bookings.
+  static Future<bool?> defaultCreateLink() async {
+    try {
+      return (await SharedPreferences.getInstance()).getBool(_kPrefLinkDefault);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> setDefaultCreateLink(bool v) async {
+    try {
+      await (await SharedPreferences.getInstance()).setBool(_kPrefLinkDefault, v);
+    } catch (_) {}
   }
 
   // ── Reading a link back ────────────────────────────────────────────────────

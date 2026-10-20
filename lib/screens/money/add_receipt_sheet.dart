@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/notifications/push_notifier.dart';
 import '../../core/receipt_followups.dart';
 import '../../core/receipt_scan_service.dart';
@@ -70,9 +69,6 @@ Future<Receipt?> showAddReceiptSheet(
 }
 
 enum _SplitMode { equal, custom, items }
-
-/// Remembers whether new receipts are shared as a Receipts link.
-const _kPrefReceiptsLink = 'pref_receipts_link_default';
 
 class _AddReceiptContent extends StatefulWidget {
   const _AddReceiptContent({
@@ -241,18 +237,15 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
       };
       // Fetch the rate for the default currency on first open.
       WidgetsBinding.instance.addPostFrameCallback((_) => _fetchRate());
-      SharedPreferences.getInstance().then((prefs) {
-        final v = prefs.getBool(_kPrefReceiptsLink);
+      ReceiptsLinkService.defaultCreateLink().then((v) {
         if (v != null && mounted) setState(() => _createLink = v);
-      }).catchError((_) {});
+      });
     }
   }
 
   void _setCreateLink(bool v) {
     setState(() => _createLink = v);
-    SharedPreferences.getInstance()
-        .then((prefs) => prefs.setBool(_kPrefReceiptsLink, v))
-        .catchError((_) => false);
+    ReceiptsLinkService.setDefaultCreateLink(v);
   }
 
   @override

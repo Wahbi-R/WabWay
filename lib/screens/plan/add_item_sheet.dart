@@ -12,6 +12,7 @@ import '../../theme/app_text_theme.dart';
 import '../../widgets/place_search_field.dart';
 import '../../widgets/widgets.dart';
 import '../../core/text_utils.dart';
+import '../../data/date_utils.dart' show parseTimeOfDay;
 import '../../data/currencies.dart';
 import '../../data/share_data.dart';
 
@@ -33,6 +34,7 @@ Future<ItineraryItem?> showAddItemSheet(
   List<TripDocument> docs = const [],
   List<Accommodation> stays = const [],
   ItineraryItem? initialItem,
+  ItineraryItem? prefillItem,
   ImportPrefill? prefill,
 }) {
   return showWabwayFormSheet<ItineraryItem>(
@@ -47,6 +49,7 @@ Future<ItineraryItem?> showAddItemSheet(
       docs: docs,
       stays: stays,
       initialItem: initialItem,
+      prefillItem: prefillItem,
       prefill: prefill,
       defaultCurrency: defaultCurrency,
       scrollController: scroll,
@@ -67,6 +70,7 @@ class _AddItemContent extends StatefulWidget {
     this.scrollController,
     this.showDragHandle = false,
     this.initialItem,
+    this.prefillItem,
     this.prefill,
   });
 
@@ -79,6 +83,10 @@ class _AddItemContent extends StatefulWidget {
   final ScrollController? scrollController;
   final bool showDragHandle;
   final ItineraryItem? initialItem;
+
+  /// A complete new item to start from (Read booking's review screen):
+  /// fills every field like [initialItem] but stays in "Add" mode.
+  final ItineraryItem? prefillItem;
 
   /// New-item prefill (Import). Never switches the sheet into edit mode.
   final ImportPrefill? prefill;
@@ -111,7 +119,7 @@ class _AddItemContentState extends State<_AddItemContent> {
     super.initState();
     _currency = widget.defaultCurrency;
     final pre = widget.prefill;
-    if (widget.initialItem == null && pre != null) {
+    if (widget.initialItem == null && widget.prefillItem == null && pre != null) {
       _titleCtrl.text    = pre.title ?? '';
       _locationCtrl.text = pre.location ?? '';
       _mapsCtrl.text     = pre.mapsUrl ?? '';
@@ -120,7 +128,7 @@ class _AddItemContentState extends State<_AddItemContent> {
       _linkedDocIds.addAll(pre.linkedDocIds);
       if (pre.mapsUrl != null || pre.url != null) _showAdvanced = true;
     }
-    final item = widget.initialItem;
+    final item = widget.initialItem ?? widget.prefillItem;
     if (item != null) {
       _titleCtrl.text    = item.title;
       _locationCtrl.text = item.location ?? '';
@@ -139,15 +147,7 @@ class _AddItemContentState extends State<_AddItemContent> {
         );
       }
       if (item.currency != null) _currency = item.currency!;
-      if (item.time != null) {
-        final parts = item.time!.split(':');
-        if (parts.length == 2) {
-          _time = TimeOfDay(
-            hour:   int.tryParse(parts[0]) ?? 0,
-            minute: int.tryParse(parts[1]) ?? 0,
-          );
-        }
-      }
+      _time = parseTimeOfDay(item.time);
       if (item.mapsUrl != null || item.confirmationUrl != null) {
         _showAdvanced = true;
       }

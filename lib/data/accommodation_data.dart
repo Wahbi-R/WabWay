@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
+import 'date_utils.dart';
 import '../widgets/wabway_badge.dart';
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
@@ -85,6 +86,8 @@ class Accommodation {
     this.currency = 'USD',
     this.checkIn,
     this.checkOut,
+    this.checkInTime,
+    this.checkOutTime,
     this.status = AccommodationStatus.brainstorming,
     this.source,
     this.notes,
@@ -107,6 +110,8 @@ class Accommodation {
   final String currency;
   final DateTime? checkIn;
   final DateTime? checkOut;
+  final String? checkInTime;  // "HH:MM" 24h — check-in from
+  final String? checkOutTime; // "HH:MM" 24h — check-out by
   final AccommodationStatus status;
   final AccommodationSource? source;
   final String? notes;
@@ -121,6 +126,14 @@ class Accommodation {
     return checkOut!.difference(checkIn!).inDays;
   }
 
+  /// "Nov 11, 15:00" — check-in date plus time when known.
+  String? get checkInLabel =>
+      checkIn == null ? null : fmtDateTime(checkIn!, checkInTime);
+
+  /// "Nov 16, 11:00" — check-out date plus time when known.
+  String? get checkOutLabel =>
+      checkOut == null ? null : fmtDateTime(checkOut!, checkOutTime);
+
   double? get totalPrice {
     final n = nights;
     if (pricePerNight == null || n == null) return null;
@@ -133,7 +146,8 @@ class Accommodation {
     return AccommodationSource.other;
   }
 
-  static const _clearSpotId = Object();
+  // Default for nullable fields copyWith can clear (pass null to clear).
+  static const _keep = Object();
 
   Accommodation copyWith({
     String? name,
@@ -146,12 +160,14 @@ class Accommodation {
     String? currency,
     DateTime? checkIn,
     DateTime? checkOut,
+    Object? checkInTime = _keep,
+    Object? checkOutTime = _keep,
     AccommodationStatus? status,
     AccommodationSource? source,
     String? notes,
     String? imageUrl,
     String? confirmationNumber,
-    Object? spotId = _clearSpotId,
+    Object? spotId = _keep,
   }) => Accommodation(
     id:                 id,
     tripId:             tripId,
@@ -165,12 +181,14 @@ class Accommodation {
     currency:           currency ?? this.currency,
     checkIn:            checkIn ?? this.checkIn,
     checkOut:           checkOut ?? this.checkOut,
+    checkInTime:        identical(checkInTime, _keep) ? this.checkInTime : checkInTime as String?,
+    checkOutTime:       identical(checkOutTime, _keep) ? this.checkOutTime : checkOutTime as String?,
     status:             status ?? this.status,
     source:             source ?? this.source,
     notes:              notes ?? this.notes,
     imageUrl:           imageUrl ?? this.imageUrl,
     confirmationNumber: confirmationNumber ?? this.confirmationNumber,
-    spotId:             identical(spotId, _clearSpotId) ? this.spotId : spotId as String?,
+    spotId:             identical(spotId, _keep) ? this.spotId : spotId as String?,
     createdBy:          createdBy,
     createdAt:          createdAt,
   );
@@ -190,6 +208,8 @@ final kMockAccommodations = <Accommodation>[
     currency: 'JPY',
     checkIn: DateTime(2024, 11, 11),
     checkOut: DateTime(2024, 11, 16),
+    checkInTime: '15:00',
+    checkOutTime: '11:00',
     status: AccommodationStatus.booked,
     source: AccommodationSource.airbnb,
     notes: 'Check-in after 3pm. Host leaves key in lockbox — code sent via Airbnb message.',

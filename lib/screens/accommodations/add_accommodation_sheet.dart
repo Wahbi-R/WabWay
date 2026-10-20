@@ -25,6 +25,7 @@ Future<AccommodationSheetResult?> showAddStaySheet(
   required String tripId,
   required String userId,
   Accommodation? editing,
+  Accommodation? draft,
   ListingResult? prefilled,
   String? initialUrl,
 }) =>
@@ -38,6 +39,7 @@ Future<AccommodationSheetResult?> showAddStaySheet(
         tripId: tripId,
         userId: userId,
         editing: editing,
+        draft: draft,
         prefilled: prefilled,
         initialUrl: initialUrl,
         scrollController: scroll,
@@ -51,6 +53,7 @@ class AddAccommodationSheet extends StatefulWidget {
     required this.tripId,
     required this.userId,
     this.editing,
+    this.draft,
     this.prefilled,
     this.initialUrl,
     this.scrollController,
@@ -60,6 +63,10 @@ class AddAccommodationSheet extends StatefulWidget {
   final String tripId;
   final String userId;
   final Accommodation? editing;
+
+  /// A complete new stay to start from (Read booking's review screen):
+  /// fills every field like [editing] but saving creates a new stay.
+  final Accommodation? draft;
   final ListingResult? prefilled;
   final String? initialUrl;
   final ScrollController? scrollController;
@@ -88,7 +95,10 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
   AccommodationSource? _source;
   DateTime? _checkIn;
   DateTime? _checkOut;
+  TimeOfDay? _checkInTime;
+  TimeOfDay? _checkOutTime;
   String? _imageUrl;
+  String? _address;
   String? _parseError;
 
   String? _linkedSpotId;
@@ -97,7 +107,7 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
   @override
   void initState() {
     super.initState();
-    final e = widget.editing;
+    final e = widget.editing ?? widget.draft;
     if (e != null) {
       _step        = 1;
       _nameCtrl.text = e.name;
@@ -115,7 +125,10 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
       _source     = e.source;
       _checkIn    = e.checkIn;
       _checkOut   = e.checkOut;
+      _checkInTime  = parseTimeOfDay(e.checkInTime);
+      _checkOutTime = parseTimeOfDay(e.checkOutTime);
       _imageUrl        = e.imageUrl;
+      _address         = e.address;
       _linkedSpotId    = e.spotId;
       if (e.spotId != null) _loadLinkedSpot(e.spotId!);
     } else if (widget.prefilled != null) {
@@ -191,6 +204,8 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
       final city    = _cityCtrl.text.trim();
       final notes   = _notesCtrl.text.trim();
       final confirm = _confirmCtrl.text.trim();
+      final inTime  = _fmtTime(_checkInTime);
+      final outTime = _fmtTime(_checkOutTime);
 
       Accommodation result;
       if (widget.editing != null) {
@@ -202,6 +217,8 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
           currency:           _currency,
           checkIn:            _checkIn,
           checkOut:           _checkOut,
+          checkInTime:        inTime,
+          checkOutTime:       outTime,
           status:             _status,
           source:             _source,
           notes:              notes.isEmpty ? null : notes,
@@ -217,10 +234,13 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
           name:               name,
           city:               city,
           url:                url.isEmpty ? null : url,
+          address:            _address,
           pricePerNight:      price,
           currency:           _currency,
           checkIn:            _checkIn,
           checkOut:           _checkOut,
+          checkInTime:        inTime,
+          checkOutTime:       outTime,
           status:             _status,
           source:             _source ?? (url.isNotEmpty ? AccommodationSource.fromUrl(url) : null),
           notes:              notes.isEmpty ? null : notes,
@@ -237,6 +257,9 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
       showWabwaySnack(context, 'Could not save stay.', error: true);
     }
   }
+
+  static String? _fmtTime(TimeOfDay? t) =>
+      t == null ? null : fmtTimeOfDay(t.hour, t.minute);
 
   Future<void> _delete() async {
     final id = widget.editing?.id;
@@ -466,6 +489,30 @@ class _AddAccommodationSheetState extends State<AddAccommodationSheet> {
                   label: 'Check-out',
                   value: _checkOut == null ? null : fmtDateLong(_checkOut!),
                   onTap: _pickDateRange,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: kSpace3),
+
+          // Hotel policy times, e.g. "check-in from 15:00, check-out by 11:00".
+          Row(
+            children: [
+              Expanded(
+                child: WabwayTimeField(
+                  label: 'Check-in from',
+                  value: _checkInTime,
+                  initialPickerTime: const TimeOfDay(hour: 15, minute: 0),
+                  onChanged: (t) => setState(() => _checkInTime = t),
+                ),
+              ),
+              const SizedBox(width: kSpace3),
+              Expanded(
+                child: WabwayTimeField(
+                  label: 'Check-out by',
+                  value: _checkOutTime,
+                  initialPickerTime: const TimeOfDay(hour: 11, minute: 0),
+                  onChanged: (t) => setState(() => _checkOutTime = t),
                 ),
               ),
             ],

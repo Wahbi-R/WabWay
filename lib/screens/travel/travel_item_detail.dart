@@ -20,6 +20,8 @@ import '../../data/connection_data.dart';
 import '../shared/attached_docs_section.dart';
 import '../shared/connections_section.dart';
 import '../../core/text_utils.dart';
+import '../../data/date_utils.dart' show parseTimeOfDay;
+import 'travellers_section.dart';
 
 // ─── Mobile screen ────────────────────────────────────────────────────────────
 
@@ -108,6 +110,11 @@ class TravelItemDetailContent extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _MetaCard(item: item),
+
+              if (item.travellers.isNotEmpty) ...[
+                const SizedBox(height: kSpace4),
+                TravellersList(travellers: item.travellers),
+              ],
 
               const SizedBox(height: kSpace4),
               Consumer(
@@ -594,16 +601,6 @@ class _ActionsSectionState extends ConsumerState<_ActionsSection> {
     _                     => ItineraryItemType.other,
   };
 
-  TimeOfDay? _parseTime(String? t) {
-    if (t == null) return null;
-    final parts = t.split(':');
-    if (parts.length < 2) return null;
-    final h = int.tryParse(parts[0]);
-    final m = int.tryParse(parts[1]);
-    if (h == null || m == null) return null;
-    return TimeOfDay(hour: h, minute: m);
-  }
-
   Future<void> _addToItinerary() async {
     if (_itineraryLoading) return;
     if (widget.days.isEmpty) {
@@ -614,7 +611,7 @@ class _ActionsSectionState extends ConsumerState<_ActionsSection> {
     final suggestedDay = widget.item.date != null
         ? widget.days.where((d) => d.date == widget.item.date).firstOrNull
         : null;
-    final suggestedTime = _parseTime(widget.item.time);
+    final suggestedTime = parseTimeOfDay(widget.item.time);
 
     final result = await showDayPickerSheet(
       context,
@@ -653,17 +650,7 @@ class _ActionsSectionState extends ConsumerState<_ActionsSection> {
         itineraryItemId: planItem.id,
       );
       if (!mounted) return;
-      final updated = TravelItem(
-        id: widget.item.id, title: widget.item.title, type: widget.item.type,
-        status: widget.item.status, date: widget.item.date, endDate: widget.item.endDate,
-        time: widget.item.time, endTime: widget.item.endTime,
-        location: widget.item.location, destination: widget.item.destination,
-        confirmationNumber: widget.item.confirmationNumber, url: widget.item.url,
-        address: widget.item.address, notes: widget.item.notes,
-        linkedDocIds: widget.item.linkedDocIds,
-        linkedItineraryItemId: planItem.id,
-        linkedDayId: dayId,
-      );
+      final updated = widget.item.withPlanLink(dayId: dayId, itineraryItemId: planItem.id);
       widget.onUpdated?.call(updated);
       showWabwaySnack(context, 'Added to ${joinNonEmpty(['Day ${day.dayNumber}', day.city])}');
     } catch (e) {

@@ -35,6 +35,11 @@ dependencies:
   lucide_icons_flutter: ^3.1.15
   connectivity_plus: ^6.0.0
   cached_network_image_ce: ^4.10.1
+  printing: ^5.14.3
+  # printing → pdf caps archive below 4.1, but image 4.11.0 calls an
+  # archive 4.1+ API despite allowing 4.0.9 (upstream bug). Keep image below
+  # 4.11 until printing can move to pdf 3.13 (blocked by Syncfusion's xml ^6).
+  image: ">=4.5.0 <4.11.0"
 
 dev_dependencies:
   flutter_test:

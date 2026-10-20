@@ -817,18 +817,12 @@ class _LinkedStayCard extends StatelessWidget {
   final Accommodation stay;
   final VoidCallback? onTap;
 
-  static String _fmtDate(DateTime dt) {
-    const months = ['Jan','Feb','Mar','Apr','May','Jun',
-                    'Jul','Aug','Sep','Oct','Nov','Dec'];
-    return '${months[dt.month - 1]} ${dt.day}';
-  }
-
   @override
   Widget build(BuildContext context) {
     final nights = stay.nights;
     String? dateRange;
     if (stay.checkIn != null && stay.checkOut != null) {
-      dateRange = '${_fmtDate(stay.checkIn!)} – ${_fmtDate(stay.checkOut!)}';
+      dateRange = '${stay.checkInLabel} – ${stay.checkOutLabel}';
       if (nights != null) dateRange += ' · $nights ${nights == 1 ? 'night' : 'nights'}';
     }
 

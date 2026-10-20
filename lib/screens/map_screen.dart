@@ -996,11 +996,6 @@ class _StayDetailSheet extends StatelessWidget {
   final Accommodation stay;
   final Spot? linkedSpot;
 
-  String _fmt(DateTime? d) {
-    if (d == null) return '—';
-    return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-  }
-
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
@@ -1062,8 +1057,10 @@ class _StayDetailSheet extends StatelessWidget {
                 children: [
                   const Icon(Icons.date_range_rounded, size: 14, color: kColorInkSoft),
                   const SizedBox(width: kSpace2),
-                  Text('${_fmt(stay.checkIn)} → ${_fmt(stay.checkOut)}',
-                      style: kStyleCaption.copyWith(color: kColorInkSoft)),
+                  Flexible(
+                    child: Text('${stay.checkInLabel ?? '—'} → ${stay.checkOutLabel ?? '—'}',
+                        style: kStyleCaption.copyWith(color: kColorInkSoft)),
+                  ),
                   if (stay.nights != null) ...[
                     const SizedBox(width: kSpace2),
                     Text('(${stay.nights} nights)',

@@ -92,6 +92,44 @@ enum TravelItemType {
       };
 }
 
+// ─── Traveller ────────────────────────────────────────────────────────────────
+
+/// One person on a booking: a trip member ([userId]) and/or the name printed
+/// on the ticket, with their seat. Unassigned seats (names not printed) have
+/// neither id nor name until someone picks who sits there.
+class TravelTraveller {
+  const TravelTraveller({this.userId, this.name, this.seat});
+
+  final String? userId;
+  final String? name;
+  final String? seat;
+
+  TravelTraveller copyWith({Object? userId = _keep, Object? name = _keep, Object? seat = _keep}) =>
+      TravelTraveller(
+        userId: identical(userId, _keep) ? this.userId : userId as String?,
+        name:   identical(name, _keep) ? this.name : name as String?,
+        seat:   identical(seat, _keep) ? this.seat : seat as String?,
+      );
+
+  static const _keep = Object();
+
+  Map<String, dynamic> toJson() => {
+        if (userId != null) 'user_id': userId,
+        if (name != null) 'name': name,
+        if (seat != null) 'seat': seat,
+      };
+
+  static TravelTraveller fromJson(Map<String, dynamic> j) => TravelTraveller(
+        userId: j['user_id'] as String?,
+        name:   j['name'] as String?,
+        seat:   j['seat'] as String?,
+      );
+
+  static List<TravelTraveller> listFrom(Object? raw) => raw is List
+      ? [for (final r in raw) if (r is Map) fromJson(Map<String, dynamic>.from(r))]
+      : const [];
+}
+
 // ─── Travel item ──────────────────────────────────────────────────────────────
 
 class TravelItem {
@@ -115,6 +153,7 @@ class TravelItem {
     this.gate,
     this.seat,
     this.boardingTime,
+    this.travellers = const [],
     this.linkedDocIds = const [],
     this.linkedItineraryItemId,
     this.linkedDayId,
@@ -140,20 +179,41 @@ class TravelItem {
   final String? gate;              // e.g. "A22"
   final String? seat;              // e.g. "14C"
   final String? boardingTime;      // "HH:MM" 24h
+  final List<TravelTraveller> travellers; // who's on it, with seats
   final List<String> linkedDocIds;
   final String? linkedItineraryItemId;
   final String? linkedDayId;
 
   /// Same item with a different attached-documents list (list badges).
-  TravelItem withDocIds(List<String> ids) => TravelItem(
+  TravelItem withDocIds(List<String> ids) => _copy(linkedDocIds: ids);
+
+  /// Same item once it has been added to a plan day.
+  TravelItem withPlanLink({required String dayId, required String itineraryItemId}) =>
+      _copy(linkedDayId: dayId, linkedItineraryItemId: itineraryItemId);
+
+  /// Same item with a different traveller list.
+  TravelItem withTravellers(List<TravelTraveller> list) => _copy(travellers: list);
+
+  // Every field in one place, so a new field can't be dropped by one of the
+  // with* helpers above.
+  TravelItem _copy({
+    List<String>? linkedDocIds,
+    List<TravelTraveller>? travellers,
+    String? linkedDayId,
+    String? linkedItineraryItemId,
+  }) =>
+      TravelItem(
         id: id, title: title, type: type, status: status,
         date: date, endDate: endDate, time: time, endTime: endTime,
         location: location, destination: destination,
         confirmationNumber: confirmationNumber, url: url, address: address,
         notes: notes, departureTerminal: departureTerminal,
         arrivalTerminal: arrivalTerminal, gate: gate, seat: seat,
-        boardingTime: boardingTime, linkedDocIds: ids,
-        linkedItineraryItemId: linkedItineraryItemId, linkedDayId: linkedDayId,
+        boardingTime: boardingTime,
+        travellers: travellers ?? this.travellers,
+        linkedDocIds: linkedDocIds ?? this.linkedDocIds,
+        linkedItineraryItemId: linkedItineraryItemId ?? this.linkedItineraryItemId,
+        linkedDayId: linkedDayId ?? this.linkedDayId,
       );
 
   bool get hasDate => date != null;

@@ -142,13 +142,15 @@ class _AccommodationsScreenState extends ConsumerState<AccommodationsScreen>
     if (list.isEmpty || kIsWeb) return;
     final tripName = ref.read(activeTripProvider)?.name ?? 'Trip';
     final buf = StringBuffer();
-    buf.writeln('Name,City,Check-in,Check-out,Nights,Price/night,Currency,Total,Status,Source,Confirmation,URL,Notes');
+    buf.writeln('Name,City,Check-in,Check-in time,Check-out,Check-out time,Nights,Price/night,Currency,Total,Status,Source,Confirmation,URL,Notes');
     for (final a in list) {
       final row = [
         _c(a.name),
         _c(a.city),
         _c(a.checkIn != null ? fmtDate(a.checkIn!) : ''),
+        _c(a.checkInTime ?? ''),
         _c(a.checkOut != null ? fmtDate(a.checkOut!) : ''),
+        _c(a.checkOutTime ?? ''),
         _c(a.nights?.toString() ?? ''),
         _c(a.pricePerNight?.toStringAsFixed(2) ?? ''),
         _c(a.currency),
@@ -379,10 +381,16 @@ class _AccommodationCard extends StatelessWidget {
     final checkIn = DateTime(item.checkIn!.year, item.checkIn!.month, item.checkIn!.day);
     final checkOut = DateTime(item.checkOut!.year, item.checkOut!.month, item.checkOut!.day);
     if (today.isAfter(checkOut)) return null;
+    final from = item.checkInTime != null ? ' from ${item.checkInTime}' : '';
+    if (today == checkOut) {
+      return item.checkOutTime != null
+          ? 'Check-out today by ${item.checkOutTime}'
+          : 'Check-out today';
+    }
     if (!today.isBefore(checkIn)) return "Staying now";
     final diff = checkIn.difference(today).inDays;
-    if (diff == 0) return "Check-in today!";
-    if (diff == 1) return "Check-in tomorrow";
+    if (diff == 0) return "Check-in today$from";
+    if (diff == 1) return "Check-in tomorrow$from";
     return "Check-in in $diff days";
   }
 
@@ -404,7 +412,7 @@ class _AccommodationCard extends StatelessWidget {
 
     String? dateStr;
     if (item.checkIn != null && item.checkOut != null) {
-      dateStr = '${fmtDate(item.checkIn!)} → ${fmtDate(item.checkOut!)}';
+      dateStr = '${item.checkInLabel} → ${item.checkOutLabel}';
       if (nightStr != null) dateStr = '$dateStr ($nightStr)';
     }
 

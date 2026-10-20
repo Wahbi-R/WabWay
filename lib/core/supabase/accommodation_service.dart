@@ -11,6 +11,8 @@
 // --   currency text not null default 'USD',
 // --   check_in date,
 // --   check_out date,
+// --   check_in_time time,   -- 051
+// --   check_out_time time,  -- 051
 // --   status text not null default 'brainstorming',
 // --   source text,
 // --   notes text,
@@ -21,6 +23,7 @@
 
 import '../../core/offline_cache.dart';
 import '../../data/accommodation_data.dart';
+import '../../data/date_utils.dart';
 import 'client.dart';
 
 abstract final class AccommodationService {
@@ -82,6 +85,8 @@ abstract final class AccommodationService {
         checkOut:           row['check_out'] != null
             ? DateTime.tryParse(row['check_out'] as String)
             : null,
+        checkInTime:        hhmmFromDb(row['check_in_time']),
+        checkOutTime:       hhmmFromDb(row['check_out_time']),
         status:             _statusFrom(row['status'] as String? ?? 'brainstorming'),
         source:             _sourceFrom(row['source'] as String?),
         notes:              row['notes'] as String?,
@@ -122,6 +127,30 @@ abstract final class AccommodationService {
             .toList(),
       );
 
+  /// Persists a complete draft (Read booking's review screen).
+  static Future<Accommodation> createFromDraft(Accommodation d) => create(
+        tripId:             d.tripId,
+        userId:             d.createdBy,
+        name:               d.name,
+        city:               d.city,
+        url:                d.url,
+        address:            d.address,
+        lat:                d.latitude,
+        lon:                d.longitude,
+        pricePerNight:      d.pricePerNight,
+        currency:           d.currency,
+        checkIn:            d.checkIn,
+        checkOut:           d.checkOut,
+        checkInTime:        d.checkInTime,
+        checkOutTime:       d.checkOutTime,
+        status:             d.status,
+        source:             d.source,
+        notes:              d.notes,
+        imageUrl:           d.imageUrl,
+        confirmationNumber: d.confirmationNumber,
+        spotId:             d.spotId,
+      );
+
   static Future<Accommodation> create({
     required String tripId,
     required String userId,
@@ -135,6 +164,8 @@ abstract final class AccommodationService {
     String currency = 'USD',
     DateTime? checkIn,
     DateTime? checkOut,
+    String? checkInTime,
+    String? checkOutTime,
     AccommodationStatus status = AccommodationStatus.brainstorming,
     AccommodationSource? source,
     String? notes,
@@ -156,6 +187,8 @@ abstract final class AccommodationService {
       if (pricePerNight      != null)                                          'price_per_night':     pricePerNight,
       if (checkIn            != null)                                          'check_in':            checkIn.toIso8601String().substring(0, 10),
       if (checkOut           != null)                                          'check_out':           checkOut.toIso8601String().substring(0, 10),
+      if (checkInTime        != null)                                          'check_in_time':       checkInTime,
+      if (checkOutTime       != null)                                          'check_out_time':      checkOutTime,
       if (source             != null)                                          'source':              _sourceToDb(source),
       if (notes              != null && notes.trim().isNotEmpty)               'notes':               notes.trim(),
       if (imageUrl           != null && imageUrl.trim().isNotEmpty)            'image_url':           imageUrl.trim(),
@@ -178,6 +211,8 @@ abstract final class AccommodationService {
       'price_per_night':     item.pricePerNight,
       'check_in':            item.checkIn?.toIso8601String().substring(0, 10),
       'check_out':           item.checkOut?.toIso8601String().substring(0, 10),
+      'check_in_time':       item.checkInTime,
+      'check_out_time':      item.checkOutTime,
       'source':              item.source != null ? _sourceToDb(item.source!) : null,
       'notes':               item.notes?.trim(),
       'image_url':           item.imageUrl?.trim(),

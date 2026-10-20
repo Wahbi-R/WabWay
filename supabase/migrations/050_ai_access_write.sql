@@ -13,9 +13,9 @@ alter table public.ai_access_tokens
 
 grant select (can_write) on public.ai_access_tokens to authenticated;
 
-drop function public.create_ai_access_token(text);
-
-create function public.create_ai_access_token(p_name text, p_can_write boolean default false)
+-- New two-argument overload; the one-argument version from 048 stays for
+-- older app builds (PostgREST picks the overload by the argument names sent).
+create function public.create_ai_access_token(p_name text, p_can_write boolean)
  returns text
  language plpgsql
  security definer

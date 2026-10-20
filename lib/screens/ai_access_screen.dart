@@ -55,9 +55,22 @@ class _AiAccessScreenState extends State<AiAccessScreen> with AsyncScreenMixin {
       confirmLabel: 'Create',
     );
     if (name == null || !mounted) return;
+    // Cancel / dismiss = read only, the safe default.
+    final canWrite = await showWabwayConfirm(
+      context,
+      title: 'What can "$name" do?',
+      message: 'Read only: look up your trips, bookings, plans and documents.\n\n'
+          'Add & edit: also add flights, stays, plan items, spots and links from '
+          'things you share with it, and fix what it added. Your crew sees '
+          'everything it adds, and you can ask it to undo its changes.',
+      confirmLabel: 'Add & edit',
+      cancelLabel: 'Read only',
+      destructive: false,
+    );
+    if (!mounted) return;
     setState(() => _creating = true);
     try {
-      final token = await AiAccessService.create(name);
+      final token = await AiAccessService.create(name, canWrite: canWrite);
       if (!mounted) return;
       setState(() => _creating = false);
       await _load(silent: true);
@@ -67,6 +80,7 @@ class _AiAccessScreenState extends State<AiAccessScreen> with AsyncScreenMixin {
         builder: (ctx, handle) => _NewTokenSheet(
           token: token,
           mcpUrl: AiAccessService.mcpUrl,
+          canWrite: canWrite,
           showDragHandle: handle,
         ),
       );
@@ -121,8 +135,9 @@ class _AiAccessScreenState extends State<AiAccessScreen> with AsyncScreenMixin {
           children: [
             Text(
               'Let Claude, ChatGPT and other AI assistants look up your bookings, '
-              'plans and documents directly — no more screenshots. They can only '
-              'read: nothing in WabWay can be changed.',
+              'plans and documents directly — no more screenshots. Tokens are read '
+              'only unless you let one add & edit, so it can put a booking '
+              'confirmation or itinerary you share with it straight into WabWay.',
               style: kStyleBody.copyWith(color: kColorInkSoft),
             ),
             const SizedBox(height: kSpace2),
@@ -210,7 +225,8 @@ class _TokenRow extends StatelessWidget {
       ),
       title: Text(token.name, style: kStyleBodyMedium),
       subtitle: Text(
-        '${token.prefix}… · Created ${fmtDate(token.createdAt)} · $used',
+        '${token.canWrite ? 'Can add & edit' : 'Read only'} · ${token.prefix}… · '
+        'Created ${fmtDate(token.createdAt)} · $used',
         style: kStyleCaption,
       ),
       trailing: IconButton(
@@ -228,10 +244,12 @@ class _NewTokenSheet extends StatelessWidget {
   const _NewTokenSheet({
     required this.token,
     required this.mcpUrl,
+    required this.canWrite,
     required this.showDragHandle,
   });
   final String token;
   final String mcpUrl;
+  final bool canWrite;
   final bool showDragHandle;
 
   @override
@@ -282,8 +300,11 @@ class _NewTokenSheet extends StatelessWidget {
             _CopyBlock(value: claudeCode, copiedMessage: 'Command copied'),
             const SizedBox(height: kSpace5),
             Text(
-              'Then just ask, e.g. "What\'s my hotel confirmation number in Kyoto?" '
-              'or "Show me my JR pass".',
+              canWrite
+                  ? 'Then just ask, e.g. "What\'s my hotel confirmation number in Kyoto?", '
+                    'or share a booking email or PDF and say "add this to my Japan trip".'
+                  : 'Then just ask, e.g. "What\'s my hotel confirmation number in Kyoto?" '
+                    'or "Show me my JR pass".',
               style: kStyleCaption,
             ),
           ],

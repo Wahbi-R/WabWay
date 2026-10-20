@@ -7,6 +7,7 @@ class AiAccessToken {
     required this.prefix,
     required this.createdAt,
     this.lastUsedAt,
+    this.canWrite = false,
   });
 
   final String id;
@@ -14,4 +15,7 @@ class AiAccessToken {
   final String prefix;
   final DateTime createdAt;
   final DateTime? lastUsedAt;
+
+  /// True when the assistant may add and edit trip items, not just read them.
+  final bool canWrite;
 }

@@ -11,6 +11,17 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 424,
+    label: "AI can add to your trip",
+    changes: [
+      "When you create an AI access token you can now let it add & edit, not just read",
+      "Share a booking email, PDF or itinerary with Claude or ChatGPT and ask it to add it — flights, stays, plan items, spots and links go straight into your trip",
+      "It can fix details it got wrong and undo anything it added, but never touches what you or your crew added",
+      "Your token list shows which tokens are read only and which can add & edit",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 423,
     label: "Offline receipts",
     changes: [

@@ -21,23 +21,25 @@ abstract final class AiAccessService {
         lastUsedAt: r['last_used_at'] != null
             ? DateTime.parse(r['last_used_at'] as String).toLocal()
             : null,
+        canWrite:   r['can_write'] as bool? ?? false,
       );
 
   /// Your active (non-revoked) tokens, newest first.
   static Future<List<AiAccessToken>> load() async {
     final data = await supabase
         .from('ai_access_tokens')
-        .select('id, name, token_prefix, created_at, last_used_at')
+        .select('id, name, token_prefix, created_at, last_used_at, can_write')
         .isFilter('revoked_at', null)
         .order('created_at', ascending: false);
     return data.map(_fromRow).toList();
   }
 
   /// Creates a token and returns its plaintext — the only time it's readable.
-  static Future<String> create(String name) async {
+  /// [canWrite] lets the assistant add and edit, not just read.
+  static Future<String> create(String name, {bool canWrite = false}) async {
     final token = await supabase.rpc(
       'create_ai_access_token',
-      params: {'p_name': name},
+      params: {'p_name': name, 'p_can_write': canWrite},
     );
     return token as String;
   }

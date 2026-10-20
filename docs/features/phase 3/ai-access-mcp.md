@@ -55,11 +55,40 @@ never have to screenshot a booking to ask an AI about it. Read-only.
   `trip` arguments accept a name, destination or id and default to the
   current/next trip.
 
+## Add & edit (build 424; wabway-server build 423)
+
+Tokens are read only unless you choose **Add & edit** when creating one
+(`ai_access_tokens.can_write`, migration `050_ai_access_write.sql`). Those
+tokens also get:
+
+| Tool | What it does |
+|---|---|
+| `add_travel` | Flight / train / bus / ferry / car with times, terminals, seat, confirmation # |
+| `add_stay` | Stay; status defaults to booked when there's a confirmation number |
+| `add_plan_item` | Plan item on a date; creates the plan day (next day number) if missing |
+| `add_spot` | Saved place (defaults: experience / idea) |
+| `add_link` | Saved link (`documents` row, `ext=url`, `link_category`) |
+| `update_item` | Whitelisted fields on travel/stay/plan item/spot/link; creator or organiser only (same rule as `canManageItem`) |
+| `attach_document` | Library document → item (`trip_connections`) |
+| `undo_ai_changes` | Lists / removes only rows that token created (`ai_created_items`), plus their connections |
+
+- **Writes run as the user.** The server signs a 10-minute HS256 Supabase JWT
+  with `WABWAY_SUPABASE_JWT_SECRET` (legacy JWT secret) and calls PostgREST
+  with it, so RLS, `created_by = auth.uid()` and the activity-feed triggers
+  apply exactly as in the app. (The triggers write `activity_events.actor_id =
+  auth.uid()`, which is NOT NULL — service-key inserts would fail.)
+- Read-only tokens never see the write tools. If migration 050 isn't applied,
+  the server treats every token as read-only.
+- Not covered: uploading the original file (an AI can't reliably pass a chat
+  attachment through), crew push notifications for AI-added items (those are
+  sent by the app), deletes of anything a person added.
+
 ## Setup on the phone
 
 1. `.env`: `WABWAY_SUPABASE_URL=https://vkrjwywagasubeoxeune.supabase.co` and
    `WABWAY_SUPABASE_SERVICE_ROLE_KEY=…` (Supabase → WabWay → Settings → API keys).
 2. `pip install pypdf` (optional — without it PDFs return only the download link).
+   For Add & edit tokens also set `WABWAY_SUPABASE_JWT_SECRET` (Supabase → Project Settings → JWT Keys → Legacy JWT secret).
 3. Merge the server branch to `master`; `watch.sh` pulls and restarts.
 
 ## Notes / next steps

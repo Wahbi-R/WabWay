@@ -1,7 +1,7 @@
 # AI Access (MCP server)
 
 **Build:** 419  
-**Area:** More → Account → AI access; wabway-server `/mcp`
+**Area:** More → Account → AI access (mobile), Settings → Account → AI access (desktop); wabway-server `/mcp`
 
 ## What it does
 

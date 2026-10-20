@@ -4,6 +4,7 @@ import '../core/providers/profile_provider.dart';
 import '../core/providers/trip_provider.dart';
 import '../core/supabase/auth_service.dart';
 import 'account_sheets.dart';
+import 'ai_access_screen.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_theme.dart';
@@ -62,6 +63,15 @@ class SettingsScreen extends ConsumerWidget {
                       icon: Icons.lock_rounded,
                       label: 'Set / change password',
                       onTap: () => showSetPasswordSheet(context),
+                    ),
+                    const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
+                    _SettingsTile(
+                      icon: Icons.smart_toy_rounded,
+                      label: 'AI access',
+                      onTap: () => Navigator.push<void>(
+                        context,
+                        MaterialPageRoute(builder: (_) => const AiAccessScreen()),
+                      ),
                     ),
                     const Divider(height: 1, indent: kSpace4 + 40 + kSpace3),
                   ],

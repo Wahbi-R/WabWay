@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 421,
+    label: "AI access on desktop",
+    changes: [
+      "AI access is now in Settings on desktop and the web app too, not just the phone's More tab",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 420,
     label: "Split receipts by item",
     changes: [

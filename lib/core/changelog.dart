@@ -11,7 +11,7 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
-    build: 419,
+    build: 420,
     label: "Split receipts by item",
     changes: [
       "New \"By item\" split: tap who had each dish, set portions on shared plates, and tax and tip are shared fairly by what each person had",
@@ -21,6 +21,17 @@ const _kChangelog = <_Release>[
       "Settle Up now actually clears what's owed, shows past payments, and lets you undo one",
       "Share any receipt as a receipts.wabble.ca link so friends can claim their items and mark themselves paid — then pull their changes back into WabWay with one tap",
       "Fixed: editing a receipt's split, logging a receipt someone else paid for, and foreign-currency amounts in balances",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
+    build: 419,
+    label: "AI access",
+    changes: [
+      "Connect Claude, ChatGPT or another AI assistant to WabWay so it can look up your bookings, plans, saved places and documents itself — no more screenshots",
+      "Ask things like \"What's my hotel confirmation number in Kyoto?\" or \"Show me my JR pass\" and it reads the real booking or file",
+      "Set it up in More → AI access: create a token and copy the ready-made setup for your assistant",
+      "AI assistants can only read your trips, never change them, and you can revoke a token any time",
     ],
   ),
   _Release(

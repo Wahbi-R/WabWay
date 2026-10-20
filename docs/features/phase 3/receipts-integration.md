@@ -1,4 +1,4 @@
-# Receipts in WabWay — split by item, Receipts links, paying back (Build 419)
+# Receipts in WabWay — split by item, Receipts links, paying back (Build 420)
 
 receipts.wabble.ca ("Receipts") is its own product: a split-the-bill site where
 anyone with a link claims items and marks themselves paid. WabWay now does
@@ -15,7 +15,7 @@ whose changes are only applied when someone taps *Apply*.
 | By item | `ReceiptItemization.toSplits()` — items + proportional tax/tip/discount |
 
 All shares are in the **receipt's currency** (like `receipts.amount`). The home
-currency only appears in `home_amount` (totals). Before 419 the form saved shares
+currency only appears in `home_amount` (totals). Before 420 the form saved shares
 in home currency while balances and the detail screen read them as the receipt
 currency.
 

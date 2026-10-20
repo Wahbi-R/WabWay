@@ -1,5 +1,5 @@
--- Build 419: itemized receipts, Receipts links, and per-share settling.
--- (049 — the live DB already has an unrelated 048_ai_access_tokens.)
+-- Build 420: itemized receipts, Receipts links, and per-share settling.
+-- (049 — the live DB already has an 048_ai_access_tokens, build 419.)
 --
 -- 1. receipts.items         — the itemized bill (items, tax/tip/discount and
 --                              who had what), so editing keeps the breakdown.

@@ -108,7 +108,7 @@ class _ItemsEditorState extends State<_ItemsEditor> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Split by item', style: kStyleTitle),
-                    Text('Tap who had each item', style: kStyleCaption),
+                    Text('Tap who had each item · tap a portion to type it', style: kStyleCaption),
                   ],
                 ),
               ),
@@ -377,6 +377,18 @@ class _ItemRow extends StatelessWidget {
                   _PortionStepper(
                     label: m.isYou ? 'You' : m.name.split(' ').first,
                     value: weights[m.id] ?? 0,
+                    onType: () async {
+                      final text = await showWabwayTextPrompt(
+                        context,
+                        title: m.isYou ? 'Your portion' : "${m.name.split(' ').first}'s portion",
+                        initialValue: fmtQty(double.parse((weights[m.id] ?? 0).toStringAsFixed(2))),
+                        hint: 'e.g. 2 or 1.5',
+                        helper: 'Of ${fmtQty(item.quantity)}. 0 takes them off this item.',
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      );
+                      final v = text == null ? null : double.tryParse(text.replaceAll(',', '.'));
+                      if (v != null && v >= 0) onSetWeight(m.id, v);
+                    },
                     onMinus: () => onSetWeight(m.id, stepPortion(weights[m.id] ?? 0, _step, up: false)),
                     onPlus: () => onSetWeight(m.id, stepPortion(weights[m.id] ?? 0, _step, up: true)),
                   ),
@@ -408,11 +420,14 @@ class _PortionStepper extends StatelessWidget {
     required this.value,
     required this.onMinus,
     required this.onPlus,
+    required this.onType,
   });
   final String label;
   final double value;
   final VoidCallback onMinus;
   final VoidCallback onPlus;
+  /// Tap the number to type any portion (decimals allowed).
+  final VoidCallback onType;
 
   @override
   Widget build(BuildContext context) {
@@ -430,7 +445,18 @@ class _PortionStepper extends StatelessWidget {
           color: kColorInkSoft,
           onPressed: onMinus,
         ),
-        Text(fmtQty(double.parse(value.toStringAsFixed(2))), style: kStyleBodySemibold),
+        InkWell(
+          onTap: onType,
+          borderRadius: kRadiusSm,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: kSpace2, vertical: 2),
+            decoration: BoxDecoration(
+              borderRadius: kRadiusSm,
+              border: Border(bottom: BorderSide(color: kColorBorder)),
+            ),
+            child: Text(fmtQty(double.parse(value.toStringAsFixed(2))), style: kStyleBodySemibold),
+          ),
+        ),
         IconButton(
           constraints: tight,
           padding: EdgeInsets.zero,

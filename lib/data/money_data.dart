@@ -56,20 +56,26 @@ class ReceiptSplit {
   const ReceiptSplit({
     required this.memberId,
     required this.amount,
+    this.contributed = 0,
     this.isSettled = false,
     this.settledAt,
     this.settlementId,
   });
   final String memberId;
+  /// Their share of the cost (0 when they only chipped in).
   final double amount;
+  /// What they handed over towards the bill when several people paid
+  /// (see [Receipt.hasSeveralPayers]); 0 otherwise.
+  final double contributed;
   final bool isSettled;
   final DateTime? settledAt;
   final String? settlementId;
 
-  ReceiptSplit copyWith({bool? isSettled, DateTime? settledAt, String? settlementId}) =>
+  ReceiptSplit copyWith({bool? isSettled, DateTime? settledAt, String? settlementId, double? contributed}) =>
       ReceiptSplit(
         memberId:     memberId,
         amount:       amount,
+        contributed:  contributed ?? this.contributed,
         isSettled:    isSettled ?? this.isSettled,
         settledAt:    (isSettled ?? this.isSettled) ? (settledAt ?? this.settledAt) : null,
         settlementId: (isSettled ?? this.isSettled) ? (settlementId ?? this.settlementId) : null,
@@ -176,12 +182,44 @@ class Receipt {
   double settleAmount(double share, String? homeCurrency) =>
       settleCurrency(homeCurrency) == currency ? share : share * homeRate;
 
-  /// Open (unsettled) shares owed to the payer by other people.
+  /// More than one person put money in. [paidById] is then the main payer
+  /// (who put in the most) and everyone settles with them.
+  bool get hasSeveralPayers =>
+      splits.any((s) => s.memberId != paidById && s.contributed > 0.005);
+
+  /// What [memberId] handed over towards the bill. The main payer covered
+  /// whatever the others didn't.
+  double contributionOf(String memberId) {
+    if (memberId != paidById) {
+      return splits.where((s) => s.memberId == memberId).fold(0.0, (a, s) => a + s.contributed);
+    }
+    final others = splits
+        .where((s) => s.memberId != paidById)
+        .fold(0.0, (a, s) => a + s.contributed);
+    return amount - others;
+  }
+
+  /// Everyone who put money in → how much, main payer first.
+  Map<String, double> get payers {
+    if (!hasSeveralPayers) return {paidById: amount};
+    return {
+      paidById: contributionOf(paidById),
+      for (final s in splits)
+        if (s.memberId != paidById && s.contributed > 0.005) s.memberId: s.contributed,
+    };
+  }
+
+  /// What [s]'s person still has to settle with the main payer: positive =
+  /// they owe the payer, negative = the payer owes them (they put in more
+  /// than their share). Always 0 for the payer's own share.
+  double owes(ReceiptSplit s) => s.memberId == paidById ? 0 : s.amount - s.contributed;
+
+  /// Open (unsettled) shares between the payer and someone else, either way.
   Iterable<ReceiptSplit> get openDebts =>
-      splits.where((s) => s.memberId != paidById && !s.isSettled);
+      splits.where((s) => !s.isSettled && owes(s).abs() > 0.005);
 
   bool get isFullySettled =>
-      splits.any((s) => s.memberId != paidById) && openDebts.isEmpty;
+      splits.any((s) => owes(s).abs() > 0.005) && openDebts.isEmpty;
 
   /// True when the receipt was entered in a foreign currency and a real rate was applied.
   bool get isForeignCurrency => exchangeRate != 1.0;
@@ -200,11 +238,47 @@ class Receipt {
   // Still outstanding: positive = owed to you, negative = you owe someone.
   double myNetFor(String myId) {
     if (paidById == myId) {
-      return openDebts.fold(0.0, (a, s) => a + s.amount);
+      return openDebts.fold(0.0, (a, s) => a + owes(s));
     }
     final yours = splits.where((s) => s.memberId == myId && !s.isSettled);
-    return yours.isEmpty ? 0.0 : -yours.first.amount;
+    return yours.isEmpty ? 0.0 : -owes(yours.first);
   }
+}
+
+/// [shares] (who owes what of the cost) with what each person put in when
+/// several people paid. [contributions] is everyone's amount, the main payer
+/// included; people who chipped in without sharing the cost get a 0 share.
+/// Pass an empty map for a single payer.
+List<ReceiptSplit> withContributions(
+  List<ReceiptSplit> shares,
+  Map<String, double> contributions,
+) {
+  final given = {
+    for (final e in contributions.entries)
+      if (e.value > 0.005) e.key: e.value,
+  };
+  if (given.length < 2) {
+    return [for (final s in shares) s.copyWith(contributed: 0)];
+  }
+  return [
+    for (final s in shares) s.copyWith(contributed: given[s.memberId] ?? 0),
+    for (final e in given.entries)
+      if (!shares.any((s) => s.memberId == e.key))
+        ReceiptSplit(memberId: e.key, amount: 0, contributed: e.value),
+  ];
+}
+
+/// The main payer when several people paid: whoever put in the most.
+String mainPayerOf(Map<String, double> contributions, String fallback) {
+  String best = fallback;
+  var most = contributions[fallback] ?? 0;
+  for (final e in contributions.entries) {
+    if (e.value > most + 0.005) {
+      best = e.key;
+      most = e.value;
+    }
+  }
+  return best;
 }
 
 // ─── Cash withdrawal ──────────────────────────────────────────────────────────
@@ -287,10 +361,11 @@ List<MemberBalance> calculateBalances(
   for (final r in receipts) {
     for (final split in r.splits) {
       if (split.isSettled) continue;
+      final owes = r.owes(split);
       if (r.paidById == me && split.memberId != me) {
-        net[split.memberId] = (net[split.memberId] ?? 0) + split.amount;
+        net[split.memberId] = (net[split.memberId] ?? 0) + owes;
       } else if (r.paidById != me && split.memberId == me) {
-        net[r.paidById] = (net[r.paidById] ?? 0) - split.amount;
+        net[r.paidById] = (net[r.paidById] ?? 0) - owes;
       }
     }
   }
@@ -362,7 +437,7 @@ Map<String, List<MemberBalance>> calculateBalancesGrouped(
     final rate = currency == r.currency && r.isForeignCurrency ? r.homeRate : null;
     for (final split in r.splits) {
       if (split.isSettled) continue;
-      final amount = r.settleAmount(split.amount, homeCurrency);
+      final amount = r.settleAmount(r.owes(split), homeCurrency);
       if (r.paidById == me && split.memberId != me) {
         add(currency, split.memberId, amount, rate);
       } else if (r.paidById != me && split.memberId == me) {
@@ -456,7 +531,8 @@ OpenShares openSharesBetween(
       for (final r in receipts)
         if (r.settleCurrency(homeCurrency) == currency)
           for (final s in r.splits)
-            if (!s.isSettled && pair(r.paidById, s.memberId)) (r.id, s.memberId),
+            if (!s.isSettled && r.owes(s).abs() > 0.005 && pair(r.paidById, s.memberId))
+              (r.id, s.memberId),
     ],
     cashShares: [
       for (final w in withdrawals)

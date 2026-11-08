@@ -7,6 +7,7 @@ import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
 import '../../core/text_utils.dart';
 import '../../widgets/widgets.dart';
+import 'item_names_language.dart';
 
 /// Edit an itemized bill and who had what — the same split the Receipts site
 /// does, inside WabWay and fully offline. Returns the edited itemization, or
@@ -87,24 +88,6 @@ class _ItemsEditorState extends State<_ItemsEditor> {
     if (result != null) _set(_it.copyWith(tax: result.$1, tip: result.$2, discount: result.$3));
   }
 
-  Future<void> _editPortions(ReceiptItem item) async {
-    final result = await showWabwayAutoSheet<Map<String, double>>(
-      context,
-      builder: (ctx, handle) => _PortionsForm(
-        item: item,
-        members: widget.members,
-        weights: _it.weightsFor(item.id),
-        showDragHandle: handle,
-      ),
-    );
-    if (result == null) return;
-    var next = _it;
-    for (final m in widget.members) {
-      next = next.setWeight(item.id, m.id, result[m.id] ?? 0);
-    }
-    _set(next);
-  }
-
   @override
   Widget build(BuildContext context) {
     final navBarPad = MediaQuery.paddingOf(context).bottom;
@@ -112,7 +95,7 @@ class _ItemsEditorState extends State<_ItemsEditor> {
     final unclaimed = _it.unclaimedTotal;
     final shares = _it.itemSharesByMember();
 
-    return Column(
+    return ItemNamesLanguage(builder: (context, english) => Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (widget.showDragHandle) const WabwayDragHandle(),
@@ -176,6 +159,7 @@ class _ItemsEditorState extends State<_ItemsEditor> {
                     ],
                   ),
                 ),
+              ItemNamesLanguageBar(items: _it, english: english, onTranslated: _set),
               if (_it.items.isEmpty)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: kSpace6),
@@ -193,7 +177,9 @@ class _ItemsEditorState extends State<_ItemsEditor> {
                   currency: widget.currency,
                   onEdit: () => _editItem(item),
                   onToggle: (memberId) => _set(_it.toggle(item.id, memberId)),
-                  onPortions: () => _editPortions(item),
+                  english: english,
+                  onSetWeight: (memberId, w) => _set(_it.setWeight(item.id, memberId, w)),
+                  onSplitEqually: () => _set(_it.splitItemEqually(item.id)),
                 ),
                 const Divider(height: 1),
               ],
@@ -266,7 +252,7 @@ class _ItemsEditorState extends State<_ItemsEditor> {
           ),
         ),
       ],
-    );
+    ));
   }
 }
 
@@ -280,7 +266,9 @@ class _ItemRow extends StatelessWidget {
     required this.currency,
     required this.onEdit,
     required this.onToggle,
-    required this.onPortions,
+    required this.onSetWeight,
+    required this.onSplitEqually,
+    this.english = true,
   });
 
   final ReceiptItem item;
@@ -289,14 +277,25 @@ class _ItemRow extends StatelessWidget {
   final String currency;
   final VoidCallback onEdit;
   final ValueChanged<String> onToggle;
-  final VoidCallback onPortions;
+  final void Function(String memberId, double weight) onSetWeight;
+  final VoidCallback onSplitEqually;
+  final bool english;
+
+  /// Whole units for whole-number items; halves otherwise.
+  double get _step => item.quantity == item.quantity.roundToDouble() ? 1 : 0.5;
 
   @override
   Widget build(BuildContext context) {
     final claimed = weights.values.fold(0.0, (a, b) => a + b);
     final multi = item.quantity > 1;
     final vals = weights.values.toList();
-    final custom = vals.isNotEmpty && vals.any((v) => (v - vals.first).abs() > 1e-9);
+    final unequal = vals.isNotEmpty && vals.any((v) => (v - vals.first).abs() > 1e-9);
+    final assigned = [for (final m in members) if (weights.containsKey(m.id)) m];
+    // Like the Receipts site: portions show once 2+ people share an item, or
+    // one person has part of a multi-unit item.
+    final showPortions = assigned.length >= 2 || (assigned.length == 1 && multi);
+    final mismatch = claimed > 0 && (claimed - item.quantity).abs() > 0.01;
+    final divisor = ReceiptItemization.portionDivisor(item, claimed);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: kSpace3),
       child: Column(
@@ -308,9 +307,10 @@ class _ItemRow extends StatelessWidget {
             child: Row(
               children: [
                 Expanded(
-                  child: Text(
-                    multi ? '${fmtQty(item.quantity)}× ${item.name}' : item.name,
-                    style: kStyleBodyMedium,
+                  child: ItemNameText(
+                    item: item,
+                    english: english,
+                    prefix: multi ? '${fmtQty(item.quantity)}× ' : '',
                   ),
                 ),
                 const SizedBox(width: kSpace2),
@@ -330,16 +330,8 @@ class _ItemRow extends StatelessWidget {
                 _MemberChip(
                   member: m,
                   selected: weights.containsKey(m.id),
-                  portion: multi || custom ? weights[m.id] : null,
+                  portion: multi || unequal ? weights[m.id] : null,
                   onTap: () => onToggle(m.id),
-                ),
-              if (multi || custom)
-                ActionChip(
-                  avatar: const Icon(Icons.tune_rounded, size: 14),
-                  label: const Text('Portions'),
-                  labelStyle: kStyleCaption,
-                  visualDensity: VisualDensity.compact,
-                  onPressed: onPortions,
                 ),
             ],
           ),
@@ -347,15 +339,108 @@ class _ItemRow extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(top: kSpace1),
               child: Text('Nobody yet', style: kStyleCaption.copyWith(color: kColorWarning)),
-            )
-          else if (multi && claimed < item.quantity - 1e-6)
+            ),
+          if (showPortions) ...[
+            const SizedBox(height: kSpace2),
+            Row(
+              children: [
+                Text('Portions', style: kStyleCaptionMedium.copyWith(color: kColorInkSoft)),
+                const SizedBox(width: kSpace2),
+                Expanded(
+                  child: Text(
+                    [
+                      '${fmtQty(claimed)} of ${fmtQty(item.quantity)}',
+                      if (mismatch && claimed < item.quantity)
+                        '${fmtQty(item.quantity - claimed)} unclaimed',
+                      if (mismatch && claimed > item.quantity) 'shared in proportion',
+                      if (!mismatch && multi) '${fmtAmount(item.unitPrice, currency)} each',
+                    ].join(' · '),
+                    style: kStyleCaption.copyWith(
+                        color: mismatch && claimed < item.quantity ? kColorWarning : kColorInkSoft),
+                  ),
+                ),
+                TextButton(
+                  onPressed: onSplitEqually,
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: kSpace2),
+                  ),
+                  child: Text('Split equally', style: kStyleCaptionMedium.copyWith(color: kColorPrimary)),
+                ),
+              ],
+            ),
+            Wrap(
+              spacing: kSpace3,
+              runSpacing: kSpace1,
+              children: [
+                for (final m in assigned)
+                  _PortionStepper(
+                    label: m.isYou ? 'You' : m.name.split(' ').first,
+                    value: weights[m.id] ?? 0,
+                    onMinus: () => onSetWeight(m.id, (weights[m.id] ?? 0) - _step),
+                    onPlus: () => onSetWeight(m.id, (weights[m.id] ?? 0) + _step),
+                  ),
+              ],
+            ),
+          ],
+          // What each person pays for this item when it isn't an even split.
+          if ((unequal || mismatch) && assigned.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: kSpace1),
-              child: Text('${fmtQty(item.quantity - claimed)} of ${fmtQty(item.quantity)} unclaimed',
-                  style: kStyleCaption.copyWith(color: kColorWarning)),
+              child: Text(
+                [
+                  for (final m in assigned)
+                    '${m.isYou ? 'You' : m.name.split(' ').first} '
+                        '${fmtAmount((weights[m.id] ?? 0) / divisor * item.totalPrice, currency)}',
+                ].join('  ·  '),
+                style: kStyleCaption.copyWith(color: kColorInkSoft),
+              ),
             ),
         ],
       ),
+    );
+  }
+}
+
+class _PortionStepper extends StatelessWidget {
+  const _PortionStepper({
+    required this.label,
+    required this.value,
+    required this.onMinus,
+    required this.onPlus,
+  });
+  final String label;
+  final double value;
+  final VoidCallback onMinus;
+  final VoidCallback onPlus;
+
+  @override
+  Widget build(BuildContext context) {
+    const tight = BoxConstraints.tightFor(width: 32, height: 32);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(label, style: kStyleCaptionMedium.copyWith(color: kColorInk)),
+        IconButton(
+          constraints: tight,
+          padding: EdgeInsets.zero,
+          iconSize: 18,
+          tooltip: 'Less',
+          icon: const Icon(Icons.remove_circle_outline_rounded),
+          color: kColorInkSoft,
+          onPressed: onMinus,
+        ),
+        Text(fmtQty(double.parse(value.toStringAsFixed(2))), style: kStyleBodySemibold),
+        IconButton(
+          constraints: tight,
+          padding: EdgeInsets.zero,
+          iconSize: 18,
+          tooltip: 'More',
+          icon: const Icon(Icons.add_circle_outline_rounded),
+          color: kColorPrimary,
+          onPressed: onPlus,
+        ),
+      ],
     );
   }
 }
@@ -660,92 +745,6 @@ class _ExtrasFormState extends State<_ExtrasForm> {
           label: 'Save',
           fullWidth: true,
           onPressed: () => Navigator.pop(context, (_v(_tax), _v(_tip), _v(_discount))),
-        ),
-      ],
-    );
-  }
-}
-
-class _PortionsForm extends StatefulWidget {
-  const _PortionsForm({
-    required this.item,
-    required this.members,
-    required this.weights,
-    required this.showDragHandle,
-  });
-  final ReceiptItem item;
-  final List<TripMember> members;
-  final Map<String, double> weights;
-  final bool showDragHandle;
-
-  @override
-  State<_PortionsForm> createState() => _PortionsFormState();
-}
-
-class _PortionsFormState extends State<_PortionsForm> {
-  late final Map<String, double> _w = Map.of(widget.weights);
-
-  double get _claimed => _w.values.fold(0.0, (a, b) => a + b);
-
-  /// Whole units for whole-number items; halves otherwise.
-  double get _step => widget.item.quantity == widget.item.quantity.roundToDouble() ? 1 : 0.5;
-
-  @override
-  Widget build(BuildContext context) {
-    final qty = widget.item.quantity;
-    return _SheetFrame(
-      title: '${fmtQty(qty)}× ${widget.item.name}',
-      showDragHandle: widget.showDragHandle,
-      children: [
-        Text('How many each person had. Unclaimed units are left for the payer.',
-            style: kStyleCaption),
-        const SizedBox(height: kSpace3),
-        for (final m in widget.members)
-          Padding(
-            padding: const EdgeInsets.only(bottom: kSpace2),
-            child: Row(
-              children: [
-                WabwayAvatar(name: m.name, size: WabwayAvatarSize.sm),
-                const SizedBox(width: kSpace2),
-                Expanded(child: Text(m.label, style: kStyleBodyMedium)),
-                IconButton(
-                  icon: const Icon(Icons.remove_circle_outline_rounded),
-                  color: kColorInkSoft,
-                  onPressed: (_w[m.id] ?? 0) <= 0
-                      ? null
-                      : () => setState(() {
-                            final v = (_w[m.id] ?? 0) - _step;
-                            if (v <= 1e-9) {
-                              _w.remove(m.id);
-                            } else {
-                              _w[m.id] = v;
-                            }
-                          }),
-                ),
-                SizedBox(
-                  width: 36,
-                  child: Text(fmtQty(_w[m.id] ?? 0),
-                      textAlign: TextAlign.center, style: kStyleBodySemibold),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.add_circle_outline_rounded),
-                  color: kColorPrimary,
-                  onPressed: () => setState(() => _w[m.id] = (_w[m.id] ?? 0) + _step),
-                ),
-              ],
-            ),
-          ),
-        Text(
-          _claimed > qty + 1e-6
-              ? '${fmtQty(_claimed)} claimed of ${fmtQty(qty)} — shared in proportion'
-              : '${fmtQty(_claimed)} of ${fmtQty(qty)} claimed',
-          style: kStyleCaption,
-        ),
-        const SizedBox(height: kSpace4),
-        WabwayButton(
-          label: 'Save portions',
-          fullWidth: true,
-          onPressed: () => Navigator.pop(context, _w),
         ),
       ],
     );

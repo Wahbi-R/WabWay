@@ -18,27 +18,40 @@ class ReceiptItem {
     required this.name,
     required this.quantity,
     required this.totalPrice,
+    this.nameEn,
   });
 
   final int id;
+  /// As printed on the receipt.
   final String name;
+  /// English translation when [name] isn't English (from the scan or
+  /// Translate); null otherwise.
+  final String? nameEn;
+
+  /// [name] in English when [english] and a translation exists.
+  String displayName({bool english = true}) =>
+      english && nameEn != null && nameEn!.isNotEmpty ? nameEn! : name;
   final double quantity;
   /// The line total as printed (already quantity × unit price).
   final double totalPrice;
 
   double get unitPrice => quantity > 0 ? totalPrice / quantity : totalPrice;
 
-  ReceiptItem copyWith({String? name, double? quantity, double? totalPrice}) =>
+  /// A new [name] drops the translation (it no longer matches) unless
+  /// [nameEn] is given too.
+  ReceiptItem copyWith({String? name, double? quantity, double? totalPrice, String? nameEn}) =>
       ReceiptItem(
         id:         id,
         name:       name ?? this.name,
         quantity:   quantity ?? this.quantity,
         totalPrice: totalPrice ?? this.totalPrice,
+        nameEn:     nameEn ?? (name == null || name == this.name ? this.nameEn : null),
       );
 
   Map<String, dynamic> toJson() => {
         'id':          id,
         'name':        name,
+        if (nameEn != null && nameEn!.isNotEmpty) 'name_en': nameEn,
         'quantity':    quantity,
         'unit_price':  _round2(unitPrice),
         'total_price': totalPrice,
@@ -51,6 +64,9 @@ class ReceiptItem {
       name:       (j['name'] as String?)?.trim().isNotEmpty == true ? (j['name'] as String).trim() : 'Item',
       quantity:   qty > 0 ? qty : 1,
       totalPrice: (j['total_price'] as num?)?.toDouble() ?? 0,
+      nameEn:     (j['name_en'] as String?)?.trim().isNotEmpty == true
+          ? (j['name_en'] as String).trim()
+          : null,
     );
   }
 }
@@ -349,8 +365,13 @@ class ReceiptItemization {
       for (var i = 0; i < raw.length; i++)
         ReceiptItem.fromJson({...(raw[i] as Map).cast<String, dynamic>(), 'id': i}),
     ];
+    final title = (j['title'] as String?)?.trim();
+    final titleEn = (j['title_en'] as String?)?.trim();
     return ReceiptItemization(
-      title:        (j['title'] as String?)?.trim(),
+      // "Yakiniku Rengaya (焼肉れんが屋)" — readable, and still matches the sign.
+      title:        titleEn != null && titleEn.isNotEmpty && title != null && title.isNotEmpty
+          ? '$titleEn ($title)'
+          : title,
       items:        items,
       subtotal:     (j['subtotal'] as num?)?.toDouble() ?? 0,
       discount:     (j['discount'] as num?)?.toDouble() ?? 0,
@@ -360,6 +381,21 @@ class ReceiptItemization {
       assignments:  {for (final it in items) it.id: <String, double>{}},
     );
   }
+
+  /// Some item isn't in English and has no translation yet.
+  bool get needsTranslation =>
+      items.any((i) => (i.nameEn == null || i.nameEn!.isEmpty) && !isProbablyEnglish(i.name));
+
+  /// Some item has a translation to show.
+  bool get hasTranslations => items.any((i) => i.nameEn != null && i.nameEn!.isNotEmpty);
+
+  /// With [namesEn] (same order as [items]; empty = already English) applied.
+  ReceiptItemization withTranslations(List<String> namesEn) => copyWith(items: [
+        for (var i = 0; i < items.length; i++)
+          i < namesEn.length && namesEn[i].trim().isNotEmpty
+              ? items[i].copyWith(nameEn: namesEn[i].trim())
+              : items[i],
+      ]);
 
   // ── Storage (receipts.items jsonb) ────────────────────────────────────────
 
@@ -430,3 +466,11 @@ double _roundTo(double v, int decimals) {
 /// Quantity without a trailing ".0" (2 → "2", 0.5 → "0.5").
 String fmtQty(double q) =>
     q == q.roundToDouble() ? q.toInt().toString() : q.toStringAsFixed(2).replaceFirst(RegExp(r'0+$'), '');
+
+/// Mostly Latin letters — a name that needs no translation ("Coke", "Café").
+bool isProbablyEnglish(String s) {
+  final letters = s.runes.where((r) => !(r < 0x41 || (r > 0x5A && r < 0x61) || (r > 0x7A && r < 0xC0))).toList();
+  if (letters.isEmpty) return true;
+  final latin = letters.where((r) => r < 0x250).length;
+  return latin / letters.length > 0.8;
+}

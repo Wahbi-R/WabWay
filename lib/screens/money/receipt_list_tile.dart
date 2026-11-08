@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/text_utils.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../data/money_data.dart';
 import '../../theme/app_colors.dart';
@@ -83,7 +84,9 @@ class ReceiptListTile extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     [
-                      '${payer.label} paid',
+                      receipt.hasSeveralPayers
+                          ? '${payer.label} + ${pluralize(receipt.payers.length - 1, 'other')} paid'
+                          : '${payer.label} paid',
                       fmtDate(receipt.date),
                       if (receipt.isFullySettled) 'all paid'
                       else if (receipt.isItemized) 'by item'

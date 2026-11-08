@@ -120,6 +120,31 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
   late String _paidById;
   late Set<String> _splitWith;
   late Map<String, TextEditingController> _customCtrls;
+  /// "Several people paid": what each person put in.
+  bool _severalPaid = false;
+  late final Map<String, TextEditingController> _paidCtrls = {
+    for (final m in widget.members) m.id: TextEditingController(),
+  };
+
+  Map<String, double> get _contributions => {
+        for (final e in _paidCtrls.entries)
+          if ((double.tryParse(e.value.text.trim()) ?? 0) > 0)
+            e.key: double.parse(e.value.text.trim()),
+      };
+
+  String _fmtInput(double v) =>
+      v.toStringAsFixed(currencyDecimals(_currency) == 0 || v == v.truncateToDouble() ? 0 : 2);
+
+  void _setSeveralPaid(bool on) => setState(() {
+        _severalPaid = on;
+        if (on && _contributions.isEmpty) {
+          // Start with the current payer covering everything.
+          final total = _splitMode == _SplitMode.items && _items != null
+              ? _items!.total
+              : double.tryParse(_amountCtrl.text.trim()) ?? 0;
+          if (total > 0) _paidCtrls[_paidById]?.text = _fmtInput(total);
+        }
+      });
 
   ReceiptCategory _category  = ReceiptCategory.food;
   late String     _currency  = widget.defaultCurrency ?? widget.homeCurrency;
@@ -221,6 +246,12 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
       };
       _items     = ex.items;
       _splitMode = ex.isItemized ? _SplitMode.items : _SplitMode.custom;
+      if (ex.hasSeveralPayers) {
+        _severalPaid = true;
+        for (final e in ex.payers.entries) {
+          _paidCtrls[e.key]?.text = _fmtInput(e.value);
+        }
+      }
       // Pre-fill conversion fields
       if (ex.exchangeRate != 1.0) {
         _rateCtrl.text    = ex.exchangeRate.toStringAsFixed(6);
@@ -276,7 +307,7 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
     _rateCtrl.dispose();
     _feePctCtrl.dispose();
     _homeAmountCtrl.dispose();
-    for (final c in _customCtrls.values) {
+    for (final c in [..._customCtrls.values, ..._paidCtrls.values]) {
       c.dispose();
     }
     super.dispose();
@@ -340,6 +371,20 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
     final total = _splitMode == _SplitMode.items
         ? _items!.total
         : double.tryParse(_amountCtrl.text.trim()) ?? 0;
+    // Several people paid: what they put in must add up to the bill, and the
+    // one who put in the most becomes the main payer everyone settles with.
+    var payerId = _paidById;
+    var contributions = const <String, double>{};
+    if (_severalPaid) {
+      contributions = _contributions;
+      final given = contributions.values.fold(0.0, (a, v) => a + v);
+      if ((given - total).abs() > 0.01) {
+        setState(() => _error = 'Who paid adds up to ${fmtAmount(given, _currency)}, '
+            'but the receipt is ${fmtAmount(total, _currency)}.');
+        return;
+      }
+      payerId = mainPayerOf(contributions, _paidById);
+    }
     final title = _titleCtrl.text.trim();
     final notes =
         _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim();
@@ -357,7 +402,7 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
     final homeAmountSet = _needsConversion && _homeOverride;
 
     final items = _splitMode == _SplitMode.items ? _items : null;
-    final splits = switch (_splitMode) {
+    final shares = switch (_splitMode) {
       _SplitMode.equal => [
           for (final id in _splitWith)
             ReceiptSplit(memberId: id, amount: total / _splitWith.length),
@@ -371,6 +416,7 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
         ],
       _SplitMode.items => items!.toSplits(widget.members.map((m) => m.id), _currency),
     };
+    final splits = withContributions(shares, contributions);
 
     // Local-only mode when tripId was not provided.
     if (widget.tripId == null) {
@@ -382,7 +428,7 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
         homeAmount:        homeTotal,
         exchangeRate:      exchangeRate,
         transactionFeePct: feePct,
-        paidById:          _paidById,
+        paidById:          payerId,
         splits:            splits,
         category:          _category,
         date:              DateTime.now(),
@@ -399,7 +445,7 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
       if (_isEditing) {
         receipt = await MoneyService.updateReceipt(
           receiptId:         widget.existingReceipt!.id,
-          paidBy:            _paidById,
+          paidBy:            payerId,
           title:             title,
           amount:            total,
           currency:          _currency,
@@ -417,7 +463,7 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
       } else {
         receipt = await MoneyService.createReceipt(
           tripId:            widget.tripId!,
-          paidBy:            _paidById,
+          paidBy:            payerId,
           title:             title,
           amount:            total,
           currency:          _currency,
@@ -487,7 +533,7 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
           try {
             await SyncQueue.enqueueReceipt(
               widget.tripId!,
-              paidBy:            _paidById,
+              paidBy:            payerId,
               title:             title,
               amount:            total,
               currency:          _currency,
@@ -655,18 +701,61 @@ class _AddReceiptContentState extends State<_AddReceiptContent> {
                   ),
                   const SizedBox(height: kSpace4),
 
-                  WabwaySelectField<String>(
-                    label: 'Paid by',
-                    value: _paidById,
-                    onChanged: (v) =>
-                        setState(() => _paidById = v ?? widget.userId),
-                    items: widget.members
-                        .map((m) => WabwaySelectItem(
-                              value: m.id,
-                              label: m.isYou ? 'You' : m.name,
-                            ))
-                        .toList(),
-                  ),
+                  if (!_severalPaid) ...[
+                    WabwaySelectField<String>(
+                      label: 'Paid by',
+                      value: _paidById,
+                      onChanged: (v) =>
+                          setState(() => _paidById = v ?? widget.userId),
+                      items: widget.members
+                          .map((m) => WabwaySelectItem(
+                                value: m.id,
+                                label: m.isYou ? 'You' : m.name,
+                              ))
+                          .toList(),
+                    ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: WabwayButton(
+                        label: 'Several people paid',
+                        icon: Icons.group_add_rounded,
+                        size: WabwayButtonSize.sm,
+                        variant: WabwayButtonVariant.ghost,
+                        onPressed: () => _setSeveralPaid(true),
+                      ),
+                    ),
+                  ] else ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text('Who paid  ·  amounts in $_currency',
+                              style: kStyleCaptionMedium.copyWith(color: kColorInk)),
+                        ),
+                        WabwayButton(
+                          label: 'One person paid',
+                          size: WabwayButtonSize.sm,
+                          variant: WabwayButtonVariant.ghost,
+                          onPressed: () => _setSeveralPaid(false),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      'What each person put in (cash or card). Everyone settles up '
+                      'with whoever put in the most.',
+                      style: kStyleCaption.copyWith(color: kColorInkSoft),
+                    ),
+                    const SizedBox(height: kSpace2),
+                    _CustomSplitPicker(
+                      members: widget.members,
+                      controllers: _paidCtrls,
+                      currency: _currency,
+                      total: _splitMode == _SplitMode.items && _items != null
+                          ? _items!.total
+                          : double.tryParse(_amountCtrl.text.trim()) ?? 0,
+                      onChanged: () => setState(() {}),
+                      remainderText: (left) => '$left still to cover',
+                    ),
+                  ],
                   const SizedBox(height: kSpace4),
 
                   // Split method — shares are in the receipt's currency.
@@ -1278,12 +1367,16 @@ class _CustomSplitPicker extends StatelessWidget {
     required this.currency,
     required this.total,
     required this.onChanged,
+    this.remainderText,
   });
   final List<TripMember> members;
   final Map<String, TextEditingController> controllers;
   final String currency;
   final double total;
   final VoidCallback onChanged;
+  /// The line under the rows for what's [left] (> 0) of the total; defaults
+  /// to the custom-split wording.
+  final String Function(String left)? remainderText;
 
   @override
   Widget build(BuildContext context) {
@@ -1326,7 +1419,8 @@ class _CustomSplitPicker extends StatelessWidget {
             left.abs() < 0.01
                 ? 'All ${fmtAmount(total, currency)} assigned'
                 : left > 0
-                    ? '${fmtAmount(left, currency)} not assigned — the payer covers it'
+                    ? (remainderText?.call(fmtAmount(left, currency)) ??
+                        '${fmtAmount(left, currency)} not assigned — the payer covers it')
                     : 'Assigned ${fmtAmount(-left, currency)} more than the total',
             style: kStyleCaption.copyWith(
                 color: left.abs() < 0.01 ? kColorInkSoft : kColorWarning),

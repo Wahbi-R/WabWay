@@ -177,7 +177,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
   }
 
   Widget _payerFilterStrip() {
-    final payerIds = _receipts.map((r) => r.paidById).toSet();
+    final payerIds = {for (final r in _receipts) ...r.payers.keys};
     if (payerIds.length < 2) return const SizedBox.shrink();
     final payers = payerIds
         .map((id) => _members.firstWhere(
@@ -191,7 +191,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
       options: payers.map((m) => (
         value: m.id,
         label: m.id == _userId ? 'Me' : m.name,
-        count: _receipts.where((r) => r.paidById == m.id).length,
+        count: _receipts.where((r) => r.payers.containsKey(m.id)).length,
       )).toList(),
       allCount: _receipts.length,
       onChanged: (id) => setState(() {
@@ -502,7 +502,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
     }
     final base = _receipts.where((r) {
       if (_filterCategory != null && r.category != _filterCategory) return false;
-      if (_filterPayerId != null && r.paidById != _filterPayerId) return false;
+      if (_filterPayerId != null && !r.payers.containsKey(_filterPayerId)) return false;
       if (_dateRange != null) {
         final day = DateUtils.dateOnly(r.date);
         if (day.isBefore(_dateRange!.start) || day.isAfter(_dateRange!.end)) return false;
@@ -602,8 +602,13 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> with AsyncScreenMixin
         _csvCell(r.currency),
         _csvCell(r.homeAmount.toStringAsFixed(2)),
         _csvCell(_homeCurrency),
-        _csvCell(payer.name),
-        _csvCell('${r.splits.length}'),
+        _csvCell(r.hasSeveralPayers
+            ? [
+                for (final e in r.payers.entries)
+                  '${memberById(e.key, _members).name} ${e.value.toStringAsFixed(2)}',
+              ].join('; ')
+            : payer.name),
+        _csvCell('${r.splits.where((s) => s.amount > 0).length}'),
         _csvCell(r.notes ?? ''),
       ].join(','));
     }
@@ -1620,7 +1625,11 @@ class _SpendingByMemberCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final Map<String, double> paid = {};
     for (final r in receipts) {
-      paid[r.paidById] = (paid[r.paidById] ?? 0.0) + r.homeAmount;
+      // Several payers: each gets their part of the home amount.
+      for (final e in r.payers.entries) {
+        final part = r.amount > 0 ? r.homeAmount * e.value / r.amount : r.homeAmount;
+        paid[e.key] = (paid[e.key] ?? 0.0) + part;
+      }
     }
     // Only show when at least 2 different people paid.
     if (paid.length < 2) return const SizedBox.shrink();

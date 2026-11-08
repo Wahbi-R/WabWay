@@ -11,6 +11,19 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 440,
+    label: "Several people paid, and receipts in English",
+    changes: [
+      "Split a bill several people paid: tap \"Several people paid\" on a receipt and enter what each person put in. Everyone settles up with whoever put in the most, so nobody pays twice",
+      "Each person's row shows what they put in and what they still owe (or get back)",
+      "Splitting by item works like the Receipts site: change portions right on the item with − and +, and see what each person pays for items that aren't split evenly",
+      "Scanned receipts in Japanese (or any language) now show item names in English, with the original underneath. Tap \"Show original\" to switch back",
+      "Older receipts can be translated with \"Translate to English\"",
+      "Receipts links show who paid and the English item names too",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 439,
     label: "Link receipts to stays, spots and more",
     changes: [

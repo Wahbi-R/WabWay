@@ -23,6 +23,7 @@ bool pricesAgree(double a, double b, String currency) =>
 String? rescaleBlocker(Receipt r) {
   if (r.splits.any((s) => s.isSettled)) return 'some shares are already paid back';
   if (r.isItemized) return "it's split by item";
+  if (r.hasSeveralPayers) return 'several people paid';
   return null;
 }
 

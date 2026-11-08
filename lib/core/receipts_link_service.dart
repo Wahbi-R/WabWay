@@ -98,7 +98,10 @@ abstract final class ReceiptsLinkService {
     final byId = {for (final m in members) m.id: m};
     final paid = {
       for (final s in receipt.splits)
-        if (s.isSettled && index.containsKey(s.memberId)) '${index[s.memberId]}': true,
+        // Settled, or nothing to settle (they put in exactly their share).
+        if ((s.isSettled || (s.contributed > 0 && receipt.owes(s).abs() < 0.005)) &&
+            index.containsKey(s.memberId))
+          '${index[s.memberId]}': true,
       // The payer has paid by definition.
       if (index.containsKey(receipt.paidById)) '${index[receipt.paidById]}': true,
     };
@@ -111,6 +114,11 @@ abstract final class ReceiptsLinkService {
           'home_currency': homeCurrency,
           'home_rate':     receipt.homeRate,
         },
+        if (receipt.hasSeveralPayers)
+          'payers': {
+            for (final e in receipt.payers.entries)
+              if (index.containsKey(e.key)) '${index[e.key]}': e.value,
+          },
         'items':    [for (final i in items.items) i.toJson()],
         'subtotal': items.itemsTotal,
         'discount': items.discount,
@@ -481,8 +489,9 @@ abstract final class ReceiptsLinkService {
   }
 
   static bool _sameSplits(List<ReceiptSplit> a, List<ReceiptSplit> b) {
-    final ma = {for (final s in a) s.memberId: s.amount};
-    final mb = {for (final s in b) s.memberId: s.amount};
+    // Only shares of the cost count (people who just chipped in have 0).
+    final ma = {for (final s in a) if (s.amount > 0) s.memberId: s.amount};
+    final mb = {for (final s in b) if (s.amount > 0) s.memberId: s.amount};
     if (ma.length != mb.length) return false;
     return ma.entries.every((e) => mb[e.key] != null && (mb[e.key]! - e.value).abs() < 0.005);
   }

@@ -22,6 +22,7 @@ import '../../data/connection_data.dart';
 import '../shared/attached_docs_section.dart';
 import '../shared/connections_section.dart';
 import 'add_receipt_sheet.dart';
+import 'item_names_language.dart';
 
 // ─── Confirmation helper ──────────────────────────────────────────────────────
 
@@ -223,6 +224,19 @@ class _ReceiptDetailContentState extends ConsumerState<ReceiptDetailContent> {
   /// Can mark this share paid (RLS: that person, the payer or the owner).
   bool _canSettle(ReceiptSplit s) =>
       s.memberId == _me || _me == _receipt.paidById || _isOrganiser;
+
+  /// Keep translated item names on the receipt (same split, same shares).
+  Future<void> _saveTranslations(ReceiptItemization items) async {
+    final r = _receipt;
+    setState(() => _receipt = r.copyWith(items: items));
+    try {
+      final updated = await MoneyService.updateItemsAndSplits(
+          r, items, items.toSplits(widget.members.map((m) => m.id), r.currency));
+      if (mounted) _update(updated);
+    } catch (_) {
+      if (mounted) showWabwaySnack(context, "Translated, but couldn't save it — it'll show again next time.");
+    }
+  }
 
   void _update(Receipt r) {
     setState(() => _receipt = r);
@@ -453,9 +467,14 @@ class _ReceiptDetailContentState extends ConsumerState<ReceiptDetailContent> {
             children: [
               // Paid by
               _InfoRow(
-                icon: Icons.person_rounded,
+                icon: receipt.hasSeveralPayers ? Icons.group_rounded : Icons.person_rounded,
                 label: 'Paid by',
-                value: payer.label,
+                value: receipt.hasSeveralPayers
+                    ? [
+                        for (final e in receipt.payers.entries)
+                          '${memberById(e.key, widget.members).label} ${fmtAmount(e.value, receipt.currency)}',
+                      ].join('  ·  ')
+                    : payer.label,
               ),
 
               // Still outstanding for you
@@ -489,13 +508,18 @@ class _ReceiptDetailContentState extends ConsumerState<ReceiptDetailContent> {
               Text('Split', style: kStyleCaptionMedium.copyWith(color: kColorInk)),
               const SizedBox(height: kSpace3),
               if (receipt.splits.length > 1 && receipt.amount > 0) ...[
-                _SplitBar(splits: receipt.splits, total: receipt.amount),
+                _SplitBar(
+                  splits: [for (final s in receipt.splits) if (s.amount > 0) s],
+                  total: receipt.amount,
+                ),
                 const SizedBox(height: kSpace3),
               ],
               ...receipt.splits.map((s) => _SplitRow(
                     split:    s,
                     currency: receipt.currency,
                     paidById: receipt.paidById,
+                    owes:     receipt.owes(s),
+                    severalPayers: receipt.hasSeveralPayers,
                     members:  widget.members,
                     total:    receipt.amount,
                     // What each share comes to at home (so everyone knows
@@ -503,7 +527,7 @@ class _ReceiptDetailContentState extends ConsumerState<ReceiptDetailContent> {
                     homeCurrency: receipt.isForeignCurrency ? _homeCurrency : null,
                     homeRate: receipt.homeRate,
                     busy:     _busyShares.contains(s.memberId),
-                    onToggle: s.memberId != receipt.paidById && _canSettle(s)
+                    onToggle: receipt.owes(s).abs() > 0.005 && _canSettle(s)
                         ? () => _toggleShare(s)
                         : null,
                   )),
@@ -514,6 +538,7 @@ class _ReceiptDetailContentState extends ConsumerState<ReceiptDetailContent> {
                   items: receipt.items!,
                   members: widget.members,
                   currency: receipt.currency,
+                  onTranslated: _canEdit && !receipt.isPending ? _saveTranslations : null,
                 ),
               ],
 
@@ -668,6 +693,8 @@ class _SplitRow extends StatelessWidget {
     required this.currency,
     required this.paidById,
     required this.members,
+    this.owes = 0,
+    this.severalPayers = false,
     this.total = 0,
     this.homeCurrency,
     this.homeRate = 1,
@@ -682,6 +709,9 @@ class _SplitRow extends StatelessWidget {
   final String? homeCurrency;
   final double homeRate;
   final String paidById;
+  /// What this person settles with the payer: + they owe, − they're owed.
+  final double owes;
+  final bool severalPayers;
   final List<TripMember> members;
   final double total;
   final bool busy;
@@ -708,7 +738,14 @@ class _SplitRow extends StatelessWidget {
                   style: kStyleBodyMedium,
                 ),
                 if (isPayer)
-                  Text('paid the bill', style: kStyleCaption)
+                  Text(severalPayers ? 'paid the most · settle with them' : 'paid the bill',
+                      style: kStyleCaption)
+                else if (split.contributed > 0 && !split.isSettled)
+                  Text(
+                    'put in ${fmtAmount(split.contributed, currency)} · '
+                    '${owes.abs() < 0.005 ? 'all square' : owes > 0 ? 'owes ${fmtAmount(owes, currency)}' : 'is owed ${fmtAmount(-owes, currency)}'}',
+                    style: kStyleCaption.copyWith(color: owes < -0.005 ? kColorSuccess : null),
+                  )
                 else if (split.isSettled)
                   Text(
                     split.settledAt != null ? 'paid · ${fmtDate(split.settledAt!)}' : 'paid',
@@ -741,7 +778,7 @@ class _SplitRow extends StatelessWidget {
                 ),
             ],
           ),
-          if (!isPayer) ...[
+          if (!isPayer && owes.abs() > 0.005) ...[
             const SizedBox(width: kSpace2),
             SizedBox(
               width: 92,
@@ -777,13 +814,23 @@ class _SplitRow extends StatelessWidget {
 // ─── Item breakdown ───────────────────────────────────────────────────────────
 
 class _ItemBreakdown extends StatelessWidget {
-  const _ItemBreakdown({required this.items, required this.members, required this.currency});
+  const _ItemBreakdown({
+    required this.items,
+    required this.members,
+    required this.currency,
+    this.onTranslated,
+  });
   final ReceiptItemization items;
   final List<TripMember> members;
   final String currency;
+  /// Saves translated item names; null when you can't edit this receipt.
+  final ValueChanged<ReceiptItemization>? onTranslated;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      ItemNamesLanguage(builder: (context, english) => _build(context, english));
+
+  Widget _build(BuildContext context, bool english) {
     final shares = items.itemSharesByMember();
     final totals = items.personTotals(members.map((m) => m.id));
     final unclaimed = items.unclaimed;
@@ -805,6 +852,10 @@ class _ItemBreakdown extends StatelessWidget {
           ),
           childrenPadding: const EdgeInsets.fromLTRB(kSpace4, 0, kSpace4, kSpace3),
           children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: ItemNamesLanguageBar(items: items, english: english, onTranslated: onTranslated),
+            ),
             for (final m in members)
               if (shares[m.id]?.isNotEmpty ?? false) ...[
                 Padding(
@@ -819,7 +870,10 @@ class _ItemBreakdown extends StatelessWidget {
                   ),
                 ),
                 for (final sh in shares[m.id]!)
-                  _Line(sh.item.quantity > 1 ? '${fmtQty(sh.item.quantity)}× ${sh.item.name}' : sh.item.name,
+                  _Line(
+                      sh.item.quantity > 1
+                          ? '${fmtQty(sh.item.quantity)}× ${sh.item.displayName(english: english)}'
+                          : sh.item.displayName(english: english),
                       fmtAmount(sh.share, currency)),
                 if (items.extras.abs() > 0.005)
                   _Line('Tax / tip share',
@@ -828,7 +882,8 @@ class _ItemBreakdown extends StatelessWidget {
             if (unclaimed.isNotEmpty) ...[
               const SizedBox(height: kSpace2),
               Text('Not claimed (payer covers)', style: kStyleCaptionMedium.copyWith(color: kColorWarning)),
-              for (final u in unclaimed) _Line(u.item.name, fmtAmount(u.amount, currency)),
+              for (final u in unclaimed)
+                _Line(u.item.displayName(english: english), fmtAmount(u.amount, currency)),
             ],
           ],
         ),

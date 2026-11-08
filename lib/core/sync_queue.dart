@@ -95,7 +95,11 @@ abstract final class SyncQueue {
       'category': category.name,
       'date': date.toIso8601String(),
       'notes': notes,
-      'splits': splits.map((s) => {'memberId': s.memberId, 'amount': s.amount}).toList(),
+      'splits': splits.map((s) => {
+        'memberId': s.memberId,
+        'amount': s.amount,
+        if (s.contributed > 0) 'contributed': s.contributed,
+      }).toList(),
       if (items != null && !items.isEmpty) 'items': items.toJson(),
       if (photoFiles.isNotEmpty) 'photos': photoFiles,
       if (docIds.isNotEmpty) 'docIds': docIds.toList(),
@@ -137,8 +141,12 @@ abstract final class SyncQueue {
           items:             ReceiptItemization.fromJsonOrNull(item['items']),
           splits: [
             for (final s in (item['splits'] as List?) ?? const [])
-              if (((s as Map)['amount'] as num) > 0)
-                ReceiptSplit(memberId: s['memberId'] as String, amount: (s['amount'] as num).toDouble()),
+              if (((s as Map)['amount'] as num) > 0 || ((s['contributed'] as num?) ?? 0) > 0)
+                ReceiptSplit(
+                  memberId:    s['memberId'] as String,
+                  amount:      (s['amount'] as num).toDouble(),
+                  contributed: (s['contributed'] as num?)?.toDouble() ?? 0,
+                ),
           ],
         ));
       } catch (_) {}
@@ -309,6 +317,7 @@ abstract final class SyncQueue {
             ?.map((s) => ReceiptSplit(
                   memberId: s['memberId'] as String,
                   amount: (s['amount'] as num).toDouble(),
+                  contributed: (s['contributed'] as num?)?.toDouble() ?? 0,
                 ))
             .toList() ?? [];
         // Guard against empty splits (older payloads or corrupted cache) by

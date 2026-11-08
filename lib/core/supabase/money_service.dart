@@ -33,6 +33,7 @@ abstract final class MoneyService {
       return ReceiptSplit(
         memberId:     split['user_id'] as String,
         amount:       (split['amount'] as num).toDouble(),
+        contributed:  (split['contributed'] as num?)?.toDouble() ?? 0,
         isSettled:    split['is_settled'] as bool? ?? false,
         settledAt:    DateTime.tryParse(split['settled_at'] as String? ?? ''),
         settlementId: split['settlement_id'] as String?,
@@ -179,13 +180,14 @@ abstract final class MoneyService {
     }).select().single();
 
     final receiptId = receipt['id'] as String;
-    final validSplits = splits.where((s) => s.amount > 0).toList();
+    final validSplits = splits.where(_keepSplit).toList();
     if (validSplits.isNotEmpty) {
       await supabase.from('receipt_splits').insert(
         validSplits.map((s) => {
           'receipt_id': receiptId,
           'user_id':    s.memberId,
           'amount':     s.amount,
+          if (s.contributed > 0) 'contributed': s.contributed,
         }).toList(),
       );
     }
@@ -276,16 +278,19 @@ abstract final class MoneyService {
         if (p.isSettled) p.memberId: p,
     };
     await supabase.from('receipt_splits').delete().eq('receipt_id', receiptId);
-    final nonZero = splits.where((s) => s.amount > 0).toList();
+    final nonZero = splits.where(_keepSplit).toList();
     if (nonZero.isNotEmpty) {
       await supabase.from('receipt_splits').insert(
         nonZero.map((s) {
           final prev = paidBefore[s.memberId];
-          final keep = prev != null && (prev.amount - s.amount).abs() < 0.005;
+          final keep = prev != null &&
+              (prev.amount - s.amount).abs() < 0.005 &&
+              (prev.contributed - s.contributed).abs() < 0.005;
           return {
             'receipt_id': receiptId,
             'user_id':    s.memberId,
             'amount':     s.amount,
+            if (s.contributed > 0) 'contributed': s.contributed,
             if (keep) ...{
               'is_settled':    true,
               'settled_at':    (prev.settledAt ?? DateTime.now()).toUtc().toIso8601String(),
@@ -303,6 +308,9 @@ abstract final class MoneyService {
         .single();
     return _receiptFromRow(full);
   }
+
+  /// A share row is stored when the person shares the cost or chipped in.
+  static bool _keepSplit(ReceiptSplit s) => s.amount > 0 || s.contributed > 0;
 
   static Future<void> deleteReceipt(String receiptId) async {
     await supabase.from('receipt_splits').delete().eq('receipt_id', receiptId);
@@ -351,7 +359,9 @@ abstract final class MoneyService {
         category:          receipt.category,
         paidBy:            receipt.paidById,
         date:              receipt.date,
-        splits:            splits,
+        // Keep who put money in when several people paid.
+        splits:            withContributions(
+            splits, receipt.hasSeveralPayers ? receipt.payers : const {}),
         notes:             receipt.notes,
         items:             items,
         previousSplits:    receipt.splits,

@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 442,
+    label: "Type any portion",
+    changes: [
+      "Tap a portion number when splitting by item to type any amount, decimals included (like 1.5 or 0.33)",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 441,
     label: "Portions go by whole items",
     changes: [

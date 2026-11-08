@@ -73,6 +73,7 @@ Future<String?> showWabwayTextPrompt(
   int maxLines = 1,
   int? maxLength,
   String confirmLabel = 'Save',
+  TextInputType? keyboardType,
 }) async {
   final ctrl = TextEditingController(text: initialValue);
   try {
@@ -96,6 +97,7 @@ Future<String?> showWabwayTextPrompt(
               style: kStyleBody,
               maxLines: maxLines,
               maxLength: maxLength,
+              keyboardType: keyboardType,
               textInputAction: maxLines == 1 ? TextInputAction.done : TextInputAction.newline,
               onSubmitted: maxLines == 1 ? (_) => Navigator.pop(ctx, true) : null,
               decoration: InputDecoration(

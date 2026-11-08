@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wabway/core/receipts_link_service.dart';
 import 'package:wabway/data/money_data.dart';
+import 'package:wabway/screens/money/receipt_items_editor.dart' show stepPortion;
 
 // A dinner: 2× gyoza (shared by A and B), ramen (A), beer 3× (A 1, C 2),
 // edamame (nobody), 10% tax, 5 tip, 3 discount.
@@ -218,5 +219,14 @@ void main() {
       expect(remote.paidMemberIds, {'c'});
       expect(remote.unknownPeople, ['Dana']);
     });
+  });
+
+  test('portion steps snap to whole drinks after an even split', () {
+    expect(stepPortion(2.25, 1, up: true), 3);
+    expect(stepPortion(2.25, 1, up: false), 2);
+    expect(stepPortion(3, 1, up: true), 4);
+    expect(stepPortion(3, 1, up: false), 2);
+    expect(stepPortion(0.5, 1, up: false), 0);
+    expect(stepPortion(1.25, 0.5, up: true), 1.5);
   });
 }

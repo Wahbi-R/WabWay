@@ -377,8 +377,8 @@ class _ItemRow extends StatelessWidget {
                   _PortionStepper(
                     label: m.isYou ? 'You' : m.name.split(' ').first,
                     value: weights[m.id] ?? 0,
-                    onMinus: () => onSetWeight(m.id, (weights[m.id] ?? 0) - _step),
-                    onPlus: () => onSetWeight(m.id, (weights[m.id] ?? 0) + _step),
+                    onMinus: () => onSetWeight(m.id, stepPortion(weights[m.id] ?? 0, _step, up: false)),
+                    onPlus: () => onSetWeight(m.id, stepPortion(weights[m.id] ?? 0, _step, up: true)),
                   ),
               ],
             ),
@@ -749,4 +749,15 @@ class _ExtrasFormState extends State<_ExtrasForm> {
       ],
     );
   }
+}
+
+/// The next whole step from [value]: an even split leaves fractions (9 drinks
+/// four ways = 2.25 each), so + goes to 3 and − to 2 rather than 3.25 / 1.25.
+double stepPortion(double value, double step, {required bool up}) {
+  final units = value / step;
+  final onStep = (units - units.round()).abs() < 1e-6;
+  final next = up
+      ? (onStep ? units.round() + 1 : units.ceil())
+      : (onStep ? units.round() - 1 : units.floor());
+  return next < 0 ? 0 : next * step;
 }

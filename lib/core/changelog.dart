@@ -11,6 +11,14 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 441,
+    label: "Portions go by whole items",
+    changes: [
+      "The − and + next to each person's portion now move to the next whole item. After an even split of 9 drinks four ways (2.25 each), + gives 3 and − gives 2, so you can count drinks one by one",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 440,
     label: "Several people paid, and receipts in English",
     changes: [

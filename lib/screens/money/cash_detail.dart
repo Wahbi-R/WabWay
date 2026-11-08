@@ -4,6 +4,7 @@ import '../../data/docs_data.dart';
 import '../../data/money_data.dart';
 import '../../data/connection_data.dart';
 import '../shared/attached_docs_section.dart';
+import '../shared/connections_section.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_theme.dart';
@@ -229,6 +230,13 @@ class CashDetailContent extends StatelessWidget {
                 title:      'ATM slip',
                 uploadType: DocType.receipt,
                 emptyText:  'No ATM slip yet. Snap or upload one to keep it with this withdrawal.',
+              ),
+              const SizedBox(height: kSpace5),
+
+              ConnectionsSection(
+                entityType: EntityType.cash,
+                entityId:   withdrawal.id,
+                tripId:     tripId,
               ),
               const SizedBox(height: kSpace5),
 

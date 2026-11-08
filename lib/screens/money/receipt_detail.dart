@@ -20,6 +20,7 @@ import '../../theme/app_text_theme.dart';
 import '../../widgets/widgets.dart';
 import '../../data/connection_data.dart';
 import '../shared/attached_docs_section.dart';
+import '../shared/connections_section.dart';
 import 'add_receipt_sheet.dart';
 
 // ─── Confirmation helper ──────────────────────────────────────────────────────
@@ -544,6 +545,13 @@ class _ReceiptDetailContentState extends ConsumerState<ReceiptDetailContent> {
                 entityName: receipt.title,
                 uploadType: DocType.receipt,
                 emptyText:  'Nothing attached yet. Attach the receipt photo, invoice or booking.',
+              ),
+              const SizedBox(height: kSpace5),
+
+              ConnectionsSection(
+                entityType: EntityType.receipt,
+                entityId:   receipt.id,
+                tripId:     widget.tripId,
               ),
               const SizedBox(height: kSpace5),
 

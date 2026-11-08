@@ -11,6 +11,16 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 439,
+    label: "Link receipts to stays, spots and more",
+    changes: [
+      "Receipts now have a Connections section — link one to a stay, spot, travel item, plan item or link right from the receipt",
+      "See what a receipt is linked to (like the stay it paid for) without going to the other item first",
+      "Cash withdrawals can be linked the same way",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 438,
     label: "Undo a swipe",
     changes: [

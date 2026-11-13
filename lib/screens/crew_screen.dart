@@ -14,6 +14,7 @@ import '../core/async_screen_mixin.dart';
 import '../core/image_cache_manager.dart';
 import '../core/providers/profile_provider.dart';
 import '../core/providers/trip_provider.dart';
+import '../core/location/current_position.dart';
 import '../core/location/location_sharing_manager.dart';
 import '../core/supabase/crew_service.dart';
 import '../core/trip/app_trip_member.dart';
@@ -27,6 +28,7 @@ import '../widgets/wabway_avatar.dart';
 import '../widgets/wabway_confirm_dialog.dart';
 import '../widgets/widgets.dart';
 import 'members_screen.dart' show MembersList;
+import 'crew/whereabouts.dart';
 
 class CrewScreen extends ConsumerStatefulWidget {
   const CrewScreen({super.key});
@@ -45,6 +47,8 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
   bool _sendingFindMe = false;
   bool _sending = false;
   bool _sendingImage = false;
+  bool _checkingIn = false;
+  bool _askingWhere = false;
 
   RealtimeChannel? _messageChannel;
   RealtimeChannel? _locationChannel;
@@ -234,61 +238,10 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
     return const LocationSettings(accuracy: LocationAccuracy.high);
   }
 
-  Future<bool> _ensureLocationPermission() async {
-    try {
-      if (kIsWeb) {
-        await Geolocator.getCurrentPosition(
-          locationSettings:
-              const LocationSettings(accuracy: LocationAccuracy.medium),
-        );
-        return true;
-      }
-      // Check that the device's location service is turned on.
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        if (mounted) {
-          _showError('Location services are off — enable them in Settings');
-          await Geolocator.openLocationSettings();
-        }
-        return false;
-      }
-      var perm = await Geolocator.checkPermission();
-      if (perm == LocationPermission.denied) {
-        perm = await Geolocator.requestPermission();
-      }
-      if (perm == LocationPermission.deniedForever) {
-        if (mounted) await Geolocator.openAppSettings();
-        return false;
-      }
-      return perm == LocationPermission.always ||
-          perm == LocationPermission.whileInUse;
-    } catch (_) {
-      if (mounted) _showError('Could not access location');
-      return false;
-    }
-  }
+  Future<bool> _ensureLocationPermission() =>
+      ensureLocationPermission(onError: _showError);
 
-  /// Gets current position with layered fallbacks (fastest first):
-  /// 1. Cached position from active location-sharing stream (instant)
-  /// 2. Last-known position from OS (instant, usually fresh)
-  /// 3. One-shot medium-accuracy request (15s timeout — network/WiFi)
-  Future<Position> _getCurrentPosition() async {
-    // If the sharing stream is running, its most recent fix is right there.
-    final cached = LocationSharingManager.instance.lastPosition;
-    if (cached != null) return cached;
-
-    // OS-cached position — instant, no radio needed.
-    final last = await Geolocator.getLastKnownPosition();
-    if (last != null) return last;
-
-    // Nothing cached — request a fresh fix (medium accuracy works without GPS).
-    return await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.medium,
-        timeLimit: Duration(seconds: 15),
-      ),
-    );
-  }
+  Future<Position> _getCurrentPosition() => currentPosition();
 
   Future<void> _sendMessage() async {
     final text = _textController.text.trim();
@@ -467,6 +420,95 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
     }
   }
 
+  /// "I'm at Uniqlo · 3F · near the escalators" (+ optional photo / map pin).
+  Future<void> _checkIn() async {
+    if (_checkingIn) return;
+    final draft = await showCheckInSheet(context);
+    if (draft == null || !mounted) return;
+    final tripId = _tripId;
+    final userId = _userId;
+    if (tripId.isEmpty || userId == null) return;
+    setState(() => _checkingIn = true);
+    String? photoPath;
+    try {
+      String? photoUrl;
+      final photo = draft.photo;
+      if (photo != null) {
+        final ext = photo.name.contains('.') ? photo.name.split('.').last.toLowerCase() : 'jpg';
+        final up = await CrewService.uploadChatImage(tripId, userId, await photo.readAsBytes(), ext);
+        photoPath = up.path;
+        photoUrl = up.url;
+      }
+      await CrewService.sendCheckIn(
+        tripId: tripId,
+        authorId: userId,
+        body: draft.body,
+        photoUrl: photoUrl,
+        lat: draft.position?.latitude,
+        lng: draft.position?.longitude,
+      );
+      await _onNewMessage();
+      pushNotify(
+        tripId: tripId,
+        title: '\u{1F4CD} $_myDisplayName is at ${draft.body}',
+        body: 'Open Crew to see where everyone is',
+        excludeUserId: userId,
+        data: {'screen': 'crew', 'trip_id': tripId},
+        prefKey: kPrefNotifCrew,
+      );
+    } catch (_) {
+      if (photoPath != null) {
+        try {
+          await CrewService.deleteChatImage(photoPath);
+        } catch (_) {}
+      }
+      _showError("Couldn't check in — check your connection");
+    } finally {
+      if (mounted) setState(() => _checkingIn = false);
+    }
+  }
+
+  /// Ask everyone to check in.
+  Future<void> _askWhere() async {
+    if (_askingWhere) return;
+    final tripId = _tripId;
+    final userId = _userId;
+    if (tripId.isEmpty || userId == null) return;
+    setState(() => _askingWhere = true);
+    try {
+      await CrewService.sendWhereAsk(tripId: tripId, authorId: userId);
+      await _onNewMessage();
+      pushNotify(
+        tripId: tripId,
+        title: '\u{1F440} $_myDisplayName: where is everyone?',
+        body: 'Tap to say where you are',
+        excludeUserId: userId,
+        data: {'screen': 'crew', 'trip_id': tripId},
+        prefKey: kPrefNotifCrew,
+      );
+    } catch (_) {
+      _showError("Couldn't send — check your connection");
+    } finally {
+      if (mounted) setState(() => _askingWhere = false);
+    }
+  }
+
+  void _openCheckIn(TripMessage m) {
+    final members = ref.read(tripMembersProvider);
+    final name = m.authorId == _userId
+        ? 'You'
+        : members.where((x) => x.userId == m.authorId).firstOrNull?.profile.displayName ?? 'Someone';
+    showWabwayAutoSheet<void>(
+      context,
+      builder: (ctx, handle) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(kSpace5, kSpace2, kSpace5, kSpace5),
+          child: CheckInDetails(message: m, name: name),
+        ),
+      ),
+    );
+  }
+
   Future<void> _onSetMeetupPoint(LatLng point) async {
     final confirm = await showWabwayConfirm(context,
         title: 'Set meetup point?',
@@ -567,6 +609,11 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
             onLinkUp: _sendLocationPing,
             onFindMe: _sendFindMe,
             onSendImage: _showImageSourceSheet,
+            checkingIn: _checkingIn,
+            askingWhere: _askingWhere,
+            onCheckIn: _checkIn,
+            onAskWhere: _askWhere,
+            onOpenCheckIn: _openCheckIn,
             onRetry: () => _load(_tripId),
             onReact: _onReact,
           ),
@@ -648,6 +695,11 @@ class _ChatTab extends StatelessWidget {
     required this.onLinkUp,
     required this.onFindMe,
     required this.onSendImage,
+    required this.checkingIn,
+    required this.askingWhere,
+    required this.onCheckIn,
+    required this.onAskWhere,
+    required this.onOpenCheckIn,
     required this.onRetry,
     required this.onReact,
   });
@@ -667,6 +719,11 @@ class _ChatTab extends StatelessWidget {
   final VoidCallback onLinkUp;
   final VoidCallback onFindMe;
   final VoidCallback onSendImage;
+  final bool checkingIn;
+  final bool askingWhere;
+  final VoidCallback onCheckIn;
+  final VoidCallback onAskWhere;
+  final ValueChanged<TripMessage> onOpenCheckIn;
   final VoidCallback onRetry;
   final Future<void> Function(String messageId, String emoji) onReact;
 
@@ -763,6 +820,20 @@ class _ChatTab extends StatelessWidget {
             return _MeetupPointCard(
                 message: msg, member: member, isMe: isMe);
           }
+          if (msg.type == MessageType.checkIn) {
+            return CheckInCard(
+                message: msg,
+                name: isMe ? 'You' : (member?.profile.displayName ?? 'Someone'));
+          }
+          if (msg.type == MessageType.whereAsk) {
+            return WhereAskCard(
+              name: member?.profile.displayName ?? 'Someone',
+              isMe: isMe,
+              answered: messages.skip(i + 1).any((m) =>
+                  m.type == MessageType.checkIn && m.authorId == currentUserId),
+              onCheckIn: onCheckIn,
+            );
+          }
           return _MessageBubble(
             message: msg,
             member: member,
@@ -775,8 +846,24 @@ class _ChatTab extends StatelessWidget {
       );
     }
 
+    final now = DateTime.now();
+    final checkIns = latestCheckIns(messages, now);
+    final recentAsk = messages.any((m) =>
+        m.type == MessageType.whereAsk &&
+        now.difference(m.createdAt.toLocal()) <= kCheckInFresh);
+
     return Column(
       children: [
+        if (!loading && (checkIns.isNotEmpty || recentAsk)) ...[
+          WhereaboutsStrip(
+            checkIns: checkIns,
+            members: members,
+            currentUserId: currentUserId,
+            onCheckIn: onCheckIn,
+            onOpen: onOpenCheckIn,
+          ),
+          const Divider(height: 1, color: kColorBorder),
+        ],
         Expanded(child: body),
         // Show a compact error banner when messages exist but a reload failed,
         // so stale chat is visibly flagged without hiding the message history.
@@ -808,6 +895,10 @@ class _ChatTab extends StatelessWidget {
           onLinkUp: onLinkUp,
           onFindMe: onFindMe,
           onSendImage: onSendImage,
+          checkingIn: checkingIn,
+          askingWhere: askingWhere,
+          onCheckIn: onCheckIn,
+          onAskWhere: onAskWhere,
         ),
       ],
     );
@@ -1359,6 +1450,10 @@ class _InputBar extends StatelessWidget {
     required this.onLinkUp,
     required this.onFindMe,
     required this.onSendImage,
+    required this.checkingIn,
+    required this.askingWhere,
+    required this.onCheckIn,
+    required this.onAskWhere,
   });
 
   final TextEditingController textController;
@@ -1370,6 +1465,10 @@ class _InputBar extends StatelessWidget {
   final VoidCallback onLinkUp;
   final VoidCallback onFindMe;
   final VoidCallback onSendImage;
+  final bool checkingIn;
+  final bool askingWhere;
+  final VoidCallback onCheckIn;
+  final VoidCallback onAskWhere;
 
   @override
   Widget build(BuildContext context) {
@@ -1387,6 +1486,36 @@ class _InputBar extends StatelessWidget {
             children: [
               // SOS button — prominent, full width. Orange primary: red is
               // reserved for destructive actions.
+              Row(
+                children: [
+                  // No GPS needed — for malls and stations where everyone's
+                  // pin sits on the same spot.
+                  Expanded(
+                    child: WabwayButton(
+                      label: "I'm at…",
+                      size: WabwayButtonSize.sm,
+                      icon: Icons.where_to_vote_rounded,
+                      variant: WabwayButtonVariant.secondary,
+                      fullWidth: true,
+                      loading: checkingIn,
+                      onPressed: checkingIn ? null : onCheckIn,
+                    ),
+                  ),
+                  const SizedBox(width: kSpace2),
+                  Expanded(
+                    child: WabwayButton(
+                      label: "Where's everyone?",
+                      size: WabwayButtonSize.sm,
+                      icon: Icons.travel_explore_rounded,
+                      variant: WabwayButtonVariant.secondary,
+                      fullWidth: true,
+                      loading: askingWhere,
+                      onPressed: askingWhere ? null : onAskWhere,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: kSpace2),
               WabwayButton(
                 label: sendingFindMe ? 'Alerting crew…' : 'Find Me',
                 icon: Icons.crisis_alert_rounded,

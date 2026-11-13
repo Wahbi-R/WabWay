@@ -99,6 +99,41 @@ abstract final class CrewService {
     });
   }
 
+  /// "I'm at Uniqlo · 3F · by the escalators" — works without GPS (malls,
+  /// stations). [photoUrl] is a picture of what's around; [lat]/[lng] only
+  /// when the sender chose to add a map pin.
+  static Future<void> sendCheckIn({
+    required String tripId,
+    required String authorId,
+    required String body,
+    String? photoUrl,
+    double? lat,
+    double? lng,
+  }) async {
+    await supabase.from('trip_messages').insert({
+      'trip_id': tripId,
+      'author_id': authorId,
+      'body': body.trim(),
+      'message_type': 'check_in',
+      if (photoUrl != null) 'image_url': photoUrl,
+      if (lat != null && lng != null) 'lat': lat,
+      if (lat != null && lng != null) 'lng': lng,
+    });
+  }
+
+  /// "Where is everyone?" — asks the crew to check in.
+  static Future<void> sendWhereAsk({
+    required String tripId,
+    required String authorId,
+  }) async {
+    await supabase.from('trip_messages').insert({
+      'trip_id': tripId,
+      'author_id': authorId,
+      'body': 'Where is everyone?',
+      'message_type': 'where_ask',
+    });
+  }
+
   static Future<({String path, String url})> uploadChatImage(
       String tripId, String userId, Uint8List bytes, String ext) async {
     final mime = switch (ext) {

@@ -11,6 +11,21 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 446,
+    label: "What's nearby, and where's everyone",
+    changes: [
+      "New Nearby screen: find food near you, or search anything (ramen, halal, coffee, Uniqlo, ATM) and see Google ratings, number of reviews, price, distance and whether it's open right now",
+      "Quick buttons for Food, Ramen, Sushi, Coffee, Dessert, Bars, Konbini, ATMs, pharmacies and toilets",
+      "Filter by distance, open now or 4 stars and up, and sort by best match or closest",
+      "Tap a place for photos, today's hours, phone and website, then get directions or save it as a trip spot in one tap",
+      "Open Nearby from the Spots screen (top right) or More → Explore",
+      "In Crew, tap \"I'm at…\" to tell everyone where you are — the shop, the floor, what you're next to, and a photo if you like. Works in malls and stations where everyone's map pin sits on the same spot",
+      "Tap \"Where's everyone?\" to ask the crew to check in. They get a notification and can answer in one tap",
+      "\"Who's where\" at the top of the chat shows where each person last said they were",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 442,
     label: "Type any portion",
     changes: [

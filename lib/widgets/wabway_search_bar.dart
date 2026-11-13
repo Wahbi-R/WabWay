@@ -13,6 +13,7 @@ class WabwaySearchBar extends StatelessWidget {
     required this.onChanged,
     this.hint = 'Search…',
     this.padding = const EdgeInsets.fromLTRB(16, 12, 16, 0),
+    this.onSubmitted,
   });
 
   final TextEditingController controller;
@@ -20,6 +21,8 @@ class WabwaySearchBar extends StatelessWidget {
   final String hint;
   // Outer padding; default matches the standard screen-edge spacing.
   final EdgeInsetsGeometry padding;
+  // Keyboard search key — for searches that hit the network (Nearby).
+  final ValueChanged<String>? onSubmitted;
 
   @override
   Widget build(BuildContext context) {
@@ -28,6 +31,8 @@ class WabwaySearchBar extends StatelessWidget {
       child: TextField(
         controller: controller,
         style: kStyleBody,
+        textInputAction: onSubmitted != null ? TextInputAction.search : null,
+        onSubmitted: onSubmitted,
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: kStyleBody.copyWith(color: kColorInkSoft),

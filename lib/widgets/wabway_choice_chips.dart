@@ -23,22 +23,33 @@ class WabwayChoiceChips<T> extends StatelessWidget {
     required this.selected,
     required this.onChanged,
     this.label,
+    this.scroll = false,
   });
 
   final List<WabwayChoice<T>> choices;
+  /// One horizontally scrolling row instead of wrapping (long chip rows on
+  /// top of a list, e.g. Nearby shortcuts).
+  final bool scroll;
   final T? selected;
   final ValueChanged<T> onChanged;
   final String? label;
 
   @override
   Widget build(BuildContext context) {
-    final chips = Wrap(
-      spacing: kSpace2,
-      runSpacing: kSpace2,
-      children: [
-        for (final c in choices) _Chip(choice: c, selected: c.value == selected, onTap: () => onChanged(c.value)),
-      ],
-    );
+    final items = [
+      for (final c in choices) _Chip(choice: c, selected: c.value == selected, onTap: () => onChanged(c.value)),
+    ];
+    final Widget chips = scroll
+        ? SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(children: [
+              for (var i = 0; i < items.length; i++) ...[
+                if (i > 0) const SizedBox(width: kSpace2),
+                items[i],
+              ],
+            ]),
+          )
+        : Wrap(spacing: kSpace2, runSpacing: kSpace2, children: items);
     if (label == null) return chips;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

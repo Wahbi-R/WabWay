@@ -150,7 +150,11 @@ class _AddSpotContentState extends ConsumerState<_AddSpotContent> {
     }
     _mapsCtrl.addListener(_onMapsUrlChanged);
     final pre = widget.prefill;
-    if (s == null && pre != null) {
+    if (s == null && pre != null && pre.place != null) {
+      _applySuggestion(pre.place!);
+      _notesCtrl.text  = pre.notes ?? '';
+      _sourceCtrl.text = pre.url ?? '';
+    } else if (s == null && pre != null) {
       _nameCtrl.text   = pre.title ?? '';
       _notesCtrl.text  = pre.notes ?? '';
       _sourceCtrl.text = pre.url ?? '';

@@ -1,4 +1,4 @@
-enum MessageType { text, locationPing, findMe, meetupPoint, image }
+enum MessageType { text, locationPing, findMe, meetupPoint, image, checkIn, whereAsk }
 
 class LocationShare {
   const LocationShare({
@@ -75,6 +75,8 @@ class TripMessage {
         'find_me'       => MessageType.findMe,
         'meetup_point'  => MessageType.meetupPoint,
         'image'         => MessageType.image,
+        'check_in'      => MessageType.checkIn,
+        'where_ask'     => MessageType.whereAsk,
         _               => MessageType.text,
       },
       lat:       (m['lat'] as num?)?.toDouble(),

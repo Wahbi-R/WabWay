@@ -163,7 +163,11 @@ class _WabwayButtonState extends State<WabwayButton> {
                   Icon(widget.icon, size: _iconSize, color: _fgColor),
                   SizedBox(width: _gap),
                 ],
-                Text(widget.label, style: _textStyle),
+                // Ellipsize instead of overflowing when squeezed (e.g. two
+                // buttons side by side on a narrow phone).
+                Flexible(
+                  child: Text(widget.label, style: _textStyle, maxLines: 1, overflow: TextOverflow.ellipsis),
+                ),
               ],
             ),
           ),

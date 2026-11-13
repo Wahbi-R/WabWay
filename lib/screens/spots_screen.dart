@@ -27,6 +27,7 @@ import 'package:latlong2/latlong.dart';
 import 'spots/spot_list_tile.dart';
 import 'spots/spot_detail.dart';
 import 'spots/add_spot_sheet.dart';
+import 'nearby_screen.dart';
 import 'map_screen.dart';
 import '../core/text_utils.dart';
 import '../data/date_utils.dart';
@@ -796,6 +797,13 @@ class _MobileLayout extends StatelessWidget {
                     const SizedBox(width: kSpace2),
                   ]
                 : [
+                    IconButton(
+                      icon: const Icon(Icons.near_me_rounded),
+                      color: kColorInkSoft,
+                      tooltip: 'Find places nearby',
+                      onPressed: () => Navigator.push<void>(
+                          context, MaterialPageRoute(builder: (_) => const NearbyScreen())),
+                    ),
                     // Share the filtered list as a CSV
                     if (spots.isNotEmpty)
                       IconButton(

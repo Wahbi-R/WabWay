@@ -18,6 +18,7 @@ import '../screens/more_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/travel_screen.dart';
 import '../screens/map_screen.dart';
+import '../screens/nearby_screen.dart';
 import '../screens/accommodations/accommodations_screen.dart';
 import '../screens/packing_screen.dart';
 import '../screens/photos_screen.dart';
@@ -112,6 +113,13 @@ const _desktopDestinations = [
     builder: _buildSpots,
   ),
   _NavDest(
+    key: 'nearby',
+    label: 'Nearby',
+    icon: Icons.near_me_outlined,
+    selectedIcon: Icons.near_me_rounded,
+    builder: _buildNearby,
+  ),
+  _NavDest(
     key: 'map',
     label: 'Map',
     icon: Icons.map_outlined,
@@ -189,6 +197,7 @@ Widget _buildHome(BuildContext _)    => const HomeScreen();
 Widget _buildCrew(BuildContext _)    => const CrewScreen();
 Widget _buildSpots(BuildContext _)   => const SpotsScreen();
 Widget _buildMap(BuildContext _)     => const MapScreen();
+Widget _buildNearby(BuildContext _)  => const NearbyScreen();
 Widget _buildPlan(BuildContext _)    => const PlanScreen();
 Widget _buildTravel(BuildContext _)  => const TravelScreen();
 Widget _buildStays(BuildContext _)   => const AccommodationsScreen();

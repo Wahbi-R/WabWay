@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'spot_data.dart' show PlaceSuggestion;
 
 // ─── Share content type ───────────────────────────────────────────────────────
 
@@ -365,6 +366,7 @@ class ImportPrefill {
     this.fileName,
     this.fileExt,
     this.linkedDocIds = const [],
+    this.place,
   });
 
   final String? title;
@@ -387,6 +389,10 @@ class ImportPrefill {
   /// Documents already uploaded for this import, to pre-select in doc pickers.
   final List<String> linkedDocIds;
 
+  /// A place already looked up (e.g. a Nearby result) — Add spot fills in
+  /// name, address, city, area, coordinates and category from it.
+  final PlaceSuggestion? place;
+
   ImportPrefill withDocIds(List<String> ids) => ids.isEmpty
       ? this
       : ImportPrefill(
@@ -395,6 +401,6 @@ class ImportPrefill {
           endDate: endDate, confirmationNumber: confirmationNumber,
           amount: amount, currency: currency, fileBytes: fileBytes,
           fileName: fileName, fileExt: fileExt,
-          linkedDocIds: [...linkedDocIds, ...ids],
+          linkedDocIds: [...linkedDocIds, ...ids], place: place,
         );
 }

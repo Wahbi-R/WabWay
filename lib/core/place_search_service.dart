@@ -41,7 +41,7 @@ abstract final class PlaceSearchService {
       if (response.statusCode != 200) return null;
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       final slug = (json['category'] as String?)?.trim() ?? '';
-      return slug.isNotEmpty ? _categoryFromSlug(slug) : null;
+      return slug.isNotEmpty ? categoryFromSlug(slug) : null;
     } catch (_) {
       return null;
     }
@@ -95,7 +95,7 @@ abstract final class PlaceSearchService {
           city:      city,
           area:      (m['area']    as String?)?.trim() ?? '',
           country:   (m['country'] as String?)?.trim() ?? '',
-          category:  _categoryFromSlug(m['category'] as String? ?? ''),
+          category:  categoryFromSlug(m['category'] as String? ?? ''),
           latitude:  lat,
           longitude: lng,
           mapsUrl:   lat != 0 ? 'https://www.google.com/maps/search/?api=1&query=$lat,$lng' : '',
@@ -107,7 +107,7 @@ abstract final class PlaceSearchService {
     }
   }
 
-  static SpotCategory _categoryFromSlug(String slug) => switch (slug) {
+  static SpotCategory categoryFromSlug(String slug) => switch (slug) {
     'food'       => SpotCategory.food,
     'shopping'   => SpotCategory.shopping,
     'nature'     => SpotCategory.nature,

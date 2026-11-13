@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../trip/app_trip_member.dart';
 
 /// Trail mode: find the crew with no signal. Each phone sends its GPS position
@@ -27,6 +28,7 @@ class TrailMode {
   final openRequests = ValueNotifier<int>(0);
 
   bool _initialised = false;
+  String _configuredFor = '';
 
   /// Call once at startup (after the first frame) on Android.
   Future<void> init() async {
@@ -58,6 +60,44 @@ class TrailMode {
       'names': [for (final m in sorted) m.profile.displayName],
       'myIndex': myIndex,
     });
+  }
+
+  /// Keep the phone's crew list current without opening the Trail screen, so
+  /// "Let the crew wake me" works on every phone by default. Called by AppShell
+  /// whenever the active trip or its members change; skips repeats.
+  Future<void> autoConfigure({
+    required String tripId,
+    required List<AppTripMember> members,
+    required String? myUserId,
+  }) async {
+    if (!supported || tripId.isEmpty || myUserId == null || members.isEmpty) return;
+    final key = '$tripId|$myUserId|${[for (final m in sortedCrew(members)) '${m.userId}:${m.profile.displayName}'].join(',')}';
+    if (key == _configuredFor) return;
+    _configuredFor = key;
+    try {
+      await configure(tripId: tripId, members: members, myUserId: myUserId);
+    } catch (_) {
+      _configuredFor = '';
+    }
+  }
+
+  static const _kPrefWakeAsked = 'trail_wake_permission_asked';
+
+  /// Waking needs the Bluetooth ("Nearby devices") permission, which Android
+  /// only grants when asked. Ask once (from Crew); the Trail screen's checklist
+  /// covers the rest.
+  Future<void> askWakePermissionOnce(Future<bool> Function() confirm) async {
+    if (!supported) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool(_kPrefWakeAsked) == true) return;
+      final s = await setup();
+      if (!s.supported || (s.bluetoothPermission && s.locationPermission)) return;
+      await prefs.setBool(_kPrefWakeAsked, true);
+      if (!await confirm()) return;
+      await requestPermissions();
+      await _methods.invokeMethod('refreshWake');
+    } catch (_) {}
   }
 
   static List<AppTripMember> sortedCrew(List<AppTripMember> members) =>

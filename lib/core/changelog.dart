@@ -11,6 +11,15 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 448,
+    label: "Trail mode wakes up on every phone",
+    changes: [
+      "\"Let the crew wake me\" now works on every phone from the start, without opening Trail mode first",
+      "The first time you open Crew, WabWay asks once for Bluetooth and location so your phone can switch Trail mode on when someone nearby starts it",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 447,
     label: "Trail mode: find each other with no signal",
     changes: [

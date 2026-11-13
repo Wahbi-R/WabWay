@@ -298,6 +298,13 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   @override
   Widget build(BuildContext context) {
+    // Every phone keeps its Trail mode crew list current, so "Let the crew
+    // wake me" works without opening the Trail screen first.
+    TrailMode.instance.autoConfigure(
+      tripId: ref.watch(activeTripIdProvider),
+      members: ref.watch(tripMembersProvider),
+      myUserId: ref.watch(profileProvider)?.id,
+    );
     final offline = ref.watch(tripNotifierProvider).offline ||
         !ref.watch(connectivityProvider);
     return LayoutBuilder(

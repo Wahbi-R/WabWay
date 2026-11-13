@@ -20,7 +20,7 @@ Android only. Not yet tested on real phones — expect range and wake-up timing 
   · one AES-128 block keyed from the trip id: subject index, flags, lat/lng ×1e7, accuracy,
   fix age, sender index, 3 random bytes. Members are numbered by sorting user ids, so every
   phone agrees. Legacy advert size: 22 + 4 + 3 flags = 29 ≤ 31 bytes.
-- `TrailWake` / `TrailWakeReceiver` — "Let the crew wake me" (on by default): a PendingIntent
+- `TrailWake` / `TrailWakeReceiver` — "Let the crew wake me" (on by default; since build 448 every phone saves the crew list at app start via `TrailMode.autoConfigure`, and Crew asks once for the Bluetooth permission): a PendingIntent
   BLE scan with a hardware filter on the `WW1` prefix, `SCAN_MODE_LOW_POWER`. On a crew beacon:
   start `TrailService` + a heads-up "Trail mode turned on" notification. If Android blocks a
   background start (battery optimisation) or you stopped Trail mode yourself in the last 2 h:

@@ -71,6 +71,16 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
       _tripId = ref.read(activeTripIdProvider);
       _userId = ref.read(profileProvider)?.id;
       if (_tripId.isNotEmpty) _load(_tripId);
+      TrailMode.instance.askWakePermissionOnce(() => showWabwayConfirm(
+            context,
+            title: 'Find each other with no signal?',
+            message: 'When someone in your crew turns on Trail mode nearby (say on a hike), '
+                "WabWay can switch yours on too, so you can see how far away everyone is and which way. "
+                'It needs Bluetooth ("Nearby devices") and location access, and uses almost no battery until then.',
+            confirmLabel: 'Allow',
+            cancelLabel: 'Not now',
+            destructive: false,
+          ));
     });
   }
 

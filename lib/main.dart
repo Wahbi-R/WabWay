@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/invite/invite_link_handler.dart';
 import 'core/location/location_sharing_manager.dart';
+import 'core/trail/trail_mode.dart';
 import 'core/notifications/notification_service.dart';
 import 'core/share/share_handler.dart';
 import 'screens/auth/auth_gate.dart';
@@ -40,6 +41,7 @@ Future<void> main() async {
   await ShareHandler.instance.init();
   if (!kIsWeb) await NotificationService.instance.init();
   if (!kIsWeb) LocationSharingManager.instance.init();
+  TrailMode.instance.init();
   await InviteLinkHandler.instance.init();
 
   runApp(const ProviderScope(child: WabwayApp()));

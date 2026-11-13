@@ -29,6 +29,8 @@ import '../widgets/wabway_confirm_dialog.dart';
 import '../widgets/widgets.dart';
 import 'members_screen.dart' show MembersList;
 import 'crew/whereabouts.dart';
+import 'trail_screen.dart';
+import '../core/trail/trail_mode.dart';
 
 class CrewScreen extends ConsumerStatefulWidget {
   const CrewScreen({super.key});
@@ -567,6 +569,14 @@ class _CrewScreenState extends ConsumerState<CrewScreen>
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         actions: [
+          if (TrailMode.supported)
+            IconButton(
+              tooltip: 'Trail mode — find the crew with no signal',
+              icon: const Icon(Icons.hiking_rounded),
+              color: kColorInkSoft,
+              onPressed: () => Navigator.push<void>(
+                  context, MaterialPageRoute(builder: (_) => const TrailScreen())),
+            ),
           Padding(
             padding: const EdgeInsets.only(right: kSpace4),
             child: _LocationToggle(

@@ -9,6 +9,7 @@ import 'accommodations/accommodations_screen.dart';
 import 'crew_screen.dart';
 import 'map_screen.dart';
 import 'nearby_screen.dart';
+import 'trail_screen.dart';
 import 'travel_screen.dart';
 import 'packing_screen.dart';
 import 'shopping/shopping_screen.dart';
@@ -185,6 +186,7 @@ class MoreScreen extends ConsumerWidget {
           const SizedBox(height: kSpace3),
           _ExploreGrid(items: [
             _ExploreItem(icon: Icons.near_me_rounded,       label: 'Nearby',    onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const NearbyScreen()))),
+            _ExploreItem(icon: Icons.hiking_rounded,        label: 'Trail',     onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const TrailScreen()))),
             _ExploreItem(icon: Icons.map_rounded,           label: 'Map',       onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const MapScreen()))),
             _ExploreItem(icon: Icons.flight_rounded,        label: 'Travel',    onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const TravelScreen()))),
             _ExploreItem(icon: Icons.photo_library_rounded, label: 'Photos',    onTap: () => Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const PhotosScreen()))),

@@ -23,7 +23,10 @@ class MainActivity : FlutterActivity() {
         private const val GEO_CHANNEL_ID = "geolocator_channel_01"
 
         const val STOP_ACTION = "ca.wabble.wabway.STOP_LOCATION_SHARING"
+        const val OPEN_TRAIL_ACTION = "ca.wabble.wabway.OPEN_TRAIL"
     }
+
+    private var trailChannel: TrailChannel? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -75,6 +78,9 @@ class MainActivity : FlutterActivity() {
             }
         }
 
+        // ── Trail mode (offline crew finder over Bluetooth) ─────────────────
+        trailChannel = TrailChannel(this, flutterEngine.dartExecutor.binaryMessenger)
+
         // ── Location sharing channel ─────────────────────────────────────────
         locationSharingChannel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
@@ -115,8 +121,17 @@ class MainActivity : FlutterActivity() {
         NotificationManagerCompat.from(this).notify(GEO_NOTIFICATION_ID, notification)
     }
 
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        if (trailChannel?.onPermissionsResult(requestCode, grantResults) == true) return
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        if (intent.action == OPEN_TRAIL_ACTION) {
+            trailChannel?.openTrail()
+            return
+        }
         val url = intent.dataString
         if (url != null) {
             linksChannel?.invokeMethod("onNewLink", url)
@@ -126,6 +141,7 @@ class MainActivity : FlutterActivity() {
     override fun onDestroy() {
         locationSharingChannel = null
         linksChannel = null
+        trailChannel = null
         super.onDestroy()
     }
 }

@@ -11,6 +11,20 @@ import '../theme/app_text_theme.dart';
 const _kChangelog = <_Release>[
   _Release(
     version: '1.1.0',
+    build: 447,
+    label: "Trail mode: find each other with no signal",
+    changes: [
+      "New Trail mode (Crew → hiking icon, or More → Trail): see how far away each person is and which way, with no signal, using your phones' Bluetooth and GPS",
+      "An arrow turns with your phone to point at each person, with the distance and how fresh it is",
+      "Positions hop between phones: if you can reach Ana and Ana passed Sam, you see Sam too",
+      "Out of range? You still see where they were last and which way that was",
+      "Turn on \"Let the crew wake me\" and Trail mode switches itself on when someone nearby starts it, even with the app closed",
+      "Starting it while you still have signal sends the crew a notification to join",
+      "It turns itself off after 6 hours. Brand new, so tell us how far it reaches on your trail",
+    ],
+  ),
+  _Release(
+    version: '1.1.0',
     build: 446,
     label: "What's nearby, and where's everyone",
     changes: [

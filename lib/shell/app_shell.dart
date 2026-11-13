@@ -19,6 +19,8 @@ import '../screens/home_screen.dart';
 import '../screens/travel_screen.dart';
 import '../screens/map_screen.dart';
 import '../screens/nearby_screen.dart';
+import '../screens/trail_screen.dart';
+import '../core/trail/trail_mode.dart';
 import '../screens/accommodations/accommodations_screen.dart';
 import '../screens/packing_screen.dart';
 import '../screens/photos_screen.dart';
@@ -227,6 +229,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     super.initState();
     ShareHandler.instance.addListener(_onSharePending);
     if (!kIsWeb) NotificationService.instance.setTabSwitcher(_switchTab);
+    TrailMode.instance.openRequests.addListener(_openTrail);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _onSharePending();
       ChangelogService.maybeShowOnLaunch(context);
@@ -236,6 +239,7 @@ class _AppShellState extends ConsumerState<AppShell> {
   @override
   void dispose() {
     ShareHandler.instance.removeListener(_onSharePending);
+    TrailMode.instance.openRequests.removeListener(_openTrail);
     super.dispose();
   }
 
@@ -255,8 +259,15 @@ class _AppShellState extends ConsumerState<AppShell> {
     return i < 0 ? null : i;
   }
 
+  /// Trail mode notification tapped (push, or a crew member nearby turned it on).
+  void _openTrail() {
+    if (!mounted) return;
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const TrailScreen()));
+  }
+
   void _switchTab(String screenKey) {
     if (!mounted) return;
+    if (screenKey == 'trail') return _openTrail();
     final isDesktop = MediaQuery.sizeOf(context).width >= kDesktopBreakpoint;
     if (isDesktop) {
       final idx = _desktopIndexFor(screenKey);
